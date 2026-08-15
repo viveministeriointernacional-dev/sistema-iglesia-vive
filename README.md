@@ -21,6 +21,7 @@ relacional, auditoría de acciones sensibles y cola de eventos de integración.
 | Estilos | Tailwind CSS 4 con los design tokens del handoff |
 | Datos | PostgreSQL (Supabase) con Prisma 7 (adaptador `pg`) |
 | Autenticación | Supabase Auth (correo y contraseña) + roles en `app_user` |
+| Despliegue | Cloudflare Workers con OpenNext + Hyperdrive |
 
 ## Puesta en marcha
 
@@ -116,6 +117,62 @@ Del handoff y de `design/ESPECIFICACION_PRODUCTO.md`:
 - El historial es acumulativo: no se sobrescriben estados críticos en silencio.
 - Las notas pastorales son privadas frente al aprendiz (modeladas en
   `PrivateNote`; su pantalla llega con el expediente).
+
+## Despliegue en Cloudflare Workers
+
+La aplicación se despliega con [OpenNext](https://opennext.js.org/cloudflare),
+que empaqueta Next.js para workerd. La configuración está versionada
+(`wrangler.jsonc`, `open-next.config.ts`): no dejes que el asistente de Wrangler
+la genere en cada build.
+
+```bash
+npm run cf:preview   # build + Worker en local (usa .dev.vars)
+npm run cf:deploy    # build + despliegue
+```
+
+En **Workers Builds**, configura:
+
+| Ajuste | Valor |
+| --- | --- |
+| Build command | `npx opennextjs-cloudflare build` |
+| Deploy command | `npx wrangler deploy` |
+
+Variables del proyecto en el panel de Cloudflare:
+
+- `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — hacen
+  falta **en el build**, porque Next las inserta en el bundle del navegador.
+- `DATABASE_URL` — como *secret*, si no usas Hyperdrive.
+
+### Postgres desde el Worker
+
+Tres detalles que no son opcionales y que ya están resueltos en el repo:
+
+1. **Hyperdrive.** Un Worker no mantiene un pool de conexiones entre
+   invocaciones. Sin Hyperdrive, cada petición abre una conexión nueva contra
+   Supabase y el pooler se agota. Crea la configuración y añade el binding a
+   `wrangler.jsonc`:
+
+   ```bash
+   npx wrangler hyperdrive create iglesia-vive-db \
+     --connection-string="postgresql://postgres.PROYECTO:CONTRASENA@aws-0-REGION.pooler.supabase.com:5432/postgres"
+   ```
+
+   `src/lib/prisma.ts` toma la conexión del binding `HYPERDRIVE` cuando existe y
+   cae a `DATABASE_URL` en cualquier otro entorno.
+
+2. **Un cliente por petición.** workerd no deja usar un socket abierto durante
+   otra petición: el cliente se memoiza por petición en Cloudflare y como
+   singleton fuera de ahí.
+
+3. **El cliente de Prisma se genera dentro de `node_modules`**
+   (`@iglesia/prisma-client`) y está declarado en `serverExternalPackages`. Así
+   el bundler de Next no lo procesa y la resolución por condiciones elige la
+   variante `workerd`, que importa el compilador de consultas como módulo
+   WebAssembly. workerd no permite compilar WASM en caliente.
+
+El middleware se mantiene como `middleware.ts` (runtime edge) y no como el
+`proxy.ts` de Next 16: el proxy solo corre en Node y el adaptador de Cloudflare
+todavía no lo soporta.
 
 ## Estructura
 

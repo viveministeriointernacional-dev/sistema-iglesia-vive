@@ -7,8 +7,8 @@ import {
   MilestoneStatus,
   Operation72Status,
   Role,
-} from "@/generated/prisma";
-import { prisma } from "@/lib/prisma";
+} from "@iglesia/prisma-client";
+import { getPrisma } from "@/lib/prisma";
 import { auditar, encolarEventoIntegracion } from "@/lib/audit";
 import {
   ErrorDePermiso,
@@ -25,6 +25,7 @@ export type ResultadoAccion = { ok: true } | { ok: false; mensaje: string };
 /// Un consolidador solo opera sobre las personas que tiene asignadas; pastor y
 /// administrador ven y operan toda la iglesia.
 async function cargarOperacion(id: string, usuario: UsuarioSesion) {
+  const prisma = await getPrisma();
   const operacion = await prisma.operation72.findUnique({
     where: { id },
     select: {
@@ -90,6 +91,8 @@ export async function avanzarOperacion72(
     [Operation72Status.CONTACTADA]: "operacion72.visita_agendada",
     [Operation72Status.VISITA_PENDIENTE]: "operacion72.visita_cerrada",
   } as const;
+
+  const prisma = await getPrisma();
 
   await prisma.$transaction(async (tx) => {
     const proximo = transicion.siguiente;
@@ -182,6 +185,7 @@ export async function entregarAMentor(
   }
 
   const ahora = new Date();
+  const prisma = await getPrisma();
 
   await prisma.$transaction(async (tx) => {
     await tx.mentorRelationship.create({

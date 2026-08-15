@@ -46,3 +46,8 @@ next-env.d.ts
 # Reglas para agentes generadas por Next
 /AGENTS.md
 /CLAUDE.md
+
+# Cloudflare / OpenNext
+.open-next/
+.wrangler/
+.dev.vars

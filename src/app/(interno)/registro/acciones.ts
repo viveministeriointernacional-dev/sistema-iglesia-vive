@@ -8,8 +8,8 @@ import {
   MilestoneStatus,
   Role,
   type Prisma,
-} from "@/generated/prisma";
-import { prisma } from "@/lib/prisma";
+} from "@iglesia/prisma-client";
+import { getPrisma } from "@/lib/prisma";
 import { auditar, encolarEventoIntegracion } from "@/lib/audit";
 import { ErrorDePermiso, requerirRolEnAccion, ROLES_CONSOLIDACION } from "@/lib/auth";
 import { asignarConsolidador } from "@/lib/asignacion";
@@ -47,6 +47,7 @@ export async function buscarInvitador(
   if (texto.length < 2) return [];
 
   const digitos = normalizarTelefono(texto);
+  const prisma = await getPrisma();
 
   const personas = await prisma.person.findMany({
     where: {
@@ -116,6 +117,7 @@ async function buscarDuplicados(datos: {
 
   if (telefonos.length === 0 && !datos.email) return [];
 
+  const prisma = await getPrisma();
   const filas = await prisma.$queryRaw<
     { id: string; first_name: string; last_name: string; call_phone: string | null; por_telefono: boolean }[]
   >`
@@ -171,6 +173,7 @@ export async function guardarRegistro(
   }
 
   const datos = analisis.data;
+  const prisma = await getPrisma();
 
   if (!opciones.confirmadoNoDuplicado) {
     const duplicados = await buscarDuplicados(datos);

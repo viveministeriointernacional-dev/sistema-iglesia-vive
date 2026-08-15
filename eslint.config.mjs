@@ -12,8 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
-    // Prisma Client generado.
-    "src/generated/**",
+    // Salida del adaptador de Cloudflare.
+    ".open-next/**",
+    ".wrangler/**",
   ]),
 ]);
 

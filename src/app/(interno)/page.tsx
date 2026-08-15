@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Role } from "@/generated/prisma";
+import { Role } from "@iglesia/prisma-client";
 import { requerirUsuario } from "@/lib/auth";
 
 export default async function Inicio() {

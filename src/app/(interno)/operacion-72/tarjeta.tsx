@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Operation72Status } from "@/generated/prisma";
+import { Operation72Status } from "@iglesia/prisma-client";
 import { avanzarOperacion72, entregarAMentor } from "./acciones";
 
 export type TarjetaPersona = {

@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { Role } from "@/generated/prisma";
-import { prisma } from "@/lib/prisma";
+import { Role } from "@iglesia/prisma-client";
+import { getPrisma } from "@/lib/prisma";
 import { requerirRol, ROLES_CONSOLIDACION } from "@/lib/auth";
 import { ETIQUETA_ENTRADA, nombreCompleto } from "@/lib/dominio";
 import {
@@ -21,6 +21,7 @@ export const dynamic = "force-dynamic";
 export default async function TableroOperacion72() {
   const usuario = await requerirRol(ROLES_CONSOLIDACION);
   const ahora = new Date();
+  const prisma = await getPrisma();
 
   // Alcance por red: el consolidador ve solo sus personas asignadas.
   const operaciones = await prisma.operation72.findMany({

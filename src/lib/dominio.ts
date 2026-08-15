@@ -1,4 +1,4 @@
-import { CallSchedule, EntryPoint, Gender, InvitationKind } from "@/generated/prisma";
+import { CallSchedule, EntryPoint, Gender, InvitationKind } from "@iglesia/prisma-client";
 
 /// Etiquetas de los seis puntos de entrada del paso 3 del registro, en el orden
 /// del diseño (rejilla 3×2).

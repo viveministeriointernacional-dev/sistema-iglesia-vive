@@ -1,8 +1,6 @@
-import { Gender, Operation72Status, Role, type Prisma } from "@/generated/prisma";
-import { prisma } from "@/lib/prisma";
+import { Gender, Role } from "@iglesia/prisma-client";
+import type { ClientePrisma } from "@/lib/prisma";
 import { ESTADOS_EN_TABLERO } from "@/lib/op72";
-
-type ClientePrisma = Prisma.TransactionClient | typeof prisma;
 
 export type CargaDeUsuario = {
   id: string;
@@ -206,5 +204,3 @@ async function mentorDeLaLinea(db: ClientePrisma, invitadorPersonId: string) {
     carga,
   };
 }
-
-export { Operation72Status };

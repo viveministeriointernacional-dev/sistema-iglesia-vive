@@ -1,4 +1,4 @@
-import { Operation72Status } from "@/generated/prisma";
+import { Operation72Status } from "@iglesia/prisma-client";
 
 export const DURACION_OPERACION_72_HORAS = 72;
 const MS_POR_HORA = 3_600_000;

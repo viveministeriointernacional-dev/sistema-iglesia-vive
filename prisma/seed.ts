@@ -20,7 +20,7 @@ import {
   Operation72Status,
   PrismaClient,
   Role,
-} from "../src/generated/prisma";
+} from "@iglesia/prisma-client";
 import { TEMAS_CASA_DE_FE } from "../src/lib/dominio";
 
 for (const archivo of [".env.local", ".env"]) {
