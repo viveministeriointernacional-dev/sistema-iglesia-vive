@@ -42,3 +42,7 @@ next-env.d.ts
 
 # Prisma Client generado
 /src/generated
+
+# Reglas para agentes generadas por Next
+/AGENTS.md
+/CLAUDE.md
