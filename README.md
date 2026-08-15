@@ -130,12 +130,17 @@ npm run cf:preview   # build + Worker en local (usa .dev.vars)
 npm run cf:deploy    # build + despliegue
 ```
 
-En **Workers Builds**, configura:
+En **Workers Builds**, basta con el comando de despliegue:
 
 | Ajuste | Valor |
 | --- | --- |
-| Build command | `npx opennextjs-cloudflare build` |
-| Deploy command | `npx wrangler deploy` |
+| Deploy command | `npm run cf:deploy` |
+| Build command | *(vacío)* |
+
+`cf:deploy` compila y despliega en un solo paso. Si prefieres separarlos, pon
+`npx opennextjs-cloudflare build` como build command y `npx wrangler deploy`
+como deploy command; lo que no funciona es dejar el build vacío con
+`npx wrangler deploy`, porque OpenNext no encuentra nada compilado.
 
 Variables del proyecto en el panel de Cloudflare:
 
