@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+/* Design tokens del handoff (design/README.md § Design Tokens). */
+@theme {
+  --color-azul-900: #0e2a4e;
+  --color-azul-700: #1b4a7a;
+  --color-azul-100: #e7eef6;
+  --color-azul-050: #eaf0f7;
+  --color-verde-700: #4f7038;
+  --color-verde-600: #4c7a5a;
+  --color-verde-500: #6e9a55;
+  --color-verde-100: #eef4e8;
+  --color-verde-050: #f5f8f1;
+  --color-savia: #c8e0a8;
+  --color-bosque-900: #1f3b2b;
+  --color-bosque-100: #e6ebdd;
+  --color-bosque-050: #eef1e8;
+  --color-papel: #f6f4ef;
+  --color-escritorio: #e9e6df;
+  --color-tinta: #131c24;
+  --color-ambar-fondo: #fdf3e6;
+  --color-ambar-chip: #fdf1e3;
+  --color-ambar-texto: #a9691f;
+  --color-ambar-barra: #c97b2c;
+  --color-rojo-fondo: #fbe9e4;
+  --color-rojo: #b4462f;
+
+  --font-sans: var(--fuente-manrope), system-ui, sans-serif;
+  --font-serif: var(--fuente-newsreader), Georgia, serif;
+}
+
+@theme inline {
+  --color-tinta-55: rgba(19, 28, 36, 0.55);
+  --color-tinta-42: rgba(19, 28, 36, 0.42);
+  --color-borde-tarjeta: rgba(19, 28, 36, 0.09);
+  --color-borde-control: rgba(19, 28, 36, 0.18);
+}
+
+body {
+  margin: 0;
+  background: var(--color-escritorio);
+  color: var(--color-tinta);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer components {
+  /* Tarjeta blanca de escritorio */
+  .tarjeta {
+    @apply rounded-[14px] border border-[rgba(19,28,36,.09)] bg-white;
+  }
+
+  /* Etiqueta en versalitas sobre un grupo de campos */
+  .etiqueta-campo {
+    @apply text-[11.5px] leading-none font-semibold text-[rgba(19,28,36,.5)];
+  }
+
+  .etiqueta-seccion {
+    @apply text-[10px] leading-none font-bold tracking-[.16em] text-[rgba(19,28,36,.42)];
+  }
+
+  /* Input de una línea del registro */
+  .campo {
+    @apply mt-[7px] w-full rounded-[9px] border border-[rgba(19,28,36,.18)] bg-white
+      px-[13px] py-3 text-[13.5px] leading-[1.2] font-semibold text-tinta outline-none
+      placeholder:font-medium placeholder:text-[rgba(19,28,36,.35)]
+      focus:border-azul-900;
+  }
+
+  .campo-opcional {
+    @apply border-dashed border-[rgba(19,28,36,.24)];
+  }
+
+  /* Botón-opción (género, horario, punto de entrada, invitación) */
+  .opcion {
+    @apply cursor-pointer rounded-[9px] border border-[rgba(19,28,36,.18)] bg-white
+      text-[13px] leading-none font-semibold text-[rgba(19,28,36,.55)]
+      transition-colors;
+  }
+
+  .opcion[aria-pressed="true"] {
+    @apply border-[1.5px] border-azul-900 bg-azul-050 text-tinta;
+  }
+
+  .opcion-amplia {
+    @apply rounded-[11px] px-3 py-[15px] text-left leading-[1.25];
+  }
+
+  .boton-primario {
+    @apply cursor-pointer rounded-[10px] border-0 bg-azul-900 px-5 py-[13px]
+      text-[13px] leading-none font-bold text-white
+      disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .boton-secundario {
+    @apply cursor-pointer rounded-[10px] border border-[rgba(19,28,36,.18)] bg-transparent
+      px-[18px] py-[13px] text-[13px] leading-none font-semibold text-tinta;
+  }
+
+  .aviso-ambar {
+    @apply rounded-[10px] border border-[rgba(201,123,44,.3)] bg-ambar-fondo px-[15px] py-[14px];
+  }
+}
