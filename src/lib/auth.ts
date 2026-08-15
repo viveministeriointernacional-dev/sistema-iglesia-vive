@@ -1,0 +1,119 @@
+import { cache } from "react";
+import { redirect } from "next/navigation";
+import { Role } from "@/generated/prisma";
+import { prisma } from "@/lib/prisma";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+export type UsuarioSesion = {
+  id: string;
+  email: string;
+  fullName: string;
+  role: Role;
+  personId: string | null;
+  teamId: string | null;
+};
+
+export const ETIQUETA_ROL: Record<Role, string> = {
+  APRENDIZ: "Aprendiz",
+  CONSOLIDADOR: "Consolidador",
+  LIDER_ALPHA: "Líder Alpha",
+  MENTOR: "Mentor",
+  PASTOR: "Pastor",
+  ADMIN: "Administrador",
+};
+
+/// Quién puede operar el tablero de Operación 72 y registrar personas nuevas.
+export const ROLES_CONSOLIDACION: Role[] = [
+  Role.CONSOLIDADOR,
+  Role.PASTOR,
+  Role.ADMIN,
+];
+
+/// Quién puede confirmar la entrega a mentor. La asignación la propone el
+/// sistema; la decisión final la confirma un líder
+/// (ESPECIFICACION_PRODUCTO.md §5.6).
+export const ROLES_CONFIRMAN_ENTREGA: Role[] = [
+  Role.MENTOR,
+  Role.PASTOR,
+  Role.ADMIN,
+];
+
+/// Usuario autenticado en Supabase resuelto contra `app_user`.
+///
+/// El acceso es por invitación: el correo debe existir en `app_user` con un rol
+/// asignado. En el primer inicio de sesión se enlaza el `auth_user_id`.
+export const obtenerUsuarioActual = cache(
+  async (): Promise<UsuarioSesion | null> => {
+    const supabase = await createSupabaseServerClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user?.email) return null;
+
+    const registro = await prisma.appUser.findUnique({
+      where: { email: user.email.toLowerCase() },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        role: true,
+        personId: true,
+        teamId: true,
+        active: true,
+        authUserId: true,
+      },
+    });
+
+    if (!registro || !registro.active) return null;
+
+    if (registro.authUserId !== user.id) {
+      if (registro.authUserId && registro.authUserId !== user.id) {
+        // Otro usuario de Supabase ya está enlazado a este registro: no se
+        // reasigna en silencio.
+        return null;
+      }
+      await prisma.appUser.update({
+        where: { id: registro.id },
+        data: { authUserId: user.id },
+      });
+    }
+
+    return {
+      id: registro.id,
+      email: registro.email,
+      fullName: registro.fullName,
+      role: registro.role,
+      personId: registro.personId,
+      teamId: registro.teamId,
+    };
+  },
+);
+
+export async function requerirUsuario(): Promise<UsuarioSesion> {
+  const usuario = await obtenerUsuarioActual();
+  if (!usuario) redirect("/ingresar?motivo=sin-acceso");
+  return usuario;
+}
+
+export async function requerirRol(roles: Role[]): Promise<UsuarioSesion> {
+  const usuario = await requerirUsuario();
+  if (!roles.includes(usuario.role)) redirect("/sin-permiso");
+  return usuario;
+}
+
+export class ErrorDePermiso extends Error {
+  constructor(mensaje = "No tienes permiso para esta acción.") {
+    super(mensaje);
+    this.name = "ErrorDePermiso";
+  }
+}
+
+/// Variante para Server Actions: lanza en vez de redirigir, para poder
+/// devolver el error al formulario.
+export async function requerirRolEnAccion(roles: Role[]): Promise<UsuarioSesion> {
+  const usuario = await obtenerUsuarioActual();
+  if (!usuario) throw new ErrorDePermiso("Tu sesión expiró. Vuelve a entrar.");
+  if (!roles.includes(usuario.role)) throw new ErrorDePermiso();
+  return usuario;
+}

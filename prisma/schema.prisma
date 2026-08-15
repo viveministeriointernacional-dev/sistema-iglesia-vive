@@ -1,0 +1,397 @@
+// Sistema de Transformación y Propósito — Iglesia Vive
+// Modelo de datos base (ver design/ESPECIFICACION_PRODUCTO.md §17).
+//
+// Regla arquitectónica crítica (ARQUITECTURA_VISUAL.md §11): la relación de
+// discipulado NO es un campo `mentorId` en Person. Es la entidad
+// MentorRelationship con historial (desde, hasta, motivo, quién autorizó).
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------- Identidad
+
+enum Role {
+  APRENDIZ
+  CONSOLIDADOR
+  LIDER_ALPHA
+  MENTOR
+  PASTOR
+  ADMIN
+}
+
+enum Gender {
+  MUJER
+  HOMBRE
+}
+
+/// Usuario de la plataforma. La autenticación vive en Supabase Auth; aquí
+/// guardamos el rol y el vínculo con la persona. `authUserId` se enlaza en el
+/// primer inicio de sesión a partir del correo pre-aprovisionado.
+model AppUser {
+  id         String   @id @default(uuid())
+  authUserId String?  @unique @map("auth_user_id") @db.Uuid
+  email      String   @unique
+  fullName   String   @map("full_name")
+  role       Role
+  active     Boolean  @default(true)
+  /// Capacidad máxima de acompañamiento simultáneo (consolidador / mentor).
+  capacity   Int      @default(12)
+  personId   String?  @unique @map("person_id")
+  teamId     String?  @map("team_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  person Person? @relation(fields: [personId], references: [id])
+  team   Team?   @relation(fields: [teamId], references: [id])
+
+  consolidadorDe    LearnerProfile[]      @relation("ConsolidadorAsignado")
+  relacionesComoMentor MentorRelationship[] @relation("MentorDeRelacion")
+  relacionesAutorizadas MentorRelationship[] @relation("AutorizadaPor")
+  op72Propuestas    Operation72[]         @relation("MentorPropuesto")
+  contactosRegistrados ContactAttempt[]
+  notasEscritas     PrivateNote[]
+  hitosRegistrados  Milestone[]
+  registrosCreados  LearnerProfile[]      @relation("RegistradaPor")
+  auditoria         AuditLog[]
+
+  @@index([role, active])
+  @@map("app_user")
+}
+
+model Team {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  members  AppUser[]
+  learners LearnerProfile[]
+
+  @@map("team")
+}
+
+// ----------------------------------------------------------------- Personas
+
+enum EntryPoint {
+  SERVICIO_DOMINICAL
+  SERVICIO_MIERCOLES
+  REDES_SOCIALES
+  ALPHA_CASA_DE_FE
+  EVENTO_O_BRIGADA
+  UNO_A_UNO
+}
+
+enum InvitationKind {
+  PERSONA
+  REDES
+  DESCONOCIDO
+}
+
+enum CallSchedule {
+  MANANA
+  TARDE
+  NOCHE
+}
+
+/// Identidad de una persona. Los teléfonos se conservan por tipo
+/// (ESPECIFICACION_PRODUCTO.md §20).
+model Person {
+  id           String        @id @default(uuid())
+  firstName    String        @map("first_name")
+  lastName     String        @map("last_name")
+  gender       Gender
+  birthDate    DateTime?     @map("birth_date") @db.Date
+  callPhone    String?       @map("call_phone")
+  whatsappPhone String?      @map("whatsapp_phone")
+  email        String?
+  address      String?
+  prayerRequest String?      @map("prayer_request")
+  photoUrl     String?       @map("photo_url")
+  callSchedule CallSchedule? @map("call_schedule")
+  active       Boolean       @default(true)
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  user           AppUser?
+  learnerProfile LearnerProfile?
+  invitados      LearnerProfile[] @relation("InvitadaPor")
+
+  @@index([callPhone])
+  @@index([whatsappPhone])
+  @@index([email])
+  @@map("person")
+}
+
+enum Phase {
+  GANAR
+  FORTALECER
+  ENTRENAR
+  MULTIPLICAR
+}
+
+enum LearnerStatus {
+  ACTIVO
+  PAUSADO
+  RETIRADO
+  GRADUADO
+}
+
+/// Expediente vivo del aprendiz.
+model LearnerProfile {
+  id             String         @id @default(uuid())
+  personId       String         @unique @map("person_id")
+  phase          Phase          @default(GANAR)
+  status         LearnerStatus  @default(ACTIVO)
+  phaseStartedAt DateTime       @default(now()) @map("phase_started_at")
+
+  // Origen
+  entryPoint     EntryPoint     @map("entry_point")
+  invitationKind InvitationKind @map("invitation_kind")
+  invitedByPersonId String?     @map("invited_by_person_id")
+  /// Línea de origen conservada cuando hay invitador conocido.
+  lineOfOrigin   String?        @map("line_of_origin")
+  originNotes    String?        @map("origin_notes")
+
+  consolidatorId String?        @map("consolidator_id")
+  teamId         String?        @map("team_id")
+  registeredById String?        @map("registered_by_id")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  person         Person   @relation(fields: [personId], references: [id])
+  invitedBy      Person?  @relation("InvitadaPor", fields: [invitedByPersonId], references: [id])
+  consolidator   AppUser? @relation("ConsolidadorAsignado", fields: [consolidatorId], references: [id])
+  team           Team?    @relation(fields: [teamId], references: [id])
+  registeredBy   AppUser? @relation("RegistradaPor", fields: [registeredById], references: [id])
+
+  operation72        Operation72?
+  mentorRelationships MentorRelationship[]
+  milestones          Milestone[]
+  privateNotes        PrivateNote[]
+  faithHouseProgress  FaithHouseProgress[]
+
+  @@index([phase, status])
+  @@map("learner_profile")
+}
+
+/// Historial de discipulado: quién fue mentor, desde cuándo, hasta cuándo,
+/// por qué cambió y quién autorizó el cambio.
+model MentorRelationship {
+  id              String    @id @default(uuid())
+  learnerId       String    @map("learner_id")
+  mentorId        String    @map("mentor_id")
+  startedAt       DateTime  @default(now()) @map("started_at")
+  endedAt         DateTime? @map("ended_at")
+  reason          String?
+  authorizedById  String?   @map("authorized_by_id")
+  /// true cuando se conservó la línea del invitador.
+  keepsLine       Boolean   @default(false) @map("keeps_line")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  learner      LearnerProfile @relation(fields: [learnerId], references: [id])
+  mentor       AppUser        @relation("MentorDeRelacion", fields: [mentorId], references: [id])
+  authorizedBy AppUser?       @relation("AutorizadaPor", fields: [authorizedById], references: [id])
+
+  @@index([learnerId, endedAt])
+  @@index([mentorId, endedAt])
+  @@map("mentor_relationship")
+}
+
+// ------------------------------------------------------------ Operación 72
+
+enum Operation72Status {
+  INICIADA
+  CONTACTADA
+  VISITA_PENDIENTE
+  LISTA_PARA_ENTREGA
+  ENTREGADA
+  CERRADA
+}
+
+model Operation72 {
+  id          String            @id @default(uuid())
+  learnerId   String            @unique @map("learner_id")
+  status      Operation72Status @default(INICIADA)
+  startedAt   DateTime          @default(now()) @map("started_at")
+  /// startedAt + 72 h. Las horas restantes se calculan siempre en servidor.
+  deadlineAt  DateTime          @map("deadline_at")
+  deliveredAt DateTime?         @map("delivered_at")
+  /// Resumen corto que se muestra en la tarjeta del tablero.
+  detail      String
+  /// true = llegó con invitador conocido y se conserva la línea.
+  lineKnown   Boolean           @default(false) @map("line_known")
+  proposedMentorId     String?  @map("proposed_mentor_id")
+  proposedMentorNote   String?  @map("proposed_mentor_note")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  learner        LearnerProfile @relation(fields: [learnerId], references: [id])
+  proposedMentor AppUser?       @relation("MentorPropuesto", fields: [proposedMentorId], references: [id])
+  attempts       ContactAttempt[]
+
+  @@index([status, deadlineAt])
+  @@map("operation72")
+}
+
+enum ContactType {
+  LLAMADA
+  INTENTO_LLAMADA
+  MENSAJE
+  CONVERSACION
+  VISITA
+  INTENTO_VISITA
+}
+
+model ContactAttempt {
+  id           String      @id @default(uuid())
+  operation72Id String     @map("operation72_id")
+  type         ContactType
+  result       String?
+  note         String?
+  nextAction   String?     @map("next_action")
+  occurredAt   DateTime    @default(now()) @map("occurred_at")
+  byUserId     String?     @map("by_user_id")
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  operation72 Operation72 @relation(fields: [operation72Id], references: [id], onDelete: Cascade)
+  byUser      AppUser?    @relation(fields: [byUserId], references: [id])
+
+  @@index([operation72Id, occurredAt])
+  @@map("contact_attempt")
+}
+
+// ----------------------------------------------------- Hitos, notas, Casa de Fe
+
+enum MilestoneKind {
+  REGISTRO
+  OPERACION_72
+  ALPHA
+  FOCUS_DAY
+  CASA_DE_FE
+  BAUTISMO
+  ENCUENTRO
+  EVALUACION_CIERRE
+  GRADUACION
+  VALIDACION_PASTORAL
+  ENTRADA_ESCUELA
+  SERVICIO
+  MULTIPLICACION
+}
+
+enum MilestoneStatus {
+  PENDIENTE
+  EN_CURSO
+  COMPLETADO
+}
+
+model Milestone {
+  id           String          @id @default(uuid())
+  learnerId    String          @map("learner_id")
+  kind         MilestoneKind
+  status       MilestoneStatus @default(PENDIENTE)
+  achievedAt   DateTime?       @map("achieved_at")
+  detail       String?
+  /// Ninguna transición es automática: siempre queda el responsable humano.
+  recordedById String?         @map("recorded_by_id")
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  learner    LearnerProfile @relation(fields: [learnerId], references: [id])
+  recordedBy AppUser?       @relation(fields: [recordedById], references: [id])
+
+  @@unique([learnerId, kind])
+  @@map("milestone")
+}
+
+/// Privadas frente al aprendiz. Visibles para su mentor, su consolidador y el
+/// líder responsable de la línea. Cada apertura se audita.
+model PrivateNote {
+  id        String   @id @default(uuid())
+  learnerId String   @map("learner_id")
+  authorId  String   @map("author_id")
+  kind      String
+  body      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  learner LearnerProfile @relation(fields: [learnerId], references: [id])
+  author  AppUser        @relation(fields: [authorId], references: [id])
+
+  @@index([learnerId, createdAt])
+  @@map("private_note")
+}
+
+enum FaithHouseStatus {
+  PENDIENTE
+  EN_PROCESO
+  COMPLETADO
+  REQUIERE_SEGUIMIENTO
+}
+
+/// 12 temas obligatorios, orden flexible decidido por el mentor.
+model FaithHouseTopic {
+  id       String @id @default(uuid())
+  number   Int    @unique
+  name     String
+
+  progress FaithHouseProgress[]
+
+  @@map("faith_house_topic")
+}
+
+model FaithHouseProgress {
+  id          String           @id @default(uuid())
+  learnerId   String           @map("learner_id")
+  topicId     String           @map("topic_id")
+  status      FaithHouseStatus @default(PENDIENTE)
+  completedAt DateTime?        @map("completed_at")
+  notes       String?
+
+  learner LearnerProfile  @relation(fields: [learnerId], references: [id])
+  topic   FaithHouseTopic @relation(fields: [topicId], references: [id])
+
+  @@unique([learnerId, topicId])
+  @@map("faith_house_progress")
+}
+
+// ---------------------------------------------- Auditoría e integraciones
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?  @map("actor_id")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  actor AppUser? @relation(fields: [actorId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_log")
+}
+
+enum IntegrationStatus {
+  PENDIENTE
+  ENVIADO
+  ERROR
+}
+
+/// Cola de eventos de dominio hacia GoHighLevel / WhatsApp.
+model IntegrationEvent {
+  id        String            @id @default(uuid())
+  event     String
+  payload   Json
+  status    IntegrationStatus @default(PENDIENTE)
+  attempts  Int               @default(0)
+  lastError String?           @map("last_error")
+  sentAt    DateTime?         @map("sent_at")
+  createdAt DateTime          @default(now()) @map("created_at")
+
+  @@index([status, createdAt])
+  @@map("integration_event")
+}

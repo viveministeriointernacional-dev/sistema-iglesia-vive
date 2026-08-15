@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#e9e6df;font-family:"Manrope",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#1b4a7a}a:hover{color:#0e2a4e}
+input,textarea,button{font-family:inherit}
+</style></helmet>
+
+<template id="__bundler_thumbnail"><svg viewBox="0 0 240 160" xmlns="http://www.w3.org/2000/svg"><rect width="240" height="160" fill="#0e2a4e"/><g transform="translate(72,48)"><rect width="96" height="64" rx="14" fill="#cfe3bc"/><text x="48" y="41" text-anchor="middle" font-family="Manrope,system-ui,sans-serif" font-size="26" font-weight="700" fill="#0e2a4e">IV</text></g></svg></template>
+<div style="min-height:100vh;background:#e9e6df">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 26px;background:#0e2a4e;color:#fff;position:sticky;top:0;z-index:10">
+    <div style="display:flex;align-items:center;gap:26px">
+      <div style="display:flex;align-items:center;gap:10px"><div style="width:26px;height:26px;border-radius:7px;background:#fff;color:#0e2a4e;display:grid;place-items:center;font:700 8px/1 'Manrope'">LOGO</div><span style="font:700 12px/1 'Manrope';letter-spacing:.14em;text-transform:uppercase">Iglesia Vive</span></div>
+      <div style="display:flex;gap:6px">
+        <button onClick="{{ verAprendiz }}" style="border:0;padding:8px 13px;border-radius:8px;background:{{ bgAprendiz }};color:#fff;font:600 12.5px/1 'Manrope';cursor:pointer">Aprendiz</button>
+        <button onClick="{{ verRegistro }}" style="border:0;padding:8px 13px;border-radius:8px;background:{{ bgRegistro }};color:#fff;font:600 12.5px/1 'Manrope';cursor:pointer">Registro</button>
+        <button onClick="{{ verOp72 }}" style="border:0;padding:8px 13px;border-radius:8px;background:{{ bgOp72 }};color:#fff;font:600 12.5px/1 'Manrope';cursor:pointer">Operación 72</button>
+        <button onClick="{{ verPerfil }}" style="border:0;padding:8px 13px;border-radius:8px;background:{{ bgPerfil }};color:#fff;font:600 12.5px/1 'Manrope';cursor:pointer">Expediente</button>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;font:600 12px/1 'Manrope'"><span style="color:rgba(255,255,255,.55)">{{ usuario }}</span><div style="width:26px;height:26px;border-radius:50%;background:#cfe3bc;color:#0e2a4e;display:grid;place-items:center;font:700 10px/1 'Manrope'">{{ iniciales }}</div></div>
+  </div>
+
+  <sc-if value="{{ esAprendiz }}" hint-placeholder-val="{{ true }}">
+  <div style="padding:34px 20px 60px;display:grid;place-items:start center">
+    <div style="width:390px;background:#eef1e8;color:#1c2a20;border-radius:26px;overflow:hidden;box-shadow:0 20px 44px -20px rgba(20,40,28,.45)">
+      <div style="padding:22px 22px 26px;background:#1f3b2b;color:#eef1e8;border-radius:0 0 30px 30px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="display:flex;align-items:center;gap:9px"><div style="width:24px;height:24px;border-radius:7px;background:#eef1e8;color:#1f3b2b;display:grid;place-items:center;font:700 7.5px/1 'Manrope'">LOGO</div><span style="font:600 11px/1 'Manrope';letter-spacing:.16em;text-transform:uppercase;opacity:.6">Iglesia Vive</span></div>
+          <div style="width:30px;height:30px;border-radius:10px;background:rgba(238,241,232,.14);display:grid;place-items:center;font:600 11px/1 'Manrope'">PP</div>
+        </div>
+        <div style="margin-top:24px;font:600 10px/1 'Manrope';letter-spacing:.18em;color:#c8e0a8">ESTA SEMANA</div>
+        <div style="margin-top:12px;font:300 31px/1.15 'Newsreader',serif">Tema 9 con Felipe:<br>el perdón que libera.</div>
+        <div style="margin-top:18px;display:flex;align-items:center;gap:11px">
+          <div style="width:36px;height:36px;border-radius:12px;background:rgba(238,241,232,.14);display:grid;place-items:center;font:600 11px/1 'Manrope'">FC</div>
+          <div><div style="font:600 12.5px/1.2 'Manrope'">Jueves 6:30 pm</div><div style="margin-top:3px;font:500 11.5px/1.2 'Manrope';opacity:.6">Casa de Felipe · Laureles</div></div>
+        </div>
+        <div style="margin-top:18px;display:flex;gap:9px">
+          <button onClick="{{ confirmar }}" style="flex:1;border:0;padding:13px;border-radius:13px;background:{{ confirmarBg }};color:{{ confirmarColor }};font:700 13px/1 'Manrope';cursor:pointer">{{ confirmarTexto }}</button>
+          <button style="border:0;padding:13px 15px;border-radius:13px;background:rgba(238,241,232,.14);color:#eef1e8;font:600 13px/1 'Manrope';cursor:pointer">Preparar</button>
+        </div>
+        <div style="margin-top:22px;display:flex;gap:6px">
+          <div style="flex:1"><div style="height:5px;border-radius:3px;background:#c8e0a8"></div><div style="margin-top:8px;font:600 9.5px/1 'Manrope';letter-spacing:.1em;opacity:.75">GANAR</div></div>
+          <div style="flex:1"><div style="height:5px;border-radius:3px;background:linear-gradient(90deg,#c8e0a8 66%,rgba(238,241,232,.2) 66%)"></div><div style="margin-top:8px;font:600 9.5px/1 'Manrope';letter-spacing:.1em">FORTALECER</div></div>
+          <div style="flex:1"><div style="height:5px;border-radius:3px;background:rgba(238,241,232,.2)"></div><div style="margin-top:8px;font:600 9.5px/1 'Manrope';letter-spacing:.1em;opacity:.4">ENTRENAR</div></div>
+          <div style="flex:1"><div style="height:5px;border-radius:3px;background:rgba(238,241,232,.2)"></div><div style="margin-top:8px;font:600 9.5px/1 'Manrope';letter-spacing:.1em;opacity:.4">MULTIPLICAR</div></div>
+        </div>
+      </div>
+
+      <div style="padding:22px">
+        <div style="padding:20px;border-radius:22px;background:#fff">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><div style="font:700 10px/1 'Manrope';letter-spacing:.16em;color:#4c7a5a">CASA DE FE</div><div style="font:600 11.5px/1 'Manrope';color:rgba(28,42,32,.45)">8 de 12</div></div>
+          <div style="margin-top:14px;display:grid;grid-template-columns:repeat(12,1fr);gap:4px">
+            <div style="height:30px;border-radius:5px;background:#4c7a5a"></div><div style="height:30px;border-radius:5px;background:#4c7a5a"></div><div style="height:30px;border-radius:5px;background:#4c7a5a"></div><div style="height:30px;border-radius:5px;background:#4c7a5a"></div><div style="height:30px;border-radius:5px;background:#4c7a5a"></div><div style="height:30px;border-radius:5px;background:#4c7a5a"></div><div style="height:30px;border-radius:5px;background:#4c7a5a"></div><div style="height:30px;border-radius:5px;background:#4c7a5a"></div>
+            <div style="height:30px;border-radius:5px;background:#c8e0a8"></div><div style="height:30px;border-radius:5px;background:rgba(28,42,32,.1)"></div><div style="height:30px;border-radius:5px;background:rgba(28,42,32,.1)"></div><div style="height:30px;border-radius:5px;background:rgba(28,42,32,.1)"></div>
+          </div>
+          <div style="margin-top:12px;font:500 12px/1.5 'Manrope';color:rgba(28,42,32,.55)">Cuatro temas para cerrar. El orden lo decide tu mentor.</div>
+        </div>
+
+        <div style="margin-top:12px;border-radius:22px;overflow:hidden;background:#fff">
+          <div style="height:104px;background:repeating-linear-gradient(135deg,#dfe6d5 0 12px,#d6dfca 12px 24px);display:grid;place-items:center;font:500 10.5px/1 'Manrope';letter-spacing:.12em;color:rgba(28,42,32,.4)">IMAGEN DEVOCIONAL</div>
+          <div style="padding:18px">
+            <div style="font:700 10px/1 'Manrope';letter-spacing:.16em;color:#4c7a5a">DEVOCIONAL DE HOY</div>
+            <div style="margin-top:8px;font:400 20px/1.25 'Newsreader',serif">Lo que se siembra en silencio</div>
+            <div style="margin-top:6px;font:500 12px/1.5 'Manrope';color:rgba(28,42,32,.55)">Gálatas 6:9 · 3 min y una pregunta</div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;padding:18px 20px;border-radius:22px;background:rgba(31,59,43,.06);display:flex;justify-content:space-between;align-items:center">
+          <div><div style="font:600 13px/1.2 'Manrope'">Tu recorrido completo</div><div style="margin-top:4px;font:500 11.5px/1.3 'Manrope';color:rgba(28,42,32,.5)">6 hitos · desde el 3 sep</div></div>
+          <div style="font:600 18px/1 'Manrope';color:#4c7a5a">›</div>
+        </div>
+
+        <div style="margin-top:12px;padding:18px 20px;border-radius:22px;background:#1f3b2b;color:#eef1e8;display:flex;justify-content:space-between;align-items:center">
+          <div><div style="font:600 13px/1.2 'Manrope'">Encuentro de marzo</div><div style="margin-top:4px;font:500 11.5px/1.3 'Manrope';opacity:.6">Vie 14 · 7:00 pm</div></div>
+          <div style="padding:9px 14px;border-radius:20px;background:#c8e0a8;color:#1f3b2b;font:600 11.5px/1 'Manrope'">Inscribirme</div>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:space-around;padding:14px 0 22px;background:#e6ebdd">
+        <div style="font:700 11px/1 'Manrope';color:#1f3b2b">Esta semana</div>
+        <div style="font:500 11px/1 'Manrope';color:rgba(28,42,32,.45)">Mi historia</div>
+        <div style="font:500 11px/1 'Manrope';color:rgba(28,42,32,.45)">Contenido</div>
+        <div style="font:500 11px/1 'Manrope';color:rgba(28,42,32,.45)">Perfil</div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ esRegistro }}" hint-placeholder-val="{{ true }}">
+  <div style="padding:30px 20px 60px;display:grid;place-items:start center">
+    <div style="width:100%;max-width:740px;background:#f6f4ef;border-radius:18px;overflow:hidden;box-shadow:0 20px 44px -22px rgba(14,42,78,.35)">
+      <div style="padding:26px 28px 32px">
+        <div style="display:flex;gap:8px">
+          <div style="flex:1"><div style="height:6px;border-radius:3px;background:{{ paso1Color }}"></div><div style="margin-top:9px;font:700 10px/1 'Manrope';letter-spacing:.1em;color:rgba(19,28,36,.5)">IDENTIDAD</div></div>
+          <div style="flex:1"><div style="height:6px;border-radius:3px;background:{{ paso2Color }}"></div><div style="margin-top:9px;font:700 10px/1 'Manrope';letter-spacing:.1em;color:rgba(19,28,36,.5)">CONTACTO</div></div>
+          <div style="flex:1"><div style="height:6px;border-radius:3px;background:{{ paso3Color }}"></div><div style="margin-top:9px;font:700 10px/1 'Manrope';letter-spacing:.1em;color:rgba(19,28,36,.5)">ORIGEN</div></div>
+        </div>
+
+        <div style="margin-top:24px;font:400 29px/1.15 'Newsreader',serif">{{ tituloPaso }}</div>
+        <div style="margin-top:8px;font:500 13px/1.5 'Manrope';color:rgba(19,28,36,.55)">{{ subtituloPaso }}</div>
+
+        <sc-if value="{{ enPaso1 }}" hint-placeholder-val="{{ true }}">
+        <div style="margin-top:20px;padding:22px;border-radius:14px;background:#fff;border:1px solid rgba(19,28,36,.09)">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+            <div>
+              <div style="font:600 11.5px/1 'Manrope';color:rgba(19,28,36,.5)">Nombres *</div>
+              <input value="{{ nombres }}" onChange="{{ setNombres }}" placeholder="Natalia Andrea" style="margin-top:7px;width:100%;box-sizing:border-box;padding:12px 13px;border-radius:9px;border:1px solid rgba(19,28,36,.18);font:600 13.5px/1.2 'Manrope';color:#131c24;background:#fff;outline:none">
+            </div>
+            <div>
+              <div style="font:600 11.5px/1 'Manrope';color:rgba(19,28,36,.5)">Apellidos *</div>
+              <input value="{{ apellidos }}" onChange="{{ setApellidos }}" placeholder="Gómez Ríos" style="margin-top:7px;width:100%;box-sizing:border-box;padding:12px 13px;border-radius:9px;border:1px solid rgba(19,28,36,.18);font:600 13.5px/1.2 'Manrope';color:#131c24;background:#fff;outline:none">
+            </div>
+            <div>
+              <div style="font:600 11.5px/1 'Manrope';color:rgba(19,28,36,.5)">Género *</div>
+              <div style="margin-top:7px;display:flex;gap:8px">
+                <button onClick="{{ setMujer }}" style="flex:1;padding:12px;border-radius:9px;border:{{ bordeMujer }};background:{{ fondoMujer }};font:600 13px/1 'Manrope';color:#131c24;cursor:pointer">Mujer</button>
+                <button onClick="{{ setHombre }}" style="flex:1;padding:12px;border-radius:9px;border:{{ bordeHombre }};background:{{ fondoHombre }};font:600 13px/1 'Manrope';color:#131c24;cursor:pointer">Hombre</button>
+              </div>
+              <div style="margin-top:7px;font:500 11px/1.4 'Manrope';color:rgba(19,28,36,.45)">Define la asignación de consolidador</div>
+            </div>
+            <div>
+              <div style="font:600 11.5px/1 'Manrope';color:rgba(19,28,36,.5)">Fecha de nacimiento</div>
+              <input value="{{ nacimiento }}" onChange="{{ setNacimiento }}" placeholder="14 / 06 / 1998" style="margin-top:7px;width:100%;box-sizing:border-box;padding:12px 13px;border-radius:9px;border:1px solid rgba(19,28,36,.18);font:600 13.5px/1.2 'Manrope';color:#131c24;background:#fff;outline:none">
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ enPaso2 }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:20px;padding:22px;border-radius:14px;background:#fff;border:1px solid rgba(19,28,36,.09)">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+            <div>
+              <div style="font:600 11.5px/1 'Manrope';color:rgba(19,28,36,.5)">Teléfono para llamadas *</div>
+              <input value="{{ telefono }}" onChange="{{ setTelefono }}" placeholder="+57 300 412 4412" style="margin-top:7px;width:100%;box-sizing:border-box;padding:12px 13px;border-radius:9px;border:1px solid rgba(19,28,36,.18);font:600 13.5px/1.2 'Manrope';color:#131c24;background:#fff;outline:none">
+            </div>
+            <div>
+              <div style="font:600 11.5px/1 'Manrope';color:rgba(19,28,36,.5)">WhatsApp <span style="font-weight:500;color:rgba(19,28,36,.4)">si es otro</span></div>
+              <input value="{{ whatsapp }}" onChange="{{ setWhatsapp }}" placeholder="Mismo número" style="margin-top:7px;width:100%;box-sizing:border-box;padding:12px 13px;border-radius:9px;border:1px dashed rgba(19,28,36,.24);font:600 13.5px/1.2 'Manrope';color:#131c24;background:#fff;outline:none">
+            </div>
+          </div>
+          <div style="margin-top:16px;font:600 11.5px/1 'Manrope';color:rgba(19,28,36,.5)">Horario preferido de llamada</div>
+          <div style="margin-top:8px;display:flex;gap:8px">
+            <button onClick="{{ setManana }}" style="flex:1;padding:12px;border-radius:9px;border:{{ bordeManana }};background:{{ fondoManana }};font:600 12.5px/1 'Manrope';color:#131c24;cursor:pointer">Mañana</button>
+            <button onClick="{{ setTarde }}" style="flex:1;padding:12px;border-radius:9px;border:{{ bordeTarde }};background:{{ fondoTarde }};font:600 12.5px/1 'Manrope';color:#131c24;cursor:pointer">Tarde</button>
+            <button onClick="{{ setNoche }}" style="flex:1;padding:12px;border-radius:9px;border:{{ bordeNoche }};background:{{ fondoNoche }};font:600 12.5px/1 'Manrope';color:#131c24;cursor:pointer">Noche</button>
+          </div>
+          <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:16px">
+            <div>
+              <div style="font:600 11.5px/1 'Manrope';color:rgba(19,28,36,.5)">Dirección / barrio</div>
+              <input value="{{ direccion }}" onChange="{{ setDireccion }}" placeholder="Cra 45 #12-30 · Laureles" style="margin-top:7px;width:100%;box-sizing:border-box;padding:12px 13px;border-radius:9px;border:1px solid rgba(19,28,36,.18);font:600 13.5px/1.2 'Manrope';color:#131c24;background:#fff;outline:none">
+            </div>
+            <div>
+              <div style="font:600 11.5px/1 'Manrope';color:rgba(19,28,36,.5)">Petición de oración</div>
+              <input value="{{ oracion }}" onChange="{{ setOracion }}" placeholder="Por su mamá, está enferma" style="margin-top:7px;width:100%;box-sizing:border-box;padding:12px 13px;border-radius:9px;border:1px solid rgba(19,28,36,.18);font:500 13px/1.2 'Manrope';color:#131c24;background:#fff;outline:none">
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ enPaso3 }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:20px;padding:22px;border-radius:14px;background:#fff;border:1px solid rgba(19,28,36,.09)">
+          <div style="font:600 11.5px/1 'Manrope';color:rgba(19,28,36,.5)">Punto de entrada *</div>
+          <div style="margin-top:11px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+            <sc-for list="{{ entradas }}" as="op" hint-placeholder-count="6">
+              <button onClick="{{ op.elegir }}" style="padding:15px 12px;border-radius:11px;border:{{ op.borde }};background:{{ op.fondo }};font:600 13px/1.25 'Manrope';color:{{ op.color }};cursor:pointer">{{ op.nombre }}</button>
+            </sc-for>
+          </div>
+
+          <div style="margin-top:24px;font:600 11.5px/1 'Manrope';color:rgba(19,28,36,.5)">¿Alguien la invitó?</div>
+          <div style="margin-top:11px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+            <sc-for list="{{ invitaciones }}" as="op" hint-placeholder-count="3">
+              <button onClick="{{ op.elegir }}" style="padding:15px 12px;border-radius:11px;border:{{ op.borde }};background:{{ op.fondo }};font:600 13px/1.25 'Manrope';color:{{ op.color }};cursor:pointer">{{ op.nombre }}</button>
+            </sc-for>
+          </div>
+
+          <sc-if value="{{ conInvitador }}" hint-placeholder-val="{{ true }}">
+            <div style="margin-top:12px;padding:13px 14px;border-radius:10px;border:1px solid rgba(19,28,36,.16);display:flex;justify-content:space-between;align-items:center">
+              <span style="font:600 13.5px/1 'Manrope';color:rgba(19,28,36,.45)">Buscar por nombre o teléfono…</span>
+              <span style="font:600 12px/1 'Manrope';color:#1b4a7a">Buscar</span>
+            </div>
+            <div style="margin-top:10px;padding:13px 14px;border-radius:10px;border:1.5px solid #6e9a55;background:#f5f8f1;display:flex;justify-content:space-between;align-items:center">
+              <div><div style="font:600 13.5px/1 'Manrope'">Marta Solís</div><div style="margin-top:4px;font:500 11.5px/1.3 'Manrope';color:rgba(19,28,36,.55)">Se conserva su línea: Alejandro Ruiz → Marta</div></div>
+              <span style="font:600 11.5px/1 'Manrope';color:#4f7038">Seleccionada</span>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ sinInvitador }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:12px;padding:14px 15px;border-radius:10px;background:#fdf3e6;border:1px solid rgba(201,123,44,.3)">
+              <div style="font:700 10px/1 'Manrope';letter-spacing:.14em;color:#a9691f">SIN LÍNEA CONOCIDA</div>
+              <div style="margin-top:9px;font:500 12.5px/1.5 'Manrope';color:rgba(19,28,36,.7)">El mentor se asignará por perfil: género, edad, tipo de población, disponibilidad y carga. La decisión final la confirma un líder.</div>
+            </div>
+          </sc-if>
+        </div>
+        </sc-if>
+
+        <div style="margin-top:18px;display:flex;justify-content:space-between;align-items:center">
+          <button onClick="{{ atras }}" style="padding:13px 18px;border-radius:10px;border:1px solid rgba(19,28,36,.18);background:transparent;font:600 13px/1 'Manrope';color:#131c24;cursor:pointer">{{ textoAtras }}</button>
+          <button onClick="{{ siguiente }}" style="padding:13px 20px;border-radius:10px;border:0;background:#0e2a4e;color:#fff;font:700 13px/1 'Manrope';cursor:pointer">{{ textoSiguiente }}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ esOp72 }}" hint-placeholder-val="{{ false }}">
+  <div style="padding:28px 26px 60px">
+    <div style="max-width:1240px;margin:0 auto">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end">
+        <div>
+          <div style="font:400 30px/1.1 'Newsreader',serif;color:#131c24">Operación 72</div>
+          <div style="margin-top:8px;font:500 13px/1 'Manrope';color:rgba(19,28,36,.55)">Las primeras 72 horas de cada persona nueva · {{ totalEnCurso }} en curso</div>
+        </div>
+        <button onClick="{{ verRegistro }}" style="padding:11px 15px;border-radius:9px;border:0;background:#0e2a4e;color:#fff;font:600 12.5px/1 'Manrope';cursor:pointer">+ Registrar persona</button>
+      </div>
+
+      <div style="margin-top:20px;display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+        <sc-for list="{{ columnas }}" as="col" hint-placeholder-count="4">
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:0 4px 10px">
+              <span style="font:700 10px/1 'Manrope';letter-spacing:.14em;color:rgba(19,28,36,.5)">{{ col.titulo }}</span>
+              <span style="font:600 11px/1 'Manrope';color:rgba(19,28,36,.35)">{{ col.total }}</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <sc-for list="{{ col.personas }}" as="p" hint-placeholder-count="2">
+                <div style="padding:16px;border-radius:13px;background:#fff;border:{{ p.borde }}">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+                    <div>
+                      <div style="font:600 14px/1.2 'Manrope';color:#131c24">{{ p.nombre }}</div>
+                      <div style="margin-top:4px;font:500 11.5px/1.3 'Manrope';color:rgba(19,28,36,.5)">{{ p.origen }}</div>
+                    </div>
+                    <span style="padding:4px 8px;border-radius:20px;background:{{ p.chipFondo }};color:{{ p.chipColor }};font:700 9.5px/1 'Manrope';white-space:nowrap">{{ p.chip }}</span>
+                  </div>
+                  <div style="margin-top:14px;height:6px;border-radius:4px;background:rgba(19,28,36,.1);overflow:hidden">
+                    <div style="width:{{ p.avance }};height:100%;background:{{ p.barra }}"></div>
+                  </div>
+                  <div style="margin-top:11px;font:500 11.5px/1.5 'Manrope';color:rgba(19,28,36,.55)">{{ p.detalle }}</div>
+                  <sc-if value="{{ p.tieneAccion }}" hint-placeholder-val="{{ true }}">
+                    <button onClick="{{ p.accion }}" style="margin-top:12px;width:100%;padding:10px;border-radius:8px;border:0;background:#0e2a4e;color:#fff;font:600 11.5px/1 'Manrope';cursor:pointer">{{ p.accionTexto }}</button>
+                  </sc-if>
+                  <sc-if value="{{ p.esEntrega }}" hint-placeholder-val="{{ false }}">
+                    <div style="margin-top:12px;padding:12px;border-radius:10px;background:#f5f8f1;border:1px solid rgba(110,154,85,.4)">
+                      <div style="font:700 9.5px/1 'Manrope';letter-spacing:.12em;color:#4f7038">{{ p.lineaTitulo }}</div>
+                      <div style="margin-top:8px;font:600 12.5px/1.35 'Manrope';color:#131c24">{{ p.mentorPropuesto }}</div>
+                      <div style="margin-top:4px;font:500 11.5px/1.35 'Manrope';color:rgba(19,28,36,.5)">{{ p.mentorDetalle }}</div>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ esPerfil }}" hint-placeholder-val="{{ false }}">
+  <div style="padding:26px 26px 60px">
+    <div style="max-width:1240px;margin:0 auto;background:#f6f4ef;border-radius:18px;overflow:hidden;box-shadow:0 20px 44px -24px rgba(14,42,78,.3);display:flex;flex-wrap:wrap;align-items:stretch">
+      <div style="flex:1 1 620px;min-width:0;padding:26px 26px 32px">
+        <div style="display:flex;gap:18px;align-items:center">
+          <div style="width:62px;height:62px;border-radius:20px;background:#e7eef6;display:grid;place-items:center;font:600 9.5px/1 'Manrope';letter-spacing:.1em;color:rgba(14,42,78,.45)">FOTO</div>
+          <div>
+            <div style="font:400 31px/1.1 'Newsreader',serif;color:#131c24">Pedro Pérez Molina</div>
+            <div style="margin-top:8px;display:flex;gap:9px;align-items:center;flex-wrap:wrap;font:600 12px/1 'Manrope';color:rgba(19,28,36,.55)">
+              <span style="padding:5px 10px;border-radius:6px;background:#0e2a4e;color:#fff;letter-spacing:.08em">FORTALECER</span>
+              <span>día 96</span><span>·</span><span>Mentor: Felipe Carvajal</span><span>·</span><span>Línea: Alejandro Ruiz</span><span>·</span><span>Equipo 12 Norte</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:20px;display:flex;gap:6px">
+          <div style="flex:1;height:10px;border-radius:3px;background:#0e2a4e"></div>
+          <div style="flex:1;height:10px;border-radius:3px;background:linear-gradient(90deg,#6e9a55 66%,rgba(19,28,36,.12) 66%)"></div>
+          <div style="flex:1;height:10px;border-radius:3px;background:rgba(19,28,36,.12)"></div>
+          <div style="flex:1;height:10px;border-radius:3px;background:rgba(19,28,36,.12)"></div>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:6px;font:700 9.5px/1 'Manrope';letter-spacing:.1em;color:rgba(19,28,36,.42)"><span style="flex:1">GANAR</span><span style="flex:1;color:#4f7038">FORTALECER</span><span style="flex:1">ENTRENAR</span><span style="flex:1">MULTIPLICAR</span></div>
+
+        <div style="margin-top:24px;padding:20px;border-radius:14px;background:#fff;border:1px solid rgba(19,28,36,.09)">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><div style="font:700 10px/1 'Manrope';letter-spacing:.16em;color:rgba(19,28,36,.42)">HITOS</div><div style="font:600 11.5px/1 'Manrope';color:rgba(19,28,36,.4)">6 de 8 requeridos para cerrar Fortalecer</div></div>
+          <div style="margin-top:14px;display:grid;grid-template-columns:repeat(4,1fr);gap:9px">
+            <div style="padding:14px;border-radius:11px;background:#eef4e8"><div style="font:700 10px/1 'Manrope';letter-spacing:.1em;color:#4f7038">✓ REGISTRO</div><div style="margin-top:8px;font:600 13.5px/1 'Manrope';color:#131c24">3 sep</div></div>
+            <div style="padding:14px;border-radius:11px;background:#eef4e8"><div style="font:700 10px/1 'Manrope';letter-spacing:.1em;color:#4f7038">✓ OPERACIÓN 72</div><div style="margin-top:8px;font:600 13.5px/1 'Manrope';color:#131c24">5 sep</div></div>
+            <div style="padding:14px;border-radius:11px;background:#eef4e8"><div style="font:700 10px/1 'Manrope';letter-spacing:.1em;color:#4f7038">✓ ALPHA + FOCUS</div><div style="margin-top:8px;font:600 13.5px/1 'Manrope';color:#131c24">12 dic · 92%</div></div>
+            <div style="padding:14px;border-radius:11px;background:#eef4e8"><div style="font:700 10px/1 'Manrope';letter-spacing:.1em;color:#4f7038">✓ BAUTISMO</div><div style="margin-top:8px;font:600 13.5px/1 'Manrope';color:#131c24">18 ene</div></div>
+            <div style="padding:14px;border-radius:11px;background:#eef4e8"><div style="font:700 10px/1 'Manrope';letter-spacing:.1em;color:#4f7038">✓ ENCUENTRO</div><div style="margin-top:8px;font:600 13.5px/1 'Manrope';color:#131c24">2 feb</div></div>
+            <div style="padding:14px;border-radius:11px;background:#f5f8f1;border:1.5px solid #6e9a55"><div style="font:700 10px/1 'Manrope';letter-spacing:.1em;color:#4f7038">CASA DE FE</div><div style="margin-top:8px;font:600 13.5px/1 'Manrope';color:#131c24">8 / 12</div></div>
+            <div style="padding:14px;border-radius:11px;border:1px dashed rgba(19,28,36,.22)"><div style="font:700 10px/1 'Manrope';letter-spacing:.1em;color:rgba(19,28,36,.4)">GRADUACIÓN</div><div style="margin-top:8px;font:600 13.5px/1 'Manrope';color:rgba(19,28,36,.4)">Pendiente</div></div>
+            <div style="padding:14px;border-radius:11px;border:1px dashed rgba(19,28,36,.22)"><div style="font:700 10px/1 'Manrope';letter-spacing:.1em;color:rgba(19,28,36,.4)">VALIDACIÓN</div><div style="margin-top:8px;font:600 13.5px/1 'Manrope';color:rgba(19,28,36,.4)">Pendiente</div></div>
+          </div>
+        </div>
+
+        <div style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div style="padding:20px;border-radius:14px;background:#fff;border:1px solid rgba(19,28,36,.09)">
+            <div style="display:flex;justify-content:space-between;align-items:baseline"><div style="font:700 10px/1 'Manrope';letter-spacing:.16em;color:rgba(19,28,36,.42)">CASA DE FE · 12 TEMAS</div><div style="font:600 11px/1 'Manrope';color:rgba(19,28,36,.4)">orden flexible</div></div>
+            <div style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;font:600 11.5px/1.2 'Manrope';color:#131c24">
+              <div style="padding:10px;border-radius:8px;background:#eef4e8">1 Identidad</div><div style="padding:10px;border-radius:8px;background:#eef4e8">2 Oración</div><div style="padding:10px;border-radius:8px;background:#eef4e8">3 Palabra</div>
+              <div style="padding:10px;border-radius:8px;background:#eef4e8">4 Familia</div><div style="padding:10px;border-radius:8px;background:#eef4e8">5 Carácter</div><div style="padding:10px;border-radius:8px;background:#eef4e8">6 Libertad</div>
+              <div style="padding:10px;border-radius:8px;background:#eef4e8">7 Comunidad</div><div style="padding:10px;border-radius:8px;background:#eef4e8">8 Mayordomía</div><div style="padding:10px;border-radius:8px;background:#fff;border:1.5px solid #6e9a55">9 Perdón</div>
+              <div style="padding:10px;border-radius:8px;background:#fdf3e6;color:#a9691f">10 Servicio</div><div style="padding:10px;border-radius:8px;background:rgba(19,28,36,.045);color:rgba(19,28,36,.45)">11 Visión</div><div style="padding:10px;border-radius:8px;background:rgba(19,28,36,.045);color:rgba(19,28,36,.45)">12 Multiplicar</div>
+            </div>
+          </div>
+
+          <div style="padding:20px;border-radius:14px;background:#fff;border:1px solid rgba(19,28,36,.09)">
+            <div style="display:flex;justify-content:space-between;align-items:baseline"><div style="font:700 10px/1 'Manrope';letter-spacing:.16em;color:rgba(19,28,36,.42)">LÍNEA DE TIEMPO</div><div style="font:600 11.5px/1 'Manrope';color:#1b4a7a">Historial completo</div></div>
+            <div style="margin-top:18px;display:grid;grid-template-columns:58px 16px 1fr">
+              <div style="font:600 11.5px/1.6 'Manrope';color:rgba(19,28,36,.45);padding-bottom:18px">2 mar</div>
+              <div style="display:grid;place-items:start center;position:relative"><div style="position:absolute;top:6px;bottom:0;width:1px;background:rgba(19,28,36,.13)"></div><div style="width:9px;height:9px;border-radius:50%;background:#6e9a55;position:relative;margin-top:4px"></div></div>
+              <div style="padding:0 0 18px 12px"><div style="font:600 13px/1.35 'Manrope';color:#131c24">Tema 8 completado — “Mayordomía”</div><div style="margin-top:3px;font:500 12px/1.5 'Manrope';color:rgba(19,28,36,.5)">Felipe Carvajal · tarea entregada · 1 nota privada</div></div>
+
+              <div style="font:600 11.5px/1.6 'Manrope';color:rgba(19,28,36,.45);padding-bottom:18px">24 feb</div>
+              <div style="display:grid;place-items:start center;position:relative"><div style="position:absolute;top:0;bottom:0;width:1px;background:rgba(19,28,36,.13)"></div><div style="width:9px;height:9px;border-radius:50%;background:#0e2a4e;position:relative;margin-top:4px"></div></div>
+              <div style="padding:0 0 18px 12px"><div style="font:600 13px/1.35 'Manrope';color:#131c24">Sirvió en el equipo de bienvenida</div><div style="margin-top:3px;font:500 12px/1.5 'Manrope';color:rgba(19,28,36,.5)">Evidencia registrada por Felipe</div></div>
+
+              <div style="font:600 11.5px/1.6 'Manrope';color:rgba(19,28,36,.45);padding-bottom:18px">2 feb</div>
+              <div style="display:grid;place-items:start center;position:relative"><div style="position:absolute;top:0;bottom:0;width:1px;background:rgba(19,28,36,.13)"></div><div style="width:9px;height:9px;border-radius:50%;background:#0e2a4e;position:relative;margin-top:4px"></div></div>
+              <div style="padding:0 0 18px 12px"><div style="font:600 13px/1.35 'Manrope';color:#131c24">Encuentro completado</div><div style="margin-top:3px;font:500 12px/1.5 'Manrope';color:rgba(19,28,36,.5)">Retiro de febrero · hito de Fortalecer</div></div>
+
+              <div style="font:600 11.5px/1.6 'Manrope';color:rgba(19,28,36,.45)">12 dic</div>
+              <div style="display:grid;place-items:start center"><div style="width:9px;height:9px;border-radius:50%;background:#0e2a4e;margin-top:4px"></div></div>
+              <div style="padding:0 0 0 12px"><div style="font:600 13px/1.35 'Manrope';color:#131c24">Alpha aprobado · paso a Fortalecer</div><div style="margin-top:3px;font:500 12px/1.5 'Manrope';color:rgba(19,28,36,.5)">Asistencia 92% · validado por Ana Torres</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="flex:0 1 340px;max-width:100%;min-width:0;box-sizing:border-box;background:#fff;border-left:1px solid rgba(19,28,36,.1);padding:26px 22px 32px">
+        <div style="display:flex;flex-direction:column;gap:9px">
+          <div style="padding:12px;border-radius:10px;background:#0e2a4e;color:#fff;text-align:center;font:600 12.5px/1 'Manrope'">Proponer cierre de fase</div>
+          <div style="padding:12px;border-radius:10px;border:1px solid rgba(19,28,36,.16);text-align:center;font:600 12.5px/1 'Manrope';color:#131c24">Registrar hito</div>
+          <div style="padding:12px;border-radius:10px;border:1px solid rgba(19,28,36,.16);text-align:center;font:600 12.5px/1 'Manrope';color:#131c24">Añadir nota pastoral</div>
+        </div>
+
+        <div style="margin-top:22px;padding:16px;border-radius:12px;background:#f6f4ef">
+          <div style="font:700 9.5px/1 'Manrope';letter-spacing:.16em;color:rgba(19,28,36,.42)">PRÓXIMO PASO</div>
+          <div style="margin-top:9px;font:400 18px/1.25 'Newsreader',serif;color:#131c24">Tema 9 · El perdón que libera</div>
+          <div style="margin-top:7px;font:500 12px/1.4 'Manrope';color:rgba(19,28,36,.55)">Jueves 6:30 pm</div>
+        </div>
+
+        <div style="margin-top:12px;padding:16px;border-radius:12px;background:#fdf3e6;border:1px solid rgba(201,123,44,.3)">
+          <div style="font:700 9.5px/1 'Manrope';letter-spacing:.16em;color:#a9691f">ALERTAS · 2</div>
+          <div style="margin-top:10px;font:600 12.5px/1.4 'Manrope';color:#131c24">Evaluación de cierre pendiente</div>
+          <div style="margin-top:6px;font:500 12px/1.4 'Manrope';color:rgba(19,28,36,.6)">Sin evidencia de servicio este mes</div>
+        </div>
+
+        <div style="margin-top:12px;padding:16px;border-radius:12px;background:#0e2a4e;color:#fff">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <svg viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M6 11V8a6 6 0 0 1 12 0v3" fill="none" stroke="#cfe3bc" stroke-width="1.8"></path><rect x="4.5" y="11" width="15" height="9.5" rx="2.5" fill="none" stroke="#cfe3bc" stroke-width="1.8"></rect></svg>
+              <span style="font:700 9.5px/1 'Manrope';letter-spacing:.14em;color:#cfe3bc">NOTAS PASTORALES · 4</span>
+            </div>
+            <button onClick="{{ alternarNotas }}" style="padding:8px 11px;border-radius:7px;border:0;background:rgba(255,255,255,.16);color:#fff;font:600 11.5px/1 'Manrope';cursor:pointer">{{ textoNotas }}</button>
+          </div>
+
+          <sc-if value="{{ notasOcultas }}" hint-placeholder-val="{{ true }}">
+            <div style="margin-top:12px;height:24px;border-radius:7px;background:repeating-linear-gradient(90deg,rgba(255,255,255,.18) 0 9px,rgba(255,255,255,.06) 9px 15px)"></div>
+            <div style="margin-top:8px;height:24px;border-radius:7px;background:repeating-linear-gradient(90deg,rgba(255,255,255,.18) 0 9px,rgba(255,255,255,.06) 9px 15px)"></div>
+          </sc-if>
+
+          <sc-if value="{{ notasVisibles }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:12px;display:flex;flex-direction:column;gap:9px">
+              <div style="padding:13px;border-radius:10px;background:rgba(255,255,255,.08)">
+                <div style="font:600 11px/1 'Manrope';color:rgba(255,255,255,.5)">2 mar · Felipe Carvajal · mentoría</div>
+                <div style="margin-top:8px;font:500 12px/1.55 'Manrope';color:rgba(255,255,255,.9)">Habló del conflicto con su hermano. Pidió acompañamiento antes de intentar la conversación. Sugiero trabajar Tema 9 ahora.</div>
+              </div>
+              <div style="padding:13px;border-radius:10px;background:rgba(255,255,255,.08)">
+                <div style="font:600 11px/1 'Manrope';color:rgba(255,255,255,.5)">14 feb · Ana Torres · evaluación</div>
+                <div style="margin-top:8px;font:500 12px/1.55 'Manrope';color:rgba(255,255,255,.9)">Constancia notable desde el Encuentro. Falta evidencia de servicio sostenido para recomendar cierre de fase.</div>
+              </div>
+            </div>
+          </sc-if>
+
+          <div style="margin-top:12px;font:500 11.5px/1.5 'Manrope';color:rgba(255,255,255,.5)">Privadas frente al aprendiz. Visibles para su mentor, su consolidador y el líder responsable de la línea. Cada apertura queda auditada.</div>
+        </div>
+
+        <div style="margin-top:12px;padding:16px;border-radius:12px;background:#f6f4ef">
+          <div style="font:700 9.5px/1 'Manrope';letter-spacing:.16em;color:rgba(19,28,36,.42)">ORIGEN</div>
+          <div style="margin-top:12px;display:flex;flex-direction:column;gap:11px">
+            <div><div style="font:600 11px/1 'Manrope';color:rgba(19,28,36,.42)">Entrada</div><div style="margin-top:4px;font:600 12.5px/1.3 'Manrope';color:#131c24">Servicio dominical</div></div>
+            <div><div style="font:600 11px/1 'Manrope';color:rgba(19,28,36,.42)">Invitado por</div><div style="margin-top:4px;font:600 12.5px/1.3 'Manrope';color:#131c24">Marta Solís</div></div>
+            <div><div style="font:600 11px/1 'Manrope';color:rgba(19,28,36,.42)">Contacto</div><div style="margin-top:4px;font:600 12.5px/1.3 'Manrope';color:#131c24">+57 300 ••• 4412 · tardes</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1320,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  state = {
+    pantalla: 'aprendiz',
+    confirmado: false,
+    notas: false,
+    paso: 1,
+    nombres: '', apellidos: '', genero: 'mujer', nacimiento: '',
+    telefono: '', whatsapp: '', horario: 'tarde', direccion: '', oracion: '',
+    entrada: 'Servicio dominical', invitacion: 'persona',
+    personas: [
+      { id: 1, nombre: 'Laura Beltrán', origen: 'Servicio dominical · 26 años', estado: 'iniciada', horas: -6, detalle: 'Sin contacto registrado · 2 intentos de llamada' },
+      { id: 2, nombre: 'Camilo Ospina', origen: 'Invitado por Andrés · 31 años', estado: 'iniciada', horas: 56, detalle: 'Prefiere llamadas después de 6 pm' },
+      { id: 3, nombre: 'Yesenia Cruz', origen: 'Alpha · 22 años', estado: 'contactada', horas: 9, detalle: 'Llamada de 12 min · quiere visita en casa' },
+      { id: 4, nombre: 'Jhon Restrepo', origen: 'Brigada · 45 años', estado: 'contactada', horas: 37, detalle: 'WhatsApp respondido · pidió oración' },
+      { id: 5, nombre: 'Marcela Ortiz', origen: 'Servicio miércoles · 38 años', estado: 'visita', horas: 27, detalle: 'Visita mañana 5:00 pm con Diego y Marta' },
+      { id: 6, nombre: 'Natalia Gómez', origen: 'Invitada por Marta Solís · 27 años', estado: 'entrega', horas: 18, detalle: '2 llamadas · 1 visita · lista para entrega', linea: true, mentor: 'Mentora propuesta: Marta Solís', mentorDetalle: 'Equipo 12 Norte · carga 7 de 12' },
+      { id: 7, nombre: 'Kevin Arias', origen: 'Evangelismo · 19 años', estado: 'entrega', horas: 30, detalle: 'Contactado y visitado', linea: false, mentor: 'Sugerido: ministerio juvenil', mentorDetalle: '2 mentores con capacidad · confirma un líder' }
+    ]
+  };
+
+  ir = p => this.setState({ pantalla: p });
+  fondoTab = p => (this.state.pantalla === p ? 'rgba(255,255,255,.18)' : 'transparent');
+
+  mover = (id, estado) => this.setState(s => ({
+    personas: s.personas.map(p => (p.id === id ? { ...p, estado, horas: Math.max(p.horas, 12), detalle: estado === 'contactada' ? 'Llamada registrada hoy · acordar visita' : estado === 'visita' ? 'Visita agendada · pendiente de confirmar' : p.detalle } : p))
+  }));
+
+  entregar = id => this.setState(s => ({ personas: s.personas.filter(p => p.id !== id) }));
+
+  chip(p) {
+    if (p.horas < 0) return { texto: 'VENCIDA', fondo: '#fbe9e4', color: '#b4462f' };
+    if (p.horas <= 12) return { texto: p.horas + ' H', fondo: '#fdf1e3', color: '#a9691f' };
+    return { texto: p.horas + ' H', fondo: '#eef4e8', color: '#4f7038' };
+  }
+
+  tarjeta = p => {
+    const c = this.chip(p);
+    const vencida = p.horas < 0;
+    const urgente = p.horas >= 0 && p.horas <= 12;
+    const acciones = {
+      iniciada: ['Registrar llamada', () => this.mover(p.id, 'contactada')],
+      contactada: ['Agendar visita', () => this.mover(p.id, 'visita')],
+      visita: ['Cerrar visita y preparar entrega', () => this.mover(p.id, 'entrega')],
+      entrega: ['Entregar a mentor', () => this.entregar(p.id)]
+    }[p.estado];
+    return {
+      nombre: p.nombre, origen: p.origen, detalle: p.detalle,
+      chip: c.texto, chipFondo: c.fondo, chipColor: c.color,
+      borde: vencida ? '1px solid rgba(180,70,47,.45)' : urgente ? '1px solid rgba(201,123,44,.45)' : '1px solid rgba(19,28,36,.1)',
+      avance: Math.max(6, Math.min(100, Math.round(((72 - Math.max(p.horas, 0)) / 72) * 100))) + '%',
+      barra: vencida ? '#b4462f' : urgente ? '#c97b2c' : '#6e9a55',
+      tieneAccion: true, accionTexto: acciones[0], accion: acciones[1],
+      esEntrega: p.estado === 'entrega',
+      lineaTitulo: p.linea ? 'LÍNEA CONOCIDA · SE CONSERVA' : 'SIN LÍNEA · ASIGNAR POR PERFIL',
+      mentorPropuesto: p.mentor, mentorDetalle: p.mentorDetalle
+    };
+  };
+
+  opcion = (nombre, activo, elegir) => ({
+    nombre, elegir,
+    borde: activo ? '1.5px solid #0e2a4e' : '1px solid rgba(19,28,36,.16)',
+    fondo: activo ? '#eaf0f7' : '#fff',
+    color: activo ? '#131c24' : 'rgba(19,28,36,.55)'
+  });
+
+  siguiente = () => {
+    const { paso } = this.state;
+    if (paso < 3) return this.setState({ paso: paso + 1 });
+    const nombre = ((this.state.nombres + ' ' + this.state.apellidos).trim()) || 'Persona nueva';
+    const id = Date.now();
+    this.setState(s => ({
+      pantalla: 'op72', paso: 1,
+      nombres: '', apellidos: '', telefono: '', whatsapp: '', direccion: '', oracion: '', nacimiento: '',
+      personas: [{
+        id, nombre, origen: s.entrada + (s.invitacion === 'persona' ? ' · invitada por Marta Solís' : ' · sin invitador'),
+        estado: 'iniciada', horas: 72, detalle: 'Consolidador asignado · bienvenida por WhatsApp enviada',
+        linea: s.invitacion === 'persona', mentor: '', mentorDetalle: ''
+      }, ...s.personas]
+    }));
+  };
+
+  atras = () => this.setState(s => ({ paso: Math.max(1, s.paso - 1), pantalla: s.paso === 1 ? 'op72' : s.pantalla }));
+
+  renderVals() {
+    const s = this.state;
+    const grupos = e => s.personas.filter(p => p.estado === e).map(this.tarjeta);
+    const azul = '#0e2a4e', verde = '#6e9a55', gris = 'rgba(19,28,36,.14)';
+    const entradas = ['Servicio dominical', 'Servicio miércoles', 'Redes sociales', 'Alpha / Casa de Fe', 'Evento o brigada', 'Uno a uno']
+      .map(n => this.opcion(n, s.entrada === n, () => this.setState({ entrada: n })));
+    const invitaciones = [['Sí, una persona', 'persona'], ['No, llegó por redes', 'redes'], ['No sabe', 'desconocido']]
+      .map(([n, k]) => this.opcion(n, s.invitacion === k, () => this.setState({ invitacion: k })));
+
+    return {
+      usuario: s.pantalla === 'aprendiz' ? 'Pedro Pérez · Aprendiz' : s.pantalla === 'op72' || s.pantalla === 'registro' ? 'Diego Marín · Consolidador' : 'Felipe Carvajal · Mentor',
+      iniciales: s.pantalla === 'aprendiz' ? 'PP' : s.pantalla === 'perfil' ? 'FC' : 'DM',
+      esAprendiz: s.pantalla === 'aprendiz', esRegistro: s.pantalla === 'registro', esOp72: s.pantalla === 'op72', esPerfil: s.pantalla === 'perfil',
+      verAprendiz: () => this.ir('aprendiz'), verRegistro: () => this.ir('registro'), verOp72: () => this.ir('op72'), verPerfil: () => this.ir('perfil'),
+      bgAprendiz: this.fondoTab('aprendiz'), bgRegistro: this.fondoTab('registro'), bgOp72: this.fondoTab('op72'), bgPerfil: this.fondoTab('perfil'),
+
+      confirmar: () => this.setState({ confirmado: !s.confirmado }),
+      confirmarTexto: s.confirmado ? 'Confirmado ✓' : 'Confirmar',
+      confirmarBg: s.confirmado ? 'rgba(238,241,232,.2)' : '#c8e0a8',
+      confirmarColor: s.confirmado ? '#eef1e8' : '#1f3b2b',
+
+      alternarNotas: () => this.setState({ notas: !s.notas }),
+      textoNotas: s.notas ? 'Ocultar' : 'Revelar (4)',
+      notasVisibles: s.notas, notasOcultas: !s.notas,
+
+      paso: s.paso, enPaso1: s.paso === 1, enPaso2: s.paso === 2, enPaso3: s.paso === 3,
+      paso1Color: s.paso >= 1 ? azul : gris, paso2Color: s.paso >= 2 ? azul : gris, paso3Color: s.paso >= 3 ? verde : gris,
+      tituloPaso: s.paso === 1 ? '¿A quién acabas de conocer?' : s.paso === 2 ? '¿Cómo la contactamos?' : '¿Cómo llegó?',
+      subtituloPaso: s.paso === 1 ? 'Solo lo esencial ahora. El expediente se completa con el acompañamiento.' : s.paso === 2 ? 'El horario y el número correcto son lo que hace posible Operación 72.' : 'El origen define la línea y, con ella, el mentor que la acompaña.',
+      textoAtras: s.paso === 1 ? 'Cancelar' : 'Atrás',
+      textoSiguiente: s.paso === 3 ? 'Guardar e iniciar Operación 72' : 'Continuar',
+      siguiente: this.siguiente, atras: this.atras,
+
+      nombres: s.nombres, apellidos: s.apellidos, nacimiento: s.nacimiento, telefono: s.telefono, whatsapp: s.whatsapp, direccion: s.direccion, oracion: s.oracion,
+      setNombres: e => this.setState({ nombres: e.target.value }),
+      setApellidos: e => this.setState({ apellidos: e.target.value }),
+      setNacimiento: e => this.setState({ nacimiento: e.target.value }),
+      setTelefono: e => this.setState({ telefono: e.target.value }),
+      setWhatsapp: e => this.setState({ whatsapp: e.target.value }),
+      setDireccion: e => this.setState({ direccion: e.target.value }),
+      setOracion: e => this.setState({ oracion: e.target.value }),
+      setMujer: () => this.setState({ genero: 'mujer' }), setHombre: () => this.setState({ genero: 'hombre' }),
+      bordeMujer: s.genero === 'mujer' ? '1.5px solid #0e2a4e' : '1px solid rgba(19,28,36,.18)',
+      fondoMujer: s.genero === 'mujer' ? '#eaf0f7' : '#fff',
+      bordeHombre: s.genero === 'hombre' ? '1.5px solid #0e2a4e' : '1px solid rgba(19,28,36,.18)',
+      fondoHombre: s.genero === 'hombre' ? '#eaf0f7' : '#fff',
+      setManana: () => this.setState({ horario: 'manana' }), setTarde: () => this.setState({ horario: 'tarde' }), setNoche: () => this.setState({ horario: 'noche' }),
+      bordeManana: s.horario === 'manana' ? '1.5px solid #0e2a4e' : '1px solid rgba(19,28,36,.18)',
+      fondoManana: s.horario === 'manana' ? '#eaf0f7' : '#fff',
+      bordeTarde: s.horario === 'tarde' ? '1.5px solid #0e2a4e' : '1px solid rgba(19,28,36,.18)',
+      fondoTarde: s.horario === 'tarde' ? '#eaf0f7' : '#fff',
+      bordeNoche: s.horario === 'noche' ? '1.5px solid #0e2a4e' : '1px solid rgba(19,28,36,.18)',
+      fondoNoche: s.horario === 'noche' ? '#eaf0f7' : '#fff',
+      entradas, invitaciones,
+      conInvitador: s.invitacion === 'persona', sinInvitador: s.invitacion !== 'persona',
+
+      totalEnCurso: s.personas.length,
+      columnas: [
+        { titulo: 'INICIADA', personas: grupos('iniciada'), total: grupos('iniciada').length },
+        { titulo: 'CONTACTADA', personas: grupos('contactada'), total: grupos('contactada').length },
+        { titulo: 'VISITA PENDIENTE', personas: grupos('visita'), total: grupos('visita').length },
+        { titulo: 'LISTA PARA ENTREGA', personas: grupos('entrega'), total: grupos('entrega').length }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
