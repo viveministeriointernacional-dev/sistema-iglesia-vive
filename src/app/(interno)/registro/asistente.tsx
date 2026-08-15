@@ -7,7 +7,7 @@ import {
   EntryPoint,
   Gender,
   InvitationKind,
-} from "@/generated/prisma";
+} from "@iglesia/prisma-client";
 import {
   GENEROS,
   HORARIOS,

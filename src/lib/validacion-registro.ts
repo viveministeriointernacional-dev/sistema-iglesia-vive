@@ -4,7 +4,7 @@ import {
   EntryPoint,
   Gender,
   InvitationKind,
-} from "@/generated/prisma";
+} from "@iglesia/prisma-client";
 
 const textoOpcional = z
   .string()

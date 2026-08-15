@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { redirect } from "next/navigation";
-import { Role } from "@/generated/prisma";
-import { prisma } from "@/lib/prisma";
+import { Role } from "@iglesia/prisma-client";
+import { getPrisma } from "@/lib/prisma";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export type UsuarioSesion = {
@@ -50,6 +50,9 @@ export const obtenerUsuarioActual = cache(
     } = await supabase.auth.getUser();
 
     if (!user?.email) return null;
+
+    // Solo se abre conexión a Postgres cuando hay sesión que resolver.
+    const prisma = await getPrisma();
 
     const registro = await prisma.appUser.findUnique({
       where: { email: user.email.toLowerCase() },

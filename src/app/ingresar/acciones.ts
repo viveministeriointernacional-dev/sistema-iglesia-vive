@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export type EstadoIngreso = { error: string | null };
@@ -30,6 +30,7 @@ export async function ingresar(
     return { error: "Correo o contraseña incorrectos." };
   }
 
+  const prisma = await getPrisma();
   const registro = await prisma.appUser.findUnique({
     where: { email },
     select: { active: true },

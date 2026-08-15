@@ -5,9 +5,13 @@
 // discipulado NO es un campo `mentorId` en Person. Es la entidad
 // MentorRelationship con historial (desde, hasta, motivo, quién autorizó).
 
+// El cliente se genera dentro de node_modules, como paquete: así el bundler de
+// Next lo trata como dependencia externa y la resolución por condiciones elige
+// la variante correcta —`workerd` en Cloudflare, Node en el seed y los
+// scripts—. Generado en `postinstall`.
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
+  output   = "../node_modules/@iglesia/prisma-client"
 }
 
 datasource db {

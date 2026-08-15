@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sistema-iglesia-vive",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-08-15",
+  // nodejs_compat es obligatorio: Next y el adaptador `pg` de Prisma usan APIs
+  // de Node (sockets TCP, streams, crypto).
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true
+  }
+
+  // Conexión a Postgres. Hyperdrive mantiene el pool del lado de Cloudflare;
+  // sin él, cada invocación abre una conexión nueva contra Supabase y el pooler
+  // se agota. Crea la configuración con:
+  //
+  //   npx wrangler hyperdrive create iglesia-vive-db \
+  //     --connection-string="postgresql://postgres.PROYECTO:CONTRASENA@aws-0-REGION.pooler.supabase.com:5432/postgres"
+  //
+  // y pega el id devuelto aquí:
+  //
+  // "hyperdrive": [
+  //   { "binding": "HYPERDRIVE", "id": "<id-de-hyperdrive>" }
+  // ]
+}

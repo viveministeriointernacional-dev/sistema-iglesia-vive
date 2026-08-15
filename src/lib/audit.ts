@@ -1,7 +1,5 @@
-import type { Prisma } from "@/generated/prisma";
-import { prisma } from "@/lib/prisma";
-
-type ClientePrisma = Prisma.TransactionClient | typeof prisma;
+import type { Prisma } from "@iglesia/prisma-client";
+import type { ClientePrisma } from "@/lib/prisma";
 
 /// Acciones sensibles que quedan registradas (ESPECIFICACION_PRODUCTO.md §19).
 export type AccionAuditada =
