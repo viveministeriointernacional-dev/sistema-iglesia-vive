@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { salir } from "@/app/ingresar/acciones";
 import { ETIQUETA_ROL, requerirUsuario } from "@/lib/auth";
@@ -24,13 +25,16 @@ export default async function LayoutInterno({
     <div className="min-h-screen bg-escritorio">
       <header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 bg-azul-900 px-5 py-3 text-white sm:px-[26px]">
         <div className="flex flex-wrap items-center gap-4 sm:gap-[26px]">
-          <Link href="/" className="flex items-center gap-[10px] text-white">
-            <span className="grid h-[26px] w-[26px] place-items-center rounded-[7px] bg-white text-[8px] leading-none font-bold tracking-[.08em] text-azul-900">
-              LOGO
-            </span>
-            <span className="text-[11px] leading-none font-semibold tracking-[.16em] opacity-60">
-              IGLESIA VIVE
-            </span>
+          <Link href="/" aria-label="Iglesia Vive · inicio" className="flex items-center">
+            <Image
+              src="/logo-vive-firma-blanca.png"
+              alt="Vive Ministerio Internacional"
+              width={119}
+              height={28}
+              priority
+              unoptimized
+              className="h-7 w-auto"
+            />
           </Link>
 
           {puedeConsolidar ? <PestanasSuperiores /> : null}
