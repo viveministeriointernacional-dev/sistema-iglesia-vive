@@ -1,11 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Operation72Status } from "@iglesia/prisma-client";
 import { avanzarOperacion72, entregarAMentor } from "./acciones";
 
 export type TarjetaPersona = {
   operacionId: string;
+  learnerId: string;
   estado: Operation72Status;
   nombre: string;
   origen: string;
@@ -62,7 +64,12 @@ export function TarjetaDePersona({ persona }: { persona: TarjetaPersona }) {
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <h3 className="text-[14px] leading-[1.2] font-semibold text-tinta">
-            {persona.nombre}
+            <Link
+              href={`/expediente/${persona.learnerId}`}
+              className="text-tinta hover:text-azul-700 hover:underline"
+            >
+              {persona.nombre}
+            </Link>
           </h3>
           <p className="mt-1 text-[11.5px] leading-[1.3] font-medium text-[rgba(19,28,36,.5)]">
             {persona.origen}

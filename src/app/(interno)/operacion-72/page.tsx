@@ -44,6 +44,7 @@ export default async function TableroOperacion72() {
       },
       learner: {
         select: {
+          id: true,
           entryPoint: true,
           lineOfOrigin: true,
           person: {
@@ -61,6 +62,7 @@ export default async function TableroOperacion72() {
 
     return {
       operacionId: operacion.id,
+      learnerId: learner.id,
       estado: operacion.status,
       nombre: nombreCompleto(learner.person),
       origen: [

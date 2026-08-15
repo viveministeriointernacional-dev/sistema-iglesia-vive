@@ -12,6 +12,7 @@ export type AccionAuditada =
   | "operacion72.entregada"
   | "mentor.asignado"
   | "notas.reveladas"
+  | "hito.registrado"
   | "fase.cambiada"
   | "duplicado.detectado";
 

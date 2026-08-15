@@ -1,12 +1,23 @@
+import { redirect } from "next/navigation";
+import { getPrisma } from "@/lib/prisma";
 import { ETIQUETA_ROL, requerirUsuario } from "@/lib/auth";
 
 export const metadata = { title: "Mi proceso · Iglesia Vive" };
 
-/// Marcador de posición. El panel del aprendiz, el panel del mentor y el
-/// expediente están diseñados pero todavía no construidos: entran en la
-/// siguiente entrega (design/README.md § Screens y ROADMAP_DESARROLLO.md).
+/// Quien tiene expediente entra al suyo. El resto —líderes sin expediente
+/// propio— ve este marcador hasta que exista el panel del mentor.
 export default async function MiProceso() {
   const usuario = await requerirUsuario();
+
+  // Quien tiene expediente entra directo al suyo.
+  if (usuario.personId) {
+    const prisma = await getPrisma();
+    const propio = await prisma.learnerProfile.findUnique({
+      where: { personId: usuario.personId },
+      select: { id: true },
+    });
+    if (propio) redirect(`/expediente/${propio.id}`);
+  }
 
   return (
     <main className="grid place-items-start justify-center px-5 py-[30px] pb-16">
@@ -16,9 +27,9 @@ export default async function MiProceso() {
           Hola, {usuario.fullName.split(" ")[0]}
         </h1>
         <p className="mt-2 text-[13px] leading-[1.5] font-medium text-[rgba(19,28,36,.55)]">
-          Tu panel —esta semana, tu progreso, tu devocional y tus eventos— es la
-          siguiente pantalla en construcción. Por ahora, esta entrega cubre el
-          registro de personas nuevas y el tablero de Operación 72.
+          Tu panel de acompañamiento —tu red, tus alertas y tus tareas— es la
+          siguiente pantalla en construcción. Por ahora están el registro de
+          personas nuevas, el tablero de Operación 72 y el expediente.
         </p>
       </div>
     </main>
