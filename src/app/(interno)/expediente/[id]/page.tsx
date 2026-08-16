@@ -20,6 +20,8 @@ import {
   proximoPaso,
   telefonoParcial,
 } from "@/lib/expediente";
+import { CasaDeFe } from "./casa-de-fe";
+import type { TemaCasaDeFe } from "./acciones";
 import { NotasPastorales, RegistrarHito } from "./panel-lateral";
 
 export const dynamic = "force-dynamic";
@@ -67,7 +69,7 @@ export default async function PaginaExpediente({
   const edad = edadDesde(expediente.person.birthDate, ahora);
   const mentorActual = expediente.mentorRelationships.find((r) => !r.endedAt);
   const faseActual = FASES.findIndex((f) => f.valor === expediente.phase);
-  const linea = construirLineaDeTiempo(expediente);
+  const linea = construirLineaDeTiempo(expediente, acceso.puedeVerNotas);
   const alertas = calcularAlertas(expediente, ahora);
   const paso = proximoPaso(expediente, ahora);
 
@@ -77,6 +79,28 @@ export default async function PaginaExpediente({
 
   const hitoDe = (kind: MilestoneKind) =>
     expediente.milestones.find((hito) => hito.kind === kind);
+
+  // La evaluación y las notas del tema son privadas: solo viajan al navegador
+  // de quien puede verlas.
+  const temasCasaDeFe: TemaCasaDeFe[] = expediente.temas.map((tema) => {
+    const avance = expediente.faithHouseProgress.find(
+      (a) => a.topic.number === tema.number,
+    );
+    return {
+      topicId: tema.id,
+      numero: tema.number,
+      nombre: tema.name,
+      status: avance?.status ?? FaithHouseStatus.PENDIENTE,
+      assessment: acceso.puedeVerNotas ? (avance?.assessment ?? null) : null,
+      notes: acceso.puedeVerNotas ? (avance?.notes ?? null) : null,
+      // Ni siquiera viajan al navegador de quien no puede verlas.
+      task: acceso.puedeVerNotas ? (avance?.task ?? null) : null,
+      evidence: acceso.puedeVerNotas ? (avance?.evidence ?? null) : null,
+      registradoPor: acceso.puedeVerNotas
+        ? (avance?.recordedBy?.fullName ?? null)
+        : null,
+    };
+  });
 
   return (
     <main className="px-5 py-[26px] pb-16 sm:px-[26px]">
@@ -214,30 +238,11 @@ export default async function PaginaExpediente({
                   orden flexible
                 </p>
               </div>
-              <ul className="mt-[14px] grid grid-cols-2 gap-[7px] text-[11.5px] leading-[1.2] font-semibold text-tinta sm:grid-cols-3">
-                {expediente.temas.map((tema) => {
-                  const avance = expediente.faithHouseProgress.find(
-                    (a) => a.topic.number === tema.number,
-                  );
-                  const estado = avance?.status ?? FaithHouseStatus.PENDIENTE;
-                  return (
-                    <li
-                      key={tema.id}
-                      className={`rounded-[8px] p-[10px] ${
-                        estado === FaithHouseStatus.COMPLETADO
-                          ? "bg-verde-100"
-                          : estado === FaithHouseStatus.EN_PROCESO
-                            ? "border-[1.5px] border-verde-500 bg-white"
-                            : estado === FaithHouseStatus.REQUIERE_SEGUIMIENTO
-                              ? "bg-ambar-fondo text-ambar-texto"
-                              : "bg-[rgba(19,28,36,.045)] text-[rgba(19,28,36,.45)]"
-                      }`}
-                    >
-                      {tema.number} {tema.name}
-                    </li>
-                  );
-                })}
-              </ul>
+              <CasaDeFe
+                learnerId={expediente.id}
+                temas={temasCasaDeFe}
+                puedeEditar={acceso.puedeEscribir}
+              />
             </section>
 
             <section className="tarjeta p-5">

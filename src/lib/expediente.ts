@@ -191,7 +191,11 @@ export async function cargarExpediente(learnerId: string) {
           status: true,
           completedAt: true,
           notes: true,
-          topic: { select: { number: true, name: true } },
+          assessment: true,
+          task: true,
+          evidence: true,
+          recordedBy: { select: { fullName: true } },
+          topic: { select: { id: true, number: true, name: true } },
         },
       },
     },
@@ -209,8 +213,13 @@ export async function cargarExpediente(learnerId: string) {
 
 /// Historia acumulativa: se arma con lo que realmente ocurrió, no con texto
 /// decorativo.
+///
+/// `incluyePrivado` decide si el detalle puede citar notas internas —las del
+/// tema de Casa de Fe y las de los contactos—. El aprendiz ve su línea de
+/// tiempo, así que para él la historia va sin ese detalle.
 export function construirLineaDeTiempo(
   expediente: DatosExpediente,
+  incluyePrivado = false,
 ): HitoLineaDeTiempo[] {
   const eventos: HitoLineaDeTiempo[] = [
     {
@@ -227,7 +236,10 @@ export function construirLineaDeTiempo(
     eventos.push({
       fecha: intento.occurredAt,
       titulo: intento.result ?? "Contacto registrado",
-      detalle: [intento.byUser?.fullName, intento.note].filter(Boolean).join(" · ") || null,
+      detalle:
+        [intento.byUser?.fullName, incluyePrivado ? intento.note : null]
+          .filter(Boolean)
+          .join(" · ") || null,
       tono: "azul",
     });
   }
@@ -270,7 +282,7 @@ export function construirLineaDeTiempo(
     eventos.push({
       fecha: avance.completedAt,
       titulo: `Tema ${avance.topic.number} completado — «${avance.topic.name}»`,
-      detalle: avance.notes,
+      detalle: incluyePrivado ? avance.notes : null,
       tono: "verde",
     });
   }

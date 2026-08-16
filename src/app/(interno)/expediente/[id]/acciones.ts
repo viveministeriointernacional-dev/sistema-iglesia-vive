@@ -1,7 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { MilestoneKind, MilestoneStatus } from "@iglesia/prisma-client";
+import {
+  FaithHouseStatus,
+  MilestoneKind,
+  MilestoneStatus,
+} from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
 import { auditar } from "@/lib/audit";
 import { ErrorDePermiso, obtenerUsuarioActual } from "@/lib/auth";
@@ -158,6 +162,80 @@ export async function registrarHito(
       entityType: "learner_profile",
       entityId: learnerId,
       metadata: { hito: kind, etiqueta: ETIQUETA_HITO[kind] },
+    });
+  });
+
+  revalidatePath(`/expediente/${learnerId}`);
+  return { ok: true };
+}
+
+export type TemaCasaDeFe = {
+  topicId: string;
+  numero: number;
+  nombre: string;
+  status: FaithHouseStatus;
+  assessment: string | null;
+  notes: string | null;
+  task: string | null;
+  evidence: string | null;
+  registradoPor: string | null;
+};
+
+/// Actualiza un tema de Casa de Fe. El orden lo decide el mentor, así que
+/// cualquier tema se puede trabajar en cualquier momento; lo que queda
+/// registrado es el estado, quién lo registró y cuándo
+/// (ESPECIFICACION_PRODUCTO.md §6.2).
+export async function actualizarTema(
+  learnerId: string,
+  topicId: string,
+  datos: {
+    status: FaithHouseStatus;
+    assessment: string;
+    notes: string;
+    task: string;
+    evidence: string;
+  },
+): Promise<ResultadoSimple> {
+  const { usuario, acceso } = await usuarioConAcceso(learnerId);
+
+  if (!acceso.puedeEscribir) {
+    return { ok: false, mensaje: "No puedes escribir en este expediente." };
+  }
+
+  const prisma = await getPrisma();
+
+  const tema = await prisma.faithHouseTopic.findUnique({
+    where: { id: topicId },
+    select: { id: true, number: true, name: true },
+  });
+  if (!tema) return { ok: false, mensaje: "Ese tema no existe." };
+
+  const limpio = (valor: string) => (valor.trim() ? valor.trim() : null);
+  const completado = datos.status === FaithHouseStatus.COMPLETADO;
+
+  await prisma.$transaction(async (tx) => {
+    const comunes = {
+      status: datos.status,
+      assessment: limpio(datos.assessment),
+      notes: limpio(datos.notes),
+      task: limpio(datos.task),
+      evidence: limpio(datos.evidence),
+      recordedById: usuario.id,
+      completedAt: completado ? new Date() : null,
+    };
+
+    await tx.faithHouseProgress.upsert({
+      where: { learnerId_topicId: { learnerId, topicId } },
+      create: { learnerId, topicId, ...comunes },
+      update: comunes,
+    });
+
+    await auditar(tx, {
+      actorId: usuario.id,
+      action: "casa_de_fe.tema_actualizado",
+      entityType: "learner_profile",
+      entityId: learnerId,
+      metadata: { tema: tema.number, nombre: tema.name, estado: datos.status },
     });
   });
 
