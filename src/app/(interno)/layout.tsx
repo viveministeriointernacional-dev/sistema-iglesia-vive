@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { Role } from "@iglesia/prisma-client";
 import { salir } from "@/app/ingresar/acciones";
 import {
   ETIQUETA_ROL,
@@ -37,6 +38,9 @@ export default async function LayoutInterno({
       : []),
     ...(ROLES_ALPHA.includes(usuario.role)
       ? [{ href: "/alpha", etiqueta: "Alpha" }]
+      : []),
+    ...(usuario.role === Role.APRENDIZ
+      ? [{ href: "/mi-proceso", etiqueta: "Mi proceso" }]
       : []),
   ];
 

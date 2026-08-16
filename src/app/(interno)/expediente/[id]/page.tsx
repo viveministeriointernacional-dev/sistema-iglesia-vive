@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import {
   FaithHouseStatus,
   MilestoneKind,
@@ -54,6 +54,9 @@ export default async function PaginaExpediente({
   const usuario = await requerirUsuario();
   const acceso = await accesoAExpediente(usuario, id);
 
+  // Quien mira su propio recorrido va a «Mi proceso»: el expediente lleva
+  // alertas de gestión y estado interno que no son para el aprendiz (§10).
+  if (acceso.esPropio && !acceso.puedeVer) redirect("/mi-proceso");
   if (!acceso.puedeVer) notFound();
 
   const expediente = await cargarExpediente(id);

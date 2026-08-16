@@ -242,7 +242,8 @@ export async function validarAlpha(
   }
 
   const ahora = new Date();
-  const detalle = `Asistencia ${participante.porcentaje} % · validó ${usuario.fullName}`;
+  // Quién validó ya queda en `recordedBy` del hito: no se repite en el detalle.
+  const detalle = `Asistencia ${participante.porcentaje} %`;
   const prisma = await getPrisma();
 
   await prisma.$transaction(async (tx) => {

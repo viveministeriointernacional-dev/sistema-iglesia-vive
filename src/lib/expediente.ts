@@ -63,6 +63,9 @@ export type AccesoExpediente = {
   /// su consolidador y los líderes responsables de la línea.
   puedeVerNotas: boolean;
   puedeEscribir: boolean;
+  /// El expediente es la herramienta de quien acompaña. Cuando quien mira es la
+  /// propia persona, su pantalla es «Mi proceso» (§10), no esta.
+  esPropio: boolean;
 };
 
 /// Resuelve qué puede hacer esta persona con este expediente.
@@ -84,10 +87,14 @@ export async function accesoAExpediente(
     },
   });
 
-  if (!aprendiz) return { puedeVer: false, puedeVerNotas: false, puedeEscribir: false };
+  const esPropio = Boolean(usuario.personId && usuario.personId === aprendiz?.personId);
+
+  if (!aprendiz) {
+    return { puedeVer: false, puedeVerNotas: false, puedeEscribir: false, esPropio };
+  }
 
   if (usuario.role === Role.ADMIN || usuario.role === Role.PASTOR) {
-    return { puedeVer: true, puedeVerNotas: true, puedeEscribir: true };
+    return { puedeVer: true, puedeVerNotas: true, puedeEscribir: true, esPropio };
   }
 
   const esSuMentor = aprendiz.mentorRelationships.some(
@@ -96,15 +103,15 @@ export async function accesoAExpediente(
   const esSuConsolidador = aprendiz.consolidatorId === usuario.id;
 
   if (esSuMentor || esSuConsolidador) {
-    return { puedeVer: true, puedeVerNotas: true, puedeEscribir: true };
+    return { puedeVer: true, puedeVerNotas: true, puedeEscribir: true, esPropio };
   }
 
-  // El aprendiz ve su propio expediente, nunca las notas.
-  if (usuario.personId && usuario.personId === aprendiz.personId) {
-    return { puedeVer: true, puedeVerNotas: false, puedeEscribir: false };
+  // El aprendiz no entra a su expediente: su pantalla es «Mi proceso».
+  if (esPropio) {
+    return { puedeVer: false, puedeVerNotas: false, puedeEscribir: false, esPropio };
   }
 
-  return { puedeVer: false, puedeVerNotas: false, puedeEscribir: false };
+  return { puedeVer: false, puedeVerNotas: false, puedeEscribir: false, esPropio };
 }
 
 export type HitoLineaDeTiempo = {
