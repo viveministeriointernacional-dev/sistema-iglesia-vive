@@ -29,6 +29,9 @@ export const ROLES_CONSOLIDACION: Role[] = [
   Role.ADMIN,
 ];
 
+/// Quién tiene una red de acompañamiento que mirar.
+export const ROLES_CON_RED: Role[] = [Role.MENTOR, Role.PASTOR, Role.ADMIN];
+
 /// Quién puede confirmar la entrega a mentor. La asignación la propone el
 /// sistema; la decisión final la confirma un líder
 /// (ESPECIFICACION_PRODUCTO.md §5.6).

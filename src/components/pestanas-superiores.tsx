@@ -3,17 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const PESTANAS = [
-  { href: "/operacion-72", etiqueta: "Operación 72" },
-  { href: "/registro", etiqueta: "Registrar persona" },
-];
+export type Pestana = { href: string; etiqueta: string };
 
-export function PestanasSuperiores() {
+export function PestanasSuperiores({ pestanas }: { pestanas: Pestana[] }) {
   const ruta = usePathname();
 
   return (
-    <nav className="flex items-center gap-2">
-      {PESTANAS.map((pestana) => {
+    <nav className="flex flex-wrap items-center gap-2">
+      {pestanas.map((pestana) => {
         const activa = ruta.startsWith(pestana.href);
         return (
           <Link

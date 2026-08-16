@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getPrisma } from "@/lib/prisma";
-import { ETIQUETA_ROL, requerirUsuario } from "@/lib/auth";
+import { ETIQUETA_ROL, requerirUsuario, ROLES_CON_RED } from "@/lib/auth";
 
 export const metadata = { title: "Mi proceso · Iglesia Vive" };
 
@@ -18,6 +18,8 @@ export default async function MiProceso() {
     });
     if (propio) redirect(`/expediente/${propio.id}`);
   }
+
+  if (ROLES_CON_RED.includes(usuario.role)) redirect("/mi-red");
 
   return (
     <main className="grid place-items-start justify-center px-5 py-[30px] pb-16">
