@@ -12,6 +12,7 @@ import {
   FASES,
   HITOS_DEL_RECORRIDO,
 } from "@/lib/expediente";
+import { ETIQUETA_EVENTO, proximoEventoDe } from "@/lib/eventos";
 import { cargarMiAlpha, miHistoria, miProximoPaso } from "@/lib/mi-proceso";
 
 export const metadata = { title: "Mi proceso · Iglesia Vive" };
@@ -20,6 +21,14 @@ export const dynamic = "force-dynamic";
 const FECHA_CORTA = new Intl.DateTimeFormat("es-CO", {
   day: "numeric",
   month: "short",
+});
+
+const FECHA_LARGA = new Intl.DateTimeFormat("es-CO", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  hour: "numeric",
+  minute: "2-digit",
 });
 
 /// El recorrido visto por la persona que lo está viviendo (§10).
@@ -47,7 +56,10 @@ export default async function MiProceso() {
   if (!expediente) return <SinExpediente nombre={usuario.fullName} rol={usuario.role} />;
 
   const ahora = new Date();
-  const alpha = await cargarMiAlpha(propio.id, ahora);
+  const [alpha, evento] = await Promise.all([
+    cargarMiAlpha(propio.id, ahora),
+    proximoEventoDe(propio.id, expediente.phase, ahora),
+  ]);
 
   const faseActual = FASES.findIndex((f) => f.valor === expediente.phase);
   const paso = miProximoPaso(expediente);
@@ -174,6 +186,28 @@ export default async function MiProceso() {
           </section>
 
           <div className="flex flex-col gap-[14px]">
+            {evento ? (
+              <section className="tarjeta p-5">
+                <h2 className="etiqueta-seccion">PRÓXIMO EVENTO</h2>
+                <p className="mt-[10px] font-serif text-[18px] leading-[1.25] font-normal text-tinta">
+                  {evento.titulo}
+                </p>
+                <p className="mt-1 text-[11.5px] leading-[1.4] font-medium text-[rgba(19,28,36,.5)]">
+                  {ETIQUETA_EVENTO[evento.kind]} · {FECHA_LARGA.format(evento.fecha)}
+                  {evento.lugar ? ` · ${evento.lugar}` : ""}
+                </p>
+                {evento.inscripcion && evento.inscripcion !== "CANCELADO" ? (
+                  <p className="mt-3 rounded-[8px] bg-verde-100 px-2 py-1 text-[10px] leading-[1.4] font-bold text-verde-700">
+                    ✓ TIENES TU LUGAR
+                  </p>
+                ) : (
+                  <p className="mt-3 text-[11.5px] leading-[1.4] font-medium text-[rgba(19,28,36,.5)]">
+                    Habla con quien te acompaña para apartar tu lugar.
+                  </p>
+                )}
+              </section>
+            ) : null}
+
             {alpha ? (
               <section className="tarjeta p-5">
                 <h2 className="etiqueta-seccion">TU GRUPO DE ALPHA</h2>
