@@ -1,8 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { salir } from "@/app/ingresar/acciones";
-import { ETIQUETA_ROL, requerirUsuario } from "@/lib/auth";
-import { ROLES_CONSOLIDACION } from "@/lib/auth";
+import {
+  ETIQUETA_ROL,
+  requerirUsuario,
+  ROLES_CON_RED,
+  ROLES_CONSOLIDACION,
+} from "@/lib/auth";
 import { PestanasSuperiores } from "@/components/pestanas-superiores";
 
 function iniciales(nombre: string) {
@@ -19,7 +23,18 @@ export default async function LayoutInterno({
   children: React.ReactNode;
 }) {
   const usuario = await requerirUsuario();
-  const puedeConsolidar = ROLES_CONSOLIDACION.includes(usuario.role);
+
+  const pestanas = [
+    ...(ROLES_CON_RED.includes(usuario.role)
+      ? [{ href: "/mi-red", etiqueta: "Mi red" }]
+      : []),
+    ...(ROLES_CONSOLIDACION.includes(usuario.role)
+      ? [
+          { href: "/operacion-72", etiqueta: "Operación 72" },
+          { href: "/registro", etiqueta: "Registrar persona" },
+        ]
+      : []),
+  ];
 
   return (
     <div className="min-h-screen bg-escritorio">
@@ -37,7 +52,7 @@ export default async function LayoutInterno({
             />
           </Link>
 
-          {puedeConsolidar ? <PestanasSuperiores /> : null}
+          {pestanas.length ? <PestanasSuperiores pestanas={pestanas} /> : null}
         </div>
 
         <div className="flex items-center gap-3">

@@ -7,9 +7,11 @@ export default async function Inicio() {
 
   switch (usuario.role) {
     case Role.CONSOLIDADOR:
+      redirect("/operacion-72");
+    case Role.MENTOR:
     case Role.PASTOR:
     case Role.ADMIN:
-      redirect("/operacion-72");
+      redirect("/mi-red");
     default:
       redirect("/mi-proceso");
   }
