@@ -8,6 +8,8 @@ export default async function Inicio() {
   switch (usuario.role) {
     case Role.CONSOLIDADOR:
       redirect("/operacion-72");
+    case Role.LIDER_ALPHA:
+      redirect("/alpha");
     case Role.MENTOR:
     case Role.PASTOR:
     case Role.ADMIN:

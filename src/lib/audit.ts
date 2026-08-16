@@ -14,6 +14,8 @@ export type AccionAuditada =
   | "notas.reveladas"
   | "hito.registrado"
   | "casa_de_fe.tema_actualizado"
+  | "alpha.focus_day"
+  | "alpha.validado"
   | "fase.cambiada"
   | "duplicado.detectado";
 

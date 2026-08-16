@@ -4,6 +4,7 @@ import { salir } from "@/app/ingresar/acciones";
 import {
   ETIQUETA_ROL,
   requerirUsuario,
+  ROLES_ALPHA,
   ROLES_CON_RED,
   ROLES_CONSOLIDACION,
 } from "@/lib/auth";
@@ -33,6 +34,9 @@ export default async function LayoutInterno({
           { href: "/operacion-72", etiqueta: "Operación 72" },
           { href: "/registro", etiqueta: "Registrar persona" },
         ]
+      : []),
+    ...(ROLES_ALPHA.includes(usuario.role)
+      ? [{ href: "/alpha", etiqueta: "Alpha" }]
       : []),
   ];
 

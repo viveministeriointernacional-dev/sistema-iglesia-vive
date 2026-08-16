@@ -62,6 +62,9 @@ model AppUser {
   notasEscritas         PrivateNote[]
   hitosRegistrados      Milestone[]
   temasRegistrados      FaithHouseProgress[]
+  gruposAlphaLiderados  AlphaProgram[]       @relation("LiderDeAlpha")
+  validacionesAlpha     AlphaEnrollment[]    @relation("ValidacionAlpha")
+  asistenciasAlpha      AlphaAttendance[]
   registrosCreados      LearnerProfile[]     @relation("RegistradaPor")
   auditoria             AuditLog[]
 
@@ -74,8 +77,9 @@ model Team {
   name      String   @unique
   createdAt DateTime @default(now()) @map("created_at")
 
-  members  AppUser[]
-  learners LearnerProfile[]
+  members     AppUser[]
+  learners    LearnerProfile[]
+  gruposAlpha AlphaProgram[]
 
   @@map("team")
 }
@@ -179,6 +183,7 @@ model LearnerProfile {
   milestones          Milestone[]
   privateNotes        PrivateNote[]
   faithHouseProgress  FaithHouseProgress[]
+  alphaEnrollments    AlphaEnrollment[]
 
   @@index([phase, status])
   @@map("learner_profile")
@@ -268,6 +273,86 @@ model ContactAttempt {
 
   @@index([operation72Id, occurredAt])
   @@map("contact_attempt")
+}
+
+// ------------------------------------------------------------------- Alpha
+
+/// Grupo de Alpha. Referencia: 3 meses, 12 sesiones
+/// (ESPECIFICACION_PRODUCTO.md §5.7).
+model AlphaProgram {
+  id        String    @id @default(uuid())
+  name      String
+  startDate DateTime  @map("start_date") @db.Date
+  endDate   DateTime? @map("end_date") @db.Date
+  leaderId  String    @map("leader_id")
+  teamId    String?   @map("team_id")
+  closedAt  DateTime? @map("closed_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  leader      AppUser           @relation("LiderDeAlpha", fields: [leaderId], references: [id])
+  team        Team?             @relation(fields: [teamId], references: [id])
+  sessions    AlphaSession[]
+  enrollments AlphaEnrollment[]
+
+  @@index([leaderId, closedAt])
+  @@map("alpha_program")
+}
+
+model AlphaSession {
+  id        String   @id @default(uuid())
+  programId String   @map("program_id")
+  number    Int
+  date      DateTime @db.Date
+  topic     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  program    AlphaProgram      @relation(fields: [programId], references: [id], onDelete: Cascade)
+  attendance AlphaAttendance[]
+
+  @@unique([programId, number])
+  @@map("alpha_session")
+}
+
+/// Participación de una persona en el grupo. Aquí viven el Focus Day y la
+/// validación final del líder, que son las dos condiciones que el sistema no
+/// puede dar por cumplidas solo.
+model AlphaEnrollment {
+  id             String    @id @default(uuid())
+  programId      String    @map("program_id")
+  learnerId      String    @map("learner_id")
+  joinedAt       DateTime  @default(now()) @map("joined_at")
+  focusDayAt     DateTime? @map("focus_day_at")
+  validatedAt    DateTime? @map("validated_at")
+  validatedById  String?   @map("validated_by_id")
+  validationNote String?   @map("validation_note")
+
+  program     AlphaProgram      @relation(fields: [programId], references: [id], onDelete: Cascade)
+  learner     LearnerProfile    @relation(fields: [learnerId], references: [id])
+  validatedBy AppUser?          @relation("ValidacionAlpha", fields: [validatedById], references: [id])
+  attendance  AlphaAttendance[]
+
+  @@unique([programId, learnerId])
+  @@map("alpha_enrollment")
+}
+
+model AlphaAttendance {
+  id           String   @id @default(uuid())
+  sessionId    String   @map("session_id")
+  enrollmentId String   @map("enrollment_id")
+  present      Boolean  @default(false)
+  /// Observación privada de la sesión: no se muestra al aprendiz.
+  note         String?
+  recordedById String?  @map("recorded_by_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  session    AlphaSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  enrollment AlphaEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  recordedBy AppUser?        @relation(fields: [recordedById], references: [id])
+
+  @@unique([sessionId, enrollmentId])
+  @@map("alpha_attendance")
 }
 
 // ----------------------------------------------------- Hitos, notas, Casa de Fe
