@@ -9,6 +9,7 @@ import {
   ROLES_CON_RED,
   ROLES_CONSOLIDACION,
 } from "@/lib/auth";
+import { ROLES_OPERAN_EVENTOS } from "@/lib/eventos";
 import { PestanasSuperiores } from "@/components/pestanas-superiores";
 
 function iniciales(nombre: string) {
@@ -38,6 +39,9 @@ export default async function LayoutInterno({
       : []),
     ...(ROLES_ALPHA.includes(usuario.role)
       ? [{ href: "/alpha", etiqueta: "Alpha" }]
+      : []),
+    ...(ROLES_OPERAN_EVENTOS.includes(usuario.role)
+      ? [{ href: "/eventos", etiqueta: "Eventos" }]
       : []),
     ...(usuario.role === Role.APRENDIZ
       ? [{ href: "/mi-proceso", etiqueta: "Mi proceso" }]

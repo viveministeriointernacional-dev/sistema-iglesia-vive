@@ -16,6 +16,11 @@ export type AccionAuditada =
   | "casa_de_fe.tema_actualizado"
   | "alpha.focus_day"
   | "alpha.validado"
+  | "evento.publicado"
+  | "evento.despublicado"
+  | "evento.cancelado"
+  | "evento.inscripcion"
+  | "evento.asistencia"
   | "fase.cambiada"
   | "duplicado.detectado";
 
