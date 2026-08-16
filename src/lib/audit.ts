@@ -13,6 +13,7 @@ export type AccionAuditada =
   | "mentor.asignado"
   | "notas.reveladas"
   | "hito.registrado"
+  | "casa_de_fe.tema_actualizado"
   | "fase.cambiada"
   | "duplicado.detectado";
 
