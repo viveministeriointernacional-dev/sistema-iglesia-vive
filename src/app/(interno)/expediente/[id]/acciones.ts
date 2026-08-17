@@ -3,13 +3,25 @@
 import { revalidatePath } from "next/cache";
 import {
   FaithHouseStatus,
+  LearnerStatus,
   MilestoneKind,
   MilestoneStatus,
+  type Phase,
 } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
-import { auditar } from "@/lib/audit";
+import { auditar, encolarEventoIntegracion } from "@/lib/audit";
 import { ErrorDePermiso, obtenerUsuarioActual } from "@/lib/auth";
-import { accesoAExpediente, ETIQUETA_HITO, HITOS_REGISTRABLES } from "@/lib/expediente";
+import {
+  accesoAExpediente,
+  cargarExpediente,
+  ETIQUETA_HITO,
+  HITOS_REGISTRABLES,
+} from "@/lib/expediente";
+import {
+  HITO_DE_TRANSICION,
+  puedeCambiarFase,
+  requisitosDeFase,
+} from "@/lib/fases";
 
 export type NotaPastoral = {
   id: string;
@@ -241,4 +253,122 @@ export async function actualizarTema(
 
   revalidatePath(`/expediente/${learnerId}`);
   return { ok: true };
+}
+
+/// Aprueba el paso a la siguiente fase.
+///
+/// La regla pastoral la definió la iglesia: basta el mentor de esa persona, y
+/// el pastor también puede. Las condiciones se vuelven a comprobar aquí; la
+/// decisión queda registrada con fecha y responsable (§8.2, §19), y deja el
+/// hito formal que corresponda.
+export async function cambiarDeFase(
+  learnerId: string,
+  nota: string,
+): Promise<{ ok: true; fase: Phase } | { ok: false; mensaje: string }> {
+  const usuario = await obtenerUsuarioActual();
+  if (!usuario) throw new ErrorDePermiso("Tu sesión expiró. Vuelve a entrar.");
+
+  if (!(await puedeCambiarFase(usuario, learnerId))) {
+    return {
+      ok: false,
+      mensaje: "Solo su mentor o un pastor pueden aprobar el cambio de fase.",
+    };
+  }
+
+  const expediente = await cargarExpediente(learnerId);
+  if (!expediente) return { ok: false, mensaje: "Esa persona no existe." };
+
+  if (expediente.status !== LearnerStatus.ACTIVO) {
+    return {
+      ok: false,
+      mensaje: `Su proceso está en ${expediente.status.toLowerCase()}: retómalo antes de avanzar de fase.`,
+    };
+  }
+
+  const requisitos = requisitosDeFase(expediente);
+  if (!requisitos.destino) {
+    return { ok: false, mensaje: "Ya está en la última fase del recorrido." };
+  }
+  if (!requisitos.puedeAvanzar) {
+    return {
+      ok: false,
+      mensaje: `Todavía falta: ${requisitos.faltantes.join(", ")}.`,
+    };
+  }
+
+  const desde = expediente.phase;
+  const hasta = requisitos.destino;
+  const ahora = new Date();
+  const hito = HITO_DE_TRANSICION[desde];
+  const prisma = await getPrisma();
+
+  let yaCambiada = false;
+
+  await prisma.$transaction(async (tx) => {
+    // La condición sobre la fase actual hace la aprobación idempotente: si dos
+    // líderes pulsan a la vez, solo la primera escribe. Sin esto quedarían dos
+    // registros, dos entradas de bitácora y dos avisos a la persona.
+    const cambiadas = await tx.learnerProfile.updateMany({
+      where: { id: learnerId, phase: desde },
+      data: { phase: hasta, phaseStartedAt: ahora },
+    });
+    if (cambiadas.count === 0) {
+      yaCambiada = true;
+      return;
+    }
+
+    await tx.phaseChange.create({
+      data: {
+        learnerId,
+        fromPhase: desde,
+        toPhase: hasta,
+        decidedById: usuario.id,
+        decidedAt: ahora,
+        note: nota.trim() || null,
+      },
+    });
+
+    if (hito) {
+      await tx.milestone.upsert({
+        where: { learnerId_kind: { learnerId, kind: hito } },
+        create: {
+          learnerId,
+          kind: hito,
+          status: MilestoneStatus.COMPLETADO,
+          achievedAt: ahora,
+          detail: `Paso a ${hasta}`,
+          recordedById: usuario.id,
+        },
+        update: {
+          status: MilestoneStatus.COMPLETADO,
+          achievedAt: ahora,
+          detail: `Paso a ${hasta}`,
+          recordedById: usuario.id,
+        },
+      });
+    }
+
+    await auditar(tx, {
+      actorId: usuario.id,
+      action: "fase.cambiada",
+      entityType: "learner_profile",
+      entityId: learnerId,
+      metadata: { desde, hasta, nota: nota.trim() || null },
+    });
+
+    await encolarEventoIntegracion(tx, "fase_cambiada", {
+      learnerId,
+      desde,
+      hasta,
+    });
+  });
+
+  if (yaCambiada) {
+    return { ok: false, mensaje: "Alguien más ya aprobó este paso. Recarga la página." };
+  }
+
+  revalidatePath(`/expediente/${learnerId}`);
+  revalidatePath("/mi-red");
+  revalidatePath("/red");
+  return { ok: true, fase: hasta };
 }
