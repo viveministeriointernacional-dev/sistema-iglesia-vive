@@ -12,6 +12,7 @@ import {
   FASES,
   HITOS_DEL_RECORRIDO,
 } from "@/lib/expediente";
+import { cargarMiEscuela } from "@/lib/entrenar";
 import { ETIQUETA_EVENTO, proximoEventoDe } from "@/lib/eventos";
 import { cargarMiAlpha, miHistoria, miProximoPaso } from "@/lib/mi-proceso";
 
@@ -56,9 +57,10 @@ export default async function MiProceso() {
   if (!expediente) return <SinExpediente nombre={usuario.fullName} rol={usuario.role} />;
 
   const ahora = new Date();
-  const [alpha, evento] = await Promise.all([
+  const [alpha, evento, escuela] = await Promise.all([
     cargarMiAlpha(propio.id, ahora),
     proximoEventoDe(propio.id, expediente.phase, ahora),
+    cargarMiEscuela(propio.id, ahora),
   ]);
 
   const faseActual = FASES.findIndex((f) => f.valor === expediente.phase);
@@ -205,6 +207,51 @@ export default async function MiProceso() {
                     Habla con quien te acompaña para apartar tu lugar.
                   </p>
                 )}
+              </section>
+            ) : null}
+
+            {escuela ? (
+              <section className="tarjeta p-5">
+                <h2 className="etiqueta-seccion">ESCUELA SER LÍDER</h2>
+                <p className="mt-[10px] font-serif text-[18px] leading-[1.25] font-normal text-tinta">
+                  {escuela.escuela}
+                </p>
+                <p className="mt-1 text-[11.5px] leading-[1.4] font-medium text-[rgba(19,28,36,.5)]">
+                  Con {escuela.lider} · has ido a {escuela.presentes} de{" "}
+                  {escuela.realizadas}{" "}
+                  {escuela.realizadas === 1 ? "sesión" : "sesiones"}
+                </p>
+
+                {escuela.proxima ? (
+                  <div className="mt-3 rounded-[10px] bg-papel p-3">
+                    <p className="text-[12.5px] leading-[1.45] font-semibold text-tinta">
+                      Próxima · sesión {escuela.proxima.numero} el{" "}
+                      {FECHA_CORTA.format(escuela.proxima.fecha)} ·{" "}
+                      {escuela.proxima.tema}
+                    </p>
+                    {escuela.proxima.tarea ? (
+                      <p className="mt-2 text-[11.5px] leading-[1.45] font-medium text-[rgba(19,28,36,.6)]">
+                        Tarea: {escuela.proxima.tarea}
+                      </p>
+                    ) : null}
+                    {escuela.proxima.recurso ? (
+                      <a
+                        href={escuela.proxima.recurso}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="mt-2 inline-block text-[11.5px] leading-none font-semibold text-azul-700 underline"
+                      >
+                        Material de la sesión
+                      </a>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {escuela.completado ? (
+                  <p className="mt-3 rounded-[8px] bg-verde-100 px-2 py-1 text-[10px] leading-[1.4] font-bold text-verde-700">
+                    ✓ ESCUELA COMPLETADA · {FECHA_CORTA.format(escuela.completado)}
+                  </p>
+                ) : null}
               </section>
             ) : null}
 
