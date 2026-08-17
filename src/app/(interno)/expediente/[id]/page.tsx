@@ -20,7 +20,9 @@ import {
   proximoPaso,
   telefonoParcial,
 } from "@/lib/expediente";
+import { cargarServicios, ROLES_ENTRENAR } from "@/lib/entrenar";
 import { CasaDeFe } from "./casa-de-fe";
+import { Servicio, type ServicioVista } from "./servicio";
 import type { TemaCasaDeFe } from "./acciones";
 import { NotasPastorales, RegistrarHito } from "./panel-lateral";
 
@@ -67,6 +69,21 @@ export default async function PaginaExpediente({
   const cantidadDeNotas = acceso.puedeVerNotas
     ? await prisma.privateNote.count({ where: { learnerId: id } })
     : 0;
+
+  // El servicio es parte del acompañamiento, no del panel del aprendiz: solo
+  // se carga para quien puede ver las notas.
+  const servicios: ServicioVista[] = acceso.puedeVerNotas
+    ? (await cargarServicios(id)).map((servicio) => ({
+        id: servicio.id,
+        ministerio: servicio.ministry,
+        status: servicio.status,
+        desde: FECHA_CORTA.format(servicio.startedAt),
+        hasta: servicio.endedAt ? FECHA_CORTA.format(servicio.endedAt) : null,
+        responsable: servicio.responsible?.fullName ?? null,
+        observaciones: servicio.notes,
+        evidencia: servicio.evidence,
+      }))
+    : [];
 
   const nombre = nombreCompleto(expediente.person);
   const edad = edadDesde(expediente.person.birthDate, ahora);
@@ -339,6 +356,14 @@ export default async function PaginaExpediente({
                 puedeEscribir={acceso.puedeEscribir}
               />
             </div>
+          ) : null}
+
+          {acceso.puedeVerNotas ? (
+            <Servicio
+              learnerId={expediente.id}
+              servicios={servicios}
+              puedeEditar={acceso.puedeEscribir && ROLES_ENTRENAR.includes(usuario.role)}
+            />
           ) : null}
 
           <section className="mt-3 rounded-[12px] bg-papel p-4">

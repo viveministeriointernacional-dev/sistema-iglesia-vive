@@ -9,6 +9,7 @@ import {
   ROLES_CON_RED,
   ROLES_CONSOLIDACION,
 } from "@/lib/auth";
+import { ROLES_ENTRENAR } from "@/lib/entrenar";
 import { ROLES_OPERAN_EVENTOS } from "@/lib/eventos";
 import { PestanasSuperiores } from "@/components/pestanas-superiores";
 
@@ -42,6 +43,9 @@ export default async function LayoutInterno({
       : []),
     ...(ROLES_ALPHA.includes(usuario.role)
       ? [{ href: "/alpha", etiqueta: "Alpha" }]
+      : []),
+    ...(ROLES_ENTRENAR.includes(usuario.role)
+      ? [{ href: "/escuela", etiqueta: "Escuela" }]
       : []),
     ...(ROLES_OPERAN_EVENTOS.includes(usuario.role)
       ? [{ href: "/eventos", etiqueta: "Eventos" }]

@@ -66,6 +66,11 @@ model AppUser {
   validacionesAlpha     AlphaEnrollment[]    @relation("ValidacionAlpha")
   asistenciasAlpha      AlphaAttendance[]
   registrosCreados      LearnerProfile[]     @relation("RegistradaPor")
+  escuelasLideradas     TrainingProgram[]    @relation("LiderDeEscuela")
+  cierresDeEscuela      TrainingEnrollment[] @relation("CerroEscuela")
+  asistenciasEscuela    TrainingAttendance[]
+  serviciosResponsable  ServiceAssignment[]  @relation("ResponsableDeServicio")
+  serviciosRegistrados  ServiceAssignment[]  @relation("RegistroServicio")
   eventosCreados        Event[]              @relation("EventoCreadoPor")
   inscripcionesEvento   EventRegistration[]  @relation("InscribioAEvento")
   asistenciasEvento     EventRegistration[]  @relation("MarcoAsistenciaEvento")
@@ -83,6 +88,7 @@ model Team {
   members     AppUser[]
   learners    LearnerProfile[]
   gruposAlpha AlphaProgram[]
+  escuelas    TrainingProgram[]
   eventos     Event[]
 
   @@map("team")
@@ -189,6 +195,8 @@ model LearnerProfile {
   faithHouseProgress  FaithHouseProgress[]
   alphaEnrollments    AlphaEnrollment[]
   eventRegistrations  EventRegistration[]
+  trainingEnrollments TrainingEnrollment[]
+  serviceAssignments  ServiceAssignment[]
 
   @@index([phase, status])
   @@map("learner_profile")
@@ -559,6 +567,131 @@ model EventRegistration {
   @@unique([eventId, learnerId])
   @@index([learnerId])
   @@map("event_registration")
+}
+
+// ----------------------------------------------------- Entrenar (§7)
+
+/// El ritmo del §7.3: taller presencial el primer sábado de cada mes y
+/// talleres virtuales los sábados según programación. La programación exacta la
+/// arma administración sesión por sesión, no una regla fija en código.
+enum TrainingSessionKind {
+  PRESENCIAL
+  VIRTUAL
+}
+
+model TrainingProgram {
+  id        String    @id @default(uuid())
+  name      String
+  startDate DateTime  @map("start_date") @db.Date
+  endDate   DateTime? @map("end_date") @db.Date
+  leaderId  String    @map("leader_id")
+  teamId    String?   @map("team_id")
+  closedAt  DateTime? @map("closed_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  leader      AppUser              @relation("LiderDeEscuela", fields: [leaderId], references: [id])
+  team        Team?                @relation(fields: [teamId], references: [id])
+  sessions    TrainingSession[]
+  enrollments TrainingEnrollment[]
+
+  @@index([leaderId, closedAt])
+  @@map("training_program")
+}
+
+model TrainingSession {
+  id        String              @id @default(uuid())
+  programId String              @map("program_id")
+  number    Int
+  date      DateTime            @db.Date
+  kind      TrainingSessionKind @default(VIRTUAL)
+  topic     String
+  /// Contenido y recursos de la sesión (§7.2). Un enlace, no un gestor de
+  /// archivos: la iglesia ya publica su material en otra parte.
+  resource  String?
+  /// Tarea asignada en la sesión.
+  task      String?
+  createdAt DateTime            @default(now()) @map("created_at")
+
+  program    TrainingProgram      @relation(fields: [programId], references: [id], onDelete: Cascade)
+  attendance TrainingAttendance[]
+
+  @@unique([programId, number])
+  @@map("training_session")
+}
+
+model TrainingEnrollment {
+  id          String    @id @default(uuid())
+  programId   String    @map("program_id")
+  learnerId   String    @map("learner_id")
+  joinedAt    DateTime  @default(now()) @map("joined_at")
+  /// Cierre de la escuela para esta persona. Como en Alpha, lo emite el líder:
+  /// el sistema comprueba condiciones, no aprueba solo.
+  completedAt DateTime? @map("completed_at")
+  completedById String? @map("completed_by_id")
+  completionNote String? @map("completion_note")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  program     TrainingProgram      @relation(fields: [programId], references: [id], onDelete: Cascade)
+  learner     LearnerProfile       @relation(fields: [learnerId], references: [id])
+  completedBy AppUser?             @relation("CerroEscuela", fields: [completedById], references: [id])
+  attendance  TrainingAttendance[]
+
+  @@unique([programId, learnerId])
+  @@map("training_enrollment")
+}
+
+model TrainingAttendance {
+  id            String   @id @default(uuid())
+  sessionId     String   @map("session_id")
+  enrollmentId  String   @map("enrollment_id")
+  present       Boolean  @default(false)
+  /// Si entregó la tarea de esa sesión (§7.2).
+  taskDelivered Boolean  @default(false) @map("task_delivered")
+  note          String?
+  recordedById  String?  @map("recorded_by_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  session    TrainingSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  enrollment TrainingEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  recordedBy AppUser?           @relation(fields: [recordedById], references: [id])
+
+  @@unique([sessionId, enrollmentId])
+  @@map("training_attendance")
+}
+
+enum ServiceStatus {
+  PROPUESTO
+  ACTIVO
+  PAUSADO
+  FINALIZADO
+}
+
+/// Servicio en un ministerio (§7.4).
+model ServiceAssignment {
+  id            String        @id @default(uuid())
+  learnerId     String        @map("learner_id")
+  ministry      String
+  status        ServiceStatus @default(PROPUESTO)
+  startedAt     DateTime      @map("started_at") @db.Date
+  endedAt       DateTime?     @map("ended_at") @db.Date
+  /// Quién responde por esa persona dentro del ministerio.
+  responsibleId String?       @map("responsible_id")
+  notes         String?
+  /// Evidencia de servicio: un enlace o una descripción de lo que se hizo.
+  evidence      String?
+  registeredById String?      @map("registered_by_id")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  learner      LearnerProfile @relation(fields: [learnerId], references: [id])
+  responsible  AppUser?       @relation("ResponsableDeServicio", fields: [responsibleId], references: [id])
+  registeredBy AppUser?       @relation("RegistroServicio", fields: [registeredById], references: [id])
+
+  @@index([learnerId, status])
+  @@map("service_assignment")
 }
 
 enum IntegrationStatus {
