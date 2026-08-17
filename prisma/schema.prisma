@@ -71,6 +71,7 @@ model AppUser {
   asistenciasEscuela    TrainingAttendance[]
   serviciosResponsable  ServiceAssignment[]  @relation("ResponsableDeServicio")
   serviciosRegistrados  ServiceAssignment[]  @relation("RegistroServicio")
+  cambiosDeFase         PhaseChange[]        @relation("DecidioCambioDeFase")
   eventosCreados        Event[]              @relation("EventoCreadoPor")
   inscripcionesEvento   EventRegistration[]  @relation("InscribioAEvento")
   asistenciasEvento     EventRegistration[]  @relation("MarcoAsistenciaEvento")
@@ -197,6 +198,7 @@ model LearnerProfile {
   eventRegistrations  EventRegistration[]
   trainingEnrollments TrainingEnrollment[]
   serviceAssignments  ServiceAssignment[]
+  phaseChanges        PhaseChange[]
 
   @@index([phase, status])
   @@map("learner_profile")
@@ -692,6 +694,27 @@ model ServiceAssignment {
 
   @@index([learnerId, status])
   @@map("service_assignment")
+}
+
+/// Historia de fases (§8.2, §19). Cada paso de una fase a la siguiente deja
+/// registro de la decisión, la fecha y el responsable: no es un campo que
+/// cambia sin dejar rastro.
+model PhaseChange {
+  id           String   @id @default(uuid())
+  learnerId    String   @map("learner_id")
+  fromPhase    Phase    @map("from_phase")
+  toPhase      Phase    @map("to_phase")
+  /// Quién aprobó: su mentor o el pastor de la línea.
+  decidedById  String   @map("decided_by_id")
+  decidedAt    DateTime @default(now()) @map("decided_at")
+  note         String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  learner   LearnerProfile @relation(fields: [learnerId], references: [id])
+  decidedBy AppUser        @relation("DecidioCambioDeFase", fields: [decidedById], references: [id])
+
+  @@index([learnerId, decidedAt])
+  @@map("phase_change")
 }
 
 enum IntegrationStatus {

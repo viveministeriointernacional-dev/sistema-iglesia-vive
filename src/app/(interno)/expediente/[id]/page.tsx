@@ -3,7 +3,6 @@ import {
   FaithHouseStatus,
   MilestoneKind,
   MilestoneStatus,
-  Phase,
 } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
 import { requerirUsuario } from "@/lib/auth";
@@ -21,6 +20,12 @@ import {
   telefonoParcial,
 } from "@/lib/expediente";
 import { cargarServicios, ROLES_ENTRENAR } from "@/lib/entrenar";
+import {
+  cargarHistorialDeFases,
+  puedeCambiarFase,
+  requisitosDeFase,
+} from "@/lib/fases";
+import { CambioDeFase, type HistorialDeFase } from "./cambio-de-fase";
 import { CasaDeFe } from "./casa-de-fe";
 import { Servicio, type ServicioVista } from "./servicio";
 import type { TemaCasaDeFe } from "./acciones";
@@ -82,6 +87,23 @@ export default async function PaginaExpediente({
         responsable: servicio.responsible?.fullName ?? null,
         observaciones: servicio.notes,
         evidencia: servicio.evidence,
+      }))
+    : [];
+
+  // El cambio de fase es asunto de quien acompaña: ni se calcula ni se envía
+  // al navegador del aprendiz.
+  const requisitos = acceso.puedeVerNotas ? requisitosDeFase(expediente) : null;
+  const puedeAprobarFase = acceso.puedeVerNotas
+    ? await puedeCambiarFase(usuario, id)
+    : false;
+  const historialDeFases: HistorialDeFase[] = acceso.puedeVerNotas
+    ? (await cargarHistorialDeFases(id)).map((paso) => ({
+        id: paso.id,
+        desde: paso.fromPhase,
+        hasta: paso.toPhase,
+        fecha: FECHA_CORTA.format(paso.decidedAt),
+        decidio: paso.decidedBy.fullName,
+        nota: paso.note,
       }))
     : [];
 
@@ -358,6 +380,17 @@ export default async function PaginaExpediente({
             </div>
           ) : null}
 
+          {requisitos ? (
+            <CambioDeFase
+              learnerId={expediente.id}
+              destino={requisitos.destino}
+              cumplidos={requisitos.cumplidos}
+              faltantes={requisitos.faltantes}
+              historial={historialDeFases}
+              puedeAprobar={puedeAprobarFase}
+            />
+          ) : null}
+
           {acceso.puedeVerNotas ? (
             <Servicio
               learnerId={expediente.id}
@@ -423,12 +456,6 @@ export default async function PaginaExpediente({
             </dl>
           </section>
 
-          {expediente.phase === Phase.GANAR && expediente.operation72 ? (
-            <p className="mt-3 text-[11.5px] leading-[1.5] font-medium text-[rgba(19,28,36,.45)]">
-              El cierre de fase requiere validación de un líder. Todavía no está
-              habilitado en el sistema.
-            </p>
-          ) : null}
         </aside>
       </div>
     </main>

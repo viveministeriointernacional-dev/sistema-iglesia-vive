@@ -160,10 +160,11 @@ export async function cargarArbol(usuario: UsuarioSesion, ahora = new Date()) {
     propio.porFase[aprendiz.phase] += 1;
 
     if (aprendiz.status === LearnerStatus.ACTIVO) propio.activas += 1;
-    if (aprendiz.status === LearnerStatus.GRADUADO) propio.graduaciones += 1;
     if (aprendiz.phase === Phase.MULTIPLICAR) propio.multiplicadores += 1;
 
     const kinds = new Set(aprendiz.milestones.map((h) => h.kind));
+    // La graduación es el hito formal del §8.4, no un estado suelto.
+    if (kinds.has(MilestoneKind.GRADUACION)) propio.graduaciones += 1;
     if (kinds.has(MilestoneKind.BAUTISMO)) propio.bautismos += 1;
     if (kinds.has(MilestoneKind.ENCUENTRO)) propio.encuentros += 1;
 
