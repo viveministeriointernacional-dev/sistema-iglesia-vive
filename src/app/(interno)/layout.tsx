@@ -29,7 +29,10 @@ export default async function LayoutInterno({
 
   const pestanas = [
     ...(ROLES_CON_RED.includes(usuario.role)
-      ? [{ href: "/mi-red", etiqueta: "Mi red" }]
+      ? [
+          { href: "/mi-red", etiqueta: "Mi red" },
+          { href: "/red", etiqueta: "Árbol" },
+        ]
       : []),
     ...(ROLES_CONSOLIDACION.includes(usuario.role)
       ? [
