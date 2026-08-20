@@ -114,6 +114,13 @@ export async function accesoAExpediente(
   return { puedeVer: false, puedeVerNotas: false, puedeEscribir: false, esPropio };
 }
 
+const FORMATO_CITA = new Intl.DateTimeFormat("es-CO", {
+  day: "numeric",
+  month: "short",
+  hour: "numeric",
+  minute: "2-digit",
+});
+
 export type HitoLineaDeTiempo = {
   fecha: Date;
   titulo: string;
@@ -167,8 +174,12 @@ export async function cargarExpediente(learnerId: string) {
             orderBy: { occurredAt: "desc" },
             select: {
               type: true,
+              outcome: true,
               result: true,
               note: true,
+              scheduledAt: true,
+              place: true,
+              isVirtual: true,
               occurredAt: true,
               byUser: { select: { fullName: true } },
             },
@@ -242,11 +253,20 @@ export function construirLineaDeTiempo(
   ];
 
   for (const intento of expediente.operation72?.attempts ?? []) {
+    const cita = intento.scheduledAt
+      ? [
+          FORMATO_CITA.format(intento.scheduledAt),
+          intento.isVirtual ? "virtual" : intento.place,
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : null;
+
     eventos.push({
       fecha: intento.occurredAt,
       titulo: intento.result ?? "Contacto registrado",
       detalle:
-        [intento.byUser?.fullName, incluyePrivado ? intento.note : null]
+        [cita, intento.byUser?.fullName, incluyePrivado ? intento.note : null]
           .filter(Boolean)
           .join(" · ") || null,
       tono: "azul",
