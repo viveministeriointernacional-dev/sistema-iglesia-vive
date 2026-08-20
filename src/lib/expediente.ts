@@ -137,6 +137,7 @@ export async function cargarExpediente(learnerId: string) {
       phaseStartedAt: true,
       createdAt: true,
       entryPoint: true,
+      entryPointOther: true,
       invitationKind: true,
       lineOfOrigin: true,
       person: {
@@ -149,7 +150,8 @@ export async function cargarExpediente(learnerId: string) {
           email: true,
           address: true,
           prayerRequest: true,
-          callSchedule: true,
+          callSchedules: true,
+          callScheduleNote: true,
         },
       },
       team: { select: { name: true } },

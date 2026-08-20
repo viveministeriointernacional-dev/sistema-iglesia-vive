@@ -227,7 +227,7 @@ async function main() {
         gender: nueva.gender,
         birthDate: nacimiento,
         callPhone: `+57 300 ${Math.floor(1000000 + Math.random() * 8999999)}`,
-        callSchedule: CallSchedule.TARDE,
+        callSchedules: [CallSchedule.TARDE],
       },
       select: { id: true },
     });

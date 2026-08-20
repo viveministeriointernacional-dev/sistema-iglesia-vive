@@ -10,14 +10,21 @@ export type CargaDeUsuario = {
   carga: number;
 };
 
+/// `genero` nulo = no se conoce el de la persona. En ese caso la regla del
+/// mismo género (§5.4) no se puede aplicar y queda solo el criterio de menor
+/// carga; un líder puede reasignar después.
 async function candidatosConCarga(
   db: ClientePrisma,
   rol: Role,
-  genero: Gender,
+  genero: Gender | null,
   contarCarga: (ids: string[]) => Promise<Map<string, number>>,
 ): Promise<CargaDeUsuario[]> {
   const candidatos = await db.appUser.findMany({
-    where: { role: rol, active: true, person: { gender: genero } },
+    where: {
+      role: rol,
+      active: true,
+      ...(genero ? { person: { gender: genero } } : {}),
+    },
     select: {
       id: true,
       fullName: true,
@@ -44,7 +51,7 @@ async function candidatosConCarga(
 /// (personas con Operación 72 en curso).
 export async function consolidadoresDisponibles(
   db: ClientePrisma,
-  genero: Gender,
+  genero: Gender | null,
 ) {
   return candidatosConCarga(db, Role.CONSOLIDADOR, genero, async (ids) => {
     const grupos = await db.learnerProfile.groupBy({
@@ -67,7 +74,7 @@ export async function consolidadoresDisponibles(
 
 /// Mentores del mismo género con su carga actual (relaciones de discipulado
 /// abiertas).
-export async function mentoresDisponibles(db: ClientePrisma, genero: Gender) {
+export async function mentoresDisponibles(db: ClientePrisma, genero: Gender | null) {
   return candidatosConCarga(db, Role.MENTOR, genero, async (ids) => {
     const grupos = await db.mentorRelationship.groupBy({
       by: ["mentorId"],
@@ -94,7 +101,7 @@ export function elegirPorCarga(candidatos: CargaDeUsuario[]) {
 
 /// Asignación automática de consolidador: respeta el género y balancea carga
 /// (ESPECIFICACION_PRODUCTO.md §5.4).
-export async function asignarConsolidador(db: ClientePrisma, genero: Gender) {
+export async function asignarConsolidador(db: ClientePrisma, genero: Gender | null) {
   const candidatos = await consolidadoresDisponibles(db, genero);
   return elegirPorCarga(candidatos);
 }

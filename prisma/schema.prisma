@@ -104,6 +104,8 @@ enum EntryPoint {
   ALPHA_CASA_DE_FE
   EVENTO_O_BRIGADA
   UNO_A_UNO
+  /// La lista nunca cubre todo. `entryPointOther` guarda el detalle.
+  OTRO
 }
 
 enum InvitationKind {
@@ -121,18 +123,25 @@ enum CallSchedule {
 /// Identidad de una persona. Los teléfonos se conservan por tipo
 /// (ESPECIFICACION_PRODUCTO.md §20).
 model Person {
-  id            String        @id @default(uuid())
-  firstName     String        @map("first_name")
-  lastName      String        @map("last_name")
-  gender        Gender
-  birthDate     DateTime?     @map("birth_date") @db.Date
-  callPhone     String?       @map("call_phone")
-  whatsappPhone String?       @map("whatsapp_phone")
+  id        String  @id @default(uuid())
+  firstName String  @map("first_name")
+  /// Opcional: a veces solo se sabe el nombre de pila.
+  lastName  String? @map("last_name")
+  /// Opcional: si no se conoce, la asignación de consolidador cae al criterio
+  /// de menor carga en vez del mismo género (§5.4).
+  gender        Gender?
+  birthDate     DateTime?      @map("birth_date") @db.Date
+  callPhone     String?        @map("call_phone")
+  whatsappPhone String?        @map("whatsapp_phone")
   email         String?
   address       String?
-  prayerRequest String?       @map("prayer_request")
-  photoUrl      String?       @map("photo_url")
-  callSchedule  CallSchedule? @map("call_schedule")
+  prayerRequest String?        @map("prayer_request")
+  photoUrl      String?        @map("photo_url")
+  /// Franjas en las que acepta llamadas. Varias a la vez: «mañana y noche» es
+  /// una respuesta normal.
+  callSchedules CallSchedule[] @map("call_schedules")
+  /// Horario escrito a mano cuando ninguna franja sirve («después de las 7»).
+  callScheduleNote String?     @map("call_schedule_note")
   active        Boolean       @default(true)
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
@@ -169,13 +178,18 @@ model LearnerProfile {
   status         LearnerStatus @default(ACTIVO)
   phaseStartedAt DateTime      @default(now()) @map("phase_started_at")
 
-  // Origen
-  entryPoint        EntryPoint     @map("entry_point")
-  invitationKind    InvitationKind @map("invitation_kind")
-  invitedByPersonId String?        @map("invited_by_person_id")
-  /// Línea de origen conservada cuando hay invitador conocido.
-  lineOfOrigin      String?        @map("line_of_origin")
-  originNotes       String?        @map("origin_notes")
+  // Origen. Todo opcional: en la puerta de un domingo no siempre se alcanza a
+  // preguntar, y un dato en blanco es mejor que un dato inventado.
+  entryPoint        EntryPoint?     @map("entry_point")
+  /// Detalle cuando el punto de entrada es OTRO.
+  entryPointOther   String?         @map("entry_point_other")
+  invitationKind    InvitationKind? @map("invitation_kind")
+  /// Solo cuando la persona que invitó ya existe en la base.
+  invitedByPersonId String?         @map("invited_by_person_id")
+  /// Nombre de quien invitó, exista o no en la base. Si se escribió a mano, un
+  /// líder lo revisa después: no bloquear el registro por eso.
+  lineOfOrigin      String?         @map("line_of_origin")
+  originNotes       String?         @map("origin_notes")
 
   consolidatorId String?  @map("consolidator_id")
   teamId         String?  @map("team_id")
