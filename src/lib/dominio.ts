@@ -9,6 +9,7 @@ export const PUNTOS_DE_ENTRADA: { valor: EntryPoint; etiqueta: string }[] = [
   { valor: EntryPoint.ALPHA_CASA_DE_FE, etiqueta: "Alpha / Casa de Fe" },
   { valor: EntryPoint.EVENTO_O_BRIGADA, etiqueta: "Evento o brigada" },
   { valor: EntryPoint.UNO_A_UNO, etiqueta: "Uno a uno" },
+  { valor: EntryPoint.OTRO, etiqueta: "Otro" },
 ];
 
 export const ETIQUETA_ENTRADA: Record<EntryPoint, string> = Object.fromEntries(
@@ -49,8 +50,35 @@ export const TEMAS_CASA_DE_FE = [
   "Multiplicar",
 ];
 
-export function nombreCompleto(persona: { firstName: string; lastName: string }) {
-  return `${persona.firstName} ${persona.lastName}`.trim();
+/// El apellido es opcional: a veces solo se sabe el nombre de pila.
+export function nombreCompleto(persona: {
+  firstName: string;
+  lastName?: string | null;
+}) {
+  return `${persona.firstName} ${persona.lastName ?? ""}`.trim();
+}
+
+/// Cómo llegó, incluyendo el detalle cuando la respuesta fue «otro».
+export function textoDeEntrada(
+  entryPoint: EntryPoint | null,
+  otro?: string | null,
+) {
+  if (!entryPoint) return "Sin registrar";
+  if (entryPoint === EntryPoint.OTRO) return otro?.trim() || "Otro";
+  return ETIQUETA_ENTRADA[entryPoint];
+}
+
+/// Las franjas y el horario escrito, en una sola frase legible.
+export function textoDeHorario(
+  franjas: CallSchedule[],
+  nota?: string | null,
+): string | null {
+  const etiquetas = franjas.map(
+    (franja) => HORARIOS.find((h) => h.valor === franja)?.etiqueta ?? franja,
+  );
+  if (nota?.trim()) etiquetas.push(nota.trim());
+  if (!etiquetas.length) return null;
+  return etiquetas.join(" · ");
 }
 
 /// Normaliza un teléfono para comparar duplicados: solo dígitos, sin

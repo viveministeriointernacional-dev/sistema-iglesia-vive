@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Role } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
 import { requerirRol, ROLES_CONSOLIDACION } from "@/lib/auth";
-import { ETIQUETA_ENTRADA, nombreCompleto } from "@/lib/dominio";
+import { nombreCompleto, textoDeEntrada } from "@/lib/dominio";
 import {
   COLUMNAS_OP72,
   ESTADOS_EN_TABLERO,
@@ -46,6 +46,7 @@ export default async function TableroOperacion72() {
         select: {
           id: true,
           entryPoint: true,
+          entryPointOther: true,
           lineOfOrigin: true,
           person: {
             select: { firstName: true, lastName: true, birthDate: true },
@@ -66,7 +67,7 @@ export default async function TableroOperacion72() {
       estado: operacion.status,
       nombre: nombreCompleto(learner.person),
       origen: [
-        ETIQUETA_ENTRADA[learner.entryPoint],
+        textoDeEntrada(learner.entryPoint, learner.entryPointOther),
         learner.lineOfOrigin ? `invitada por ${learner.lineOfOrigin}` : null,
         edad !== null ? `${edad} años` : null,
       ]

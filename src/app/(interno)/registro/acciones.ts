@@ -3,7 +3,6 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
-  InvitationKind,
   MilestoneKind,
   MilestoneStatus,
   Role,
@@ -106,7 +105,7 @@ export async function buscarInvitador(
 /// Detecta duplicados por teléfono (normalizado) y por correo, antes de crear
 /// un expediente (ESPECIFICACION_PRODUCTO.md §5.3 y §20).
 async function buscarDuplicados(datos: {
-  callPhone: string;
+  callPhone: string | null;
   whatsappPhone: string | null;
   email: string | null;
 }): Promise<PosibleDuplicado[]> {
@@ -196,13 +195,18 @@ export async function guardarRegistro(
     ahora.getTime() + DURACION_OPERACION_72_HORAS * 3_600_000,
   );
 
-  const invitador =
-    datos.invitationKind === InvitationKind.PERSONA && datos.invitedByPersonId
-      ? await prisma.person.findUnique({
-          where: { id: datos.invitedByPersonId },
-          select: { id: true, firstName: true, lastName: true },
-        })
-      : null;
+  // El invitador puede venir elegido de la búsqueda o escrito a mano. Si no
+  // está en la base, se guarda solo el nombre y un líder lo revisa después:
+  // no se bloquea el registro por eso.
+  const invitador = datos.invitedByPersonId
+    ? await prisma.person.findUnique({
+        where: { id: datos.invitedByPersonId },
+        select: { id: true, firstName: true, lastName: true },
+      })
+    : null;
+
+  const nombreDelInvitador =
+    (invitador ? nombreCompleto(invitador) : null) ?? datos.invitedByName;
 
   await prisma.$transaction(async (tx) => {
     const persona = await tx.person.create({
@@ -216,7 +220,8 @@ export async function guardarRegistro(
         email: datos.email,
         address: datos.address,
         prayerRequest: datos.prayerRequest,
-        callSchedule: datos.callSchedule ?? null,
+        callSchedules: datos.callSchedules,
+        callScheduleNote: datos.callScheduleNote,
       },
       select: { id: true, gender: true },
     });
@@ -226,12 +231,11 @@ export async function guardarRegistro(
     const aprendiz = await tx.learnerProfile.create({
       data: {
         personId: persona.id,
-        entryPoint: datos.entryPoint,
-        invitationKind: datos.invitationKind,
+        entryPoint: datos.entryPoint ?? null,
+        entryPointOther: datos.entryPointOther,
+        invitationKind: datos.invitationKind ?? null,
         invitedByPersonId: invitador?.id ?? null,
-        lineOfOrigin: invitador
-          ? nombreCompleto(invitador)
-          : null,
+        lineOfOrigin: nombreDelInvitador,
         consolidatorId: elegido?.id ?? null,
         teamId: null,
         registeredById: usuario.id,
@@ -247,7 +251,9 @@ export async function guardarRegistro(
         detail: elegido
           ? "Consolidador asignado · bienvenida por WhatsApp enviada"
           : "Sin consolidador con cupo · requiere asignación de un líder",
-        lineKnown: datos.invitationKind === InvitationKind.PERSONA,
+        // La línea solo se «conserva» cuando el invitador está en la base: un
+        // nombre suelto no basta para heredar mentor.
+        lineKnown: Boolean(invitador),
       },
     });
 
@@ -272,8 +278,9 @@ export async function guardarRegistro(
     const metadatosComunes: Prisma.InputJsonValue = {
       personId: persona.id,
       learnerId: aprendiz.id,
-      entryPoint: datos.entryPoint,
-      invitationKind: datos.invitationKind,
+      entryPoint: datos.entryPoint ?? null,
+      invitationKind: datos.invitationKind ?? null,
+      invitadorSinExpediente: Boolean(datos.invitedByName && !invitador),
       duplicadoConfirmadoPorHumano: opciones.confirmadoNoDuplicado ?? false,
     };
 

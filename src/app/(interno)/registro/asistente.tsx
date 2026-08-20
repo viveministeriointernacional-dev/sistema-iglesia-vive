@@ -28,12 +28,15 @@ type Formulario = {
   birthDate: string;
   callPhone: string;
   whatsappPhone: string;
-  callSchedule: CallSchedule | "";
+  callSchedules: CallSchedule[];
+  callScheduleNote: string;
   address: string;
   prayerRequest: string;
   entryPoint: EntryPoint | "";
+  entryPointOther: string;
   invitationKind: InvitationKind | "";
   invitedByPersonId: string | null;
+  invitedByName: string;
 };
 
 const INICIAL: Formulario = {
@@ -43,12 +46,15 @@ const INICIAL: Formulario = {
   birthDate: "",
   callPhone: "",
   whatsappPhone: "",
-  callSchedule: "",
+  callSchedules: [],
+  callScheduleNote: "",
   address: "",
   prayerRequest: "",
   entryPoint: "",
+  entryPointOther: "",
   invitationKind: "",
   invitedByPersonId: null,
+  invitedByName: "",
 };
 
 const PASOS = [
@@ -61,12 +67,12 @@ const TITULOS: Record<number, { titulo: string; subtitulo: string }> = {
   1: {
     titulo: "¿A quién acabas de conocer?",
     subtitulo:
-      "Solo lo esencial ahora. El expediente se completa con el acompañamiento.",
+      "Con el nombre basta para empezar. Lo demás se completa después, cuando se sepa.",
   },
   2: {
     titulo: "¿Cómo la contactamos?",
     subtitulo:
-      "El horario y el número correcto son lo que hace posible Operación 72.",
+      "Lo que tengas. El horario y el número son lo que hace posible Operación 72.",
   },
   3: {
     titulo: "¿Cómo llegó?",
@@ -96,28 +102,13 @@ export function AsistenteDeRegistro() {
     setDuplicados(null);
   }
 
+  /// El formulario es libre: lo único que se exige es el nombre, porque sin él
+  /// no hay a quién buscar después. Todo lo demás se completa desde el
+  /// expediente cuando se sepa.
   function validarPaso(numero: number) {
     const faltantes: Record<string, string> = {};
-    if (numero === 1) {
-      if (!datos.firstName.trim()) faltantes.firstName = "Escribe los nombres.";
-      if (!datos.lastName.trim()) faltantes.lastName = "Escribe los apellidos.";
-      if (!datos.gender) faltantes.gender = "Elige el género.";
-    }
-    if (numero === 2 && datos.callPhone.trim().length < 7) {
-      faltantes.callPhone = "El teléfono para llamadas es obligatorio.";
-    }
-    if (numero === 3) {
-      if (!datos.entryPoint) faltantes.entryPoint = "Elige el punto de entrada.";
-      if (!datos.invitationKind) {
-        faltantes.invitationKind = "Indica si alguien la invitó.";
-      }
-      if (
-        datos.invitationKind === InvitationKind.PERSONA &&
-        !datos.invitedByPersonId
-      ) {
-        faltantes.invitedByPersonId =
-          "Busca y selecciona a la persona que la invitó.";
-      }
+    if (numero === 1 && !datos.firstName.trim()) {
+      faltantes.firstName = "Escribe al menos el nombre.";
     }
     setErrores(faltantes);
     return Object.keys(faltantes).length === 0;
@@ -130,10 +121,9 @@ export function AsistenteDeRegistro() {
       const resultado = await guardarRegistro(
         {
           ...datos,
-          gender: datos.gender as Gender,
-          entryPoint: datos.entryPoint as EntryPoint,
-          invitationKind: datos.invitationKind as InvitationKind,
-          callSchedule: datos.callSchedule || null,
+          gender: datos.gender || null,
+          entryPoint: datos.entryPoint || null,
+          invitationKind: datos.invitationKind || null,
           birthDate: datos.birthDate || undefined,
           email: "",
         },
@@ -147,11 +137,13 @@ export function AsistenteDeRegistro() {
       }
       setErrores(resultado.errores);
       setMensaje(resultado.mensaje ?? null);
-      const primerCampoDePaso1 = ["firstName", "lastName", "gender"].some(
+      const campoDePaso1 = ["firstName", "lastName", "gender", "birthDate"].some(
         (campo) => campo in resultado.errores,
       );
-      const campoDePaso2 = ["callPhone"].some((campo) => campo in resultado.errores);
-      if (primerCampoDePaso1) setPaso(1);
+      const campoDePaso2 = ["callPhone", "email"].some(
+        (campo) => campo in resultado.errores,
+      );
+      if (campoDePaso1) setPaso(1);
       else if (campoDePaso2) setPaso(2);
     });
   }
@@ -279,7 +271,7 @@ function PasoIdentidad({ datos, errores, actualizar }: PropsPaso) {
     <div className="tarjeta mt-5 p-[22px]">
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block">
-          <span className="etiqueta-campo">Nombres *</span>
+          <span className="etiqueta-campo">Nombres</span>
           <input
             className="campo"
             value={datos.firstName}
@@ -291,7 +283,9 @@ function PasoIdentidad({ datos, errores, actualizar }: PropsPaso) {
         </label>
 
         <label className="block">
-          <span className="etiqueta-campo">Apellidos *</span>
+          <span className="etiqueta-campo">
+            Apellidos {" "}<span className="font-medium text-[rgba(19,28,36,.4)]">si se sabe</span>
+          </span>
           <input
             className="campo"
             value={datos.lastName}
@@ -303,14 +297,18 @@ function PasoIdentidad({ datos, errores, actualizar }: PropsPaso) {
         </label>
 
         <div>
-          <span className="etiqueta-campo">Género *</span>
+          <span className="etiqueta-campo">
+            Género {" "}<span className="font-medium text-[rgba(19,28,36,.4)]">si se sabe</span>
+          </span>
           <div className="mt-[7px] flex gap-2">
             {GENEROS.map(({ valor, etiqueta }) => (
               <button
                 key={valor}
                 type="button"
                 aria-pressed={datos.gender === valor}
-                onClick={() => actualizar("gender", valor)}
+                onClick={() =>
+                  actualizar("gender", datos.gender === valor ? "" : valor)
+                }
                 className="opcion flex-1 p-3"
               >
                 {etiqueta}
@@ -318,7 +316,7 @@ function PasoIdentidad({ datos, errores, actualizar }: PropsPaso) {
             ))}
           </div>
           <p className="mt-[7px] text-[11px] leading-[1.4] font-medium text-[rgba(19,28,36,.45)]">
-            Define la asignación de consolidador
+            Define la asignación de consolidador. Sin él, se asigna por carga.
           </p>
           <MensajeDeError texto={errores.gender} />
         </div>
@@ -343,7 +341,9 @@ function PasoContacto({ datos, errores, actualizar }: PropsPaso) {
     <div className="tarjeta mt-5 p-[22px]">
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block">
-          <span className="etiqueta-campo">Teléfono para llamadas *</span>
+          <span className="etiqueta-campo">
+            Teléfono para llamadas {" "}<span className="font-medium text-[rgba(19,28,36,.4)]">si se sabe</span>
+          </span>
           <input
             className="campo"
             inputMode="tel"
@@ -371,20 +371,41 @@ function PasoContacto({ datos, errores, actualizar }: PropsPaso) {
       </div>
 
       <div className="mt-4">
-        <span className="etiqueta-campo">Horario preferido de llamada</span>
+        <span className="etiqueta-campo">
+          Horario para llamarla{" "}
+          <span className="font-medium text-[rgba(19,28,36,.4)]">
+            los que sirvan
+          </span>
+        </span>
         <div className="mt-2 flex gap-2">
-          {HORARIOS.map(({ valor, etiqueta }) => (
-            <button
-              key={valor}
-              type="button"
-              aria-pressed={datos.callSchedule === valor}
-              onClick={() => actualizar("callSchedule", valor)}
-              className="opcion flex-1 p-3 text-[12.5px]"
-            >
-              {etiqueta}
-            </button>
-          ))}
+          {HORARIOS.map(({ valor, etiqueta }) => {
+            const elegido = datos.callSchedules.includes(valor);
+            return (
+              <button
+                key={valor}
+                type="button"
+                aria-pressed={elegido}
+                onClick={() =>
+                  actualizar(
+                    "callSchedules",
+                    elegido
+                      ? datos.callSchedules.filter((franja) => franja !== valor)
+                      : [...datos.callSchedules, valor],
+                  )
+                }
+                className="opcion flex-1 p-3 text-[12.5px]"
+              >
+                {etiqueta}
+              </button>
+            );
+          })}
         </div>
+        <input
+          className="campo campo-opcional"
+          value={datos.callScheduleNote}
+          onChange={(evento) => actualizar("callScheduleNote", evento.target.value)}
+          placeholder="O escríbelo: «después de las 7», «solo sábados»…"
+        />
       </div>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -426,20 +447,34 @@ function PasoOrigen({
 }) {
   return (
     <div className="tarjeta mt-5 p-[22px]">
-      <span className="etiqueta-campo">Punto de entrada *</span>
+      <span className="etiqueta-campo">
+        ¿Cómo llegó?{" "}
+        <span className="font-medium text-[rgba(19,28,36,.4)]">si se sabe</span>
+      </span>
       <div className="mt-[11px] grid grid-cols-2 gap-2 sm:grid-cols-3">
         {PUNTOS_DE_ENTRADA.map(({ valor, etiqueta }) => (
           <button
             key={valor}
             type="button"
             aria-pressed={datos.entryPoint === valor}
-            onClick={() => actualizar("entryPoint", valor)}
+            onClick={() =>
+              actualizar("entryPoint", datos.entryPoint === valor ? "" : valor)
+            }
             className="opcion opcion-amplia"
           >
             {etiqueta}
           </button>
         ))}
       </div>
+      {datos.entryPoint === EntryPoint.OTRO ? (
+        <input
+          className="campo"
+          value={datos.entryPointOther}
+          onChange={(evento) => actualizar("entryPointOther", evento.target.value)}
+          placeholder="¿Cómo llegó? Escríbelo"
+          autoFocus
+        />
+      ) : null}
       <MensajeDeError texto={errores.entryPoint} />
 
       <div className="mt-6">
@@ -451,8 +486,11 @@ function PasoOrigen({
               type="button"
               aria-pressed={datos.invitationKind === valor}
               onClick={() => {
-                actualizar("invitationKind", valor);
-                if (valor !== InvitationKind.PERSONA) alSeleccionarInvitador(null);
+                const quitando = datos.invitationKind === valor;
+                actualizar("invitationKind", quitando ? "" : valor);
+                if (quitando || valor !== InvitationKind.PERSONA) {
+                  alSeleccionarInvitador(null);
+                }
               }}
               className="opcion opcion-amplia"
             >
@@ -467,6 +505,8 @@ function PasoOrigen({
         <BuscadorDeInvitador
           seleccionado={invitadorSeleccionado}
           alSeleccionar={alSeleccionarInvitador}
+          nombreEscrito={datos.invitedByName}
+          alEscribirNombre={(nombre) => actualizar("invitedByName", nombre)}
           error={errores.invitedByPersonId}
         />
       ) : datos.invitationKind ? (
@@ -484,13 +524,21 @@ function PasoOrigen({
   );
 }
 
+/// Buscar es una ayuda, no un requisito. Quien invitó puede no estar en la
+/// base todavía —o llamarse distinto a como lo escriben—, y eso no debe
+/// impedir registrar a la persona nueva: se guarda el nombre y un líder lo
+/// revisa cuando entregue a mentor.
 function BuscadorDeInvitador({
   seleccionado,
   alSeleccionar,
+  nombreEscrito,
+  alEscribirNombre,
   error,
 }: {
   seleccionado: InvitadorEncontrado | null;
   alSeleccionar: (invitador: InvitadorEncontrado | null) => void;
+  nombreEscrito: string;
+  alEscribirNombre: (nombre: string) => void;
   error?: string;
 }) {
   const [consulta, setConsulta] = useState("");
@@ -571,10 +619,27 @@ function BuscadorDeInvitador({
           </ul>
         ) : (
           <p className="mt-[10px] text-[12px] leading-[1.5] font-medium text-[rgba(19,28,36,.55)]">
-            Nadie coincide con esa búsqueda. Si no aparece, elige «No sabe» y un
-            líder confirmará la asignación.
+            No está en la base todavía. Escribe su nombre abajo y sigue: un líder
+            lo revisa al entregar a mentor.
           </p>
         )
+      ) : null}
+
+      {!seleccionado ? (
+        <label className="mt-3 block">
+          <span className="etiqueta-campo">
+            ¿Quién la invitó?{" "}
+            <span className="font-medium text-[rgba(19,28,36,.4)]">
+              aunque no esté en la base
+            </span>
+          </span>
+          <input
+            className="campo"
+            value={nombreEscrito}
+            onChange={(evento) => alEscribirNombre(evento.target.value)}
+            placeholder="Nombre de quien la invitó"
+          />
+        </label>
       ) : null}
 
       <MensajeDeError texto={error} />

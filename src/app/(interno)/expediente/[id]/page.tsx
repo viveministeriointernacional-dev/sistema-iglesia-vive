@@ -6,7 +6,7 @@ import {
 } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
 import { requerirUsuario } from "@/lib/auth";
-import { ETIQUETA_ENTRADA, nombreCompleto } from "@/lib/dominio";
+import { nombreCompleto, textoDeEntrada, textoDeHorario } from "@/lib/dominio";
 import { edadDesde } from "@/lib/op72";
 import {
   accesoAExpediente,
@@ -409,7 +409,7 @@ export default async function PaginaExpediente({
                   Entrada
                 </dt>
                 <dd className="mt-1 text-[12.5px] leading-[1.3] font-semibold text-tinta">
-                  {ETIQUETA_ENTRADA[expediente.entryPoint]}
+                  {textoDeEntrada(expediente.entryPoint, expediente.entryPointOther)}
                 </dd>
               </div>
               <div>
@@ -419,7 +419,7 @@ export default async function PaginaExpediente({
                 <dd className="mt-1 text-[12.5px] leading-[1.3] font-semibold text-tinta">
                   {expediente.invitedBy
                     ? nombreCompleto(expediente.invitedBy)
-                    : "Sin invitador conocido"}
+                    : (expediente.lineOfOrigin ?? "Sin invitador conocido")}
                 </dd>
               </div>
               <div>
@@ -428,8 +428,11 @@ export default async function PaginaExpediente({
                 </dt>
                 <dd className="mt-1 text-[12.5px] leading-[1.3] font-semibold text-tinta">
                   {telefonoParcial(expediente.person.callPhone) ?? "Sin teléfono"}
-                  {expediente.person.callSchedule
-                    ? ` · ${expediente.person.callSchedule.toLowerCase()}`
+                  {textoDeHorario(
+                    expediente.person.callSchedules,
+                    expediente.person.callScheduleNote,
+                  )
+                    ? ` · ${textoDeHorario(expediente.person.callSchedules, expediente.person.callScheduleNote)}`
                     : ""}
                 </dd>
               </div>
