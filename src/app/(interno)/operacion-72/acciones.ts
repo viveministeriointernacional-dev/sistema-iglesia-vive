@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import {
+  CallOutcome,
   ContactType,
   MilestoneKind,
   MilestoneStatus,
@@ -18,7 +19,26 @@ import {
   type UsuarioSesion,
 } from "@/lib/auth";
 import { proponerMentor } from "@/lib/asignacion";
-import { TRANSICIONES } from "@/lib/op72";
+import {
+  contactaDeVerdad,
+  ETIQUETA_LLAMADA,
+  RESULTADOS_DE_LLAMADA,
+} from "@/lib/op72";
+
+/// El formulario da una fecha sin hora. Hoy conserva la hora real; un día
+/// pasado se ancla al mediodía.
+function fechaDeLaLlamada(fecha: string) {
+  const ahora = new Date();
+  if (fecha === ahora.toISOString().slice(0, 10)) return ahora;
+  return new Date(`${fecha}T12:00:00`);
+}
+
+const FORMATO_VISITA = new Intl.DateTimeFormat("es-CO", {
+  day: "numeric",
+  month: "short",
+  hour: "numeric",
+  minute: "2-digit",
+});
 
 export type ResultadoAccion = { ok: true } | { ok: false; mensaje: string };
 
@@ -34,7 +54,7 @@ async function cargarOperacion(id: string, usuario: UsuarioSesion) {
       learnerId: true,
       lineKnown: true,
       proposedMentorId: true,
-      learner: { select: { consolidatorId: true } },
+      learner: { select: { consolidatorId: true, personId: true } },
     },
   });
 
@@ -47,13 +67,19 @@ async function cargarOperacion(id: string, usuario: UsuarioSesion) {
   return esSuya ? operacion : null;
 }
 
-/// Avanza el estado de una Operación 72 y deja registro del contacto.
-/// El historial es acumulativo: cada paso agrega un ContactAttempt, nunca
-/// sobrescribe el anterior.
-export async function avanzarOperacion72(
+/// Registra la primera llamada —o cualquier llamada— con lo que realmente pasó.
+///
+/// «No contestó» no avanza la tarjeta: queda como intento y la persona sigue
+/// esperando llamada. Decir «contactada» cuando nadie respondió sería mentirle
+/// al tablero, y el tablero es lo que usa el equipo para saber a quién buscar.
+export async function registrarLlamada(
   operacionId: string,
-  estadoEsperado: Operation72Status,
-  detalle?: string,
+  datos: {
+    fecha: string;
+    resultado: CallOutcome;
+    observacion: string;
+    peticionDeOracion: string;
+  },
 ): Promise<ResultadoAccion> {
   let usuario: UsuarioSesion;
   try {
@@ -64,52 +90,211 @@ export async function avanzarOperacion72(
   }
 
   const operacion = await cargarOperacion(operacionId, usuario);
-  if (!operacion) {
-    return { ok: false, mensaje: "Esta persona no está en tu lista." };
+  if (!operacion) return { ok: false, mensaje: "Esta persona no está en tu lista." };
+
+  if (
+    operacion.status === Operation72Status.ENTREGADA ||
+    operacion.status === Operation72Status.CERRADA
+  ) {
+    return { ok: false, mensaje: "Esta persona ya salió de Operación 72." };
   }
 
-  if (operacion.status !== estadoEsperado) {
-    return {
-      ok: false,
-      mensaje: "Alguien más ya movió esta tarjeta. Actualiza el tablero.",
-    };
+  if (!RESULTADOS_DE_LLAMADA.some((r) => r.valor === datos.resultado)) {
+    return { ok: false, mensaje: "Elige cómo salió la llamada." };
   }
 
-  const transicion = TRANSICIONES[operacion.status];
-  if (!transicion || transicion.siguiente === Operation72Status.ENTREGADA) {
-    return { ok: false, mensaje: "Esta tarjeta ya no admite este paso." };
+  if (Number.isNaN(Date.parse(datos.fecha))) {
+    return { ok: false, mensaje: "La fecha de la llamada no es válida." };
   }
 
-  const tipoDeContacto: Partial<Record<Operation72Status, ContactType>> = {
-    [Operation72Status.INICIADA]: ContactType.LLAMADA,
-    [Operation72Status.CONTACTADA]: ContactType.VISITA,
-    [Operation72Status.VISITA_PENDIENTE]: ContactType.VISITA,
-  };
-
-  const accionAuditada = {
-    [Operation72Status.INICIADA]: "operacion72.contacto_registrado",
-    [Operation72Status.CONTACTADA]: "operacion72.visita_agendada",
-    [Operation72Status.VISITA_PENDIENTE]: "operacion72.visita_cerrada",
-  } as const;
-
+  // El campo es solo fecha. Si es hoy se usa la hora real, para que la llamada
+  // quede después del registro en la línea de tiempo y no antes; si es un día
+  // anterior, al mediodía, que ordena bien dentro de ese día.
+  const ocurrioEl = fechaDeLaLlamada(datos.fecha);
+  const contactada = contactaDeVerdad(datos.resultado);
+  const etiqueta = ETIQUETA_LLAMADA[datos.resultado];
+  const observacion = datos.observacion.trim() || null;
+  const peticion = datos.peticionDeOracion.trim();
   const prisma = await getPrisma();
 
   await prisma.$transaction(async (tx) => {
-    const proximo = transicion.siguiente;
+    await tx.contactAttempt.create({
+      data: {
+        operation72Id: operacion.id,
+        type: contactada ? ContactType.LLAMADA : ContactType.INTENTO_LLAMADA,
+        outcome: datos.resultado,
+        result: etiqueta,
+        note: observacion,
+        occurredAt: ocurrioEl,
+        byUserId: usuario.id,
+      },
+    });
 
-    let propuesta = null;
-    if (proximo === Operation72Status.LISTA_PARA_ENTREGA) {
-      propuesta = await proponerMentor(tx, operacion.learnerId);
-    }
+    // Con una visita ya agendada, la tarjeta debe seguir mostrando la visita:
+    // es lo que el consolidador necesita ver. Una llamada posterior queda en
+    // el historial sin borrar esa cita del resumen.
+    const laLlamadaEsLoMasImportante =
+      operacion.status === Operation72Status.INICIADA ||
+      operacion.status === Operation72Status.CONTACTADA;
 
     await tx.operation72.update({
       where: { id: operacion.id },
       data: {
-        status: proximo,
-        detail:
-          detalle?.trim() ||
-          transicion.detallePorDefecto ||
-          "Visita cerrada · lista para entrega",
+        ...(contactada && operacion.status === Operation72Status.INICIADA
+          ? { status: Operation72Status.CONTACTADA }
+          : {}),
+        ...(laLlamadaEsLoMasImportante
+          ? { detail: [etiqueta, observacion].filter(Boolean).join(" · ") }
+          : {}),
+      },
+    });
+
+    // La petición de oración vive en la persona, no en el intento: es algo por
+    // lo que la iglesia ora. Se suma a lo que ya había: lo que pidió al
+    // registrarse no se borra porque hoy cuente otra cosa.
+    if (peticion) {
+      const persona = await tx.person.findUnique({
+        where: { id: operacion.learner.personId },
+        select: { prayerRequest: true },
+      });
+      const previa = persona?.prayerRequest?.trim();
+      await tx.person.update({
+        where: { id: operacion.learner.personId },
+        data: {
+          prayerRequest:
+            previa && previa !== peticion ? `${previa}\n\n${peticion}` : peticion,
+        },
+      });
+    }
+
+    await auditar(tx, {
+      actorId: usuario.id,
+      action: "operacion72.contacto_registrado",
+      entityType: "operation72",
+      entityId: operacion.id,
+      metadata: { resultado: datos.resultado, contactada },
+    });
+  });
+
+  revalidatePath("/operacion-72");
+  revalidatePath(`/expediente/${operacion.learnerId}`);
+  return { ok: true };
+}
+
+/// Agenda la visita con su fecha, hora y lugar. Virtual es un lugar más.
+export async function agendarVisita(
+  operacionId: string,
+  datos: { cuando: string; lugar: string; virtual: boolean; nota: string },
+): Promise<ResultadoAccion> {
+  let usuario: UsuarioSesion;
+  try {
+    usuario = await requerirRolEnAccion(ROLES_CONSOLIDACION);
+  } catch (error) {
+    if (error instanceof ErrorDePermiso) return { ok: false, mensaje: error.message };
+    throw error;
+  }
+
+  const operacion = await cargarOperacion(operacionId, usuario);
+  if (!operacion) return { ok: false, mensaje: "Esta persona no está en tu lista." };
+  if (operacion.status !== Operation72Status.CONTACTADA) {
+    return { ok: false, mensaje: "Alguien más ya movió esta tarjeta. Actualiza el tablero." };
+  }
+  if (Number.isNaN(Date.parse(datos.cuando))) {
+    return { ok: false, mensaje: "La fecha y hora de la visita no son válidas." };
+  }
+  if (!datos.virtual && !datos.lugar.trim()) {
+    return { ok: false, mensaje: "Escribe el lugar, o marca que la visita es virtual." };
+  }
+
+  const cuando = new Date(datos.cuando);
+  const lugar = datos.virtual ? null : datos.lugar.trim();
+  const nota = datos.nota.trim() || null;
+  const prisma = await getPrisma();
+
+  await prisma.$transaction(async (tx) => {
+    await tx.contactAttempt.create({
+      data: {
+        operation72Id: operacion.id,
+        type: ContactType.VISITA,
+        result: "Visita agendada",
+        note: nota,
+        scheduledAt: cuando,
+        place: lugar,
+        isVirtual: datos.virtual,
+        byUserId: usuario.id,
+      },
+    });
+
+    await tx.operation72.update({
+      where: { id: operacion.id },
+      data: {
+        status: Operation72Status.VISITA_PENDIENTE,
+        detail: [
+          `Visita ${FORMATO_VISITA.format(cuando)}`,
+          datos.virtual ? "virtual" : lugar,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      },
+    });
+
+    await auditar(tx, {
+      actorId: usuario.id,
+      action: "operacion72.visita_agendada",
+      entityType: "operation72",
+      entityId: operacion.id,
+      metadata: { cuando: cuando.toISOString(), virtual: datos.virtual, lugar },
+    });
+  });
+
+  revalidatePath("/operacion-72");
+  revalidatePath(`/expediente/${operacion.learnerId}`);
+  return { ok: true };
+}
+
+/// Cierra la visita con su resumen y prepara la entrega a mentor.
+export async function cerrarVisita(
+  operacionId: string,
+  resumen: string,
+): Promise<ResultadoAccion> {
+  let usuario: UsuarioSesion;
+  try {
+    usuario = await requerirRolEnAccion(ROLES_CONSOLIDACION);
+  } catch (error) {
+    if (error instanceof ErrorDePermiso) return { ok: false, mensaje: error.message };
+    throw error;
+  }
+
+  const operacion = await cargarOperacion(operacionId, usuario);
+  if (!operacion) return { ok: false, mensaje: "Esta persona no está en tu lista." };
+  if (operacion.status !== Operation72Status.VISITA_PENDIENTE) {
+    return { ok: false, mensaje: "Alguien más ya movió esta tarjeta. Actualiza el tablero." };
+  }
+  if (resumen.trim().length < 3) {
+    return { ok: false, mensaje: "Escribe un resumen de la visita." };
+  }
+
+  const texto = resumen.trim();
+  const prisma = await getPrisma();
+
+  await prisma.$transaction(async (tx) => {
+    const propuesta = await proponerMentor(tx, operacion.learnerId);
+
+    await tx.contactAttempt.create({
+      data: {
+        operation72Id: operacion.id,
+        type: ContactType.VISITA,
+        result: "Visita realizada",
+        note: texto,
+        byUserId: usuario.id,
+      },
+    });
+
+    await tx.operation72.update({
+      where: { id: operacion.id },
+      data: {
+        status: Operation72Status.LISTA_PARA_ENTREGA,
+        detail: texto,
         ...(propuesta
           ? {
               proposedMentorId: propuesta.mentorId,
@@ -120,26 +305,17 @@ export async function avanzarOperacion72(
       },
     });
 
-    await tx.contactAttempt.create({
-      data: {
-        operation72Id: operacion.id,
-        type: tipoDeContacto[operacion.status] ?? ContactType.CONVERSACION,
-        result: transicion.etiqueta,
-        note: detalle?.trim() || null,
-        byUserId: usuario.id,
-      },
-    });
-
     await auditar(tx, {
       actorId: usuario.id,
-      action: accionAuditada[operacion.status as keyof typeof accionAuditada],
+      action: "operacion72.visita_cerrada",
       entityType: "operation72",
       entityId: operacion.id,
-      metadata: { de: operacion.status, a: proximo },
+      metadata: { resumen: texto },
     });
   });
 
   revalidatePath("/operacion-72");
+  revalidatePath(`/expediente/${operacion.learnerId}`);
   return { ok: true };
 }
 

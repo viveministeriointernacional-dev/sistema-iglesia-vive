@@ -1,4 +1,4 @@
-import { Operation72Status } from "@iglesia/prisma-client";
+import { CallOutcome, Operation72Status } from "@iglesia/prisma-client";
 
 export const DURACION_OPERACION_72_HORAS = 72;
 const MS_POR_HORA = 3_600_000;
@@ -66,6 +66,34 @@ export const TRANSICIONES: Partial<Record<Operation72Status, Transicion>> = {
     etiqueta: "Entregar a mentor",
   },
 };
+
+/// Cómo salió la llamada, en el orden en que se pregunta.
+export const RESULTADOS_DE_LLAMADA: {
+  valor: CallOutcome;
+  etiqueta: string;
+  /// Solo un contacto real hace avanzar la tarjeta. «No contestó» queda
+  /// registrado como intento y la persona sigue esperando llamada: el tablero
+  /// no puede decir «contactada» si nadie respondió.
+  contacta: boolean;
+}[] = [
+  { valor: CallOutcome.CONTESTO_BIEN, etiqueta: "Contestó bien", contacta: true },
+  {
+    valor: CallOutcome.CONTESTO_REPROGRAMO,
+    etiqueta: "Contestó y reprogramó",
+    contacta: true,
+  },
+  { valor: CallOutcome.CONTESTO_REGULAR, etiqueta: "Contestó regular", contacta: true },
+  { valor: CallOutcome.CONTESTO_MAL, etiqueta: "Contestó mal", contacta: true },
+  { valor: CallOutcome.NO_CONTESTO, etiqueta: "No contestó", contacta: false },
+];
+
+export const ETIQUETA_LLAMADA: Record<CallOutcome, string> = Object.fromEntries(
+  RESULTADOS_DE_LLAMADA.map((r) => [r.valor, r.etiqueta]),
+) as Record<CallOutcome, string>;
+
+export function contactaDeVerdad(resultado: CallOutcome) {
+  return RESULTADOS_DE_LLAMADA.find((r) => r.valor === resultado)?.contacta ?? false;
+}
 
 export function tituloLinea(lineKnown: boolean) {
   return lineKnown

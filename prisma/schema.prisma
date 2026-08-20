@@ -277,6 +277,16 @@ model Operation72 {
   @@map("operation72")
 }
 
+/// Cómo salió la llamada. Es la diferencia entre «ya la contactamos» y
+/// «lo intentamos»: sin esto, el tablero miente.
+enum CallOutcome {
+  CONTESTO_BIEN
+  CONTESTO_REPROGRAMO
+  CONTESTO_REGULAR
+  CONTESTO_MAL
+  NO_CONTESTO
+}
+
 enum ContactType {
   LLAMADA
   INTENTO_LLAMADA
@@ -287,15 +297,22 @@ enum ContactType {
 }
 
 model ContactAttempt {
-  id            String      @id @default(uuid())
-  operation72Id String      @map("operation72_id")
+  id            String       @id @default(uuid())
+  operation72Id String       @map("operation72_id")
   type          ContactType
+  /// Solo en las llamadas: cómo salió.
+  outcome       CallOutcome? 
   result        String?
   note          String?
-  nextAction    String?     @map("next_action")
-  occurredAt    DateTime    @default(now()) @map("occurred_at")
-  byUserId      String?     @map("by_user_id")
-  createdAt     DateTime    @default(now()) @map("created_at")
+  nextAction    String?      @map("next_action")
+  /// Fecha y hora acordadas de la visita.
+  scheduledAt   DateTime?    @map("scheduled_at")
+  /// Dónde es la visita. Nulo cuando es virtual.
+  place         String?
+  isVirtual     Boolean      @default(false) @map("is_virtual")
+  occurredAt    DateTime     @default(now()) @map("occurred_at")
+  byUserId      String?      @map("by_user_id")
+  createdAt     DateTime     @default(now()) @map("created_at")
 
   operation72 Operation72 @relation(fields: [operation72Id], references: [id], onDelete: Cascade)
   byUser      AppUser?    @relation(fields: [byUserId], references: [id])

@@ -2,8 +2,14 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { Operation72Status } from "@iglesia/prisma-client";
-import { avanzarOperacion72, entregarAMentor } from "./acciones";
+import { CallOutcome, Operation72Status } from "@iglesia/prisma-client";
+import { RESULTADOS_DE_LLAMADA } from "@/lib/op72";
+import {
+  agendarVisita,
+  cerrarVisita,
+  entregarAMentor,
+  registrarLlamada,
+} from "./acciones";
 
 export type TarjetaPersona = {
   operacionId: string;
@@ -43,17 +49,19 @@ const ESTILO_BARRA: Record<TarjetaPersona["urgencia"], string> = {
 
 export function TarjetaDePersona({ persona }: { persona: TarjetaPersona }) {
   const [error, setError] = useState<string | null>(null);
+  const [abierto, setAbierto] = useState(false);
   const [enCurso, iniciar] = useTransition();
 
-  function ejecutar() {
+  /// Cada paso pide lo suyo. Solo la entrega a mentor se hace de un clic: ahí
+  /// la información ya está toda recogida y lo único que falta es confirmar.
+  const pideFormulario = persona.estado !== Operation72Status.LISTA_PARA_ENTREGA;
+
+  function ejecutar(accion: () => Promise<{ ok: boolean; mensaje?: string }>) {
     setError(null);
     iniciar(async () => {
-      const resultado =
-        persona.estado === Operation72Status.LISTA_PARA_ENTREGA
-          ? await entregarAMentor(persona.operacionId)
-          : await avanzarOperacion72(persona.operacionId, persona.estado);
-
-      if (!resultado.ok) setError(resultado.mensaje);
+      const resultado = await accion();
+      if (!resultado.ok) setError(resultado.mensaje ?? "No se pudo guardar.");
+      else setAbierto(false);
     });
   }
 
@@ -93,14 +101,48 @@ export function TarjetaDePersona({ persona }: { persona: TarjetaPersona }) {
         {persona.detalle}
       </p>
 
-      <button
-        type="button"
-        onClick={ejecutar}
-        disabled={enCurso}
-        className="mt-3 w-full cursor-pointer rounded-[8px] border-0 bg-azul-900 p-[10px] text-[11.5px] leading-none font-semibold text-white disabled:opacity-60"
-      >
-        {enCurso ? "Guardando…" : persona.accion}
-      </button>
+      {abierto && pideFormulario ? (
+        <div className="mt-3 rounded-[10px] bg-papel p-3">
+          {persona.estado === Operation72Status.INICIADA ? (
+            <FormularioDeLlamada
+              enCurso={enCurso}
+              alGuardar={(datos) =>
+                ejecutar(() => registrarLlamada(persona.operacionId, datos))
+              }
+              alCancelar={() => setAbierto(false)}
+            />
+          ) : persona.estado === Operation72Status.CONTACTADA ? (
+            <FormularioDeVisita
+              enCurso={enCurso}
+              alGuardar={(datos) =>
+                ejecutar(() => agendarVisita(persona.operacionId, datos))
+              }
+              alCancelar={() => setAbierto(false)}
+            />
+          ) : (
+            <FormularioDeCierre
+              enCurso={enCurso}
+              alGuardar={(resumen) =>
+                ejecutar(() => cerrarVisita(persona.operacionId, resumen))
+              }
+              alCancelar={() => setAbierto(false)}
+            />
+          )}
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() =>
+            pideFormulario
+              ? setAbierto(true)
+              : ejecutar(() => entregarAMentor(persona.operacionId))
+          }
+          disabled={enCurso}
+          className="mt-3 w-full cursor-pointer rounded-[8px] border-0 bg-azul-900 p-[10px] text-[11.5px] leading-none font-semibold text-white disabled:opacity-60"
+        >
+          {enCurso ? "Guardando…" : persona.accion}
+        </button>
+      )}
 
       {error ? (
         <p
@@ -125,5 +167,239 @@ export function TarjetaDePersona({ persona }: { persona: TarjetaPersona }) {
         </div>
       ) : null}
     </article>
+  );
+}
+
+const HOY = () => new Date().toISOString().slice(0, 10);
+
+function Etiqueta({ children }: { children: React.ReactNode }) {
+  return <span className="etiqueta-campo">{children}</span>;
+}
+
+function Botones({
+  enCurso,
+  texto,
+  alGuardar,
+  alCancelar,
+}: {
+  enCurso: boolean;
+  texto: string;
+  alGuardar: () => void;
+  alCancelar: () => void;
+}) {
+  return (
+    <div className="mt-3 flex gap-2">
+      <button
+        type="button"
+        disabled={enCurso}
+        onClick={alGuardar}
+        className="boton-primario flex-1 justify-center py-[9px] text-[11.5px]"
+      >
+        {enCurso ? "Guardando…" : texto}
+      </button>
+      <button
+        type="button"
+        onClick={alCancelar}
+        className="boton-secundario py-[9px] text-[11.5px]"
+      >
+        Cancelar
+      </button>
+    </div>
+  );
+}
+
+function FormularioDeLlamada({
+  enCurso,
+  alGuardar,
+  alCancelar,
+}: {
+  enCurso: boolean;
+  alGuardar: (datos: {
+    fecha: string;
+    resultado: CallOutcome;
+    observacion: string;
+    peticionDeOracion: string;
+  }) => void;
+  alCancelar: () => void;
+}) {
+  const [fecha, setFecha] = useState(HOY);
+  const [resultado, setResultado] = useState<CallOutcome | null>(null);
+  const [observacion, setObservacion] = useState("");
+  const [peticion, setPeticion] = useState("");
+
+  return (
+    <div>
+      <label className="block">
+        <Etiqueta>Fecha de la llamada</Etiqueta>
+        <input
+          type="date"
+          value={fecha}
+          onChange={(evento) => setFecha(evento.target.value)}
+          className="campo"
+        />
+      </label>
+
+      <div className="mt-3">
+        <Etiqueta>¿Cómo salió?</Etiqueta>
+        <div className="mt-2 flex flex-col gap-[6px]">
+          {RESULTADOS_DE_LLAMADA.map(({ valor, etiqueta }) => (
+            <button
+              key={valor}
+              type="button"
+              aria-pressed={resultado === valor}
+              onClick={() => setResultado(valor)}
+              className="opcion px-3 py-[9px] text-left text-[12px]"
+            >
+              {etiqueta}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <label className="mt-3 block">
+        <Etiqueta>Observación</Etiqueta>
+        <textarea
+          value={observacion}
+          onChange={(evento) => setObservacion(evento.target.value)}
+          rows={2}
+          placeholder="Qué se conversó"
+          className="campo font-medium"
+        />
+      </label>
+
+      <label className="mt-3 block">
+        <Etiqueta>
+          Petición de oración{" "}
+          <span className="font-medium text-[rgba(19,28,36,.4)]">si contó alguna</span>
+        </Etiqueta>
+        <textarea
+          value={peticion}
+          onChange={(evento) => setPeticion(evento.target.value)}
+          rows={2}
+          placeholder="Por su mamá, está enferma"
+          className="campo font-medium"
+        />
+      </label>
+
+      <Botones
+        enCurso={enCurso}
+        texto="Guardar llamada"
+        alCancelar={alCancelar}
+        alGuardar={() =>
+          resultado &&
+          alGuardar({ fecha, resultado, observacion, peticionDeOracion: peticion })
+        }
+      />
+      {!resultado ? (
+        <p className="mt-2 text-[11px] leading-[1.4] font-medium text-[rgba(19,28,36,.5)]">
+          Elige cómo salió la llamada para guardar.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function FormularioDeVisita({
+  enCurso,
+  alGuardar,
+  alCancelar,
+}: {
+  enCurso: boolean;
+  alGuardar: (datos: {
+    cuando: string;
+    lugar: string;
+    virtual: boolean;
+    nota: string;
+  }) => void;
+  alCancelar: () => void;
+}) {
+  const [cuando, setCuando] = useState("");
+  const [lugar, setLugar] = useState("");
+  const [virtual, setVirtual] = useState(false);
+  const [nota, setNota] = useState("");
+
+  return (
+    <div>
+      <label className="block">
+        <Etiqueta>Fecha y hora de la visita</Etiqueta>
+        <input
+          type="datetime-local"
+          value={cuando}
+          onChange={(evento) => setCuando(evento.target.value)}
+          className="campo"
+        />
+      </label>
+
+      <div className="mt-3">
+        <Etiqueta>Lugar</Etiqueta>
+        <input
+          value={lugar}
+          onChange={(evento) => setLugar(evento.target.value)}
+          disabled={virtual}
+          placeholder="Su casa · la cafetería de la esquina"
+          className="campo font-medium disabled:opacity-50"
+        />
+        <button
+          type="button"
+          aria-pressed={virtual}
+          onClick={() => setVirtual(!virtual)}
+          className="opcion mt-2 px-3 py-[9px] text-[12px]"
+        >
+          Es virtual
+        </button>
+      </div>
+
+      <label className="mt-3 block">
+        <Etiqueta>Nota</Etiqueta>
+        <textarea
+          value={nota}
+          onChange={(evento) => setNota(evento.target.value)}
+          rows={2}
+          placeholder="Va acompañada · pidió que fuéramos dos"
+          className="campo font-medium"
+        />
+      </label>
+
+      <Botones
+        enCurso={enCurso}
+        texto="Agendar visita"
+        alCancelar={alCancelar}
+        alGuardar={() => alGuardar({ cuando, lugar, virtual, nota })}
+      />
+    </div>
+  );
+}
+
+function FormularioDeCierre({
+  enCurso,
+  alGuardar,
+  alCancelar,
+}: {
+  enCurso: boolean;
+  alGuardar: (resumen: string) => void;
+  alCancelar: () => void;
+}) {
+  const [resumen, setResumen] = useState("");
+
+  return (
+    <div>
+      <label className="block">
+        <Etiqueta>Resumen de la visita</Etiqueta>
+        <textarea
+          value={resumen}
+          onChange={(evento) => setResumen(evento.target.value)}
+          rows={4}
+          placeholder="Cómo la encontramos, qué se conversó, con qué quedó"
+          className="campo font-medium"
+        />
+      </label>
+
+      <Botones
+        enCurso={enCurso}
+        texto="Cerrar visita"
+        alCancelar={alCancelar}
+        alGuardar={() => alGuardar(resumen)}
+      />
+    </div>
   );
 }
