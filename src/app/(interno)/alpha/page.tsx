@@ -1,6 +1,13 @@
 import Link from "next/link";
-import { requerirRol, ROLES_ALPHA } from "@/lib/auth";
-import { cargarGrupos, esVistaCompletaDeAlpha, SESIONES_DE_ALPHA } from "@/lib/alpha";
+import { requerirPermiso } from "@/lib/auth";
+import {
+  cargarGrupos,
+  esVistaCompletaDeAlpha,
+  lideresPosibles,
+  puedeCrearAlpha,
+  puedeVerAlpha,
+  SESIONES_DE_ALPHA,
+} from "@/lib/alpha";
 import { NuevoGrupo } from "./nuevo-grupo";
 
 export const metadata = { title: "Alpha · Iglesia Vive" };
@@ -13,8 +20,11 @@ const FECHA = new Intl.DateTimeFormat("es-CO", {
 });
 
 export default async function PaginaAlpha() {
-  const usuario = await requerirRol(ROLES_ALPHA);
-  const grupos = await cargarGrupos(usuario);
+  const usuario = await requerirPermiso(puedeVerAlpha);
+  const [grupos, lideres] = await Promise.all([
+    cargarGrupos(usuario),
+    puedeCrearAlpha(usuario) ? lideresPosibles() : Promise.resolve([]),
+  ]);
 
   return (
     <main className="px-5 py-7 pb-16 sm:px-[26px]">
@@ -31,14 +41,17 @@ export default async function PaginaAlpha() {
           </p>
         </header>
 
-        <div className="mt-5">
-          <NuevoGrupo />
-        </div>
+        {puedeCrearAlpha(usuario) ? (
+          <div className="mt-5">
+            <NuevoGrupo lideres={lideres} />
+          </div>
+        ) : null}
 
         {grupos.length === 0 ? (
           <p className="mt-6 rounded-[13px] border border-dashed border-[rgba(19,28,36,.16)] p-6 text-[12.5px] leading-[1.6] font-medium text-[rgba(19,28,36,.5)]">
-            Todavía no hay grupos. Crea el primero y ve inscribiendo a las
-            personas que están en Ganar.
+            Todavía no hay grupos. {puedeCrearAlpha(usuario)
+              ? "Crea el primero y elige quién lo lleva."
+              : "Cuando te asignen uno, aparecerá aquí."}
           </p>
         ) : (
           <ul className="mt-6 flex flex-col gap-[10px]">

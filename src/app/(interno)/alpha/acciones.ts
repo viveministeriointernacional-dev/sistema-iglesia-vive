@@ -1,15 +1,23 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { MilestoneKind, MilestoneStatus, Phase } from "@iglesia/prisma-client";
+import {
+  EntryPoint,
+  LearnerStatus,
+  MilestoneKind,
+  MilestoneStatus,
+  Phase,
+} from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
+import { colaDeTelefono, nombreCompleto } from "@/lib/dominio";
 import { auditar, encolarEventoIntegracion } from "@/lib/audit";
 import { ErrorDePermiso, obtenerUsuarioActual } from "@/lib/auth";
 import {
   cargarGrupo,
   construirParticipantes,
-  esVistaCompletaDeAlpha,
-  puedeAdministrarAlpha,
+  puedeAdministrarGrupo,
+  puedeCrearAlpha,
+  puedeVerAlpha,
   SESIONES_DE_ALPHA,
 } from "@/lib/alpha";
 
@@ -18,11 +26,20 @@ export type Resultado = { ok: true } | { ok: false; mensaje: string };
 async function usuarioDeAlpha() {
   const usuario = await obtenerUsuarioActual();
   if (!usuario) throw new ErrorDePermiso("Tu sesión expiró. Vuelve a entrar.");
-  if (!puedeAdministrarAlpha(usuario)) throw new ErrorDePermiso();
+  if (!puedeVerAlpha(usuario)) throw new ErrorDePermiso();
   return usuario;
 }
 
-/// Un líder solo administra sus grupos; pastor y administración, todos.
+/// Abrir y cerrar grupos es de dirección; llevarlos, de quien tiene el permiso.
+async function usuarioQueAbreGrupos() {
+  const usuario = await obtenerUsuarioActual();
+  if (!usuario) throw new ErrorDePermiso("Tu sesión expiró. Vuelve a entrar.");
+  if (!puedeCrearAlpha(usuario)) throw new ErrorDePermiso();
+  return usuario;
+}
+
+/// El grupo que esta persona puede administrar: el que lleva, o cualquiera si
+/// es de dirección.
 async function grupoPropio(programId: string) {
   const usuario = await usuarioDeAlpha();
   const prisma = await getPrisma();
@@ -31,14 +48,18 @@ async function grupoPropio(programId: string) {
     select: { id: true, leaderId: true, closedAt: true },
   });
   if (!grupo) return { usuario, grupo: null };
-  if (!esVistaCompletaDeAlpha(usuario) && grupo.leaderId !== usuario.id) {
-    return { usuario, grupo: null };
-  }
+  if (!puedeAdministrarGrupo(usuario, grupo)) return { usuario, grupo: null };
   return { usuario, grupo };
 }
 
-export async function crearGrupo(nombre: string, inicio: string): Promise<Resultado> {
-  const usuario = await usuarioDeAlpha();
+/// Abrir un grupo es de dirección; llevarlo, de quien tenga el permiso. Por
+/// eso se elige el líder al crearlo, en vez de asignárselo a quien lo abre.
+export async function crearGrupo(
+  nombre: string,
+  inicio: string,
+  liderId: string,
+): Promise<Resultado> {
+  const usuario = await usuarioQueAbreGrupos();
 
   if (nombre.trim().length < 3) {
     return { ok: false, mensaje: "Ponle un nombre al grupo." };
@@ -48,12 +69,24 @@ export async function crearGrupo(nombre: string, inicio: string): Promise<Result
   }
 
   const prisma = await getPrisma();
+  const lider = await prisma.appUser.findFirst({
+    where: { id: liderId, active: true, canLeadAlpha: true },
+    select: { id: true, teamId: true },
+  });
+  if (!lider) {
+    return {
+      ok: false,
+      mensaje: "Elige quién lleva el grupo, entre quienes tienen el permiso.",
+    };
+  }
+
   await prisma.alphaProgram.create({
     data: {
       name: nombre.trim(),
       startDate: new Date(inicio),
-      leaderId: usuario.id,
-      teamId: usuario.teamId,
+      leaderId: lider.id,
+      createdById: usuario.id,
+      teamId: lider.teamId ?? usuario.teamId,
     },
   });
 
@@ -302,7 +335,12 @@ export async function validarAlpha(
   return { ok: true };
 }
 
-export type CandidatoAlpha = { learnerId: string; nombre: string };
+export type CandidatoAlpha = {
+  learnerId: string;
+  nombre: string;
+  fase: Phase;
+  telefono: string | null;
+};
 
 /// Personas en Ganar que todavía no están en este grupo.
 export async function buscarCandidatos(
@@ -315,9 +353,12 @@ export async function buscarCandidatos(
   const texto = consulta.trim();
   const prisma = await getPrisma();
 
+  // Sin encerrar la búsqueda a Ganar: a un Alpha entra quien quiera, y la
+  // fase se muestra para que quien inscribe sepa a quién está metiendo.
   const aprendices = await prisma.learnerProfile.findMany({
     where: {
-      phase: Phase.GANAR,
+      // Quien se retiró o ya se graduó no se ofrece para inscribir.
+      status: LearnerStatus.ACTIVO,
       alphaEnrollments: { none: { programId } },
       ...(texto.length >= 2
         ? {
@@ -334,12 +375,110 @@ export async function buscarCandidatos(
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
-      person: { select: { firstName: true, lastName: true } },
+      phase: true,
+      person: { select: { firstName: true, lastName: true, callPhone: true } },
     },
   });
 
   return aprendices.map((aprendiz) => ({
     learnerId: aprendiz.id,
-    nombre: `${aprendiz.person.firstName} ${aprendiz.person.lastName}`.trim(),
+    nombre: nombreCompleto(aprendiz.person),
+    fase: aprendiz.phase,
+    telefono: aprendiz.person.callPhone,
   }));
+}
+
+/// Alta rápida desde el propio Alpha.
+///
+/// A un Alpha llega gente de la que no se sabe casi nada, y detener la
+/// inscripción para llenar un registro completo hace que no se registre a
+/// nadie. Con el nombre basta; el teléfono ayuda a no duplicar. El expediente
+/// queda abierto y se completa después desde el registro normal.
+export async function crearEInscribir(
+  programId: string,
+  nombre: string,
+  telefono: string,
+): Promise<Resultado> {
+  const { usuario, grupo } = await grupoPropio(programId);
+  if (!grupo) return { ok: false, mensaje: "Este grupo no es tuyo." };
+  if (grupo.closedAt) return { ok: false, mensaje: "El grupo está cerrado." };
+
+  const limpio = nombre.trim().replace(/\s+/g, " ");
+  if (limpio.length < 2) return { ok: false, mensaje: "Escribe el nombre." };
+
+  const prisma = await getPrisma();
+  const cola = colaDeTelefono(telefono);
+
+  // Si ese teléfono ya existe, no se abre un segundo expediente en silencio
+  // (§20): se dice a quién pertenece para que lo busquen.
+  if (cola) {
+    const repetida = await prisma.$queryRaw<
+      { first_name: string; last_name: string | null }[]
+    >`
+      SELECT first_name, last_name FROM person
+      WHERE active = true
+        AND (right(regexp_replace(coalesce(call_phone, ''), '\\D', '', 'g'), 10) = ${cola}
+             OR right(regexp_replace(coalesce(whatsapp_phone, ''), '\\D', '', 'g'), 10) = ${cola})
+      LIMIT 1
+    `;
+    if (repetida.length) {
+      return {
+        ok: false,
+        mensaje: `Ese teléfono ya es de ${nombreCompleto({
+          firstName: repetida[0].first_name,
+          lastName: repetida[0].last_name,
+        })}. Búscala arriba en vez de crearla de nuevo.`,
+      };
+    }
+  }
+
+  const partes = limpio.split(" ");
+  const primerNombre = partes[0];
+  const apellido = partes.slice(1).join(" ") || null;
+
+  await prisma.$transaction(async (tx) => {
+    const persona = await tx.person.create({
+      data: {
+        firstName: primerNombre,
+        lastName: apellido,
+        callPhone: telefono.trim() || null,
+      },
+      select: { id: true },
+    });
+
+    const aprendiz = await tx.learnerProfile.create({
+      data: {
+        personId: persona.id,
+        entryPoint: EntryPoint.ALPHA_CASA_DE_FE,
+        registeredById: usuario.id,
+      },
+      select: { id: true },
+    });
+
+    await tx.milestone.create({
+      data: {
+        learnerId: aprendiz.id,
+        kind: MilestoneKind.REGISTRO,
+        status: MilestoneStatus.COMPLETADO,
+        achievedAt: new Date(),
+        detail: "Registrada desde Alpha",
+        recordedById: usuario.id,
+      },
+    });
+
+    await tx.alphaEnrollment.create({
+      data: { programId, learnerId: aprendiz.id },
+    });
+
+    await auditar(tx, {
+      actorId: usuario.id,
+      action: "persona.registrada",
+      entityType: "learner_profile",
+      entityId: aprendiz.id,
+      metadata: { origen: "alpha", programId },
+    });
+  });
+
+  revalidatePath(`/alpha/${programId}`);
+  return { ok: true };
 }

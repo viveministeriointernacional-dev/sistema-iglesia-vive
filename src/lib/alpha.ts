@@ -26,14 +26,28 @@ export type ParticipanteDeAlpha = {
   faltaParaValidar: string[];
 };
 
-/// Quién administra grupos de Alpha (§3.3). Pastor y administración además ven
-/// todos los grupos.
-export function puedeAdministrarAlpha(usuario: UsuarioSesion) {
+/// Crear y cerrar grupos de Alpha: decisión de dirección, no de quien lo
+/// lleva. El líder del grupo lo administra, pero no lo abre ni lo elimina.
+export function puedeCrearAlpha(usuario: UsuarioSesion) {
   return (
-    usuario.role === Role.LIDER_ALPHA ||
+    usuario.role === Role.MENTOR ||
     usuario.role === Role.PASTOR ||
     usuario.role === Role.ADMIN
   );
+}
+
+/// Quién puede entrar a la sección de Alpha: quien tiene el permiso de
+/// liderar, y quien puede abrir grupos.
+export function puedeVerAlpha(usuario: UsuarioSesion) {
+  return usuario.canLeadAlpha || puedeCrearAlpha(usuario);
+}
+
+/// Quién administra un grupo concreto: su líder asignado, o la dirección.
+export function puedeAdministrarGrupo(
+  usuario: UsuarioSesion,
+  grupo: { leaderId: string },
+) {
+  return grupo.leaderId === usuario.id || esVistaCompletaDeAlpha(usuario);
 }
 
 export function esVistaCompletaDeAlpha(usuario: UsuarioSesion) {
@@ -44,7 +58,11 @@ export async function cargarGrupos(usuario: UsuarioSesion) {
   const prisma = await getPrisma();
 
   const grupos = await prisma.alphaProgram.findMany({
-    where: esVistaCompletaDeAlpha(usuario) ? {} : { leaderId: usuario.id },
+    // El pastor y la administración ven todo. Un mentor ve los grupos que
+    // abrió; un líder, los que lleva.
+    where: esVistaCompletaDeAlpha(usuario)
+      ? {}
+      : { OR: [{ leaderId: usuario.id }, { createdById: usuario.id }] },
     orderBy: { startDate: "desc" },
     select: {
       id: true,
@@ -72,6 +90,7 @@ export async function cargarGrupo(programId: string) {
       endDate: true,
       closedAt: true,
       leaderId: true,
+      createdById: true,
       leader: { select: { fullName: true } },
       sessions: {
         orderBy: { number: "asc" },
@@ -155,5 +174,15 @@ export function construirParticipantes(
       puedeValidarse: faltaParaValidar.length === 0 && !inscripcion.validatedAt,
       faltaParaValidar,
     };
+  });
+}
+
+/// Quién puede quedar como líder de un grupo: cualquiera con el permiso.
+export async function lideresPosibles() {
+  const prisma = await getPrisma();
+  return prisma.appUser.findMany({
+    where: { active: true, canLeadAlpha: true },
+    orderBy: { fullName: "asc" },
+    select: { id: true, fullName: true, role: true },
   });
 }

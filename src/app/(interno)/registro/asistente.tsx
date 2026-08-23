@@ -490,6 +490,9 @@ function PasoOrigen({
                 actualizar("invitationKind", quitando ? "" : valor);
                 if (quitando || valor !== InvitationKind.PERSONA) {
                   alSeleccionarInvitador(null);
+                  // Si no la invitó una persona, el nombre que se hubiera
+                  // escrito antes no debe viajar igual.
+                  actualizar("invitedByName", "");
                 }
               }}
               className="opcion opcion-amplia"

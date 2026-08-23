@@ -12,7 +12,7 @@ import { getPrisma } from "@/lib/prisma";
 import { auditar, encolarEventoIntegracion } from "@/lib/audit";
 import { ErrorDePermiso, requerirRolEnAccion, ROLES_CONSOLIDACION } from "@/lib/auth";
 import { asignarConsolidador } from "@/lib/asignacion";
-import { nombreCompleto, normalizarTelefono } from "@/lib/dominio";
+import { colaDeTelefono, nombreCompleto, normalizarTelefono } from "@/lib/dominio";
 import { DURACION_OPERACION_72_HORAS } from "@/lib/op72";
 import { esquemaRegistro, type DatosRegistro } from "@/lib/validacion-registro";
 
@@ -105,29 +105,61 @@ export async function buscarInvitador(
 /// Detecta duplicados por teléfono (normalizado) y por correo, antes de crear
 /// un expediente (ESPECIFICACION_PRODUCTO.md §5.3 y §20).
 async function buscarDuplicados(datos: {
+  firstName: string;
+  lastName: string | null;
   callPhone: string | null;
   whatsappPhone: string | null;
   email: string | null;
 }): Promise<PosibleDuplicado[]> {
+  // Se comparan las colas: la misma persona se escribe «+57 311 555 4433» o
+  // «3115554433», y comparar la cadena completa las daría por distintas.
   const telefonos = [
-    normalizarTelefono(datos.callPhone),
-    normalizarTelefono(datos.whatsappPhone),
+    colaDeTelefono(datos.callPhone),
+    colaDeTelefono(datos.whatsappPhone),
   ].filter((valor): valor is string => Boolean(valor));
 
-  if (telefonos.length === 0 && !datos.email) return [];
-
   const prisma = await getPrisma();
+
+  // Sin teléfono ni correo no hay con qué comparar salvo el nombre, y ahora que
+  // el registro es libre ese es el caso común. Un nombre repetido no prueba que
+  // sea la misma persona, pero sí merece que alguien lo mire (§20).
+  if (telefonos.length === 0 && !datos.email) {
+    const porNombre = await prisma.person.findMany({
+      where: {
+        active: true,
+        firstName: { equals: datos.firstName, mode: "insensitive" },
+        ...(datos.lastName
+          ? { lastName: { equals: datos.lastName, mode: "insensitive" } }
+          : {}),
+      },
+      take: 5,
+      select: { id: true, firstName: true, lastName: true, callPhone: true },
+    });
+
+    return porNombre.map((persona) => ({
+      id: persona.id,
+      nombre: nombreCompleto(persona),
+      telefono: persona.callPhone,
+      motivo: "Mismo nombre registrado",
+    }));
+  }
   const filas = await prisma.$queryRaw<
-    { id: string; first_name: string; last_name: string; call_phone: string | null; por_telefono: boolean }[]
+    {
+      id: string;
+      first_name: string;
+      last_name: string | null;
+      call_phone: string | null;
+      por_telefono: boolean;
+    }[]
   >`
     SELECT id, first_name, last_name, call_phone,
-           (regexp_replace(coalesce(call_phone, ''), '\\D', '', 'g') = ANY(${telefonos})
-            OR regexp_replace(coalesce(whatsapp_phone, ''), '\\D', '', 'g') = ANY(${telefonos})) AS por_telefono
+           (right(regexp_replace(coalesce(call_phone, ''), '\\D', '', 'g'), 10) = ANY(${telefonos})
+            OR right(regexp_replace(coalesce(whatsapp_phone, ''), '\\D', '', 'g'), 10) = ANY(${telefonos})) AS por_telefono
     FROM person
     WHERE active = true
       AND (
-        regexp_replace(coalesce(call_phone, ''), '\\D', '', 'g') = ANY(${telefonos})
-        OR regexp_replace(coalesce(whatsapp_phone, ''), '\\D', '', 'g') = ANY(${telefonos})
+        right(regexp_replace(coalesce(call_phone, ''), '\\D', '', 'g'), 10) = ANY(${telefonos})
+        OR right(regexp_replace(coalesce(whatsapp_phone, ''), '\\D', '', 'g'), 10) = ANY(${telefonos})
         OR (${datos.email}::text IS NOT NULL AND lower(email) = ${datos.email})
       )
     LIMIT 5
@@ -135,7 +167,10 @@ async function buscarDuplicados(datos: {
 
   return filas.map((fila) => ({
     id: fila.id,
-    nombre: `${fila.first_name} ${fila.last_name}`.trim(),
+    nombre: nombreCompleto({
+      firstName: fila.first_name,
+      lastName: fila.last_name,
+    }),
     telefono: fila.call_phone,
     motivo: fila.por_telefono
       ? "Mismo teléfono registrado"

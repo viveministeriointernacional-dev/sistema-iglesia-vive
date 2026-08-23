@@ -29,7 +29,10 @@ import {
 /// pasado se ancla al mediodía.
 function fechaDeLaLlamada(fecha: string) {
   const ahora = new Date();
-  if (fecha === ahora.toISOString().slice(0, 10)) return ahora;
+  const mes = `${ahora.getMonth() + 1}`.padStart(2, "0");
+  const dia = `${ahora.getDate()}`.padStart(2, "0");
+  const hoy = `${ahora.getFullYear()}-${mes}-${dia}`;
+  if (fecha === hoy) return ahora;
   return new Date(`${fecha}T12:00:00`);
 }
 

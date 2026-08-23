@@ -5,10 +5,10 @@ import { salir } from "@/app/ingresar/acciones";
 import {
   ETIQUETA_ROL,
   requerirUsuario,
-  ROLES_ALPHA,
   ROLES_CON_RED,
   ROLES_CONSOLIDACION,
 } from "@/lib/auth";
+import { puedeVerAlpha } from "@/lib/alpha";
 import { ROLES_ENTRENAR } from "@/lib/entrenar";
 import { ROLES_OPERAN_EVENTOS } from "@/lib/eventos";
 import { PestanasSuperiores } from "@/components/pestanas-superiores";
@@ -41,7 +41,7 @@ export default async function LayoutInterno({
           { href: "/registro", etiqueta: "Registrar persona" },
         ]
       : []),
-    ...(ROLES_ALPHA.includes(usuario.role)
+    ...(puedeVerAlpha(usuario)
       ? [{ href: "/alpha", etiqueta: "Alpha" }]
       : []),
     ...(ROLES_ENTRENAR.includes(usuario.role)

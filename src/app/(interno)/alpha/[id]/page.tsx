@@ -1,10 +1,11 @@
 import { notFound } from "next/navigation";
-import { requerirRol, ROLES_ALPHA } from "@/lib/auth";
+import { requerirPermiso } from "@/lib/auth";
 import {
   ASISTENCIA_MINIMA,
   cargarGrupo,
   construirParticipantes,
-  esVistaCompletaDeAlpha,
+  puedeAdministrarGrupo,
+  puedeVerAlpha,
   SESIONES_DE_ALPHA,
 } from "@/lib/alpha";
 import { Grupo, type ParticipanteVista, type SesionVista } from "./grupo";
@@ -33,14 +34,14 @@ export default async function PaginaGrupoDeAlpha({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const usuario = await requerirRol(ROLES_ALPHA);
+  const usuario = await requerirPermiso(puedeVerAlpha);
   const grupo = await cargarGrupo(id);
 
   if (!grupo) notFound();
 
-  // Un líder solo entra a sus grupos.
-  const esSuyo = grupo.leaderId === usuario.id;
-  if (!esSuyo && !esVistaCompletaDeAlpha(usuario)) notFound();
+  // Solo entra quien lleva el grupo, quien lo abrió, o la dirección.
+  const puedeEditar = puedeAdministrarGrupo(usuario, grupo);
+  if (!puedeEditar && grupo.createdById !== usuario.id) notFound();
 
   const ahora = new Date();
   const participantes = construirParticipantes(grupo, ahora);
@@ -103,7 +104,7 @@ export default async function PaginaGrupoDeAlpha({
           sesiones={sesiones}
           participantes={vistas}
           asistenciaMinima={ASISTENCIA_MINIMA * 100}
-          puedeEditar={esSuyo || esVistaCompletaDeAlpha(usuario)}
+          puedeEditar={puedeEditar}
         />
       </div>
     </main>

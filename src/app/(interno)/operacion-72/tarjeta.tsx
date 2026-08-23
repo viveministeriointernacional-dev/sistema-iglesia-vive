@@ -170,7 +170,14 @@ export function TarjetaDePersona({ persona }: { persona: TarjetaPersona }) {
   );
 }
 
-const HOY = () => new Date().toISOString().slice(0, 10);
+/// La fecha local, no la UTC: en Colombia, después de las 7 p. m. `toISOString`
+/// ya devuelve el día siguiente.
+const HOY = () => {
+  const ahora = new Date();
+  const mes = `${ahora.getMonth() + 1}`.padStart(2, "0");
+  const dia = `${ahora.getDate()}`.padStart(2, "0");
+  return `${ahora.getFullYear()}-${mes}-${dia}`;
+};
 
 function Etiqueta({ children }: { children: React.ReactNode }) {
   return <span className="etiqueta-campo">{children}</span>;

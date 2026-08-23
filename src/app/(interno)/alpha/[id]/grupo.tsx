@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   buscarCandidatos,
+  crearEInscribir,
   crearSesion,
   inscribir,
   marcarFocusDay,
@@ -387,7 +388,7 @@ function Inscribir({ programId }: { programId: string }) {
         <input
           value={consulta}
           onChange={(evento) => setConsulta(evento.target.value)}
-          placeholder="Buscar en Ganar…"
+          placeholder="Buscar por nombre…"
           className="campo mt-0 flex-1"
         />
         <button
@@ -432,16 +433,110 @@ function Inscribir({ programId }: { programId: string }) {
                   className="w-full rounded-[8px] border border-[rgba(19,28,36,.16)] bg-white p-2 text-left text-[12.5px] font-semibold text-tinta"
                 >
                   {candidato.nombre}
+                  <span className="ml-2 text-[11px] font-semibold text-[rgba(19,28,36,.45)]">
+                    {candidato.fase}
+                    {candidato.telefono ? ` · ${candidato.telefono}` : ""}
+                  </span>
                 </button>
               </li>
             ))}
           </ul>
         ) : (
           <p className="mt-2 text-[11.5px] leading-[1.4] font-medium text-[rgba(19,28,36,.5)]">
-            Nadie coincide en fase Ganar.
+            Nadie coincide. Si es alguien nuevo, agrégalo abajo.
           </p>
         )
       ) : null}
+
+      <AltaRapida programId={programId} />
+
+      {error ? (
+        <p role="alert" className="mt-2 text-[11.5px] leading-[1.4] font-medium text-rojo">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/// A un Alpha llega gente de la que no se sabe casi nada. Pedir un registro
+/// completo antes de anotarla hace que no se anote a nadie: con el nombre
+/// basta, y el teléfono evita duplicarla.
+function AltaRapida({ programId }: { programId: string }) {
+  const router = useRouter();
+  const [abierto, setAbierto] = useState(false);
+  const [nombre, setNombre] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [enCurso, iniciar] = useTransition();
+
+  if (!abierto) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAbierto(true)}
+        className="boton-secundario mt-3 w-full justify-center py-[9px] text-[11.5px]"
+      >
+        + Alguien nuevo
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-3 rounded-[10px] bg-papel p-3">
+      <label className="block">
+        <span className="etiqueta-campo">Nombre</span>
+        <input
+          value={nombre}
+          onChange={(evento) => setNombre(evento.target.value)}
+          placeholder="Como se presentó"
+          className="campo font-medium"
+        />
+      </label>
+      <label className="mt-2 block">
+        <span className="etiqueta-campo">
+          Teléfono{" "}
+          <span className="font-medium text-[rgba(19,28,36,.4)]">si lo dio</span>
+        </span>
+        <input
+          value={telefono}
+          onChange={(evento) => setTelefono(evento.target.value)}
+          inputMode="tel"
+          placeholder="+57 300 412 4412"
+          className="campo font-medium"
+        />
+      </label>
+
+      <div className="mt-3 flex gap-2">
+        <button
+          type="button"
+          disabled={enCurso}
+          onClick={() => {
+            setError(null);
+            iniciar(async () => {
+              const resultado = await crearEInscribir(programId, nombre, telefono);
+              if (!resultado.ok) {
+                setError(resultado.mensaje);
+                return;
+              }
+              setNombre("");
+              setTelefono("");
+              setAbierto(false);
+              router.refresh();
+            });
+          }}
+          className="boton-primario flex-1 justify-center py-[9px] text-[11.5px]"
+        >
+          {enCurso ? "Agregando…" : "Agregar al grupo"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setAbierto(false)}
+          className="boton-secundario py-[9px] text-[11.5px]"
+        >
+          Cancelar
+        </button>
+      </div>
 
       {error ? (
         <p role="alert" className="mt-2 text-[11.5px] leading-[1.4] font-medium text-rojo">
