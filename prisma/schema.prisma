@@ -46,6 +46,11 @@ model AppUser {
   active     Boolean  @default(true)
   /// Capacidad máxima de acompañamiento simultáneo (consolidador / mentor).
   capacity   Int      @default(12)
+  /// Liderar Alpha es un permiso, no un rol: un mentor, un consolidador o
+  /// cualquiera del equipo puede llevar un grupo sin cambiar lo que es dentro
+  /// de la iglesia. Quien lo tiene administra los grupos que le asignen; crear
+  /// y cerrar grupos sigue siendo del pastor o de un mentor.
+  canLeadAlpha Boolean @default(false) @map("can_lead_alpha")
   personId   String?  @unique @map("person_id")
   teamId     String?  @map("team_id")
   createdAt  DateTime @default(now()) @map("created_at")
@@ -63,6 +68,7 @@ model AppUser {
   hitosRegistrados      Milestone[]
   temasRegistrados      FaithHouseProgress[]
   gruposAlphaLiderados  AlphaProgram[]       @relation("LiderDeAlpha")
+  gruposAlphaAbiertos   AlphaProgram[]       @relation("AbrioAlpha")
   validacionesAlpha     AlphaEnrollment[]    @relation("ValidacionAlpha")
   asistenciasAlpha      AlphaAttendance[]
   registrosCreados      LearnerProfile[]     @relation("RegistradaPor")
@@ -139,7 +145,7 @@ model Person {
   photoUrl      String?        @map("photo_url")
   /// Franjas en las que acepta llamadas. Varias a la vez: «mañana y noche» es
   /// una respuesta normal.
-  callSchedules CallSchedule[] @map("call_schedules")
+  callSchedules CallSchedule[] @default([]) @map("call_schedules")
   /// Horario escrito a mano cuando ninguna franja sirve («después de las 7»).
   callScheduleNote String?     @map("call_schedule_note")
   active        Boolean       @default(true)
@@ -330,13 +336,17 @@ model AlphaProgram {
   name      String
   startDate DateTime  @map("start_date") @db.Date
   endDate   DateTime? @map("end_date") @db.Date
+  /// Quien lleva el grupo: lo administra, pero no lo abre ni lo cierra.
   leaderId  String    @map("leader_id")
+  /// Quien lo abrió: pastor o mentor.
+  createdById String? @map("created_by_id")
   teamId    String?   @map("team_id")
   closedAt  DateTime? @map("closed_at")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
   leader      AppUser           @relation("LiderDeAlpha", fields: [leaderId], references: [id])
+  createdBy   AppUser?          @relation("AbrioAlpha", fields: [createdById], references: [id])
   team        Team?             @relation(fields: [teamId], references: [id])
   sessions    AlphaSession[]
   enrollments AlphaEnrollment[]

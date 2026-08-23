@@ -11,6 +11,8 @@ export type UsuarioSesion = {
   role: Role;
   personId: string | null;
   teamId: string | null;
+  /// Permiso para llevar grupos de Alpha, independiente del rol.
+  canLeadAlpha: boolean;
 };
 
 export const ETIQUETA_ROL: Record<Role, string> = {
@@ -31,9 +33,6 @@ export const ROLES_CONSOLIDACION: Role[] = [
 
 /// Quién tiene una red de acompañamiento que mirar.
 export const ROLES_CON_RED: Role[] = [Role.MENTOR, Role.PASTOR, Role.ADMIN];
-
-/// Quién administra grupos de Alpha (§3.3).
-export const ROLES_ALPHA: Role[] = [Role.LIDER_ALPHA, Role.PASTOR, Role.ADMIN];
 
 /// Quién puede confirmar la entrega a mentor. La asignación la propone el
 /// sistema; la decisión final la confirma un líder
@@ -69,6 +68,7 @@ export const obtenerUsuarioActual = cache(
         role: true,
         personId: true,
         teamId: true,
+        canLeadAlpha: true,
         active: true,
         authUserId: true,
       },
@@ -95,6 +95,7 @@ export const obtenerUsuarioActual = cache(
       role: registro.role,
       personId: registro.personId,
       teamId: registro.teamId,
+      canLeadAlpha: registro.canLeadAlpha,
     };
   },
 );
@@ -108,6 +109,15 @@ export async function requerirUsuario(): Promise<UsuarioSesion> {
 export async function requerirRol(roles: Role[]): Promise<UsuarioSesion> {
   const usuario = await requerirUsuario();
   if (!roles.includes(usuario.role)) redirect("/sin-permiso");
+  return usuario;
+}
+
+/// Para lo que se autoriza por permiso y no por rol, como llevar Alpha.
+export async function requerirPermiso(
+  tienePermiso: (usuario: UsuarioSesion) => boolean,
+): Promise<UsuarioSesion> {
+  const usuario = await requerirUsuario();
+  if (!tienePermiso(usuario)) redirect("/sin-permiso");
   return usuario;
 }
 

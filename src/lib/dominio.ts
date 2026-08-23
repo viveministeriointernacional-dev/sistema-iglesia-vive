@@ -88,3 +88,16 @@ export function normalizarTelefono(valor: string | null | undefined) {
   const digitos = valor.replace(/\D/g, "");
   return digitos.length ? digitos : null;
 }
+
+/// Los últimos dígitos, que es lo que de verdad identifica un número.
+///
+/// La misma persona aparece como «+57 311 555 4433», «3115554433» o
+/// «57 311 5554433»: comparar la cadena completa los da por distintos y se
+/// crean expedientes duplicados. Comparar la cola los reconoce como el mismo.
+export const DIGITOS_COMPARABLES = 10;
+
+export function colaDeTelefono(valor: string | null | undefined) {
+  const digitos = normalizarTelefono(valor);
+  if (!digitos) return null;
+  return digitos.slice(-DIGITOS_COMPARABLES);
+}

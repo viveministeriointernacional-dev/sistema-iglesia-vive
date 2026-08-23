@@ -4,11 +4,14 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { crearGrupo } from "./acciones";
 
-export function NuevoGrupo() {
+export type LiderPosible = { id: string; fullName: string; role: string };
+
+export function NuevoGrupo({ lideres }: { lideres: LiderPosible[] }) {
   const router = useRouter();
   const [abierto, setAbierto] = useState(false);
   const [nombre, setNombre] = useState("");
   const [inicio, setInicio] = useState("");
+  const [liderId, setLiderId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [enCurso, iniciar] = useTransition();
 
@@ -45,7 +48,29 @@ export function NuevoGrupo() {
             className="campo"
           />
         </label>
+        <label className="block sm:col-span-2">
+          <span className="etiqueta-campo">¿Quién lo lleva?</span>
+          <select
+            value={liderId}
+            onChange={(evento) => setLiderId(evento.target.value)}
+            className="campo"
+          >
+            <option value="">Elige a quien lo lleva…</option>
+            {lideres.map((lider) => (
+              <option key={lider.id} value={lider.id}>
+                {lider.fullName}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
+
+      {lideres.length === 0 ? (
+        <p className="mt-3 text-[11.5px] leading-[1.5] font-medium text-ambar-texto">
+          Todavía nadie tiene el permiso de liderar Alpha. Pídeselo a
+          administración y vuelve.
+        </p>
+      ) : null}
 
       <div className="mt-4 flex gap-2">
         <button
@@ -54,13 +79,14 @@ export function NuevoGrupo() {
           onClick={() => {
             setError(null);
             iniciar(async () => {
-              const resultado = await crearGrupo(nombre, inicio);
+              const resultado = await crearGrupo(nombre, inicio, liderId);
               if (!resultado.ok) {
                 setError(resultado.mensaje);
                 return;
               }
               setNombre("");
               setInicio("");
+              setLiderId("");
               setAbierto(false);
               router.refresh();
             });
