@@ -1,7 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const RUTAS_PUBLICAS = ["/ingresar", "/auth"];
+const RUTAS_PUBLICAS = [
+  "/ingresar",
+  "/auth",
+  "/api/integraciones/highlevel/registro-nuevo",
+];
 
 /// Refresca la sesión de Supabase en cada navegación y bloquea las rutas
 /// privadas. La autorización fina por rol se aplica en cada pantalla y acción.

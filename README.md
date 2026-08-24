@@ -38,6 +38,9 @@ Variables de entorno (ver `.env.example`):
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — Supabase Auth.
 - `DATABASE_URL` — conexión de la aplicación (pooler, puerto 6543).
 - `DIRECT_URL` — conexión directa (puerto 5432) para las migraciones.
+- `HIGHLEVEL_WEBHOOK_SECRET` — secreto compartido solo con el workflow que
+  recibe el formulario **Registro Nuevo**.
+- `HIGHLEVEL_REGISTRO_FORM_ID` — identificador del formulario permitido.
 
 > El esquema ya está aplicado en el proyecto Supabase de desarrollo
 > (`cxtfftuexqmkktxumkfz`). Para que Prisma no intente recrearlo, marca las dos
@@ -207,6 +210,44 @@ Toda lectura y escritura pasa por la API de Next.js con Prisma, que aplica el
 control de acceso en código. Las tablas de `public` tienen RLS habilitado sin
 políticas y sin permisos para `anon` / `authenticated`, de modo que las claves
 públicas de Supabase no alcanzan los datos.
+
+## Entrada desde HighLevel
+
+`POST /api/integraciones/highlevel/registro-nuevo` recibe en tiempo real el
+contacto generado por el formulario **Registro Nuevo**. El endpoint:
+
+- exige `x-iglesia-webhook-secret` y valida el identificador del formulario;
+- crea la persona, su expediente, Operación 72, hitos, auditoría y eventos en
+  una única transacción;
+- usa `locationId + contactId` como identidad estable para que un reintento no
+  cree otro expediente;
+- concilia una coincidencia única por teléfono o correo con la persona que ya
+  existe, completando únicamente sus campos vacíos;
+- devuelve `409` cuando hay varias coincidencias y hace falta revisión humana.
+
+En HighLevel crea un workflow con el disparador **Form Submitted**, filtrado por
+**Registro Nuevo**, y agrega una acción **Custom Webhook** con método `POST`,
+tipo `application/json`, el encabezado `x-iglesia-webhook-secret` y un cuerpo
+como este (los nombres de variables se eligen desde el selector de HighLevel):
+
+```json
+{
+  "contactId": "{{contact.id}}",
+  "locationId": "ID_DE_LA_UBICACION",
+  "formId": "ID_DEL_FORMULARIO",
+  "firstName": "{{contact.first_name}}",
+  "lastName": "{{contact.last_name}}",
+  "email": "{{contact.email}}",
+  "phone": "{{contact.phone}}",
+  "address": "{{contact.address1}}"
+}
+```
+
+Los campos adicionales aceptan sus nombres canónicos (`gender`, `birthDate`,
+`whatsappPhone`, `prayerRequest`, `callSchedules`, `callScheduleNote`,
+`entryPoint`, `entryPointOther`, `invitationKind`, `invitedByName`) o sus
+equivalentes habituales en español. El Private Integration Token de HighLevel
+no se expone en este webhook ni se guarda en el repositorio.
 
 ## Lo que sigue
 
