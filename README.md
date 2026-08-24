@@ -6,7 +6,8 @@ llega a Iglesia Vive hasta que se gradúa como mentora. Cuatro fases:
 
 Esta primera entrega cubre dos de las cuatro pantallas del handoff de diseño:
 
-- **Registro de persona nueva** en tres pasos (`/registro`).
+- **Autorregistro público** desde un enlace abierto (`/registro`).
+- **Registro interno de persona nueva** en tres pasos (`/registro-interno`).
 - **Tablero Operación 72** (`/operacion-72`), las primeras 72 horas de cada
   persona nueva.
 
@@ -41,6 +42,8 @@ Variables de entorno (ver `.env.example`):
 - `HIGHLEVEL_WEBHOOK_SECRET` — secreto compartido solo con el workflow que
   recibe el formulario **Registro Nuevo**.
 - `HIGHLEVEL_REGISTRO_FORM_ID` — identificador del formulario permitido.
+- `REGISTRO_PUBLICO_RATE_LIMIT_SECRET` — secreto recomendado para anonimizar
+  la dirección de red usada por el límite de intentos del formulario público.
 
 > El esquema ya está aplicado en el proyecto Supabase de desarrollo
 > (`cxtfftuexqmkktxumkfz`). Para que Prisma no intente recrearlo, marca las dos
@@ -53,7 +56,8 @@ Variables de entorno (ver `.env.example`):
 
 ### Cómo se entra
 
-El acceso es **por invitación**: no hay registro público.
+El acceso a las pantallas internas es **por invitación**. El formulario
+`/registro` sí es público, pero registrarse allí no crea una cuenta de acceso.
 
 1. Un administrador crea la persona usuaria en Supabase Auth (correo y
    contraseña) desde el panel de Supabase.
@@ -68,11 +72,22 @@ Roles disponibles: `APRENDIZ`, `CONSOLIDADOR`, `LIDER_ALPHA`, `MENTOR`,
 
 ## Qué hay implementado
 
-### Registro en tres pasos (`/registro`)
+### Autorregistro público (`/registro`)
+
+Una persona puede abrir el enlace sin iniciar sesión y enviar directamente sus
+datos al sistema. Se exige el nombre, un medio de contacto y la autorización de
+uso de datos. El formulario aplica campo trampa, límite por conexión y detección
+de duplicados; la respuesta nunca revela si un teléfono o correo ya existía.
+
+Un envío nuevo crea la persona, el expediente y Operación 72. El equipo puede
+seguir usando el flujo con búsqueda interna y confirmación humana desde
+`/registro-interno`.
+
+### Registro interno en tres pasos (`/registro-interno`)
 
 Identidad → Contacto → Origen, sin perder lo escrito al avanzar o retroceder.
-Obligatorios: nombres, apellidos, género, teléfono para llamadas y punto de
-entrada; con invitador conocido hay que decir quién invitó.
+El nombre es el único campo obligatorio en el flujo interno; el resto puede
+completarse después desde el expediente.
 
 Al guardar, en una sola transacción:
 

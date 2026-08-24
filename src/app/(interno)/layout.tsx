@@ -38,7 +38,7 @@ export default async function LayoutInterno({
     ...(ROLES_CONSOLIDACION.includes(usuario.role)
       ? [
           { href: "/operacion-72", etiqueta: "Operación 72" },
-          { href: "/registro", etiqueta: "Registrar persona" },
+          { href: "/registro-interno", etiqueta: "Registrar persona" },
         ]
       : []),
     ...(puedeVerAlpha(usuario)

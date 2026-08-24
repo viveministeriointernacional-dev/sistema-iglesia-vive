@@ -2,10 +2,17 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 const RUTAS_PUBLICAS = [
+  "/registro",
   "/ingresar",
   "/auth",
   "/api/integraciones/highlevel/registro-nuevo",
 ];
+
+export function esRutaPublica(pathname: string) {
+  return RUTAS_PUBLICAS.some(
+    (ruta) => pathname === ruta || pathname.startsWith(`${ruta}/`),
+  );
+}
 
 /// Refresca la sesión de Supabase en cada navegación y bloquea las rutas
 /// privadas. La autorización fina por rol se aplica en cada pantalla y acción.
@@ -36,7 +43,7 @@ export async function actualizarSesion(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
-  const esPublica = RUTAS_PUBLICAS.some((ruta) => pathname.startsWith(ruta));
+  const esPublica = esRutaPublica(pathname);
 
   if (!user && !esPublica) {
     const url = request.nextUrl.clone();
