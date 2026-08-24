@@ -61,6 +61,7 @@ export const esquemaRegistro = z.object({
   entryPoint: z.enum(EntryPoint).nullish(),
   entryPointOther: textoOpcional,
   churchAttendance: z.enum(ChurchAttendance).nullish(),
+  churchName: textoOpcional,
   invitationKind: z.enum(InvitationKind).nullish(),
   /// Solo se llena cuando el invitador se eligió de la búsqueda.
   invitedByPersonId: z.string().uuid().nullish(),

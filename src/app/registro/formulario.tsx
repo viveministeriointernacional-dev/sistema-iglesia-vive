@@ -1,7 +1,11 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { EntryPoint, InvitationKind } from "@iglesia/prisma-client";
+import {
+  ChurchAttendance,
+  EntryPoint,
+  InvitationKind,
+} from "@iglesia/prisma-client";
 import {
   ASISTENCIAS_IGLESIA,
   GENEROS,
@@ -26,7 +30,11 @@ export function FormularioRegistroPublico() {
     { errores: {} },
   );
   const [puntoDeEntrada, setPuntoDeEntrada] = useState("");
+  const [asistenciaIglesia, setAsistenciaIglesia] = useState("");
   const [tipoDeInvitacion, setTipoDeInvitacion] = useState("");
+  const asisteAUnaIglesia =
+    asistenciaIglesia === ChurchAttendance.IGLESIA_VIVE ||
+    asistenciaIglesia === ChurchAttendance.OTRA_IGLESIA;
 
   return (
     <form action={accion} className="mt-7 space-y-5">
@@ -125,14 +133,13 @@ export function FormularioRegistroPublico() {
             />
           </label>
           <label className="block sm:col-span-2">
-            <span className="etiqueta-campo">Correo electrónico *</span>
+            <span className="etiqueta-campo">Correo electrónico (opcional)</span>
             <input
               className="campo"
               name="email"
               type="email"
               autoComplete="email"
               placeholder="nombre@correo.com"
-              required
             />
             <ErrorCampo texto={estado.errores.email} />
           </label>
@@ -223,6 +230,9 @@ export function FormularioRegistroPublico() {
                   type="radio"
                   name="churchAttendance"
                   value={valor}
+                  onChange={(evento) =>
+                    setAsistenciaIglesia(evento.target.value)
+                  }
                   required
                 />
                 {etiqueta}
@@ -231,6 +241,20 @@ export function FormularioRegistroPublico() {
           </div>
           <ErrorCampo texto={estado.errores.churchAttendance} />
         </fieldset>
+
+        {asisteAUnaIglesia ? (
+          <label className="mt-4 block">
+            <span className="etiqueta-campo">Iglesia a la que asiste *</span>
+            <input
+              className="campo"
+              name="churchName"
+              maxLength={280}
+              placeholder="Escribe el nombre de la iglesia"
+              required
+            />
+            <ErrorCampo texto={estado.errores.churchName} />
+          </label>
+        ) : null}
 
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <label className="block">

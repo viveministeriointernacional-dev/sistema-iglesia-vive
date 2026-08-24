@@ -16,7 +16,7 @@ const base = {
   birthDate: "1990-01-01",
   callPhone: "3001234567",
   whatsappPhone: "",
-  email: "ana@ejemplo.com",
+  email: "",
   callSchedules: [CallSchedule.MANANA],
   callScheduleNote: "",
   address: "Barrio Centro",
@@ -24,27 +24,28 @@ const base = {
   entryPoint: EntryPoint.SERVICIO_DOMINICAL,
   entryPointOther: "",
   churchAttendance: ChurchAttendance.IGLESIA_VIVE,
+  churchName: "Iglesia Vive",
   invitationKind: InvitationKind.REDES,
   invitedByName: "",
   aceptaPrivacidad: true as const,
   sitioWeb: "",
 };
 
-test("acepta un autorregistro completo sin WhatsApp", () => {
+test("acepta un autorregistro completo sin WhatsApp ni correo", () => {
   const resultado = esquemaRegistroPublico.parse(base);
   assert.equal(resultado.firstName, "Ana");
   assert.equal(resultado.callPhone, "3001234567");
   assert.equal(resultado.whatsappPhone, null);
+  assert.equal(resultado.email, null);
 });
 
-test("exige todos los campos públicos salvo WhatsApp", () => {
+test("exige los campos públicos salvo WhatsApp y correo", () => {
   const casos: [string, unknown][] = [
     ["firstName", ""],
     ["lastName", ""],
     ["gender", null],
     ["birthDate", ""],
     ["callPhone", ""],
-    ["email", ""],
     ["address", ""],
     ["prayerRequest", ""],
     ["entryPoint", null],
@@ -59,6 +60,21 @@ test("exige todos los campos públicos salvo WhatsApp", () => {
     });
     assert.equal(resultado.success, false, `${campo} debe ser obligatorio`);
   }
+});
+
+test("exige el nombre de la iglesia solo cuando la persona asiste", () => {
+  assert.equal(
+    esquemaRegistroPublico.safeParse({ ...base, churchName: "" }).success,
+    false,
+  );
+  assert.equal(
+    esquemaRegistroPublico.safeParse({
+      ...base,
+      churchAttendance: ChurchAttendance.NUEVO,
+      churchName: "",
+    }).success,
+    true,
+  );
 });
 
 test("exige un horario seleccionado o escrito", () => {

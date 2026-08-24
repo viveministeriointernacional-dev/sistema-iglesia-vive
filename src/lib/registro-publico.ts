@@ -20,12 +20,6 @@ export const esquemaRegistroPublico = esquemaRegistro
         "La fecha de nacimiento no es válida.",
       ),
     callPhone: z.string().trim().min(1, "Escribe tu teléfono.").max(40),
-    email: z
-      .string()
-      .trim()
-      .min(1, "Escribe tu correo electrónico.")
-      .email("El correo no es válido.")
-      .transform((valor) => valor.toLowerCase()),
     address: z.string().trim().min(1, "Escribe tu dirección o barrio.").max(280),
     prayerRequest: z
       .string()
@@ -60,6 +54,18 @@ export const esquemaRegistroPublico = esquemaRegistro
         code: "custom",
         path: ["entryPointOther"],
         message: "Cuéntanos cuál fue el punto de encuentro.",
+      });
+    }
+
+    if (
+      (datos.churchAttendance === ChurchAttendance.IGLESIA_VIVE ||
+        datos.churchAttendance === ChurchAttendance.OTRA_IGLESIA) &&
+      !datos.churchName
+    ) {
+      contexto.addIssue({
+        code: "custom",
+        path: ["churchName"],
+        message: "Escribe el nombre de la iglesia a la que asistes.",
       });
     }
 

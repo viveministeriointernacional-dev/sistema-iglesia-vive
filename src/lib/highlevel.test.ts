@@ -23,6 +23,7 @@ test("normaliza el cuerpo canónico del webhook", () => {
     callSchedules: "mañana,noche",
     entryPoint: "Servicio dominical",
     churchAttendance: "Sí, asisto a la iglesia Vive",
+    churchName: "Iglesia Vive",
     invitationKind: "Persona",
   });
 
@@ -39,6 +40,7 @@ test("normaliza el cuerpo canónico del webhook", () => {
     resultado.datos.churchAttendance,
     ChurchAttendance.IGLESIA_VIVE,
   );
+  assert.equal(resultado.datos.churchName, "Iglesia Vive");
   assert.equal(resultado.datos.invitationKind, InvitationKind.PERSONA);
 });
 
@@ -48,7 +50,7 @@ test("acepta campos personalizados habituales en español", () => {
       id: "ignorado-como-id-generico",
       customFields: [
         { name: "Petición de oración", value: "Por mi familia" },
-        { key: "¿Cómo llegó?", field_value: "Redes sociales" },
+        { key: "Punto de encuentro", field_value: "Servicio Juvenil" },
       ],
     },
     customData: {
@@ -62,7 +64,7 @@ test("acepta campos personalizados habituales en español", () => {
   assert.equal(resultado.contexto.contactId, "contacto-2");
   assert.equal(resultado.datos.firstName, "Luis");
   assert.equal(resultado.datos.prayerRequest, "Por mi familia");
-  assert.equal(resultado.datos.entryPoint, EntryPoint.REDES_SOCIALES);
+  assert.equal(resultado.datos.entryPoint, EntryPoint.SERVICIO_JUVENIL);
 });
 
 test("rechaza envíos sin identidad estable de HighLevel", () => {

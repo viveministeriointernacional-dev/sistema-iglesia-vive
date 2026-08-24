@@ -11,6 +11,7 @@ import {
 export const PUNTOS_DE_ENTRADA: { valor: EntryPoint; etiqueta: string }[] = [
   { valor: EntryPoint.SERVICIO_DOMINICAL, etiqueta: "Servicio dominical" },
   { valor: EntryPoint.SERVICIO_MIERCOLES, etiqueta: "Servicio miércoles" },
+  { valor: EntryPoint.SERVICIO_JUVENIL, etiqueta: "Servicio Juvenil" },
   { valor: EntryPoint.REDES_SOCIALES, etiqueta: "Redes sociales" },
   { valor: EntryPoint.ALPHA_CASA_DE_FE, etiqueta: "Alpha / Casa de Fe" },
   { valor: EntryPoint.EVENTO_O_BRIGADA, etiqueta: "Evento o brigada" },

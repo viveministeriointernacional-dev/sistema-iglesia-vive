@@ -433,6 +433,7 @@ export default async function PaginaExpediente({
                 </dt>
                 <dd className="mt-1 text-[12.5px] leading-[1.3] font-semibold text-tinta">
                   {textoDeAsistenciaIglesia(expediente.churchAttendance)}
+                  {expediente.churchName ? ` · ${expediente.churchName}` : ""}
                 </dd>
               </div>
               <div>
