@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { Prisma } from "@iglesia/prisma-client";
 import { auditar } from "@/lib/audit";
 import { colaDeTelefono } from "@/lib/dominio";
+import { variableDeEntorno } from "@/lib/entorno";
 import { normalizarPayloadHighLevel } from "@/lib/highlevel";
 import { getPrisma } from "@/lib/prisma";
 import { buscarDuplicados, crearRegistroEnTransaccion } from "@/lib/registro";
@@ -56,7 +57,7 @@ function datosAusentes(persona: {
 }
 
 export async function POST(request: Request) {
-  const secreto = process.env.HIGHLEVEL_WEBHOOK_SECRET;
+  const secreto = await variableDeEntorno("HIGHLEVEL_WEBHOOK_SECRET");
   if (!secreto) {
     return NextResponse.json(
       { ok: false, error: "Integración no configurada." },
@@ -100,7 +101,7 @@ export async function POST(request: Request) {
   }
 
   const { contexto, datos } = normalizado;
-  const formIdEsperado = process.env.HIGHLEVEL_REGISTRO_FORM_ID;
+  const formIdEsperado = await variableDeEntorno("HIGHLEVEL_REGISTRO_FORM_ID");
   if (formIdEsperado && contexto.formId !== formIdEsperado) {
     return NextResponse.json(
       { ok: false, error: "El envío no pertenece al formulario configurado." },
