@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   CallSchedule,
+  ChurchAttendance,
   EntryPoint,
   Gender,
   InvitationKind,
@@ -59,6 +60,7 @@ export const esquemaRegistro = z.object({
   prayerRequest: textoOpcional,
   entryPoint: z.enum(EntryPoint).nullish(),
   entryPointOther: textoOpcional,
+  churchAttendance: z.enum(ChurchAttendance).nullish(),
   invitationKind: z.enum(InvitationKind).nullish(),
   /// Solo se llena cuando el invitador se eligió de la búsqueda.
   invitedByPersonId: z.string().uuid().nullish(),

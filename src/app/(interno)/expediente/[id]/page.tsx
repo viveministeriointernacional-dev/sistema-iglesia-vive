@@ -6,7 +6,12 @@ import {
 } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
 import { requerirUsuario } from "@/lib/auth";
-import { nombreCompleto, textoDeEntrada, textoDeHorario } from "@/lib/dominio";
+import {
+  nombreCompleto,
+  textoDeAsistenciaIglesia,
+  textoDeEntrada,
+  textoDeHorario,
+} from "@/lib/dominio";
 import { edadDesde } from "@/lib/op72";
 import {
   accesoAExpediente,
@@ -420,6 +425,14 @@ export default async function PaginaExpediente({
                   {expediente.invitedBy
                     ? nombreCompleto(expediente.invitedBy)
                     : (expediente.lineOfOrigin ?? "Sin invitador conocido")}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[11px] leading-none font-semibold text-[rgba(19,28,36,.42)]">
+                  Asistencia a iglesia
+                </dt>
+                <dd className="mt-1 text-[12.5px] leading-[1.3] font-semibold text-tinta">
+                  {textoDeAsistenciaIglesia(expediente.churchAttendance)}
                 </dd>
               </div>
               <div>

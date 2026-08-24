@@ -145,6 +145,7 @@ export async function cargarExpediente(learnerId: string) {
       createdAt: true,
       entryPoint: true,
       entryPointOther: true,
+      churchAttendance: true,
       invitationKind: true,
       lineOfOrigin: true,
       person: {

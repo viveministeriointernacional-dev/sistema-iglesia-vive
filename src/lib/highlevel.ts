@@ -1,5 +1,6 @@
 import {
   CallSchedule,
+  ChurchAttendance,
   EntryPoint,
   Gender,
   InvitationKind,
@@ -211,6 +212,25 @@ export function normalizarPayloadHighLevel(entrada: unknown) {
     ),
     entryPointOther: textoOpcional(
       obtener(indice, "entryPointOther", "entry_point_other", "comoLlegoOtro"),
+    ),
+    churchAttendance: enumPorEtiqueta(
+      obtener(
+        indice,
+        "churchAttendance",
+        "church_attendance",
+        "asisteIglesia",
+        "asistesAlgunaIglesia",
+      ),
+      {
+        iglesiavive: ChurchAttendance.IGLESIA_VIVE,
+        siasistoalaiglesiavive: ChurchAttendance.IGLESIA_VIVE,
+        otraiglesia: ChurchAttendance.OTRA_IGLESIA,
+        siasistoaotraiglesia: ChurchAttendance.OTRA_IGLESIA,
+        nuevo: ChurchAttendance.NUEVO,
+        nosoynuevo: ChurchAttendance.NUEVO,
+        asistiaantes: ChurchAttendance.ASISTIA_ANTES,
+        noperoasistiaantes: ChurchAttendance.ASISTIA_ANTES,
+      },
     ),
     invitationKind: enumPorEtiqueta(
       obtener(indice, "invitationKind", "invitation_kind", "tipoInvitacion"),
