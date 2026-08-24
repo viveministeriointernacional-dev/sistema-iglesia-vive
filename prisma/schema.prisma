@@ -10,8 +10,11 @@
 // la variante correcta —`workerd` en Cloudflare, Node en el seed y los
 // scripts—. Generado en `postinstall`.
 generator client {
-  provider = "prisma-client-js"
-  output   = "../node_modules/@iglesia/prisma-client"
+  provider      = "prisma-client-js"
+  output        = "../node_modules/@iglesia/prisma-client"
+  /// El compilador pequeño conserva toda la funcionalidad y evita superar el
+  /// límite de 3 MiB del plan gratuito de Cloudflare Workers.
+  compilerBuild = "small"
 }
 
 datasource db {
