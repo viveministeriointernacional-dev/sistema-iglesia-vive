@@ -5,6 +5,7 @@ const RUTAS_PUBLICAS = [
   "/registro",
   "/ingresar",
   "/auth",
+  "/api/registro",
   "/api/integraciones/highlevel/registro-nuevo",
 ];
 
@@ -18,6 +19,13 @@ export function esRutaPublica(pathname: string) {
 /// privadas. La autorización fina por rol se aplica en cada pantalla y acción.
 export async function actualizarSesion(request: NextRequest) {
   let response = NextResponse.next({ request });
+  const { pathname } = request.nextUrl;
+  const esPublica = esRutaPublica(pathname);
+
+  // Los formularios y webhooks públicos no necesitan crear un cliente de
+  // autenticación. Esto también evita depender de variables públicas de
+  // Supabase en Cloudflare para aceptar esos envíos.
+  if (esPublica && pathname !== "/ingresar") return response;
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -41,9 +49,6 @@ export async function actualizarSesion(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  const { pathname } = request.nextUrl;
-  const esPublica = esRutaPublica(pathname);
 
   if (!user && !esPublica) {
     const url = request.nextUrl.clone();
