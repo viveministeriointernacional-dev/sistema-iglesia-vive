@@ -1,4 +1,5 @@
 import { auditar } from "@/lib/audit";
+import { variableDeEntorno } from "@/lib/entorno";
 import { colaDeTelefono } from "@/lib/dominio";
 import { getPrisma } from "@/lib/prisma";
 import { esquemaRegistroPublico } from "@/lib/registro-publico";
@@ -34,9 +35,9 @@ async function huellaDelCliente(cabeceras: Headers) {
   if (!ip) return null;
 
   const secreto =
-    process.env.REGISTRO_PUBLICO_RATE_LIMIT_SECRET ??
-    process.env.HIGHLEVEL_WEBHOOK_SECRET ??
-    process.env.DATABASE_URL ??
+    (await variableDeEntorno("REGISTRO_PUBLICO_RATE_LIMIT_SECRET")) ??
+    (await variableDeEntorno("HIGHLEVEL_WEBHOOK_SECRET")) ??
+    (await variableDeEntorno("DATABASE_URL")) ??
     "registro-publico-vive";
   const bytes = new TextEncoder().encode(`${secreto}:${ip}`);
   const resumen = await crypto.subtle.digest("SHA-256", bytes);
