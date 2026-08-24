@@ -7,6 +7,7 @@ import {
   buscarCandidatos,
   crearEInscribir,
   crearSesion,
+  desvalidarAlpha,
   inscribir,
   marcarFocusDay,
   registrarAsistencia,
@@ -217,9 +218,18 @@ export function Grupo({
                 </p>
 
                 {persona.validado ? (
-                  <p className="mt-2 rounded-[8px] bg-verde-100 px-2 py-1 text-[10px] leading-[1.4] font-bold text-verde-700">
-                    ALPHA VALIDADO · {persona.validado}
-                  </p>
+                  <>
+                    <p className="mt-2 rounded-[8px] bg-verde-100 px-2 py-1 text-[10px] leading-[1.4] font-bold text-verde-700">
+                      ALPHA VALIDADO · {persona.validado}
+                    </p>
+                    {puedeEditar ? (
+                      <DeshacerValidacion
+                        programId={programId}
+                        enrollmentId={persona.enrollmentId}
+                        nombre={persona.nombre}
+                      />
+                    ) : null}
+                  </>
                 ) : (
                   <div className="mt-2 flex flex-wrap gap-2">
                     {puedeEditar ? (
@@ -365,6 +375,95 @@ function NuevaSesion({
           Cancelar
         </button>
       </div>
+      {error ? (
+        <p role="alert" className="mt-2 text-[11.5px] leading-[1.4] font-medium text-rojo">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/// Deshacer una validación no es una acción de un clic: pide el motivo y lo
+/// confirma. Se emitió a mano, se retira a mano, y queda dicho por qué.
+function DeshacerValidacion({
+  programId,
+  enrollmentId,
+  nombre,
+}: {
+  programId: string;
+  enrollmentId: string;
+  nombre: string;
+}) {
+  const router = useRouter();
+  const [abierto, setAbierto] = useState(false);
+  const [motivo, setMotivo] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [enCurso, iniciar] = useTransition();
+
+  if (!abierto) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAbierto(true)}
+        className="mt-2 cursor-pointer border-0 bg-transparent p-0 text-[11px] leading-none font-semibold text-[rgba(19,28,36,.5)] underline hover:text-rojo"
+      >
+        Deshacer validación
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-2 rounded-[10px] border border-[rgba(19,28,36,.14)] bg-white p-3">
+      <label className="block">
+        <span className="etiqueta-campo">
+          ¿Por qué se deshace la validación de {nombre}?
+        </span>
+        <input
+          value={motivo}
+          onChange={(evento) => setMotivo(evento.target.value)}
+          placeholder="Se validó por error"
+          className="campo font-medium"
+        />
+      </label>
+
+      <div className="mt-3 flex gap-2">
+        <button
+          type="button"
+          disabled={enCurso || !motivo.trim()}
+          onClick={() => {
+            setError(null);
+            iniciar(async () => {
+              const resultado = await desvalidarAlpha(
+                programId,
+                enrollmentId,
+                motivo,
+              );
+              if (!resultado.ok) {
+                setError(resultado.mensaje);
+                return;
+              }
+              setMotivo("");
+              setAbierto(false);
+              router.refresh();
+            });
+          }}
+          className="boton-primario px-3 py-2 text-[11.5px]"
+        >
+          {enCurso ? "Deshaciendo…" : "Deshacer"}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setAbierto(false);
+            setError(null);
+          }}
+          className="boton-secundario px-3 py-2 text-[11.5px]"
+        >
+          Cancelar
+        </button>
+      </div>
+
       {error ? (
         <p role="alert" className="mt-2 text-[11.5px] leading-[1.4] font-medium text-rojo">
           {error}

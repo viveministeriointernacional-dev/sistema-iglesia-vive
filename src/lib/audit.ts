@@ -16,6 +16,7 @@ export type AccionAuditada =
   | "casa_de_fe.tema_actualizado"
   | "alpha.focus_day"
   | "alpha.validado"
+  | "alpha.desvalidado"
   | "escuela.inscripcion"
   | "escuela.cerrada"
   | "servicio.registrado"
