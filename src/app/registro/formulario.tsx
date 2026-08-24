@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { type FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   ChurchAttendance,
   EntryPoint,
@@ -13,7 +14,7 @@ import {
   PUNTOS_DE_ENTRADA,
   TIPOS_DE_INVITACION,
 } from "@/lib/dominio";
-import { guardarRegistroPublico } from "./acciones";
+import type { EstadoRegistroPublico } from "@/lib/registro-publico-servidor";
 
 function ErrorCampo({ texto }: { texto?: string }) {
   if (!texto) return null;
@@ -25,10 +26,9 @@ function ErrorCampo({ texto }: { texto?: string }) {
 }
 
 export function FormularioRegistroPublico() {
-  const [estado, accion, enviando] = useActionState(
-    guardarRegistroPublico,
-    { errores: {} },
-  );
+  const router = useRouter();
+  const [estado, setEstado] = useState<EstadoRegistroPublico>({ errores: {} });
+  const [enviando, setEnviando] = useState(false);
   const [puntoDeEntrada, setPuntoDeEntrada] = useState("");
   const [asistenciaIglesia, setAsistenciaIglesia] = useState("");
   const [tipoDeInvitacion, setTipoDeInvitacion] = useState("");
@@ -36,8 +36,49 @@ export function FormularioRegistroPublico() {
     asistenciaIglesia === ChurchAttendance.IGLESIA_VIVE ||
     asistenciaIglesia === ChurchAttendance.OTRA_IGLESIA;
 
+  async function enviarRegistro(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    if (enviando) return;
+
+    setEnviando(true);
+    setEstado({ errores: {} });
+    try {
+      const respuesta = await fetch("/api/registro", {
+        method: "POST",
+        body: new FormData(evento.currentTarget),
+        headers: { Accept: "application/json" },
+      });
+      const resultado = (await respuesta.json()) as
+        | { ok: true }
+        | EstadoRegistroPublico;
+
+      if (respuesta.ok && "ok" in resultado) {
+        router.push("/registro/gracias");
+        return;
+      }
+
+      setEstado(
+        "errores" in resultado
+          ? resultado
+          : {
+              errores: {},
+              mensaje:
+                "No pudimos guardar tu información en este momento. Inténtalo nuevamente.",
+            },
+      );
+    } catch {
+      setEstado({
+        errores: {},
+        mensaje:
+          "No pudimos conectarnos con el sistema. Revisa tu conexión e inténtalo nuevamente.",
+      });
+    } finally {
+      setEnviando(false);
+    }
+  }
+
   return (
-    <form action={accion} className="mt-7 space-y-5">
+    <form onSubmit={enviarRegistro} className="mt-7 space-y-5">
       <div className="absolute -left-[10000px]" aria-hidden="true">
         <label>
           Sitio web
