@@ -1,7 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+import { EntryPoint, InvitationKind } from "@iglesia/prisma-client";
 import {
+  ASISTENCIAS_IGLESIA,
   GENEROS,
   HORARIOS,
   PUNTOS_DE_ENTRADA,
@@ -23,6 +25,8 @@ export function FormularioRegistroPublico() {
     guardarRegistroPublico,
     { errores: {} },
   );
+  const [puntoDeEntrada, setPuntoDeEntrada] = useState("");
+  const [tipoDeInvitacion, setTipoDeInvitacion] = useState("");
 
   return (
     <form action={accion} className="mt-7 space-y-5">
@@ -52,33 +56,36 @@ export function FormularioRegistroPublico() {
             <ErrorCampo texto={estado.errores.firstName} />
           </label>
           <label className="block">
-            <span className="etiqueta-campo">Apellidos</span>
+            <span className="etiqueta-campo">Apellidos *</span>
             <input
               className="campo"
               name="lastName"
               autoComplete="family-name"
               maxLength={120}
+              required
             />
             <ErrorCampo texto={estado.errores.lastName} />
           </label>
           <label className="block">
-            <span className="etiqueta-campo">Género</span>
-            <select className="campo" name="gender" defaultValue="">
-              <option value="">Prefiero no indicarlo</option>
+            <span className="etiqueta-campo">Género *</span>
+            <select className="campo" name="gender" defaultValue="" required>
+              <option value="">Selecciona una opción</option>
               {GENEROS.map(({ valor, etiqueta }) => (
                 <option key={valor} value={valor}>
                   {etiqueta}
                 </option>
               ))}
             </select>
+            <ErrorCampo texto={estado.errores.gender} />
           </label>
           <label className="block">
-            <span className="etiqueta-campo">Fecha de nacimiento</span>
+            <span className="etiqueta-campo">Fecha de nacimiento *</span>
             <input
               className="campo"
               type="date"
               name="birthDate"
               autoComplete="bday"
+              required
             />
             <ErrorCampo texto={estado.errores.birthDate} />
           </label>
@@ -88,12 +95,12 @@ export function FormularioRegistroPublico() {
       <section className="tarjeta p-5 sm:p-6">
         <h2 className="font-serif text-[23px] font-normal">Cómo contactarte</h2>
         <p className="mt-1 text-[12.5px] text-tinta-55">
-          Escribe al menos un teléfono, WhatsApp o correo.
+          Completa tus datos de contacto. WhatsApp es opcional.
         </p>
 
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <label className="block">
-            <span className="etiqueta-campo">Teléfono</span>
+            <span className="etiqueta-campo">Teléfono *</span>
             <input
               className="campo"
               name="callPhone"
@@ -102,11 +109,12 @@ export function FormularioRegistroPublico() {
               autoComplete="tel"
               maxLength={40}
               placeholder="+57 300 123 4567"
+              required
             />
             <ErrorCampo texto={estado.errores.callPhone} />
           </label>
           <label className="block">
-            <span className="etiqueta-campo">WhatsApp</span>
+            <span className="etiqueta-campo">WhatsApp (opcional)</span>
             <input
               className="campo"
               name="whatsappPhone"
@@ -117,20 +125,23 @@ export function FormularioRegistroPublico() {
             />
           </label>
           <label className="block sm:col-span-2">
-            <span className="etiqueta-campo">Correo electrónico</span>
+            <span className="etiqueta-campo">Correo electrónico *</span>
             <input
               className="campo"
               name="email"
               type="email"
               autoComplete="email"
               placeholder="nombre@correo.com"
+              required
             />
             <ErrorCampo texto={estado.errores.email} />
           </label>
         </div>
 
         <fieldset className="mt-5">
-          <legend className="etiqueta-campo">¿En qué horario podemos llamarte?</legend>
+          <legend className="etiqueta-campo">
+            ¿En qué horario podemos llamarte? *
+          </legend>
           <div className="mt-3 flex flex-wrap gap-3">
             {HORARIOS.map(({ valor, etiqueta }) => (
               <label
@@ -148,16 +159,19 @@ export function FormularioRegistroPublico() {
             maxLength={280}
             placeholder="También puedes escribir un horario específico"
           />
+          <ErrorCampo texto={estado.errores.callSchedules} />
         </fieldset>
 
         <label className="mt-4 block">
-          <span className="etiqueta-campo">Dirección o barrio</span>
+          <span className="etiqueta-campo">Dirección o barrio *</span>
           <input
             className="campo"
             name="address"
             autoComplete="street-address"
             maxLength={280}
+            required
           />
+          <ErrorCampo texto={estado.errores.address} />
         </label>
       </section>
 
@@ -165,8 +179,14 @@ export function FormularioRegistroPublico() {
         <h2 className="font-serif text-[23px] font-normal">Cómo llegaste</h2>
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <label className="block">
-            <span className="etiqueta-campo">Punto de encuentro</span>
-            <select className="campo" name="entryPoint" defaultValue="">
+            <span className="etiqueta-campo">Punto de encuentro *</span>
+            <select
+              className="campo"
+              name="entryPoint"
+              value={puntoDeEntrada}
+              onChange={(evento) => setPuntoDeEntrada(evento.target.value)}
+              required
+            >
               <option value="">Selecciona una opción</option>
               {PUNTOS_DE_ENTRADA.map(({ valor, etiqueta }) => (
                 <option key={valor} value={valor}>
@@ -174,14 +194,54 @@ export function FormularioRegistroPublico() {
                 </option>
               ))}
             </select>
+            <ErrorCampo texto={estado.errores.entryPoint} />
           </label>
           <label className="block">
-            <span className="etiqueta-campo">Si elegiste “Otro”</span>
-            <input className="campo" name="entryPointOther" maxLength={280} />
+            <span className="etiqueta-campo">
+              Si elegiste “Otro”{puntoDeEntrada === EntryPoint.OTRO ? " *" : ""}
+            </span>
+            <input
+              className="campo"
+              name="entryPointOther"
+              maxLength={280}
+              required={puntoDeEntrada === EntryPoint.OTRO}
+            />
+            <ErrorCampo texto={estado.errores.entryPointOther} />
           </label>
+        </div>
+
+        <fieldset className="mt-5">
+          <legend className="etiqueta-campo">¿Asistes a alguna iglesia? *</legend>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {ASISTENCIAS_IGLESIA.map(({ valor, etiqueta }) => (
+              <label
+                key={valor}
+                className="flex cursor-pointer items-start gap-3 rounded-[10px] border border-linea px-3 py-3 text-[13px] font-medium leading-snug text-tinta"
+              >
+                <input
+                  className="mt-0.5 size-4 shrink-0"
+                  type="radio"
+                  name="churchAttendance"
+                  value={valor}
+                  required
+                />
+                {etiqueta}
+              </label>
+            ))}
+          </div>
+          <ErrorCampo texto={estado.errores.churchAttendance} />
+        </fieldset>
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <label className="block">
-            <span className="etiqueta-campo">¿Alguien te invitó?</span>
-            <select className="campo" name="invitationKind" defaultValue="">
+            <span className="etiqueta-campo">¿Alguien te invitó? *</span>
+            <select
+              className="campo"
+              name="invitationKind"
+              value={tipoDeInvitacion}
+              onChange={(evento) => setTipoDeInvitacion(evento.target.value)}
+              required
+            >
               <option value="">Selecciona una opción</option>
               {TIPOS_DE_INVITACION.map(({ valor, etiqueta }) => (
                 <option key={valor} value={valor}>
@@ -189,21 +249,33 @@ export function FormularioRegistroPublico() {
                 </option>
               ))}
             </select>
+            <ErrorCampo texto={estado.errores.invitationKind} />
           </label>
           <label className="block">
-            <span className="etiqueta-campo">Nombre de quien te invitó</span>
-            <input className="campo" name="invitedByName" maxLength={160} />
+            <span className="etiqueta-campo">
+              Nombre de quien te invitó
+              {tipoDeInvitacion === InvitationKind.PERSONA ? " *" : ""}
+            </span>
+            <input
+              className="campo"
+              name="invitedByName"
+              maxLength={160}
+              required={tipoDeInvitacion === InvitationKind.PERSONA}
+            />
+            <ErrorCampo texto={estado.errores.invitedByName} />
           </label>
         </div>
 
         <label className="mt-4 block">
-          <span className="etiqueta-campo">Petición de oración</span>
+          <span className="etiqueta-campo">Petición de oración *</span>
           <textarea
             className="campo min-h-24 resize-y"
             name="prayerRequest"
             maxLength={280}
-            placeholder="Si quieres, cuéntanos cómo podemos orar por ti"
+            placeholder="Cuéntanos cómo podemos orar por ti"
+            required
           />
+          <ErrorCampo texto={estado.errores.prayerRequest} />
         </label>
       </section>
 

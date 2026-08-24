@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   CallSchedule,
+  ChurchAttendance,
   EntryPoint,
   Gender,
   InvitationKind,
@@ -21,6 +22,7 @@ test("normaliza el cuerpo canónico del webhook", () => {
     gender: "Mujer",
     callSchedules: "mañana,noche",
     entryPoint: "Servicio dominical",
+    churchAttendance: "Sí, asisto a la iglesia Vive",
     invitationKind: "Persona",
   });
 
@@ -33,6 +35,10 @@ test("normaliza el cuerpo canónico del webhook", () => {
     CallSchedule.NOCHE,
   ]);
   assert.equal(resultado.datos.entryPoint, EntryPoint.SERVICIO_DOMINICAL);
+  assert.equal(
+    resultado.datos.churchAttendance,
+    ChurchAttendance.IGLESIA_VIVE,
+  );
   assert.equal(resultado.datos.invitationKind, InvitationKind.PERSONA);
 });
 

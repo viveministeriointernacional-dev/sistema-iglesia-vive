@@ -63,6 +63,7 @@ export async function guardarRegistroPublico(
     prayerRequest: texto(formulario, "prayerRequest"),
     entryPoint: texto(formulario, "entryPoint") || null,
     entryPointOther: texto(formulario, "entryPointOther"),
+    churchAttendance: texto(formulario, "churchAttendance") || null,
     invitationKind: texto(formulario, "invitationKind") || null,
     invitedByPersonId: null,
     invitedByName: texto(formulario, "invitedByName"),

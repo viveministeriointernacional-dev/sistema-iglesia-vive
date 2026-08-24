@@ -75,9 +75,13 @@ Roles disponibles: `APRENDIZ`, `CONSOLIDADOR`, `LIDER_ALPHA`, `MENTOR`,
 ### Autorregistro público (`/registro`)
 
 Una persona puede abrir el enlace sin iniciar sesión y enviar directamente sus
-datos al sistema. Se exige el nombre, un medio de contacto y la autorización de
-uso de datos. El formulario aplica campo trampa, límite por conexión y detección
-de duplicados; la respuesta nunca revela si un teléfono o correo ya existía.
+datos al sistema. Se exigen nombres, apellidos, género, fecha de nacimiento,
+teléfono, correo, horario de llamada, dirección, punto de encuentro, asistencia
+a una iglesia, invitación, petición de oración y la autorización de uso de
+datos; únicamente WhatsApp es opcional. El detalle de «Otro» y el nombre del
+invitador son obligatorios cuando corresponden. El formulario aplica campo
+trampa, límite por conexión y detección de duplicados; la respuesta nunca
+revela si un teléfono o correo ya existía.
 
 Un envío nuevo crea la persona, el expediente y Operación 72. El equipo puede
 seguir usando el flujo con búsqueda interna y confirmación humana desde
@@ -260,7 +264,8 @@ como este (los nombres de variables se eligen desde el selector de HighLevel):
 
 Los campos adicionales aceptan sus nombres canónicos (`gender`, `birthDate`,
 `whatsappPhone`, `prayerRequest`, `callSchedules`, `callScheduleNote`,
-`entryPoint`, `entryPointOther`, `invitationKind`, `invitedByName`) o sus
+`entryPoint`, `entryPointOther`, `churchAttendance`, `invitationKind`,
+`invitedByName`) o sus
 equivalentes habituales en español. El Private Integration Token de HighLevel
 no se expone en este webhook ni se guarda en el repositorio.
 

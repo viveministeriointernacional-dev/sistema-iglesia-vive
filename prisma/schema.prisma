@@ -126,6 +126,13 @@ enum CallSchedule {
   NOCHE
 }
 
+enum ChurchAttendance {
+  IGLESIA_VIVE
+  OTRA_IGLESIA
+  NUEVO
+  ASISTIA_ANTES
+}
+
 /// Identidad de una persona. Los teléfonos se conservan por tipo
 /// (ESPECIFICACION_PRODUCTO.md §20).
 model Person {
@@ -211,6 +218,7 @@ model LearnerProfile {
   entryPoint        EntryPoint?     @map("entry_point")
   /// Detalle cuando el punto de entrada es OTRO.
   entryPointOther   String?         @map("entry_point_other")
+  churchAttendance  ChurchAttendance? @map("church_attendance")
   invitationKind    InvitationKind? @map("invitation_kind")
   /// Solo cuando la persona que invitó ya existe en la base.
   invitedByPersonId String?         @map("invited_by_person_id")

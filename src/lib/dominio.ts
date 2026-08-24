@@ -1,4 +1,10 @@
-import { CallSchedule, EntryPoint, Gender, InvitationKind } from "@iglesia/prisma-client";
+import {
+  CallSchedule,
+  ChurchAttendance,
+  EntryPoint,
+  Gender,
+  InvitationKind,
+} from "@iglesia/prisma-client";
 
 /// Etiquetas de los seis puntos de entrada del paso 3 del registro, en el orden
 /// del diseño (rejilla 3×2).
@@ -21,6 +27,33 @@ export const TIPOS_DE_INVITACION: { valor: InvitationKind; etiqueta: string }[] 
   { valor: InvitationKind.REDES, etiqueta: "No, llegó por redes" },
   { valor: InvitationKind.DESCONOCIDO, etiqueta: "No sabe" },
 ];
+
+export const ASISTENCIAS_IGLESIA: {
+  valor: ChurchAttendance;
+  etiqueta: string;
+}[] = [
+  {
+    valor: ChurchAttendance.IGLESIA_VIVE,
+    etiqueta: "Sí, asisto a la iglesia Vive",
+  },
+  {
+    valor: ChurchAttendance.OTRA_IGLESIA,
+    etiqueta: "Sí, asisto a otra iglesia",
+  },
+  { valor: ChurchAttendance.NUEVO, etiqueta: "No, soy nuevo" },
+  {
+    valor: ChurchAttendance.ASISTIA_ANTES,
+    etiqueta: "No, pero asistía antes",
+  },
+];
+
+export const ETIQUETA_ASISTENCIA_IGLESIA: Record<ChurchAttendance, string> =
+  Object.fromEntries(
+    ASISTENCIAS_IGLESIA.map((asistencia) => [
+      asistencia.valor,
+      asistencia.etiqueta,
+    ]),
+  ) as Record<ChurchAttendance, string>;
 
 export const GENEROS: { valor: Gender; etiqueta: string }[] = [
   { valor: Gender.MUJER, etiqueta: "Mujer" },
@@ -66,6 +99,14 @@ export function textoDeEntrada(
   if (!entryPoint) return "Sin registrar";
   if (entryPoint === EntryPoint.OTRO) return otro?.trim() || "Otro";
   return ETIQUETA_ENTRADA[entryPoint];
+}
+
+export function textoDeAsistenciaIglesia(
+  asistencia: ChurchAttendance | null,
+) {
+  return asistencia
+    ? ETIQUETA_ASISTENCIA_IGLESIA[asistencia]
+    : "Sin registrar";
 }
 
 /// Las franjas y el horario escrito, en una sola frase legible.
