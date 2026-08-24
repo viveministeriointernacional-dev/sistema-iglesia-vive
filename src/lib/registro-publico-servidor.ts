@@ -3,7 +3,7 @@ import { colaDeTelefono } from "@/lib/dominio";
 import { getPrisma } from "@/lib/prisma";
 import { esquemaRegistroPublico } from "@/lib/registro-publico";
 import { buscarDuplicados, crearRegistroEnTransaccion } from "@/lib/registro";
-import { esquemaRegistro } from "@/lib/validacion-registro";
+import type { DatosRegistroValidados } from "@/lib/validacion-registro";
 
 export type EstadoRegistroPublico = {
   errores: Record<string, string>;
@@ -92,7 +92,10 @@ export async function procesarRegistroPublico(
     };
   }
 
-  const datos = esquemaRegistro.parse(analisis.data);
+  // `esquemaRegistroPublico` extiende al esquema base y ya ejecutó sus
+  // transformaciones (por ejemplo, convierte los opcionales vacíos a null).
+  // Volver a analizar esa salida exigiría strings donde ya hay nulls.
+  const datos: DatosRegistroValidados = analisis.data;
   const huella = await huellaDelCliente(cabeceras);
   const identidad =
     colaDeTelefono(datos.callPhone) ??
