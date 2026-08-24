@@ -155,11 +155,33 @@ model Person {
   user           AppUser?
   learnerProfile LearnerProfile?
   invitados      LearnerProfile[] @relation("InvitadaPor")
+  highLevelContacts HighLevelContact[]
 
   @@index([callPhone])
   @@index([whatsappPhone])
   @@index([email])
   @@map("person")
+}
+
+/// Vincula la identidad estable del contacto de HighLevel con la persona del
+/// sistema. Una persona puede tener más de un contacto histórico, pero cada
+/// contacto de una ubicación solo apunta a un expediente.
+model HighLevelContact {
+  id               String   @id @default(uuid())
+  locationId       String   @map("location_id")
+  contactId        String   @map("contact_id")
+  personId         String   @map("person_id")
+  formId           String?  @map("form_id")
+  lastSubmissionId String?  @map("last_submission_id")
+  lastReceivedAt   DateTime @default(now()) @map("last_received_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, contactId])
+  @@index([personId])
+  @@map("highlevel_contact")
 }
 
 enum Phase {

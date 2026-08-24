@@ -3,3 +3,6 @@
 NEXT_PUBLIC_SUPABASE_URL="https://TU-PROYECTO.supabase.co"
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="sb_publishable_..."
 DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5432/iglesia_vive"
+HIGHLEVEL_WEBHOOK_SECRET="genera-un-secreto-aleatorio-largo"
+HIGHLEVEL_REGISTRO_FORM_ID="id-del-formulario-registro-nuevo"
+REGISTRO_PUBLICO_RATE_LIMIT_SECRET="genera-otro-secreto-aleatorio-largo"

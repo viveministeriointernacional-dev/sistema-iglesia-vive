@@ -26,6 +26,10 @@ export type AccionAuditada =
   | "evento.inscripcion"
   | "evento.asistencia"
   | "fase.cambiada"
+  | "highlevel.registro_importado"
+  | "highlevel.contacto_vinculado"
+  | "highlevel.registro_repetido"
+  | "registro_publico.recibido"
   | "duplicado.detectado";
 
 export async function auditar(

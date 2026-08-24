@@ -110,7 +110,7 @@ export default async function TableroOperacion72() {
             </p>
           </div>
           <Link
-            href="/registro"
+            href="/registro-interno"
             className="rounded-[9px] bg-azul-900 px-[15px] py-[11px] text-[12.5px] leading-none font-semibold text-white"
           >
             + Registrar persona
