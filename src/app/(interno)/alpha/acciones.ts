@@ -335,6 +335,113 @@ export async function validarAlpha(
   return { ok: true };
 }
 
+/// Deshace una validación emitida por error.
+///
+/// La validación es un acto de líder, no un cálculo: por eso también se puede
+/// equivocar, y hasta ahora no había cómo corregirla salvo por SQL. Se exige un
+/// motivo porque quien mire el expediente después necesita saber por qué
+/// desapareció un Alpha que estuvo validado.
+///
+/// El hito no se borra: vuelve a EN_CURSO. La persona sigue inscrita y sigue
+/// yendo, así que decir «en curso» es lo cierto; borrarlo dejaría el expediente
+/// como si nunca hubiera pasado nada.
+export async function desvalidarAlpha(
+  programId: string,
+  enrollmentId: string,
+  motivo: string,
+): Promise<Resultado> {
+  const { usuario, grupo } = await grupoPropio(programId);
+  if (!grupo) return { ok: false, mensaje: "Este grupo no es tuyo." };
+
+  const razon = motivo.trim();
+  if (!razon) {
+    return { ok: false, mensaje: "Escribe por qué se deshace la validación." };
+  }
+
+  const inscripcion = await (await getPrisma()).alphaEnrollment.findUnique({
+    where: { id: enrollmentId },
+    select: { id: true, programId: true, learnerId: true, validatedAt: true },
+  });
+
+  // Se comprueba contra el grupo pedido: sin esto, el líder de un grupo podría
+  // deshacer la validación de una inscripción de otro.
+  if (!inscripcion || inscripcion.programId !== programId) {
+    return { ok: false, mensaje: "Esa inscripción no existe." };
+  }
+  const validadoEl = inscripcion.validatedAt;
+  if (!validadoEl) {
+    return { ok: false, mensaje: "Esta persona no está validada." };
+  }
+
+  const ahora = new Date();
+  const prisma = await getPrisma();
+
+  const deshecho = await prisma.$transaction(async (tx) => {
+    // La condición `validatedAt: { not: null }` va dentro del UPDATE, no en una
+    // lectura previa: si dos personas lo deshacen a la vez, solo una encuentra
+    // fila que cambiar y la otra se va sin duplicar la bitácora ni mandar dos
+    // veces el aviso al CRM.
+    const { count } = await tx.alphaEnrollment.updateMany({
+      where: { id: enrollmentId, validatedAt: { not: null } },
+      data: { validatedAt: null, validatedById: null, validationNote: null },
+    });
+    if (count === 0) return false;
+
+    // El hito es uno por persona, pero alguien puede haber pasado por más de un
+    // grupo de Alpha. Solo se retira si no le queda ninguna otra validación en
+    // pie: si no, deshacer la de un grupo borraría el Alpha que ganó en otro.
+    const otrasValidaciones = await tx.alphaEnrollment.count({
+      where: { learnerId: inscripcion.learnerId, validatedAt: { not: null } },
+    });
+
+    if (otrasValidaciones === 0) {
+      await tx.milestone.updateMany({
+        where: {
+          learnerId: inscripcion.learnerId,
+          kind: MilestoneKind.ALPHA,
+        },
+        data: {
+          status: MilestoneStatus.EN_CURSO,
+          achievedAt: null,
+          detail: `Validación deshecha: ${razon}`,
+          recordedById: usuario.id,
+        },
+      });
+    }
+
+    await auditar(tx, {
+      actorId: usuario.id,
+      action: "alpha.desvalidado",
+      entityType: "learner_profile",
+      entityId: inscripcion.learnerId,
+      metadata: {
+        programId,
+        motivo: razon,
+        validadoEl: validadoEl.toISOString(),
+        deshechoEl: ahora.toISOString(),
+        hitoRetirado: otrasValidaciones === 0,
+      },
+    });
+
+    // El «alpha_aprobado» ya salió hacia el CRM: hay que decir que se revirtió,
+    // o allá la persona se queda aprobada para siempre.
+    await encolarEventoIntegracion(tx, "alpha_revocado", {
+      learnerId: inscripcion.learnerId,
+      motivo: razon,
+    });
+
+    return true;
+  });
+
+  if (!deshecho) {
+    return { ok: false, mensaje: "Esta persona no está validada." };
+  }
+
+  revalidatePath(`/alpha/${programId}`);
+  revalidatePath(`/expediente/${inscripcion.learnerId}`);
+  return { ok: true };
+}
+
 export type CandidatoAlpha = {
   learnerId: string;
   nombre: string;
