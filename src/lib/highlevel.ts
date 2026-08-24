@@ -199,10 +199,18 @@ export function normalizarPayloadHighLevel(entrada: unknown) {
       ),
     ),
     entryPoint: enumPorEtiqueta(
-      obtener(indice, "entryPoint", "entry_point", "comoLlego"),
+      obtener(
+        indice,
+        "entryPoint",
+        "entry_point",
+        "comoLlego",
+        "puntoEncuentro",
+        "puntoDeEncuentro",
+      ),
       {
         serviciodominical: EntryPoint.SERVICIO_DOMINICAL,
         serviciomiercoles: EntryPoint.SERVICIO_MIERCOLES,
+        serviciojuvenil: EntryPoint.SERVICIO_JUVENIL,
         redessociales: EntryPoint.REDES_SOCIALES,
         alphacasadefe: EntryPoint.ALPHA_CASA_DE_FE,
         eventoobrigada: EntryPoint.EVENTO_O_BRIGADA,
@@ -231,6 +239,15 @@ export function normalizarPayloadHighLevel(entrada: unknown) {
         asistiaantes: ChurchAttendance.ASISTIA_ANTES,
         noperoasistiaantes: ChurchAttendance.ASISTIA_ANTES,
       },
+    ),
+    churchName: textoOpcional(
+      obtener(
+        indice,
+        "churchName",
+        "church_name",
+        "iglesiaAsiste",
+        "iglesiaAlaQueAsiste",
+      ),
     ),
     invitationKind: enumPorEtiqueta(
       obtener(indice, "invitationKind", "invitation_kind", "tipoInvitacion"),

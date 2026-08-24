@@ -78,7 +78,8 @@ Una persona puede abrir el enlace sin iniciar sesión y enviar directamente sus
 datos al sistema. Se exigen nombres, apellidos, género, fecha de nacimiento,
 teléfono, correo, horario de llamada, dirección, punto de encuentro, asistencia
 a una iglesia, invitación, petición de oración y la autorización de uso de
-datos; únicamente WhatsApp es opcional. El detalle de «Otro» y el nombre del
+datos; WhatsApp y correo electrónico son opcionales. El detalle de «Otro», el
+nombre de la iglesia cuando la persona asiste y el nombre del
 invitador son obligatorios cuando corresponden. El formulario aplica campo
 trampa, límite por conexión y detección de duplicados; la respuesta nunca
 revela si un teléfono o correo ya existía.
@@ -264,7 +265,7 @@ como este (los nombres de variables se eligen desde el selector de HighLevel):
 
 Los campos adicionales aceptan sus nombres canónicos (`gender`, `birthDate`,
 `whatsappPhone`, `prayerRequest`, `callSchedules`, `callScheduleNote`,
-`entryPoint`, `entryPointOther`, `churchAttendance`, `invitationKind`,
+`entryPoint`, `entryPointOther`, `churchAttendance`, `churchName`, `invitationKind`,
 `invitedByName`) o sus
 equivalentes habituales en español. El Private Integration Token de HighLevel
 no se expone en este webhook ni se guarda en el repositorio.

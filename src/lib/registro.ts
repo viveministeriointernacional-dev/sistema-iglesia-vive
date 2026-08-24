@@ -133,6 +133,7 @@ export async function crearRegistroEnTransaccion(
       entryPoint: datos.entryPoint ?? null,
       entryPointOther: datos.entryPointOther,
       churchAttendance: datos.churchAttendance ?? null,
+      churchName: datos.churchName,
       invitationKind: datos.invitationKind ?? null,
       invitedByPersonId: invitador?.id ?? null,
       lineOfOrigin: nombreDelInvitador,
@@ -178,6 +179,7 @@ export async function crearRegistroEnTransaccion(
     learnerId: aprendiz.id,
     entryPoint: datos.entryPoint ?? null,
     churchAttendance: datos.churchAttendance ?? null,
+    churchName: datos.churchName ?? null,
     invitationKind: datos.invitationKind ?? null,
     invitadorSinExpediente: Boolean(datos.invitedByName && !invitador),
     duplicadoConfirmadoPorHumano:

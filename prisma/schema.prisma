@@ -106,6 +106,7 @@ model Team {
 enum EntryPoint {
   SERVICIO_DOMINICAL
   SERVICIO_MIERCOLES
+  SERVICIO_JUVENIL
   REDES_SOCIALES
   ALPHA_CASA_DE_FE
   EVENTO_O_BRIGADA
@@ -219,6 +220,7 @@ model LearnerProfile {
   /// Detalle cuando el punto de entrada es OTRO.
   entryPointOther   String?         @map("entry_point_other")
   churchAttendance  ChurchAttendance? @map("church_attendance")
+  churchName        String?         @map("church_name")
   invitationKind    InvitationKind? @map("invitation_kind")
   /// Solo cuando la persona que invitó ya existe en la base.
   invitedByPersonId String?         @map("invited_by_person_id")
