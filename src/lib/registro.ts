@@ -1,14 +1,114 @@
 import {
+  CallOutcome,
+  ContactType,
   MilestoneKind,
   MilestoneStatus,
+  Operation72Status,
   type Prisma,
 } from "@iglesia/prisma-client";
 import type { ClientePrisma } from "@/lib/prisma";
 import { asignarConsolidador } from "@/lib/asignacion";
 import { auditar, encolarEventoIntegracion } from "@/lib/audit";
 import { colaDeTelefono, nombreCompleto } from "@/lib/dominio";
-import { DURACION_OPERACION_72_HORAS } from "@/lib/op72";
+import { DURACION_OPERACION_72_HORAS, ETIQUETA_LLAMADA } from "@/lib/op72";
+import type { VisitaDesdeCrm } from "@/lib/highlevel";
 import type { DatosRegistroValidados } from "@/lib/validacion-registro";
+
+const FORMATO_VISITA = new Intl.DateTimeFormat("es-CO", {
+  day: "2-digit",
+  month: "short",
+});
+
+/// Cuando la línea confirma una visita en el CRM, la persona pasa a «visita
+/// pendiente» con su fecha. Es el mismo movimiento que hace un consolidador a
+/// mano desde el tablero (`agendarVisita`), pero disparado por el webhook.
+///
+/// Solo avanza desde antes de la visita (INICIADA o CONTACTADA): nunca pisa una
+/// visita ya agendada, una entrega ni un cierre. Devuelve si aplicó el cambio.
+export async function programarVisitaDesdeCrm(
+  db: ClientePrisma,
+  learnerId: string,
+  visita: VisitaDesdeCrm,
+): Promise<boolean> {
+  if (visita.confirmacion !== "confirmada" && visita.confirmacion !== "virtual") {
+    return false;
+  }
+
+  const op = await db.operation72.findUnique({
+    where: { learnerId },
+    select: { id: true, status: true },
+  });
+  if (
+    !op ||
+    (op.status !== Operation72Status.INICIADA &&
+      op.status !== Operation72Status.CONTACTADA)
+  ) {
+    return false;
+  }
+
+  const esVirtual = visita.confirmacion === "virtual";
+  const fecha = fechaValida(visita.fechaVisita);
+
+  // La llamada de la línea, si el CRM manda cómo salió.
+  if (visita.estadoLinea) {
+    const contesto = visita.estadoLinea !== CallOutcome.NO_CONTESTO;
+    await db.contactAttempt.create({
+      data: {
+        operation72Id: op.id,
+        type: contesto ? ContactType.LLAMADA : ContactType.INTENTO_LLAMADA,
+        outcome: visita.estadoLinea,
+        result: `${ETIQUETA_LLAMADA[visita.estadoLinea]} (línea)`,
+        note: visita.observacionLinea,
+        occurredAt: fechaValida(visita.fechaLinea) ?? new Date(),
+      },
+    });
+  }
+
+  await db.contactAttempt.create({
+    data: {
+      operation72Id: op.id,
+      type: ContactType.VISITA,
+      result: "Visita agendada",
+      note: visita.observacionLinea,
+      scheduledAt: fecha,
+      isVirtual: esVirtual,
+    },
+  });
+
+  await db.operation72.update({
+    where: { id: op.id },
+    data: {
+      status: Operation72Status.VISITA_PENDIENTE,
+      detail: [
+        fecha ? `Visita ${FORMATO_VISITA.format(fecha)}` : "Visita confirmada por la línea",
+        esVirtual ? "virtual" : null,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    },
+  });
+
+  await auditar(db, {
+    actorId: null,
+    action: "operacion72.visita_agendada",
+    entityType: "operation72",
+    entityId: op.id,
+    metadata: {
+      origen: "highlevel",
+      form: "Registro Llamada Linea",
+      fechaVisita: visita.fechaVisita,
+      virtual: esVirtual,
+    },
+  });
+
+  return true;
+}
+
+function fechaValida(valor: string | null): Date | null {
+  if (!valor) return null;
+  const fecha = new Date(valor);
+  return Number.isNaN(fecha.getTime()) ? null : fecha;
+}
 
 export type PosibleDuplicado = {
   id: string;

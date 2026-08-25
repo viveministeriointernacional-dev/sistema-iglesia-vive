@@ -5,7 +5,11 @@ import { colaDeTelefono } from "@/lib/dominio";
 import { variableDeEntorno } from "@/lib/entorno";
 import { normalizarPayloadHighLevel } from "@/lib/highlevel";
 import { getPrisma } from "@/lib/prisma";
-import { buscarDuplicados, crearRegistroEnTransaccion } from "@/lib/registro";
+import {
+  buscarDuplicados,
+  crearRegistroEnTransaccion,
+  programarVisitaDesdeCrm,
+} from "@/lib/registro";
 
 export const runtime = "nodejs";
 
@@ -100,7 +104,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: mensaje }, { status: 422 });
   }
 
-  const { contexto, datos } = normalizado;
+  const { contexto, datos, visita } = normalizado;
   const formIdEsperado = await variableDeEntorno("HIGHLEVEL_REGISTRO_FORM_ID");
   if (formIdEsperado && contexto.formId !== formIdEsperado) {
     return NextResponse.json(
@@ -177,8 +181,18 @@ export async function POST(request: Request) {
             highLevelSubmissionId: contexto.submissionId,
           },
         });
+        const visitaAgendada = enlace.person.learnerProfile
+          ? await programarVisitaDesdeCrm(
+              tx,
+              enlace.person.learnerProfile.id,
+              visita,
+            )
+          : false;
+
         return {
-          estado: "ya_importado" as const,
+          estado: visitaAgendada
+            ? ("visita_agendada" as const)
+            : ("ya_importado" as const),
           personId: enlace.personId,
           learnerId: enlace.person.learnerProfile?.id ?? null,
         };
@@ -264,6 +278,8 @@ export async function POST(request: Request) {
             criterio: duplicados[0].motivo,
           },
         });
+        await programarVisitaDesdeCrm(tx, existente.learnerProfile.id, visita);
+
         return {
           estado: "vinculado" as const,
           personId: existente.id,
@@ -327,6 +343,11 @@ export async function POST(request: Request) {
         entityId: creado.personId,
         metadata,
       });
+
+      // Poco común en el primer envío, pero si ya viene con la visita confirmada
+      // se agenda de una vez.
+      await programarVisitaDesdeCrm(tx, creado.learnerId, visita);
+
       return { estado: "creado" as const, ...creado };
     });
 
