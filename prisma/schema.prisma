@@ -54,6 +54,10 @@ model AppUser {
   /// de la iglesia. Quien lo tiene administra los grupos que le asignen; crear
   /// y cerrar grupos sigue siendo del pastor o de un mentor.
   canLeadAlpha Boolean @default(false) @map("can_lead_alpha")
+  /// Identificador de este usuario en HighLevel. Sirve para que, cuando llega
+  /// un registro del CRM, el propietario del contacto se convierta en su
+  /// consolidador. Nulo para quien no tiene cuenta en HighLevel.
+  highlevelUserId String? @unique @map("highlevel_user_id")
   personId   String?  @unique @map("person_id")
   teamId     String?  @map("team_id")
   createdAt  DateTime @default(now()) @map("created_at")
