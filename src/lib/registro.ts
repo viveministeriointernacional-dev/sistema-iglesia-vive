@@ -92,8 +92,13 @@ export async function crearRegistroEnTransaccion(
     actorId: string | null;
     duplicadoConfirmadoPorHumano?: boolean;
     metadata?: Prisma.InputJsonObject;
+    /// Cuando el registro llega del CRM, el propietario del contacto es su
+    /// consolidador. Si se pasa (aunque sea `null`), se usa ese y no el reparto
+    /// automático por género y carga. `undefined` = reparto automático.
+    consolidadorForzado?: { id: string } | null;
   },
 ) {
+  const fuerzaConsolidador = "consolidadorForzado" in opciones;
   const ahora = new Date();
   const deadlineAt = new Date(
     ahora.getTime() + DURACION_OPERACION_72_HORAS * 3_600_000,
@@ -126,7 +131,11 @@ export async function crearRegistroEnTransaccion(
     select: { id: true, gender: true },
   });
 
-  const elegido = await asignarConsolidador(db, persona.gender);
+  const elegido = fuerzaConsolidador
+    ? opciones.consolidadorForzado
+      ? { id: opciones.consolidadorForzado.id, carga: null as number | null }
+      : null
+    : await asignarConsolidador(db, persona.gender);
   const aprendiz = await db.learnerProfile.create({
     data: {
       personId: persona.id,
@@ -203,7 +212,9 @@ export async function crearRegistroEnTransaccion(
       entityId: aprendiz.id,
       metadata: {
         consolidadorId: elegido.id,
-        criterio: "mismo género · menor carga",
+        criterio: fuerzaConsolidador
+          ? "propietario del contacto en HighLevel"
+          : "mismo género · menor carga",
         cargaPrevia: elegido.carga,
       },
     });

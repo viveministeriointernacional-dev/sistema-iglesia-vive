@@ -16,6 +16,10 @@ const contextoSchema = z.object({
   formId: z.string().trim().max(160).nullable(),
   formName: z.string().trim().max(240).nullable(),
   submissionId: z.string().trim().max(160).nullable(),
+  /// El dueño del contacto en HighLevel. Con él, quien atiende a la persona en
+  /// el CRM queda como su consolidador en el sistema.
+  ownerId: z.string().trim().max(160).nullable(),
+  ownerEmail: z.string().trim().max(240).nullable(),
 });
 
 function objeto(valor: unknown): Objeto | null {
@@ -153,6 +157,19 @@ export function normalizarPayloadHighLevel(entrada: unknown) {
         "formSubmissionId",
         "id",
       ),
+    ),
+    ownerId: texto(
+      obtener(
+        indice,
+        "assignedTo",
+        "assigned_to",
+        "ownerId",
+        "owner_id",
+        "assignedUserId",
+      ),
+    ),
+    ownerEmail: texto(
+      obtener(indice, "ownerEmail", "owner_email", "assignedToEmail"),
     ),
   });
 

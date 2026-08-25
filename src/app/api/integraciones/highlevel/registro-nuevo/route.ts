@@ -278,9 +278,38 @@ export async function POST(request: Request) {
         highLevelFormId: contexto.formId,
         highLevelSubmissionId: contexto.submissionId,
       };
+      // El propietario del contacto en HighLevel es su consolidador. Se busca
+      // por el id de HighLevel del usuario, o por su correo si el CRM lo manda.
+      // Si el contacto no trae dueño, se deja el reparto automático de siempre.
+      const duenoConocido = Boolean(contexto.ownerId || contexto.ownerEmail);
+      const consolidador = duenoConocido
+        ? await tx.appUser.findFirst({
+            where: {
+              active: true,
+              OR: [
+                ...(contexto.ownerId
+                  ? [{ highlevelUserId: contexto.ownerId }]
+                  : []),
+                ...(contexto.ownerEmail
+                  ? [{ email: contexto.ownerEmail.toLowerCase() }]
+                  : []),
+              ],
+            },
+            select: { id: true },
+          })
+        : null;
+
       const creado = await crearRegistroEnTransaccion(tx, datos, {
         actorId: null,
-        metadata,
+        metadata: {
+          ...metadata,
+          ...(duenoConocido
+            ? { highLevelOwnerId: contexto.ownerId, ownerAsignado: Boolean(consolidador) }
+            : {}),
+        },
+        ...(duenoConocido
+          ? { consolidadorForzado: consolidador ? { id: consolidador.id } : null }
+          : {}),
       });
       await tx.highLevelContact.create({
         data: {
