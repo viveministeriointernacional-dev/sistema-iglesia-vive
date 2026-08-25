@@ -1,10 +1,24 @@
 import {
+  CallOutcome,
   CallSchedule,
   ChurchAttendance,
   EntryPoint,
   Gender,
   InvitationKind,
 } from "@iglesia/prisma-client";
+
+/// Lo que deja el formulario «Registro Llamada Línea»: la llamada que hace la
+/// línea y la visita que se agenda.
+export type VisitaDesdeCrm = {
+  /// Qué respondió la persona sobre la visita.
+  confirmacion: "confirmada" | "virtual" | "no" | null;
+  /// Fecha de la visita, si la línea la fijó.
+  fechaVisita: string | null;
+  /// Cómo salió la llamada de la línea.
+  estadoLinea: CallOutcome | null;
+  fechaLinea: string | null;
+  observacionLinea: string | null;
+};
 import { z } from "zod";
 import { esquemaRegistro } from "@/lib/validacion-registro";
 
@@ -283,5 +297,49 @@ export function normalizarPayloadHighLevel(entrada: unknown) {
     ),
   });
 
-  return { contexto, datos };
+  return { contexto, datos, visita: extraerVisita(indice) };
+}
+
+/// Los campos del formulario «Registro Llamada Línea». Se buscan por el nombre
+/// del campo y también por su id en HighLevel, porque según cómo se dispare el
+/// webhook llega de una u otra forma.
+function extraerVisita(indice: Map<string, unknown>): VisitaDesdeCrm {
+  const conf = texto(
+    obtener(indice, "Confirmación de visita", "yzgZvkQikaYXnK0fNL81"),
+  );
+  const confN = conf ? normalizarClave(conf) : "";
+  const confirmacion: VisitaDesdeCrm["confirmacion"] = confN.includes("virtual")
+    ? "virtual"
+    : confN.startsWith("no")
+      ? "no"
+      : confN.includes("confirmada") || confN.startsWith("si")
+        ? "confirmada"
+        : null;
+
+  return {
+    confirmacion,
+    fechaVisita: texto(
+      obtener(indice, "Fecha visita", "RoA76CCpoBd2DvraoQEF"),
+    ),
+    estadoLinea: enumPorEtiqueta(
+      obtener(indice, "Estado Primera Llamada Linea", "U1VhdP5dRedFZ30ihJbJ"),
+      {
+        contestobien: CallOutcome.CONTESTO_BIEN,
+        contestoyreprogramo: CallOutcome.CONTESTO_REPROGRAMO,
+        contestoregular: CallOutcome.CONTESTO_REGULAR,
+        contestomal: CallOutcome.CONTESTO_MAL,
+        nocontesto: CallOutcome.NO_CONTESTO,
+      },
+    ),
+    fechaLinea: texto(
+      obtener(indice, "Fecha Primera Llamada Linea", "mXbNh4wigwrtXUpfMSqD"),
+    ),
+    observacionLinea: texto(
+      obtener(
+        indice,
+        "Observación Primera LLamada Linea",
+        "r0FlVnHCzP6tqnTMHqdJ",
+      ),
+    ),
+  };
 }
