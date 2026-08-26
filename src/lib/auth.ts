@@ -13,6 +13,9 @@ export type UsuarioSesion = {
   teamId: string | null;
   /// Permiso para llevar grupos de Alpha, independiente del rol.
   canLeadAlpha: boolean;
+  /// Coordina la consolidación: consolidador que revisa a todos, no solo lo
+  /// suyo. Independiente del rol.
+  coordinaConsolidacion: boolean;
 };
 
 export const ETIQUETA_ROL: Record<Role, string> = {
@@ -79,6 +82,7 @@ export const obtenerUsuarioActual = cache(
         personId: true,
         teamId: true,
         canLeadAlpha: true,
+        coordinatesConsolidation: true,
         active: true,
         authUserId: true,
       },
@@ -106,9 +110,21 @@ export const obtenerUsuarioActual = cache(
       personId: registro.personId,
       teamId: registro.teamId,
       canLeadAlpha: registro.canLeadAlpha,
+      coordinaConsolidacion: registro.coordinatesConsolidation,
     };
   },
 );
+
+/// Quién ve y opera toda la consolidación: pastor y administrador siempre, y el
+/// consolidador con permiso de coordinación. El consolidador común solo ve lo
+/// que tiene asignado.
+export function veTodaLaConsolidacion(usuario: UsuarioSesion): boolean {
+  return (
+    usuario.role === Role.PASTOR ||
+    usuario.role === Role.ADMIN ||
+    usuario.coordinaConsolidacion
+  );
+}
 
 export async function requerirUsuario(): Promise<UsuarioSesion> {
   const usuario = await obtenerUsuarioActual();

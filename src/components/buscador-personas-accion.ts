@@ -31,7 +31,9 @@ export async function buscarPersonas(
   if (texto.length < 2) return [];
 
   const puedeVerTodo =
-    usuario.role === Role.ADMIN || usuario.role === Role.PASTOR;
+    usuario.role === Role.ADMIN ||
+    usuario.role === Role.PASTOR ||
+    usuario.coordinaConsolidacion;
   const acompana =
     usuario.role === Role.MENTOR || usuario.role === Role.CONSOLIDADOR;
   if (!puedeVerTodo && !acompana) return [];

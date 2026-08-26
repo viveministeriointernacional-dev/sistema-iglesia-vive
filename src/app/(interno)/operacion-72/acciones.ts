@@ -16,6 +16,7 @@ import {
   requerirRolEnAccion,
   ROLES_CONFIRMAN_ENTREGA,
   ROLES_CONSOLIDACION,
+  veTodaLaConsolidacion,
   type UsuarioSesion,
 } from "@/lib/auth";
 import { proponerMentor } from "@/lib/asignacion";
@@ -66,6 +67,7 @@ async function cargarOperacion(id: string, usuario: UsuarioSesion) {
 
   const esSuya =
     usuario.role !== Role.CONSOLIDADOR ||
+    veTodaLaConsolidacion(usuario) ||
     operacion.learner.consolidatorId === usuario.id;
 
   return esSuya ? operacion : null;

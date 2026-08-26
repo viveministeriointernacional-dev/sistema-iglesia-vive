@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Role } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
-import { requerirRol, ROLES_CONSOLIDACION } from "@/lib/auth";
+import { requerirRol, ROLES_CONSOLIDACION, veTodaLaConsolidacion } from "@/lib/auth";
 import { nombreCompleto, textoDeEntrada } from "@/lib/dominio";
 import {
   COLUMNAS_OP72,
@@ -28,7 +28,7 @@ export default async function TableroOperacion72() {
   const operaciones = await prisma.operation72.findMany({
     where: {
       status: { in: [...ESTADOS_EN_TABLERO] },
-      ...(usuario.role === Role.CONSOLIDADOR
+      ...(usuario.role === Role.CONSOLIDADOR && !veTodaLaConsolidacion(usuario)
         ? { learner: { consolidatorId: usuario.id } }
         : {}),
     },

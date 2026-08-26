@@ -93,7 +93,13 @@ export async function accesoAExpediente(
     return { puedeVer: false, puedeVerNotas: false, puedeEscribir: false, esPropio };
   }
 
-  if (usuario.role === Role.ADMIN || usuario.role === Role.PASTOR) {
+  // Pastor, administrador y el consolidador coordinador (revisa a todos) ven y
+  // operan cualquier expediente.
+  if (
+    usuario.role === Role.ADMIN ||
+    usuario.role === Role.PASTOR ||
+    usuario.coordinaConsolidacion
+  ) {
     return { puedeVer: true, puedeVerNotas: true, puedeEscribir: true, esPropio };
   }
 
