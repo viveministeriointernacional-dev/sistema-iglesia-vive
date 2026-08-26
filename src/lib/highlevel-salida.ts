@@ -153,6 +153,45 @@ export async function exportarContactoNuevo(
   }
 }
 
+/// Empuja a HighLevel los datos básicos editados de una persona (nombre,
+/// teléfono, correo, dirección). Si ya está enlazada, actualiza ese contacto;
+/// si no, lo crea. Best-effort: sin token no hace nada y un fallo no rompe la
+/// edición en el sistema.
+export async function exportarDatosPersona(learnerId: string): Promise<void> {
+  const cred = await credenciales();
+  if (!cred) return;
+
+  try {
+    const aprendiz = await enlaceExistente(learnerId);
+    if (!aprendiz) return;
+    const persona = aprendiz.person;
+    const contactId = aprendiz.person.highLevelContacts[0]?.contactId ?? null;
+
+    // Sin enlace todavía: crear el contacto ya deja los datos en HighLevel.
+    if (!contactId) {
+      await exportarContactoNuevo(learnerId);
+      return;
+    }
+
+    const telefono = persona.callPhone ?? persona.whatsappPhone ?? undefined;
+    await pedir(
+      `/contacts/${contactId}`,
+      "PUT",
+      {
+        firstName: persona.firstName,
+        lastName: persona.lastName ?? undefined,
+        name: nombreCompleto(persona),
+        email: persona.email ?? undefined,
+        phone: telefono,
+        address1: persona.address ?? undefined,
+      },
+      cred.token,
+    );
+  } catch (error) {
+    console.error("No se pudo exportar los datos de la persona a HighLevel", error);
+  }
+}
+
 /// Escribe campos personalizados en el contacto. Si aún no hay enlace, primero
 /// crea el contacto.
 async function actualizarCampos(

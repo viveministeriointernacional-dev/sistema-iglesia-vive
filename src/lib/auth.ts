@@ -13,10 +13,15 @@ export type UsuarioSesion = {
   teamId: string | null;
   /// Permiso para llevar grupos de Alpha, independiente del rol.
   canLeadAlpha: boolean;
+  /// Permiso para llevar Casa de Fe, independiente del rol.
+  canLeadFaithHouse: boolean;
   /// Coordina la consolidación: consolidador que revisa a todos, no solo lo
   /// suyo. Independiente del rol.
   coordinaConsolidacion: boolean;
 };
+
+/// Quién administra el sistema: personas, roles, permisos y procesos.
+export const ROLES_ADMIN: Role[] = [Role.ADMIN];
 
 export const ETIQUETA_ROL: Record<Role, string> = {
   APRENDIZ: "Aprendiz",
@@ -82,6 +87,7 @@ export const obtenerUsuarioActual = cache(
         personId: true,
         teamId: true,
         canLeadAlpha: true,
+        canLeadFaithHouse: true,
         coordinatesConsolidation: true,
         active: true,
         authUserId: true,
@@ -110,6 +116,7 @@ export const obtenerUsuarioActual = cache(
       personId: registro.personId,
       teamId: registro.teamId,
       canLeadAlpha: registro.canLeadAlpha,
+      canLeadFaithHouse: registro.canLeadFaithHouse,
       coordinaConsolidacion: registro.coordinatesConsolidation,
     };
   },
