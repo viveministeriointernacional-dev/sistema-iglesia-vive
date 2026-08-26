@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Phase, Role } from "@iglesia/prisma-client";
 import { ETIQUETA_ROL, requerirRol, ROLES_CON_RED } from "@/lib/auth";
 import { cargarArbol, type IndicadoresDeRed, type NodoDeRed } from "@/lib/arbol";
+import { BuscadorPersonas } from "@/components/buscador-personas";
 
 export const metadata = { title: "Árbol de la red · Iglesia Vive" };
 export const dynamic = "force-dynamic";
@@ -37,6 +38,10 @@ export default async function PaginaRed() {
               : "Tu rama: a quién acompañas y a quién acompañan ellos"}
           </p>
         </header>
+
+        <div className="mt-5 max-w-[460px]">
+          <BuscadorPersonas />
+        </div>
 
         <Indicadores datos={total} />
 

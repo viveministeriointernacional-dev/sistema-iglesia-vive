@@ -34,6 +34,16 @@ export const ROLES_CONSOLIDACION: Role[] = [
 /// Quién tiene una red de acompañamiento que mirar.
 export const ROLES_CON_RED: Role[] = [Role.MENTOR, Role.PASTOR, Role.ADMIN];
 
+/// Quién puede buscar personas y abrir expedientes desde el buscador. Coincide
+/// con quienes `accesoAExpediente` deja ver algún expediente: los aprendices y
+/// líderes Alpha no buscan (no abren expedientes ajenos).
+export const ROLES_BUSCADOR: Role[] = [
+  Role.CONSOLIDADOR,
+  Role.MENTOR,
+  Role.PASTOR,
+  Role.ADMIN,
+];
+
 /// Quién puede confirmar la entrega a mentor. La asignación la propone el
 /// sistema; la decisión final la confirma un líder
 /// (ESPECIFICACION_PRODUCTO.md §5.6).

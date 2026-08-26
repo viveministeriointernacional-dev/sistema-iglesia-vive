@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { requerirRol } from "@/lib/auth";
+import { requerirRol, ROLES_BUSCADOR } from "@/lib/auth";
 import {
   cargarEscuelas,
   esVistaCompletaDeEscuela,
   ROLES_ENTRENAR,
 } from "@/lib/entrenar";
+import { BuscadorPersonas } from "@/components/buscador-personas";
 import { NuevaEscuela } from "./nueva-escuela";
 
 export const metadata = { title: "Escuela Ser Líder · Iglesia Vive" };
@@ -34,6 +35,12 @@ export default async function PaginaEscuela() {
             · presencial el primer sábado del mes, virtuales según programación
           </p>
         </header>
+
+        {ROLES_BUSCADOR.includes(usuario.role) ? (
+          <div className="mt-5 max-w-[460px]">
+            <BuscadorPersonas />
+          </div>
+        ) : null}
 
         <div className="mt-5">
           <NuevaEscuela />

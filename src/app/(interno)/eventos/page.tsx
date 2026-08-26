@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { EventKind } from "@iglesia/prisma-client";
-import { requerirRol } from "@/lib/auth";
+import { requerirRol, ROLES_BUSCADOR } from "@/lib/auth";
 import {
   cargarEventos,
   ETIQUETA_EVENTO,
@@ -8,6 +8,7 @@ import {
   puedeProgramar,
   ROLES_OPERAN_EVENTOS,
 } from "@/lib/eventos";
+import { BuscadorPersonas } from "@/components/buscador-personas";
 import { NuevoEvento } from "./nuevo-evento";
 
 export const metadata = { title: "Eventos · Iglesia Vive" };
@@ -39,6 +40,12 @@ export default async function PaginaEventos() {
             marca la asistencia
           </p>
         </header>
+
+        {ROLES_BUSCADOR.includes(usuario.role) ? (
+          <div className="mt-5 max-w-[460px]">
+            <BuscadorPersonas />
+          </div>
+        ) : null}
 
         {puedeProgramar(usuario) ? (
           <div className="mt-5">

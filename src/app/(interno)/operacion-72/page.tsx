@@ -13,6 +13,7 @@ import {
   TRANSICIONES,
   urgenciaDe,
 } from "@/lib/op72";
+import { BuscadorPersonas } from "@/components/buscador-personas";
 import { TarjetaDePersona, type TarjetaPersona } from "./tarjeta";
 
 export const metadata = { title: "Operación 72 · Iglesia Vive" };
@@ -115,6 +116,10 @@ export default async function TableroOperacion72() {
           >
             + Registrar persona
           </Link>
+        </div>
+
+        <div className="mt-5 max-w-[460px]">
+          <BuscadorPersonas />
         </div>
 
         <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
