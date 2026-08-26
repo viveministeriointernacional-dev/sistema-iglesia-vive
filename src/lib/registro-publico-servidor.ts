@@ -4,6 +4,7 @@ import { colaDeTelefono } from "@/lib/dominio";
 import { getPrisma } from "@/lib/prisma";
 import { esquemaRegistroPublico } from "@/lib/registro-publico";
 import { buscarDuplicados, crearRegistroEnTransaccion } from "@/lib/registro";
+import { exportarContactoNuevo } from "@/lib/highlevel-salida";
 import type { DatosRegistroValidados } from "@/lib/validacion-registro";
 
 export type EstadoRegistroPublico = {
@@ -125,7 +126,7 @@ export async function procesarRegistroPublico(
             metadata: { path: ["cliente"], equals: huella },
           },
         });
-        if (intentos >= MAXIMOS_INTENTOS) return "limite" as const;
+        if (intentos >= MAXIMOS_INTENTOS) return { estado: "limite" as const };
       }
 
       const duplicados = await buscarDuplicados(tx, datos);
@@ -142,19 +143,25 @@ export async function procesarRegistroPublico(
 
       // Nunca se confirma a un visitante si el teléfono o el correo ya existe.
       // Un posible duplicado queda auditado para revisión interna y no se pisa.
-      if (duplicados.length) return "aceptado" as const;
+      if (duplicados.length) return { estado: "aceptado" as const };
 
-      await crearRegistroEnTransaccion(tx, datos, {
+      const creado = await crearRegistroEnTransaccion(tx, datos, {
         actorId: null,
         metadata: {
           origen: "formulario_publico",
           consentimientoContacto: true,
         },
       });
-      return "creado" as const;
+      return { estado: "creado" as const, learnerId: creado.learnerId };
     });
 
-    if (resultado === "limite") {
+    // La persona que se registra por el formulario público nace también como
+    // contacto en HighLevel (best-effort, fuera de la transacción).
+    if (resultado.estado === "creado") {
+      await exportarContactoNuevo(resultado.learnerId);
+    }
+
+    if (resultado.estado === "limite") {
       return {
         tipo: "rechazado",
         estado: {

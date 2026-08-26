@@ -5,6 +5,7 @@ import { salir } from "@/app/ingresar/acciones";
 import {
   ETIQUETA_ROL,
   requerirUsuario,
+  ROLES_ADMIN,
   ROLES_CON_RED,
   ROLES_CONSOLIDACION,
 } from "@/lib/auth";
@@ -52,6 +53,9 @@ export default async function LayoutInterno({
       : []),
     ...(usuario.role === Role.APRENDIZ
       ? [{ href: "/mi-proceso", etiqueta: "Mi proceso" }]
+      : []),
+    ...(ROLES_ADMIN.includes(usuario.role)
+      ? [{ href: "/administracion", etiqueta: "Administración" }]
       : []),
   ];
 

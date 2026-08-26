@@ -54,6 +54,14 @@ model AppUser {
   /// de la iglesia. Quien lo tiene administra los grupos que le asignen; crear
   /// y cerrar grupos sigue siendo del pastor o de un mentor.
   canLeadAlpha Boolean @default(false) @map("can_lead_alpha")
+  /// Liderar Casa de Fe es también un permiso, no un rol: habilita a la persona
+  /// para llevar Casa de Fe, sin cambiar lo que es dentro de la iglesia.
+  canLeadFaithHouse Boolean @default(false) @map("can_lead_faith_house")
+  /// Coordina la consolidación: un consolidador que revisa el trabajo de todos.
+  /// Con este permiso ve y opera Operación 72 y los expedientes de todos los
+  /// consolidadores, no solo los que tiene asignados. No cambia su rol ni le da
+  /// poderes de pastor (red, cambios de fase, etc.).
+  coordinatesConsolidation Boolean @default(false) @map("coordinates_consolidation")
   /// Identificador de este usuario en HighLevel. Sirve para que, cuando llega
   /// un registro del CRM, el propietario del contacto se convierta en su
   /// consolidador. Nulo para quien no tiene cuenta en HighLevel.

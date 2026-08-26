@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { Role } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
 import { auditar } from "@/lib/audit";
+import { exportarContactoNuevo } from "@/lib/highlevel-salida";
 import { ErrorDePermiso, requerirRolEnAccion, ROLES_CONSOLIDACION } from "@/lib/auth";
 import { nombreCompleto, normalizarTelefono } from "@/lib/dominio";
 import {
@@ -135,13 +136,17 @@ export async function guardarRegistro(
     }
   }
 
-  await prisma.$transaction((tx) =>
+  const creado = await prisma.$transaction((tx) =>
     crearRegistroEnTransaccion(tx, datos, {
       actorId: usuario.id,
       duplicadoConfirmadoPorHumano:
         opciones.confirmadoNoDuplicado ?? false,
     }),
   );
+
+  // La persona registrada en el sistema nace también como contacto en
+  // HighLevel (best-effort, fuera de la transacción).
+  await exportarContactoNuevo(creado.learnerId);
 
   revalidatePath("/operacion-72");
   redirect("/operacion-72");

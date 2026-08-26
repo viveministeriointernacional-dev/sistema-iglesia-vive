@@ -16,9 +16,11 @@ import {
   requerirRolEnAccion,
   ROLES_CONFIRMAN_ENTREGA,
   ROLES_CONSOLIDACION,
+  veTodaLaConsolidacion,
   type UsuarioSesion,
 } from "@/lib/auth";
 import { proponerMentor } from "@/lib/asignacion";
+import { exportarPrimeraLlamada, exportarVisita } from "@/lib/highlevel-salida";
 import {
   contactaDeVerdad,
   ETIQUETA_LLAMADA,
@@ -65,6 +67,7 @@ async function cargarOperacion(id: string, usuario: UsuarioSesion) {
 
   const esSuya =
     usuario.role !== Role.CONSOLIDADOR ||
+    veTodaLaConsolidacion(usuario) ||
     operacion.learner.consolidatorId === usuario.id;
 
   return esSuya ? operacion : null;
@@ -179,6 +182,13 @@ export async function registrarLlamada(
     });
   });
 
+  // Reflejo hacia HighLevel (best-effort, fuera de la transacción).
+  await exportarPrimeraLlamada(operacion.learnerId, {
+    resultado: datos.resultado,
+    ocurrioEl,
+    observacion,
+  });
+
   revalidatePath("/operacion-72");
   revalidatePath(`/expediente/${operacion.learnerId}`);
   return { ok: true };
@@ -248,6 +258,12 @@ export async function agendarVisita(
       entityId: operacion.id,
       metadata: { cuando: cuando.toISOString(), virtual: datos.virtual, lugar },
     });
+  });
+
+  // Reflejo hacia HighLevel (best-effort, fuera de la transacción).
+  await exportarVisita(operacion.learnerId, {
+    cuando,
+    virtual: datos.virtual,
   });
 
   revalidatePath("/operacion-72");

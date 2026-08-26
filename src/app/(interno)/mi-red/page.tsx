@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Phase } from "@iglesia/prisma-client";
 import { requerirRol, ROLES_CON_RED } from "@/lib/auth";
 import { cargarRed, DIAS_SIN_CONTACTO, type PersonaDeLaRed } from "@/lib/red";
+import { BuscadorPersonas } from "@/components/buscador-personas";
 
 export const metadata = { title: "Mi red · Iglesia Vive" };
 export const dynamic = "force-dynamic";
@@ -92,6 +93,10 @@ export default async function PaginaMiRed() {
               : "Las personas que acompañas y cómo van"}
           </p>
         </header>
+
+        <div className="mt-5 max-w-[460px]">
+          <BuscadorPersonas />
+        </div>
 
         <ul className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {indicadores.map((indicador) => (

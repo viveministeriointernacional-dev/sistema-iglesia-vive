@@ -31,6 +31,10 @@ export type AccionAuditada =
   | "highlevel.contacto_vinculado"
   | "highlevel.registro_repetido"
   | "registro_publico.recibido"
+  | "administracion.datos_actualizados"
+  | "administracion.rol_actualizado"
+  | "administracion.acceso_creado"
+  | "administracion.hito_editado"
   | "duplicado.detectado";
 
 export async function auditar(
