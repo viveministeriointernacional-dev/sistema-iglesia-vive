@@ -19,6 +19,7 @@ import {
   type UsuarioSesion,
 } from "@/lib/auth";
 import { proponerMentor } from "@/lib/asignacion";
+import { exportarPrimeraLlamada, exportarVisita } from "@/lib/highlevel-salida";
 import {
   contactaDeVerdad,
   ETIQUETA_LLAMADA,
@@ -179,6 +180,13 @@ export async function registrarLlamada(
     });
   });
 
+  // Reflejo hacia HighLevel (best-effort, fuera de la transacción).
+  await exportarPrimeraLlamada(operacion.learnerId, {
+    resultado: datos.resultado,
+    ocurrioEl,
+    observacion,
+  });
+
   revalidatePath("/operacion-72");
   revalidatePath(`/expediente/${operacion.learnerId}`);
   return { ok: true };
@@ -248,6 +256,12 @@ export async function agendarVisita(
       entityId: operacion.id,
       metadata: { cuando: cuando.toISOString(), virtual: datos.virtual, lugar },
     });
+  });
+
+  // Reflejo hacia HighLevel (best-effort, fuera de la transacción).
+  await exportarVisita(operacion.learnerId, {
+    cuando,
+    virtual: datos.virtual,
   });
 
   revalidatePath("/operacion-72");
