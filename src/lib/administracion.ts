@@ -84,7 +84,7 @@ export async function buscarPersonasAdmin(consulta: string): Promise<FilaAdmin[]
         : {}),
     },
     orderBy: texto.length >= 2 ? { firstName: "asc" } : { createdAt: "desc" },
-    take: 40,
+    take: 25,
     select: {
       id: true,
       firstName: true,
