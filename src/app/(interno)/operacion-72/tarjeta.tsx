@@ -436,8 +436,8 @@ function FormularioDeEntrega({
 
       {mentores.length === 0 ? (
         <p className="mt-2 text-[11px] leading-[1.4] font-medium text-[rgba(19,28,36,.5)]">
-          No hay mentores disponibles. Un administrador debe habilitar mentores
-          en fase de Multiplicación.
+          No hay mentores disponibles. Un administrador debe marcar a alguien con
+          rol de mentor o pastor.
         </p>
       ) : null}
 

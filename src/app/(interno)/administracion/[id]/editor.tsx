@@ -136,12 +136,12 @@ function SeccionMentor({
     <Tarjeta titulo="MENTOR">
       {mentores.length === 0 ? (
         <p className="text-[12px] leading-[1.5] font-medium text-[rgba(19,28,36,.55)]">
-          No hay mentores disponibles todavía. Un mentor debe estar en fase de
-          Multiplicación y tener rol de Mentor o Pastor.
+          No hay mentores disponibles todavía. Marca a alguien con rol de Mentor
+          o Pastor para poder asignarlo.
         </p>
       ) : (
         <>
-          <Campo etiqueta="Mentor asignado (Multiplicar · mentor o pastor)">
+          <Campo etiqueta="Mentor asignado (rol de mentor o pastor)">
             <select
               className="campo max-w-[360px]"
               value={elegido}

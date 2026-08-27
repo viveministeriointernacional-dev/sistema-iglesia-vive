@@ -7,7 +7,6 @@ import {
   MilestoneKind,
   MilestoneStatus,
   Operation72Status,
-  Phase,
   Role,
 } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
@@ -381,15 +380,13 @@ export async function entregarAMentor(
         id: elegido,
         active: true,
         role: { in: [Role.MENTOR, Role.PASTOR] },
-        person: { learnerProfile: { phase: Phase.MULTIPLICAR } },
       },
       select: { id: true },
     });
     if (!mentor) {
       return {
         ok: false,
-        mensaje:
-          "Ese mentor no es válido: debe ser mentor o pastor y estar en fase de Multiplicación.",
+        mensaje: "Ese mentor no es válido: debe tener rol de mentor o pastor y estar activo.",
       };
     }
     mentorId = mentor.id;

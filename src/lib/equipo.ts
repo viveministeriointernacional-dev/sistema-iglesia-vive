@@ -1,4 +1,4 @@
-import { Phase, Role } from "@iglesia/prisma-client";
+import { Role } from "@iglesia/prisma-client";
 import type { UsuarioSesion } from "@/lib/auth";
 import { nombreCompleto } from "@/lib/dominio";
 import type { ClientePrisma } from "@/lib/prisma";
@@ -10,8 +10,9 @@ export type MentorElegible = {
   role: Role;
 };
 
-/// Quiénes pueden ser mentores: personas en fase de Multiplicación con rol de
-/// mentor o pastor. Es la regla que pidió la iglesia para escoger mentor.
+/// Quiénes pueden ser mentores: cualquier persona activa con rol de mentor o
+/// pastor. Asignar el rol es lo que la habilita para aparecer aquí; no se exige
+/// una fase, para que también entren pastores y líderes sin proceso propio.
 export async function mentoresElegibles(
   db: ClientePrisma,
 ): Promise<MentorElegible[]> {
@@ -19,7 +20,6 @@ export async function mentoresElegibles(
     where: {
       active: true,
       role: { in: [Role.MENTOR, Role.PASTOR] },
-      person: { learnerProfile: { phase: Phase.MULTIPLICAR } },
     },
     select: { id: true, fullName: true, role: true },
     orderBy: { fullName: "asc" },

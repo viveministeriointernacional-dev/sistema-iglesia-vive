@@ -424,15 +424,13 @@ export async function asignarMentor(
         id: mentorUserId,
         active: true,
         role: { in: [Role.MENTOR, Role.PASTOR] },
-        person: { learnerProfile: { phase: Phase.MULTIPLICAR } },
       },
       select: { id: true, email: true, fullName: true },
     });
     if (!mentor) {
       return {
         ok: false,
-        mensaje:
-          "Ese mentor no es válido: debe ser mentor o pastor y estar en fase de Multiplicación.",
+        mensaje: "Ese mentor no es válido: debe tener rol de mentor o pastor y estar activo.",
       };
     }
 
