@@ -8,6 +8,7 @@ import {
   requerirRolEnAccion,
   type UsuarioSesion,
 } from "@/lib/auth";
+import { correoCredenciales } from "@/lib/correo";
 import { nombreCompleto } from "@/lib/dominio";
 import { puedeGestionarEquipoDe } from "@/lib/equipo";
 import { getPrisma } from "@/lib/prisma";
@@ -176,6 +177,14 @@ export async function crearAccesoLider(
       entityType: "person",
       entityId: personId,
       metadata: { email, tipo: datos.tipo, porMentor: usuario.id },
+    });
+
+    // Le avisamos por correo sus datos de ingreso (best-effort).
+    await correoCredenciales({
+      to: email,
+      nombre: nombreCompleto(persona),
+      email,
+      password: datos.password,
     });
 
     revalidatePath("/mi-red");

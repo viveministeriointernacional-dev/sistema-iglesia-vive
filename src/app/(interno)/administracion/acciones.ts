@@ -15,6 +15,7 @@ import {
   ROLES_ADMIN,
   type UsuarioSesion,
 } from "@/lib/auth";
+import { correoCredenciales, correoMentorAsignado } from "@/lib/correo";
 import { nombreCompleto } from "@/lib/dominio";
 import { exportarDatosPersona } from "@/lib/highlevel-salida";
 import { getPrisma } from "@/lib/prisma";
@@ -265,6 +266,14 @@ export async function crearAcceso(
       metadata: { email, role: datos.role },
     });
 
+    // Le avisamos por correo sus datos de ingreso (best-effort).
+    await correoCredenciales({
+      to: email,
+      nombre: nombreCompleto(persona),
+      email,
+      password: datos.password,
+    });
+
     revalidatePath(`/administracion/${personId}`);
     revalidatePath("/administracion");
     return { ok: true };
@@ -373,7 +382,20 @@ export async function asignarMentor(
     const prisma = await getPrisma();
     const aprendiz = await prisma.learnerProfile.findUnique({
       where: { id: learnerId },
-      select: { id: true, personId: true },
+      select: {
+        id: true,
+        personId: true,
+        person: {
+          select: {
+            firstName: true,
+            lastName: true,
+            callPhone: true,
+            whatsappPhone: true,
+            email: true,
+            prayerRequest: true,
+          },
+        },
+      },
     });
     if (!aprendiz) {
       return { ok: false, mensaje: "No se encontró el proceso de la persona." };
@@ -404,7 +426,7 @@ export async function asignarMentor(
         role: { in: [Role.MENTOR, Role.PASTOR] },
         person: { learnerProfile: { phase: Phase.MULTIPLICAR } },
       },
-      select: { id: true },
+      select: { id: true, email: true, fullName: true },
     });
     if (!mentor) {
       return {
@@ -440,6 +462,16 @@ export async function asignarMentor(
         entityId: learnerId,
         metadata: { mentorId: mentorUserId },
       });
+    });
+
+    // Le avisamos al mentor por correo la persona que le fue asignada.
+    await correoMentorAsignado({
+      to: mentor.email,
+      mentorNombre: mentor.fullName,
+      personaNombre: nombreCompleto(aprendiz.person),
+      telefono: aprendiz.person.callPhone ?? aprendiz.person.whatsappPhone,
+      correoPersona: aprendiz.person.email,
+      detalle: aprendiz.person.prayerRequest,
     });
 
     revalidatePath(`/administracion/${aprendiz.personId}`);

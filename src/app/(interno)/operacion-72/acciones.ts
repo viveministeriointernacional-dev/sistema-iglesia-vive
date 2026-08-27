@@ -7,10 +7,13 @@ import {
   MilestoneKind,
   MilestoneStatus,
   Operation72Status,
+  Phase,
   Role,
 } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
 import { auditar, encolarEventoIntegracion } from "@/lib/audit";
+import { correoMentorAsignado } from "@/lib/correo";
+import { nombreCompleto } from "@/lib/dominio";
 import {
   ErrorDePermiso,
   requerirRolEnAccion,
@@ -344,6 +347,7 @@ export async function cerrarVisita(
 /// historial nunca se sobrescribe (ARQUITECTURA_VISUAL.md §11).
 export async function entregarAMentor(
   operacionId: string,
+  mentorElegidoId?: string,
 ): Promise<ResultadoAccion> {
   let usuario: UsuarioSesion;
   try {
@@ -362,35 +366,65 @@ export async function entregarAMentor(
     return { ok: false, mensaje: "Esta persona todavía no está lista para entrega." };
   }
 
-  if (!operacion.proposedMentorId) {
-    return {
-      ok: false,
-      mensaje:
-        "No hay mentor propuesto con cupo. Un líder debe asignarlo antes de entregar.",
-    };
-  }
+  const prisma = await getPrisma();
+  const elegido = mentorElegidoId?.trim();
 
-  // Sin línea conocida, la asignación por perfil la confirma un líder.
-  if (!operacion.lineKnown && !ROLES_CONFIRMAN_ENTREGA.includes(usuario.role)) {
-    return {
-      ok: false,
-      mensaje:
-        "Sin línea conocida la entrega la confirma un líder. Avísale para que la apruebe.",
-    };
+  // Dos caminos: el mentor propuesto por el sistema (según la línea/perfil), o
+  // uno escogido a mano de entre los mentores válidos. Escoger a mano no
+  // requiere línea conocida; la persona la elige quien entrega.
+  let mentorId: string;
+  let conservaLinea: boolean;
+
+  if (elegido) {
+    const mentor = await prisma.appUser.findFirst({
+      where: {
+        id: elegido,
+        active: true,
+        role: { in: [Role.MENTOR, Role.PASTOR] },
+        person: { learnerProfile: { phase: Phase.MULTIPLICAR } },
+      },
+      select: { id: true },
+    });
+    if (!mentor) {
+      return {
+        ok: false,
+        mensaje:
+          "Ese mentor no es válido: debe ser mentor o pastor y estar en fase de Multiplicación.",
+      };
+    }
+    mentorId = mentor.id;
+    conservaLinea = false;
+  } else {
+    if (!operacion.proposedMentorId) {
+      return {
+        ok: false,
+        mensaje:
+          "No hay mentor propuesto con cupo. Escoge un mentor de la lista para entregar.",
+      };
+    }
+    // Sin línea conocida, la asignación por perfil la confirma un líder.
+    if (!operacion.lineKnown && !ROLES_CONFIRMAN_ENTREGA.includes(usuario.role)) {
+      return {
+        ok: false,
+        mensaje:
+          "Sin línea conocida la entrega la confirma un líder. Avísale para que la apruebe.",
+      };
+    }
+    mentorId = operacion.proposedMentorId;
+    conservaLinea = operacion.lineKnown;
   }
 
   const ahora = new Date();
-  const prisma = await getPrisma();
 
   await prisma.$transaction(async (tx) => {
     await tx.mentorRelationship.create({
       data: {
         learnerId: operacion.learnerId,
-        mentorId: operacion.proposedMentorId!,
+        mentorId,
         startedAt: ahora,
         reason: "Entrega desde Operación 72",
         authorizedById: usuario.id,
-        keepsLine: operacion.lineKnown,
+        keepsLine: conservaLinea,
       },
     });
 
@@ -429,7 +463,7 @@ export async function entregarAMentor(
       action: "operacion72.entregada",
       entityType: "operation72",
       entityId: operacion.id,
-      metadata: { mentorId: operacion.proposedMentorId },
+      metadata: { mentorId },
     });
 
     await auditar(tx, {
@@ -437,17 +471,43 @@ export async function entregarAMentor(
       action: "mentor.asignado",
       entityType: "learner_profile",
       entityId: operacion.learnerId,
-      metadata: {
-        mentorId: operacion.proposedMentorId,
-        conservaLinea: operacion.lineKnown,
-      },
+      metadata: { mentorId, conservaLinea },
     });
 
     await encolarEventoIntegracion(tx, "mentor_asignado", {
       learnerId: operacion.learnerId,
-      mentorId: operacion.proposedMentorId,
+      mentorId,
     });
   });
+
+  // Le avisamos al mentor por correo la persona que le fue asignada (best-effort).
+  const [mentor, persona] = await Promise.all([
+    prisma.appUser.findUnique({
+      where: { id: mentorId },
+      select: { email: true, fullName: true },
+    }),
+    prisma.person.findUnique({
+      where: { id: operacion.learner.personId },
+      select: {
+        firstName: true,
+        lastName: true,
+        callPhone: true,
+        whatsappPhone: true,
+        email: true,
+        prayerRequest: true,
+      },
+    }),
+  ]);
+  if (mentor && persona) {
+    await correoMentorAsignado({
+      to: mentor.email,
+      mentorNombre: mentor.fullName,
+      personaNombre: nombreCompleto(persona),
+      telefono: persona.callPhone ?? persona.whatsappPhone,
+      correoPersona: persona.email,
+      detalle: persona.prayerRequest,
+    });
+  }
 
   revalidatePath("/operacion-72");
   return { ok: true };

@@ -11,6 +11,8 @@ import {
   registrarLlamada,
 } from "./acciones";
 
+export type MentorOpcion = { id: string; nombre: string; role: string };
+
 export type TarjetaPersona = {
   operacionId: string;
   learnerId: string;
@@ -22,6 +24,8 @@ export type TarjetaPersona = {
   urgencia: "vencida" | "urgente" | "normal";
   avance: number;
   accion: string;
+  /// Mentor propuesto por el sistema, si lo hay (para dejarlo preseleccionado).
+  mentorPropuestoId: string | null;
   entrega: {
     titulo: string;
     mentor: string;
@@ -47,14 +51,16 @@ const ESTILO_BARRA: Record<TarjetaPersona["urgencia"], string> = {
   normal: "bg-verde-500",
 };
 
-export function TarjetaDePersona({ persona }: { persona: TarjetaPersona }) {
+export function TarjetaDePersona({
+  persona,
+  mentores,
+}: {
+  persona: TarjetaPersona;
+  mentores: MentorOpcion[];
+}) {
   const [error, setError] = useState<string | null>(null);
   const [abierto, setAbierto] = useState(false);
   const [enCurso, iniciar] = useTransition();
-
-  /// Cada paso pide lo suyo. Solo la entrega a mentor se hace de un clic: ahí
-  /// la información ya está toda recogida y lo único que falta es confirmar.
-  const pideFormulario = persona.estado !== Operation72Status.LISTA_PARA_ENTREGA;
 
   function ejecutar(accion: () => Promise<{ ok: boolean; mensaje?: string }>) {
     setError(null);
@@ -101,7 +107,7 @@ export function TarjetaDePersona({ persona }: { persona: TarjetaPersona }) {
         {persona.detalle}
       </p>
 
-      {abierto && pideFormulario ? (
+      {abierto ? (
         <div className="mt-3 rounded-[10px] bg-papel p-3">
           {persona.estado === Operation72Status.INICIADA ? (
             <FormularioDeLlamada
@@ -119,6 +125,16 @@ export function TarjetaDePersona({ persona }: { persona: TarjetaPersona }) {
               }
               alCancelar={() => setAbierto(false)}
             />
+          ) : persona.estado === Operation72Status.LISTA_PARA_ENTREGA ? (
+            <FormularioDeEntrega
+              enCurso={enCurso}
+              mentores={mentores}
+              mentorPropuestoId={persona.mentorPropuestoId}
+              alGuardar={(mentorId) =>
+                ejecutar(() => entregarAMentor(persona.operacionId, mentorId))
+              }
+              alCancelar={() => setAbierto(false)}
+            />
           ) : (
             <FormularioDeCierre
               enCurso={enCurso}
@@ -132,11 +148,7 @@ export function TarjetaDePersona({ persona }: { persona: TarjetaPersona }) {
       ) : (
         <button
           type="button"
-          onClick={() =>
-            pideFormulario
-              ? setAbierto(true)
-              : ejecutar(() => entregarAMentor(persona.operacionId))
-          }
+          onClick={() => setAbierto(true)}
           disabled={enCurso}
           className="mt-3 w-full cursor-pointer rounded-[8px] border-0 bg-azul-900 p-[10px] text-[11.5px] leading-none font-semibold text-white disabled:opacity-60"
         >
@@ -373,6 +385,76 @@ function FormularioDeVisita({
         alCancelar={alCancelar}
         alGuardar={() => alGuardar({ cuando, lugar, virtual, nota })}
       />
+    </div>
+  );
+}
+
+const ETIQUETA_ROL: Record<string, string> = {
+  MENTOR: "Mentor",
+  PASTOR: "Pastor",
+};
+
+function FormularioDeEntrega({
+  enCurso,
+  mentores,
+  mentorPropuestoId,
+  alGuardar,
+  alCancelar,
+}: {
+  enCurso: boolean;
+  mentores: MentorOpcion[];
+  mentorPropuestoId: string | null;
+  /// `undefined` = usar el mentor propuesto por el sistema (conserva la línea).
+  alGuardar: (mentorId: string | undefined) => void;
+  alCancelar: () => void;
+}) {
+  // Arranca con el mentor propuesto si sigue siendo elegible; si no, vacío.
+  const propuestoElegible = mentores.some((m) => m.id === mentorPropuestoId);
+  const [mentorId, setMentorId] = useState(
+    propuestoElegible ? (mentorPropuestoId ?? "") : "",
+  );
+
+  return (
+    <div>
+      <label className="block">
+        <Etiqueta>Entregar a</Etiqueta>
+        <select
+          value={mentorId}
+          onChange={(evento) => setMentorId(evento.target.value)}
+          className="campo font-medium"
+        >
+          <option value="">Elige un mentor…</option>
+          {mentores.map((mentor) => (
+            <option key={mentor.id} value={mentor.id}>
+              {mentor.nombre}
+              {ETIQUETA_ROL[mentor.role] ? ` · ${ETIQUETA_ROL[mentor.role]}` : ""}
+              {mentor.id === mentorPropuestoId ? " (propuesto)" : ""}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {mentores.length === 0 ? (
+        <p className="mt-2 text-[11px] leading-[1.4] font-medium text-[rgba(19,28,36,.5)]">
+          No hay mentores disponibles. Un administrador debe habilitar mentores
+          en fase de Multiplicación.
+        </p>
+      ) : null}
+
+      <Botones
+        enCurso={enCurso}
+        texto="Entregar a mentor"
+        alCancelar={alCancelar}
+        alGuardar={() =>
+          mentorId &&
+          alGuardar(mentorId === mentorPropuestoId ? undefined : mentorId)
+        }
+      />
+      {!mentorId ? (
+        <p className="mt-2 text-[11px] leading-[1.4] font-medium text-[rgba(19,28,36,.5)]">
+          Escoge a quién se entrega para confirmar.
+        </p>
+      ) : null}
     </div>
   );
 }

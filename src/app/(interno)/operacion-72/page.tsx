@@ -13,6 +13,7 @@ import {
   TRANSICIONES,
   urgenciaDe,
 } from "@/lib/op72";
+import { mentoresElegibles } from "@/lib/equipo";
 import { BuscadorPersonas } from "@/components/buscador-personas";
 import { TarjetaDePersona, type TarjetaPersona } from "./tarjeta";
 
@@ -43,6 +44,7 @@ export default async function TableroOperacion72() {
     deadlineAt: true,
     detail: true,
     lineKnown: true,
+    proposedMentorId: true,
     proposedMentorNote: true,
     proposedMentor: {
       select: { fullName: true, team: { select: { name: true } } },
@@ -60,12 +62,13 @@ export default async function TableroOperacion72() {
     },
   } as const;
 
-  const [conteos, ...gruposPorColumna] = await Promise.all([
+  const [conteos, mentores, ...gruposPorColumna] = await Promise.all([
     prisma.operation72.groupBy({
       by: ["status"],
       where: { status: { in: [...ESTADOS_EN_TABLERO] }, ...alcance },
       _count: { _all: true },
     }),
+    mentoresElegibles(prisma),
     ...COLUMNAS_OP72.map((columna) =>
       prisma.operation72.findMany({
         where: { status: columna.estado, ...alcance },
@@ -103,6 +106,7 @@ export default async function TableroOperacion72() {
       urgencia: urgenciaDe(operacion.deadlineAt, ahora),
       avance: porcentajeAvance(operacion.deadlineAt, ahora),
       accion: transicion?.etiqueta ?? "Sin acción",
+      mentorPropuestoId: operacion.proposedMentorId,
       entrega:
         operacion.status === "LISTA_PARA_ENTREGA"
           ? {
@@ -166,7 +170,11 @@ export default async function TableroOperacion72() {
 
                 <div className="flex flex-col gap-[10px]">
                   {personas.map((persona) => (
-                    <TarjetaDePersona key={persona.operacionId} persona={persona} />
+                    <TarjetaDePersona
+                      key={persona.operacionId}
+                      persona={persona}
+                      mentores={mentores}
+                    />
                   ))}
                   {personas.length === 0 ? (
                     <p className="rounded-[13px] border border-dashed border-[rgba(19,28,36,.16)] p-4 text-[11.5px] leading-[1.5] font-medium text-[rgba(19,28,36,.4)]">
