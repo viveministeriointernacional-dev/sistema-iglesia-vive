@@ -2,7 +2,9 @@ import Link from "next/link";
 import { Phase } from "@iglesia/prisma-client";
 import { requerirRol, ROLES_CON_RED } from "@/lib/auth";
 import { cargarRed, DIAS_SIN_CONTACTO, type PersonaDeLaRed } from "@/lib/red";
+import { cargarEquipo } from "@/lib/equipo";
 import { BuscadorPersonas } from "@/components/buscador-personas";
+import { EquipoLideres } from "./equipo-lideres";
 
 export const metadata = { title: "Mi red · Iglesia Vive" };
 export const dynamic = "force-dynamic";
@@ -68,6 +70,7 @@ function FilaDePersona({ persona }: { persona: PersonaDeLaRed }) {
 export default async function PaginaMiRed() {
   const usuario = await requerirRol(ROLES_CON_RED);
   const red = await cargarRed(usuario);
+  const equipo = await cargarEquipo(usuario);
 
   const indicadores = [
     { etiqueta: "PERSONAS", valor: red.acompanadas },
@@ -110,6 +113,8 @@ export default async function PaginaMiRed() {
             </li>
           ))}
         </ul>
+
+        <EquipoLideres miembros={equipo} />
 
         {red.personas.length === 0 ? (
           <p className="mt-6 rounded-[13px] border border-dashed border-[rgba(19,28,36,.16)] p-6 text-[12.5px] leading-[1.6] font-medium text-[rgba(19,28,36,.5)]">

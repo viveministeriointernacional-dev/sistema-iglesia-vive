@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { requerirRol, ROLES_ADMIN } from "@/lib/auth";
 import { cargarPersonaAdmin } from "@/lib/administracion";
 import { nombreCompleto } from "@/lib/dominio";
+import { mentoresElegibles } from "@/lib/equipo";
+import { getPrisma } from "@/lib/prisma";
 import { EditorPersona } from "./editor";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +34,7 @@ export default async function PaginaPersonaAdmin({
   if (!persona) notFound();
 
   const aprendiz = persona.learnerProfile;
+  const mentores = aprendiz ? await mentoresElegibles(await getPrisma()) : [];
 
   return (
     <main className="px-5 py-7 pb-16 sm:px-[26px]">
@@ -87,6 +90,8 @@ export default async function PaginaPersonaAdmin({
           }
           fase={aprendiz?.phase ?? null}
           hitosCompletados={[...persona.hitosCompletados]}
+          mentores={mentores.map((m) => ({ id: m.id, nombre: m.nombre }))}
+          mentorActualId={persona.mentorActualId}
         />
       </div>
     </main>
