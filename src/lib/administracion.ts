@@ -58,33 +58,56 @@ export type FilaAdmin = {
   tieneAcceso: boolean;
 };
 
-/// Busca personas para el panel. Sin consulta trae las más recientes.
-export async function buscarPersonasAdmin(consulta: string): Promise<FilaAdmin[]> {
+/// Tamaños de página que ofrece el listado de personas.
+export const TAMANOS_PAGINA = [10, 20, 50] as const;
+
+export type PaginaAdmin = {
+  filas: FilaAdmin[];
+  total: number;
+  page: number;
+  size: number;
+  paginas: number;
+};
+
+/// Busca personas para el panel, paginado. Sin consulta trae las más recientes.
+export async function buscarPersonasAdmin(
+  consulta: string,
+  page = 1,
+  size = 20,
+): Promise<PaginaAdmin> {
   const texto = consulta.trim();
   const digitos = normalizarTelefono(texto);
+  const tam = (TAMANOS_PAGINA as readonly number[]).includes(size) ? size : 20;
   const prisma = await getPrisma();
 
+  const where = {
+    active: true,
+    ...(texto.length >= 2
+      ? {
+          OR: [
+            { firstName: { contains: texto, mode: "insensitive" as const } },
+            { lastName: { contains: texto, mode: "insensitive" as const } },
+            { email: { contains: texto, mode: "insensitive" as const } },
+            ...(digitos
+              ? [
+                  { callPhone: { contains: digitos } },
+                  { whatsappPhone: { contains: digitos } },
+                ]
+              : []),
+          ],
+        }
+      : {}),
+  };
+
+  const total = await prisma.person.count({ where });
+  const paginas = Math.max(1, Math.ceil(total / tam));
+  const pag = Math.min(Math.max(1, Math.trunc(page) || 1), paginas);
+
   const personas = await prisma.person.findMany({
-    where: {
-      active: true,
-      ...(texto.length >= 2
-        ? {
-            OR: [
-              { firstName: { contains: texto, mode: "insensitive" } },
-              { lastName: { contains: texto, mode: "insensitive" } },
-              { email: { contains: texto, mode: "insensitive" } },
-              ...(digitos
-                ? [
-                    { callPhone: { contains: digitos } },
-                    { whatsappPhone: { contains: digitos } },
-                  ]
-                : []),
-            ],
-          }
-        : {}),
-    },
+    where,
     orderBy: texto.length >= 2 ? { firstName: "asc" } : { createdAt: "desc" },
-    take: 25,
+    skip: (pag - 1) * tam,
+    take: tam,
     select: {
       id: true,
       firstName: true,
@@ -96,17 +119,23 @@ export async function buscarPersonasAdmin(consulta: string): Promise<FilaAdmin[]
     },
   });
 
-  return personas.map((persona) => ({
-    personId: persona.id,
-    learnerId: persona.learnerProfile?.id ?? null,
-    nombre: nombreCompleto(persona),
-    telefono: persona.callPhone,
-    email: persona.email,
-    rol: persona.user?.role ?? null,
-    activo: persona.user?.active ?? true,
-    fase: persona.learnerProfile?.phase ?? null,
-    tieneAcceso: Boolean(persona.user),
-  }));
+  return {
+    total,
+    paginas,
+    page: pag,
+    size: tam,
+    filas: personas.map((persona) => ({
+      personId: persona.id,
+      learnerId: persona.learnerProfile?.id ?? null,
+      nombre: nombreCompleto(persona),
+      telefono: persona.callPhone,
+      email: persona.email,
+      rol: persona.user?.role ?? null,
+      activo: persona.user?.active ?? true,
+      fase: persona.learnerProfile?.phase ?? null,
+      tieneAcceso: Boolean(persona.user),
+    })),
+  };
 }
 
 export type PersonaAdmin = NonNullable<
