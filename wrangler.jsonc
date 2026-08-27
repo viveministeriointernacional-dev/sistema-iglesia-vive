@@ -12,6 +12,16 @@
   },
   "observability": {
     "enabled": true
+  },
+
+  // Techo de CPU por petición. La primera petición contra un Worker recién
+  // arrancado (arranque en frío, típico justo después de un despliegue) paga la
+  // inicialización completa dentro de esa petición y puede pasarse del límite
+  // por defecto, devolviendo el error 1102 una vez hasta que el Worker queda
+  // caliente. Subir el techo le da aire a ese arranque. Solo se cobra la CPU
+  // que de verdad se usa, así que en tráfico normal no cambia el costo.
+  "limits": {
+    "cpu_ms": 300000
   }
 
   // Conexión a Postgres. Hyperdrive mantiene el pool del lado de Cloudflare;
