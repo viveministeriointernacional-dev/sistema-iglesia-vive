@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { MilestoneKind, Phase, Role } from "@iglesia/prisma-client";
 import {
   alternarHito,
+  asignarMentor,
   cambiarFase,
   crearAcceso,
   guardarDatosPersona,
@@ -69,6 +70,8 @@ export function EditorPersona({
   cuenta,
   fase,
   hitosCompletados,
+  mentores,
+  mentorActualId,
 }: {
   personId: string;
   learnerId: string | null;
@@ -76,6 +79,8 @@ export function EditorPersona({
   cuenta: Cuenta | null;
   fase: Phase | null;
   hitosCompletados: MilestoneKind[];
+  mentores: { id: string; nombre: string }[];
+  mentorActualId: string | null;
 }) {
   return (
     <div className="mt-6 flex flex-col gap-4">
@@ -86,6 +91,13 @@ export function EditorPersona({
         <SeccionCrearAcceso personId={personId} />
       )}
       {learnerId ? (
+        <SeccionMentor
+          learnerId={learnerId}
+          mentores={mentores}
+          actual={mentorActualId}
+        />
+      ) : null}
+      {learnerId ? (
         <SeccionProceso
           learnerId={learnerId}
           faseInicial={fase}
@@ -93,6 +105,68 @@ export function EditorPersona({
         />
       ) : null}
     </div>
+  );
+}
+
+function SeccionMentor({
+  learnerId,
+  mentores,
+  actual,
+}: {
+  learnerId: string;
+  mentores: { id: string; nombre: string }[];
+  actual: string | null;
+}) {
+  const [elegido, setElegido] = useState(actual ?? "");
+  const [estado, setEstado] = useState<null | { ok: boolean; texto: string }>(null);
+  const [guardando, iniciar] = useTransition();
+
+  function guardar() {
+    iniciar(async () => {
+      const r = await asignarMentor(learnerId, elegido);
+      setEstado(
+        r.ok
+          ? { ok: true, texto: "Mentor actualizado." }
+          : { ok: false, texto: r.mensaje },
+      );
+    });
+  }
+
+  return (
+    <Tarjeta titulo="MENTOR">
+      {mentores.length === 0 ? (
+        <p className="text-[12px] leading-[1.5] font-medium text-[rgba(19,28,36,.55)]">
+          No hay mentores disponibles todavía. Un mentor debe estar en fase de
+          Multiplicación y tener rol de Mentor o Pastor.
+        </p>
+      ) : (
+        <>
+          <Campo etiqueta="Mentor asignado (Multiplicar · mentor o pastor)">
+            <select
+              className="campo max-w-[360px]"
+              value={elegido}
+              onChange={(e) => setElegido(e.target.value)}
+            >
+              <option value="">Sin mentor</option>
+              {mentores.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.nombre}
+                </option>
+              ))}
+            </select>
+          </Campo>
+          <Aviso estado={estado} />
+          <button
+            type="button"
+            onClick={guardar}
+            disabled={guardando}
+            className="mt-4 cursor-pointer rounded-[9px] bg-azul-900 px-[15px] py-[11px] text-[12.5px] leading-none font-semibold text-white disabled:opacity-60"
+          >
+            {guardando ? "Guardando…" : "Guardar mentor"}
+          </button>
+        </>
+      )}
+    </Tarjeta>
   );
 }
 

@@ -35,6 +35,9 @@ export type AccionAuditada =
   | "administracion.rol_actualizado"
   | "administracion.acceso_creado"
   | "administracion.hito_editado"
+  | "administracion.mentor_asignado"
+  | "equipo.lider_asignado"
+  | "equipo.acceso_creado"
   | "duplicado.detectado";
 
 export async function auditar(

@@ -361,3 +361,88 @@ export async function alternarHito(
     return { ok: true };
   });
 }
+
+/// Asigna manualmente un mentor a una persona. El mentor debe ser válido:
+/// mentor o pastor en fase de Multiplicación. Con id vacío se le quita el
+/// mentor. Cierra la relación anterior y abre la nueva, sin borrar el historial.
+export async function asignarMentor(
+  learnerId: string,
+  mentorUserId: string,
+): Promise<ResultadoAdmin> {
+  return conAdmin(async (usuario) => {
+    const prisma = await getPrisma();
+    const aprendiz = await prisma.learnerProfile.findUnique({
+      where: { id: learnerId },
+      select: { id: true, personId: true },
+    });
+    if (!aprendiz) {
+      return { ok: false, mensaje: "No se encontró el proceso de la persona." };
+    }
+
+    const ahora = new Date();
+
+    if (!mentorUserId) {
+      await prisma.mentorRelationship.updateMany({
+        where: { learnerId, endedAt: null },
+        data: { endedAt: ahora },
+      });
+      await auditar(prisma, {
+        actorId: usuario.id,
+        action: "administracion.mentor_asignado",
+        entityType: "learner_profile",
+        entityId: learnerId,
+        metadata: { mentorId: null },
+      });
+      revalidatePath(`/administracion/${aprendiz.personId}`);
+      return { ok: true };
+    }
+
+    const mentor = await prisma.appUser.findFirst({
+      where: {
+        id: mentorUserId,
+        active: true,
+        role: { in: [Role.MENTOR, Role.PASTOR] },
+        person: { learnerProfile: { phase: Phase.MULTIPLICAR } },
+      },
+      select: { id: true },
+    });
+    if (!mentor) {
+      return {
+        ok: false,
+        mensaje:
+          "Ese mentor no es válido: debe ser mentor o pastor y estar en fase de Multiplicación.",
+      };
+    }
+
+    const yaEs = await prisma.mentorRelationship.findFirst({
+      where: { learnerId, endedAt: null, mentorId: mentorUserId },
+      select: { id: true },
+    });
+    if (yaEs) return { ok: true };
+
+    await prisma.$transaction(async (tx) => {
+      await tx.mentorRelationship.updateMany({
+        where: { learnerId, endedAt: null },
+        data: { endedAt: ahora },
+      });
+      await tx.mentorRelationship.create({
+        data: {
+          learnerId,
+          mentorId: mentorUserId,
+          reason: "Asignación manual desde administración",
+          authorizedById: usuario.id,
+        },
+      });
+      await auditar(tx, {
+        actorId: usuario.id,
+        action: "administracion.mentor_asignado",
+        entityType: "learner_profile",
+        entityId: learnerId,
+        metadata: { mentorId: mentorUserId },
+      });
+    });
+
+    revalidatePath(`/administracion/${aprendiz.personId}`);
+    return { ok: true };
+  });
+}

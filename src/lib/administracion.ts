@@ -167,7 +167,7 @@ export async function cargarPersonaAdmin(personId: string) {
           milestones: { select: { kind: true, status: true } },
           mentorRelationships: {
             where: { endedAt: null },
-            select: { mentor: { select: { fullName: true } } },
+            select: { mentorId: true, mentor: { select: { fullName: true } } },
           },
         },
       },
@@ -200,5 +200,7 @@ export async function cargarPersonaAdmin(personId: string) {
     hitosCompletados,
     mentorActual:
       persona.learnerProfile?.mentorRelationships[0]?.mentor.fullName ?? null,
+    mentorActualId:
+      persona.learnerProfile?.mentorRelationships[0]?.mentorId ?? null,
   };
 }
