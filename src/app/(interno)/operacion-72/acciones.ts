@@ -22,6 +22,7 @@ import {
   type UsuarioSesion,
 } from "@/lib/auth";
 import { proponerMentor } from "@/lib/asignacion";
+import { ROLES_MENTOR } from "@/lib/equipo";
 import { exportarPrimeraLlamada, exportarVisita } from "@/lib/highlevel-salida";
 import {
   contactaDeVerdad,
@@ -379,14 +380,15 @@ export async function entregarAMentor(
       where: {
         id: elegido,
         active: true,
-        role: { in: [Role.MENTOR, Role.PASTOR] },
+        role: { in: ROLES_MENTOR },
       },
       select: { id: true },
     });
     if (!mentor) {
       return {
         ok: false,
-        mensaje: "Ese mentor no es válido: debe tener rol de mentor o pastor y estar activo.",
+        mensaje:
+          "Ese mentor no es válido: debe tener rol de mentor, pastor o administrador y estar activo.",
       };
     }
     mentorId = mentor.id;

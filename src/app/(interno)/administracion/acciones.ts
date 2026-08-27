@@ -16,6 +16,7 @@ import {
   type UsuarioSesion,
 } from "@/lib/auth";
 import { correoCredenciales, correoMentorAsignado } from "@/lib/correo";
+import { ROLES_MENTOR } from "@/lib/equipo";
 import { nombreCompleto } from "@/lib/dominio";
 import { exportarDatosPersona } from "@/lib/highlevel-salida";
 import { getPrisma } from "@/lib/prisma";
@@ -423,14 +424,15 @@ export async function asignarMentor(
       where: {
         id: mentorUserId,
         active: true,
-        role: { in: [Role.MENTOR, Role.PASTOR] },
+        role: { in: ROLES_MENTOR },
       },
       select: { id: true, email: true, fullName: true },
     });
     if (!mentor) {
       return {
         ok: false,
-        mensaje: "Ese mentor no es válido: debe tener rol de mentor o pastor y estar activo.",
+        mensaje:
+          "Ese mentor no es válido: debe tener rol de mentor, pastor o administrador y estar activo.",
       };
     }
 

@@ -10,16 +10,19 @@ export type MentorElegible = {
   role: Role;
 };
 
-/// Quiénes pueden ser mentores: cualquier persona activa con rol de mentor o
-/// pastor. Asignar el rol es lo que la habilita para aparecer aquí; no se exige
-/// una fase, para que también entren pastores y líderes sin proceso propio.
+/// Quiénes pueden ser mentores: cualquier persona activa con rol de mentor,
+/// pastor o administrador. Asignar el rol es lo que la habilita para aparecer
+/// aquí; no se exige una fase, para que también entren pastores, administradores
+/// y líderes sin proceso propio.
+export const ROLES_MENTOR: Role[] = [Role.MENTOR, Role.PASTOR, Role.ADMIN];
+
 export async function mentoresElegibles(
   db: ClientePrisma,
 ): Promise<MentorElegible[]> {
   const usuarios = await db.appUser.findMany({
     where: {
       active: true,
-      role: { in: [Role.MENTOR, Role.PASTOR] },
+      role: { in: ROLES_MENTOR },
     },
     select: { id: true, fullName: true, role: true },
     orderBy: { fullName: "asc" },
