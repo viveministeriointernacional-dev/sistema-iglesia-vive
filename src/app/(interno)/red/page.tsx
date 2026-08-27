@@ -14,7 +14,11 @@ const FASES: Phase[] = [
   Phase.MULTIPLICAR,
 ];
 
-export default async function PaginaRed() {
+export default async function PaginaRed({
+  searchParams,
+}: {
+  searchParams: Promise<{ fase?: string }>;
+}) {
   const usuario = await requerirRol(ROLES_CON_RED);
   const arbol = await cargarArbol(usuario);
 
@@ -24,6 +28,16 @@ export default async function PaginaRed() {
     (suma, nodo) => sumarVista(suma, nodo.indicadores),
     vacio(),
   );
+
+  // Al hacer clic en una fase, el árbol se aplana y muestra solo las personas
+  // de esa fase.
+  const { fase } = await searchParams;
+  const faseFiltro = FASES.includes(fase as Phase) ? (fase as Phase) : null;
+  const personasFase = faseFiltro
+    ? aplanar([...arbol.raices, ...(arbol.sinMentor ?? [])])
+        .filter((nodo) => nodo.fase === faseFiltro)
+        .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"))
+    : [];
 
   return (
     <main className="px-5 py-7 pb-16 sm:px-[26px]">
@@ -43,36 +57,72 @@ export default async function PaginaRed() {
           <BuscadorPersonas />
         </div>
 
-        <Indicadores datos={total} />
+        <Indicadores datos={total} faseActiva={faseFiltro} />
 
-        <section className="mt-[14px] tarjeta p-5">
-          <h2 className="etiqueta-seccion">ESTRUCTURA</h2>
-          <div className="mt-4 flex flex-col gap-2">
-            {arbol.raices.map((raiz) => (
-              <Nodo key={raiz.userId ?? raiz.learnerId} nodo={raiz} nivel={0} />
-            ))}
-          </div>
-        </section>
-
-        {arbol.sinMentor?.length ? (
+        {faseFiltro ? (
           <section className="mt-[14px] tarjeta p-5">
             <div className="flex flex-wrap items-baseline justify-between gap-3">
-              <h2 className="etiqueta-seccion">TODAVÍA SIN MENTOR</h2>
-              <p className="text-[11.5px] leading-none font-semibold text-[rgba(19,28,36,.4)]">
-                {arbol.sinMentor.length}
-              </p>
+              <h2 className="etiqueta-seccion">EN FASE {faseFiltro}</h2>
+              <Link
+                href="/red"
+                className="text-[11.5px] leading-none font-semibold text-azul-700"
+              >
+                ← Ver todo el árbol
+              </Link>
             </div>
             <p className="mt-2 text-[11.5px] leading-[1.5] font-medium text-[rgba(19,28,36,.5)]">
-              No cuelgan de nadie en el árbol. Aparecen aquí para que no se
-              pierdan de vista.
+              {personasFase.length} persona{personasFase.length === 1 ? "" : "s"}{" "}
+              en {faseFiltro}.
             </p>
             <div className="mt-3 flex flex-col gap-2">
-              {arbol.sinMentor.map((nodo) => (
-                <Nodo key={nodo.learnerId} nodo={nodo} nivel={0} />
+              {personasFase.slice(0, 80).map((nodo) => (
+                <Tarjeta key={nodo.userId ?? nodo.learnerId} nodo={nodo} />
               ))}
+              {personasFase.length === 0 ? (
+                <p className="rounded-[10px] border border-dashed border-[rgba(19,28,36,.16)] p-4 text-[11.5px] leading-[1.5] font-medium text-[rgba(19,28,36,.5)]">
+                  Nadie en esta fase por ahora.
+                </p>
+              ) : null}
+              {personasFase.length > 80 ? (
+                <p className="rounded-[10px] border border-dashed border-[rgba(19,28,36,.16)] p-4 text-[11.5px] leading-[1.5] font-medium text-[rgba(19,28,36,.5)]">
+                  Se muestran las primeras 80 de {personasFase.length}. Usa el
+                  buscador de arriba para encontrar a alguien puntual.
+                </p>
+              ) : null}
             </div>
           </section>
-        ) : null}
+        ) : (
+          <>
+            <section className="mt-[14px] tarjeta p-5">
+              <h2 className="etiqueta-seccion">ESTRUCTURA</h2>
+              <div className="mt-4 flex flex-col gap-2">
+                {arbol.raices.map((raiz) => (
+                  <Nodo key={raiz.userId ?? raiz.learnerId} nodo={raiz} nivel={0} />
+                ))}
+              </div>
+            </section>
+
+            {arbol.sinMentor?.length ? (
+              <section className="mt-[14px] tarjeta p-5">
+                <div className="flex flex-wrap items-baseline justify-between gap-3">
+                  <h2 className="etiqueta-seccion">TODAVÍA SIN MENTOR</h2>
+                  <p className="text-[11.5px] leading-none font-semibold text-[rgba(19,28,36,.4)]">
+                    {arbol.sinMentor.length}
+                  </p>
+                </div>
+                <p className="mt-2 text-[11.5px] leading-[1.5] font-medium text-[rgba(19,28,36,.5)]">
+                  No cuelgan de nadie en el árbol. Aparecen aquí para que no se
+                  pierdan de vista.
+                </p>
+                <div className="mt-3 flex flex-col gap-2">
+                  {arbol.sinMentor.map((nodo) => (
+                    <Nodo key={nodo.learnerId} nodo={nodo} nivel={0} />
+                  ))}
+                </div>
+              </section>
+            ) : null}
+          </>
+        )}
       </div>
     </main>
   );
@@ -152,6 +202,16 @@ function Tarjeta({ nodo }: { nodo: NodoDeRed }) {
   );
 }
 
+/// Recorre el árbol y devuelve todos los nodos en una sola lista.
+function aplanar(nodos: NodoDeRed[]): NodoDeRed[] {
+  const salida: NodoDeRed[] = [];
+  for (const nodo of nodos) {
+    salida.push(nodo);
+    if (nodo.hijos.length) salida.push(...aplanar(nodo.hijos));
+  }
+  return salida;
+}
+
 function vacio(): IndicadoresDeRed {
   return {
     personas: 0,
@@ -182,7 +242,13 @@ function sumarVista(a: IndicadoresDeRed, b: IndicadoresDeRed): IndicadoresDeRed 
   return suma;
 }
 
-function Indicadores({ datos }: { datos: IndicadoresDeRed }) {
+function Indicadores({
+  datos,
+  faseActiva,
+}: {
+  datos: IndicadoresDeRed;
+  faseActiva: Phase | null;
+}) {
   const celdas: { etiqueta: string; valor: number; tono?: "ambar" }[] = [
     { etiqueta: "Personas", valor: datos.personas },
     { etiqueta: "Activas", valor: datos.activas },
@@ -224,15 +290,29 @@ function Indicadores({ datos }: { datos: IndicadoresDeRed }) {
       </section>
 
       <section className="tarjeta mt-[10px] p-5">
-        <h2 className="etiqueta-seccion">PERSONAS POR FASE</h2>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="etiqueta-seccion">PERSONAS POR FASE</h2>
+          <span className="text-[10.5px] leading-none font-semibold text-[rgba(19,28,36,.4)]">
+            {faseActiva ? "Filtrando · toca otra o «ver todo»" : "Toca una fase para filtrar"}
+          </span>
+        </div>
         <div className="mt-4 flex flex-wrap gap-[10px]">
           {FASES.map((fase) => {
             const valor = datos.porFase[fase];
             const porcentaje = datos.personas
               ? Math.round((valor / datos.personas) * 100)
               : 0;
+            const activa = faseActiva === fase;
             return (
-              <div key={fase} className="min-w-[150px] flex-1">
+              <Link
+                key={fase}
+                href={activa ? "/red" : `/red?fase=${fase}`}
+                className={`min-w-[150px] flex-1 rounded-[10px] p-3 transition-colors ${
+                  activa
+                    ? "bg-azul-050 ring-1 ring-azul-700"
+                    : "hover:bg-[rgba(19,28,36,.04)]"
+                }`}
+              >
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-[10px] leading-none font-bold tracking-[.1em] text-[rgba(19,28,36,.5)]">
                     {fase}
@@ -247,7 +327,7 @@ function Indicadores({ datos }: { datos: IndicadoresDeRed }) {
                     style={{ width: `${porcentaje}%` }}
                   />
                 </div>
-              </div>
+              </Link>
             );
           })}
         </div>

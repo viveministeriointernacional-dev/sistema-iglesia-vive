@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ETIQUETA_ROL, requerirRol, ROLES_ADMIN } from "@/lib/auth";
-import { buscarPersonasAdmin } from "@/lib/administracion";
+import { buscarPersonasAdmin, TAMANOS_PAGINA } from "@/lib/administracion";
 
 export const metadata = { title: "Administración · Iglesia Vive" };
 export const dynamic = "force-dynamic";
@@ -14,15 +14,29 @@ function telefonoParcial(telefono: string | null) {
   return `${telefono.slice(0, telefono.length - 4).trimEnd()} ••• ${digitos.slice(-4)}`;
 }
 
+function urlPagina(consulta: string, size: number, page: number) {
+  const params = new URLSearchParams();
+  if (consulta) params.set("q", consulta);
+  params.set("size", String(size));
+  if (page > 1) params.set("page", String(page));
+  const cadena = params.toString();
+  return cadena ? `/administracion?${cadena}` : "/administracion";
+}
+
 export default async function PaginaAdministracion({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; page?: string; size?: string }>;
 }) {
   await requerirRol(ROLES_ADMIN);
-  const { q } = await searchParams;
+  const { q, page, size } = await searchParams;
   const consulta = (q ?? "").trim();
-  const personas = await buscarPersonasAdmin(consulta);
+  const tam = Number(size) || 20;
+  const pag = Number(page) || 1;
+  const resultado = await buscarPersonasAdmin(consulta, pag, tam);
+  const personas = resultado.filas;
+  const desde = resultado.total === 0 ? 0 : (resultado.page - 1) * resultado.size + 1;
+  const hasta = Math.min(resultado.page * resultado.size, resultado.total);
 
   return (
     <main className="px-5 py-7 pb-16 sm:px-[26px]">
@@ -38,6 +52,7 @@ export default async function PaginaAdministracion({
         </header>
 
         <form className="mt-5 max-w-[460px]" action="/administracion">
+          <input type="hidden" name="size" value={resultado.size} />
           <div className="flex items-center gap-2 rounded-[10px] border border-[rgba(19,28,36,.16)] bg-white px-[14px] py-[10px]">
             <input
               name="q"
@@ -55,11 +70,34 @@ export default async function PaginaAdministracion({
           </div>
         </form>
 
-        <p className="mt-4 text-[11.5px] leading-none font-semibold text-[rgba(19,28,36,.4)]">
-          {consulta
-            ? `${personas.length} resultado${personas.length === 1 ? "" : "s"}`
-            : "Personas registradas recientemente"}
-        </p>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-[11.5px] leading-none font-semibold text-[rgba(19,28,36,.45)]">
+            {resultado.total === 0
+              ? "Sin resultados"
+              : `${desde}–${hasta} de ${resultado.total}`}
+          </p>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] leading-none font-semibold text-[rgba(19,28,36,.4)]">
+              Por página
+            </span>
+            {TAMANOS_PAGINA.map((n) => {
+              const activo = n === resultado.size;
+              return (
+                <Link
+                  key={n}
+                  href={urlPagina(consulta, n, 1)}
+                  className={`rounded-[7px] px-[10px] py-[6px] text-[11.5px] leading-none font-semibold ${
+                    activo
+                      ? "bg-azul-900 text-white"
+                      : "border border-[rgba(19,28,36,.16)] text-tinta"
+                  }`}
+                >
+                  {n}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
 
         <div className="mt-3 flex flex-col gap-2">
           {personas.map((persona) => (
@@ -109,6 +147,38 @@ export default async function PaginaAdministracion({
             </p>
           ) : null}
         </div>
+
+        {resultado.paginas > 1 ? (
+          <nav className="mt-5 flex items-center justify-center gap-3">
+            {resultado.page > 1 ? (
+              <Link
+                href={urlPagina(consulta, resultado.size, resultado.page - 1)}
+                className="rounded-[8px] border border-[rgba(19,28,36,.16)] px-[14px] py-[9px] text-[12px] leading-none font-semibold text-tinta"
+              >
+                ← Anterior
+              </Link>
+            ) : (
+              <span className="rounded-[8px] border border-[rgba(19,28,36,.08)] px-[14px] py-[9px] text-[12px] leading-none font-semibold text-[rgba(19,28,36,.3)]">
+                ← Anterior
+              </span>
+            )}
+            <span className="text-[12px] leading-none font-semibold text-[rgba(19,28,36,.5)]">
+              Página {resultado.page} de {resultado.paginas}
+            </span>
+            {resultado.page < resultado.paginas ? (
+              <Link
+                href={urlPagina(consulta, resultado.size, resultado.page + 1)}
+                className="rounded-[8px] border border-[rgba(19,28,36,.16)] px-[14px] py-[9px] text-[12px] leading-none font-semibold text-tinta"
+              >
+                Siguiente →
+              </Link>
+            ) : (
+              <span className="rounded-[8px] border border-[rgba(19,28,36,.08)] px-[14px] py-[9px] text-[12px] leading-none font-semibold text-[rgba(19,28,36,.3)]">
+                Siguiente →
+              </span>
+            )}
+          </nav>
+        ) : null}
       </div>
     </main>
   );
