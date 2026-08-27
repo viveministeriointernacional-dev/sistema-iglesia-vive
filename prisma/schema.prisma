@@ -84,6 +84,8 @@ model AppUser {
   temasRegistrados      FaithHouseProgress[]
   gruposAlphaLiderados  AlphaProgram[]       @relation("LiderDeAlpha")
   gruposAlphaAbiertos   AlphaProgram[]       @relation("AbrioAlpha")
+  casasDeFeLideradas    FaithHouseGroup[]    @relation("LiderCasaFe")
+  casasDeFeAbiertas     FaithHouseGroup[]    @relation("AbrioCasaFe")
   validacionesAlpha     AlphaEnrollment[]    @relation("ValidacionAlpha")
   asistenciasAlpha      AlphaAttendance[]
   registrosCreados      LearnerProfile[]     @relation("RegistradaPor")
@@ -110,6 +112,7 @@ model Team {
   members     AppUser[]
   learners    LearnerProfile[]
   gruposAlpha AlphaProgram[]
+  casasDeFe   FaithHouseGroup[]
   escuelas    TrainingProgram[]
   eventos     Event[]
 
@@ -261,6 +264,7 @@ model LearnerProfile {
   milestones          Milestone[]
   privateNotes        PrivateNote[]
   faithHouseProgress  FaithHouseProgress[]
+  faithHouseGroups    FaithHouseGroupMember[]
   alphaEnrollments    AlphaEnrollment[]
   eventRegistrations  EventRegistration[]
   trainingEnrollments TrainingEnrollment[]
@@ -561,6 +565,44 @@ model FaithHouseProgress {
 
   @@unique([learnerId, topicId])
   @@map("faith_house_progress")
+}
+
+/// Casa de Fe como grupo: alguien la lleva (permiso `canLeadFaithHouse`) y tiene
+/// personas inscritas. Igual que en Alpha, abrir y cerrar es de dirección
+/// (pastor o mentor) y se elige el líder al abrirla. El avance de los 12 temas
+/// sigue viviendo en cada expediente (FaithHouseProgress); este modelo solo
+/// agrupa quién la lleva y con quiénes.
+model FaithHouseGroup {
+  id          String    @id @default(uuid())
+  name        String
+  startDate   DateTime  @map("start_date") @db.Date
+  leaderId    String    @map("leader_id")
+  createdById String?   @map("created_by_id")
+  teamId      String?   @map("team_id")
+  closedAt    DateTime? @map("closed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  leader    AppUser                 @relation("LiderCasaFe", fields: [leaderId], references: [id])
+  createdBy AppUser?                @relation("AbrioCasaFe", fields: [createdById], references: [id])
+  team      Team?                   @relation(fields: [teamId], references: [id])
+  members   FaithHouseGroupMember[]
+
+  @@index([leaderId, closedAt])
+  @@map("faith_house_group")
+}
+
+model FaithHouseGroupMember {
+  id        String   @id @default(uuid())
+  groupId   String   @map("group_id")
+  learnerId String   @map("learner_id")
+  joinedAt  DateTime @default(now()) @map("joined_at")
+
+  group   FaithHouseGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  learner LearnerProfile  @relation(fields: [learnerId], references: [id])
+
+  @@unique([groupId, learnerId])
+  @@map("faith_house_group_member")
 }
 
 // ---------------------------------------------- Auditoría e integraciones

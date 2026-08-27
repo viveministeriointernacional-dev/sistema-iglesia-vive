@@ -10,6 +10,7 @@ import {
   ROLES_CONSOLIDACION,
 } from "@/lib/auth";
 import { puedeVerAlpha } from "@/lib/alpha";
+import { puedeVerCasaDeFe } from "@/lib/casa-de-fe";
 import { ROLES_ENTRENAR } from "@/lib/entrenar";
 import { ROLES_OPERAN_EVENTOS } from "@/lib/eventos";
 import { PestanasSuperiores } from "@/components/pestanas-superiores";
@@ -42,8 +43,8 @@ export default async function LayoutInterno({
           { href: "/registro-interno", etiqueta: "Registrar persona" },
         ]
       : []),
-    ...(puedeVerAlpha(usuario)
-      ? [{ href: "/alpha", etiqueta: "Alpha" }]
+    ...(puedeVerAlpha(usuario) || puedeVerCasaDeFe(usuario)
+      ? [{ href: "/alpha", etiqueta: "Alpha y Casa de Fe" }]
       : []),
     ...(ROLES_ENTRENAR.includes(usuario.role)
       ? [{ href: "/escuela", etiqueta: "Escuela" }]
