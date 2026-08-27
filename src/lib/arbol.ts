@@ -98,6 +98,8 @@ export async function cargarArbol(usuario: UsuarioSesion, ahora = new Date()) {
       select: { id: true, fullName: true, role: true, personId: true },
     }),
     prisma.learnerProfile.findMany({
+      // Los dados de baja (Retirado) no salen en el árbol de la red.
+      where: { status: { not: LearnerStatus.RETIRADO } },
       select: {
         id: true,
         personId: true,

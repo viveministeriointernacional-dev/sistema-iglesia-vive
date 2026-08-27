@@ -1,4 +1,5 @@
 import {
+  LearnerStatus,
   MilestoneKind,
   MilestoneStatus,
   Phase,
@@ -138,6 +139,55 @@ export async function buscarPersonasAdmin(
   };
 }
 
+export type FilaBaja = {
+  learnerId: string;
+  personId: string;
+  nombre: string;
+  telefono: string | null;
+  motivo: string | null;
+  fecha: Date | null;
+  por: string | null;
+};
+
+/// El listado aparte de personas dadas de baja (Retiradas), con el motivo, la
+/// fecha y quién la dio de baja. Es el «listado afuera» que pidió la iglesia.
+export async function listarDadosDeBaja(): Promise<FilaBaja[]> {
+  const prisma = await getPrisma();
+  const aprendices = await prisma.learnerProfile.findMany({
+    where: { status: LearnerStatus.RETIRADO },
+    orderBy: { updatedAt: "desc" },
+    select: {
+      id: true,
+      person: {
+        select: { id: true, firstName: true, lastName: true, callPhone: true },
+      },
+      statusChanges: {
+        where: { toStatus: LearnerStatus.RETIRADO },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: {
+          reason: true,
+          createdAt: true,
+          decidedBy: { select: { fullName: true } },
+        },
+      },
+    },
+  });
+
+  return aprendices.map((aprendiz) => {
+    const baja = aprendiz.statusChanges[0] ?? null;
+    return {
+      learnerId: aprendiz.id,
+      personId: aprendiz.person.id,
+      nombre: nombreCompleto(aprendiz.person),
+      telefono: aprendiz.person.callPhone,
+      motivo: baja?.reason ?? null,
+      fecha: baja?.createdAt ?? null,
+      por: baja?.decidedBy.fullName ?? null,
+    };
+  });
+}
+
 export type PersonaAdmin = NonNullable<
   Awaited<ReturnType<typeof cargarPersonaAdmin>>
 >;
@@ -169,6 +219,15 @@ export async function cargarPersonaAdmin(personId: string) {
             where: { endedAt: null },
             select: { mentorId: true, mentor: { select: { fullName: true } } },
           },
+          statusChanges: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: {
+              reason: true,
+              createdAt: true,
+              decidedBy: { select: { fullName: true } },
+            },
+          },
         },
       },
       user: {
@@ -194,10 +253,20 @@ export async function cargarPersonaAdmin(personId: string) {
       .map((hito) => hito.kind),
   );
 
+  const ultimoCambioEstado = persona.learnerProfile?.statusChanges[0] ?? null;
+
   return {
     ...persona,
     nombre: nombreCompleto(persona),
     hitosCompletados,
+    estado: persona.learnerProfile?.status ?? null,
+    baja: ultimoCambioEstado
+      ? {
+          motivo: ultimoCambioEstado.reason,
+          fecha: ultimoCambioEstado.createdAt,
+          por: ultimoCambioEstado.decidedBy.fullName,
+        }
+      : null,
     mentorActual:
       persona.learnerProfile?.mentorRelationships[0]?.mentor.fullName ?? null,
     mentorActualId:

@@ -40,6 +40,8 @@ export type AccionAuditada =
   | "administracion.acceso_creado"
   | "administracion.hito_editado"
   | "administracion.mentor_asignado"
+  | "administracion.dado_de_baja"
+  | "administracion.reactivado"
   | "equipo.lider_asignado"
   | "equipo.acceso_creado"
   | "duplicado.detectado";

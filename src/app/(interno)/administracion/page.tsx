@@ -41,14 +41,22 @@ export default async function PaginaAdministracion({
   return (
     <main className="px-5 py-7 pb-16 sm:px-[26px]">
       <div className="mx-auto max-w-[1240px]">
-        <header>
-          <h1 className="font-serif text-[30px] leading-[1.1] font-normal text-tinta">
-            Administración de personas
-          </h1>
-          <p className="mt-2 text-[13px] leading-none font-medium text-[rgba(19,28,36,.55)]">
-            Roles, permisos, proceso y datos de cada persona · se sincroniza con
-            HighLevel
-          </p>
+        <header className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="font-serif text-[30px] leading-[1.1] font-normal text-tinta">
+              Administración de personas
+            </h1>
+            <p className="mt-2 text-[13px] leading-none font-medium text-[rgba(19,28,36,.55)]">
+              Roles, permisos, proceso y datos de cada persona · se sincroniza
+              con HighLevel
+            </p>
+          </div>
+          <Link
+            href="/administracion/dados-de-baja"
+            className="shrink-0 rounded-[9px] border border-[rgba(19,28,36,.16)] px-[14px] py-[10px] text-[12px] leading-none font-semibold text-tinta hover:border-azul-700 hover:text-azul-700"
+          >
+            Dados de baja
+          </Link>
         </header>
 
         <form className="mt-5 max-w-[460px]" action="/administracion">

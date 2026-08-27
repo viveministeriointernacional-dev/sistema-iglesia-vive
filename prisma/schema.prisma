@@ -95,6 +95,7 @@ model AppUser {
   serviciosResponsable  ServiceAssignment[]  @relation("ResponsableDeServicio")
   serviciosRegistrados  ServiceAssignment[]  @relation("RegistroServicio")
   cambiosDeFase         PhaseChange[]        @relation("DecidioCambioDeFase")
+  cambiosDeEstado       LearnerStatusChange[] @relation("DecidioCambioDeEstado")
   eventosCreados        Event[]              @relation("EventoCreadoPor")
   inscripcionesEvento   EventRegistration[]  @relation("InscribioAEvento")
   asistenciasEvento     EventRegistration[]  @relation("MarcoAsistenciaEvento")
@@ -270,6 +271,7 @@ model LearnerProfile {
   trainingEnrollments TrainingEnrollment[]
   serviceAssignments  ServiceAssignment[]
   phaseChanges        PhaseChange[]
+  statusChanges       LearnerStatusChange[]
 
   @@index([phase, status])
   @@map("learner_profile")
@@ -845,6 +847,27 @@ model PhaseChange {
 
   @@index([learnerId, decidedAt])
   @@map("phase_change")
+}
+
+/// Historia de bajas y reactivaciones. Dar de baja a alguien que no quiere
+/// seguir ningún proceso deja registro del motivo, la fecha y quién lo hizo; y
+/// si vuelve, la reactivación queda igualmente registrada. No se borra a nadie:
+/// el expediente se conserva, solo cambia de estado.
+model LearnerStatusChange {
+  id          String        @id @default(uuid())
+  learnerId   String        @map("learner_id")
+  fromStatus  LearnerStatus @map("from_status")
+  toStatus    LearnerStatus @map("to_status")
+  /// Motivo de la baja (o nota de la reactivación).
+  reason      String?
+  decidedById String        @map("decided_by_id")
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  learner   LearnerProfile @relation(fields: [learnerId], references: [id])
+  decidedBy AppUser        @relation("DecidioCambioDeEstado", fields: [decidedById], references: [id])
+
+  @@index([learnerId, createdAt])
+  @@map("learner_status_change")
 }
 
 enum IntegrationStatus {

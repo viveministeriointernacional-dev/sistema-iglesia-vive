@@ -1,4 +1,4 @@
-import { Role } from "@iglesia/prisma-client";
+import { LearnerStatus, Role } from "@iglesia/prisma-client";
 import type { UsuarioSesion } from "@/lib/auth";
 import { nombreCompleto } from "@/lib/dominio";
 import type { ClientePrisma } from "@/lib/prisma";
@@ -46,7 +46,11 @@ export async function cargarEquipo(
 ): Promise<MiembroEquipo[]> {
   const db = await getPrisma();
   const relaciones = await db.mentorRelationship.findMany({
-    where: { mentorId: usuario.id, endedAt: null },
+    where: {
+      mentorId: usuario.id,
+      endedAt: null,
+      learner: { status: { not: LearnerStatus.RETIRADO } },
+    },
     orderBy: { startedAt: "desc" },
     select: {
       learner: {

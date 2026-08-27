@@ -8,8 +8,10 @@ import {
   asignarMentor,
   cambiarFase,
   crearAcceso,
+  darDeBaja,
   guardarDatosPersona,
   guardarRolYPermisos,
+  reactivar,
 } from "../acciones";
 
 const ROLES: { v: Role; l: string }[] = [
@@ -63,6 +65,8 @@ type Cuenta = {
   coordinatesConsolidation: boolean;
 };
 
+export type BajaInfo = { motivo: string | null; fecha: string; por: string };
+
 export function EditorPersona({
   personId,
   learnerId,
@@ -72,6 +76,8 @@ export function EditorPersona({
   hitosCompletados,
   mentores,
   mentorActualId,
+  estado,
+  baja,
 }: {
   personId: string;
   learnerId: string | null;
@@ -81,6 +87,8 @@ export function EditorPersona({
   hitosCompletados: MilestoneKind[];
   mentores: { id: string; nombre: string }[];
   mentorActualId: string | null;
+  estado: string | null;
+  baja: BajaInfo | null;
 }) {
   return (
     <div className="mt-6 flex flex-col gap-4">
@@ -104,7 +112,111 @@ export function EditorPersona({
           completados={hitosCompletados}
         />
       ) : null}
+      {learnerId ? (
+        <SeccionBaja
+          learnerId={learnerId}
+          retirada={estado === "RETIRADO"}
+          baja={baja}
+        />
+      ) : null}
     </div>
+  );
+}
+
+function SeccionBaja({
+  learnerId,
+  retirada,
+  baja,
+}: {
+  learnerId: string;
+  retirada: boolean;
+  baja: BajaInfo | null;
+}) {
+  const router = useRouter();
+  const [motivo, setMotivo] = useState("");
+  const [estado, setEstado] = useState<null | { ok: boolean; texto: string }>(null);
+  const [ocupado, iniciar] = useTransition();
+
+  function ejecutarBaja() {
+    if (!confirm("¿Dar de baja a esta persona? Saldrá de las listas y procesos, y se desactivará su acceso si tiene.")) {
+      return;
+    }
+    iniciar(async () => {
+      const r = await darDeBaja(learnerId, motivo);
+      if (r.ok) {
+        setMotivo("");
+        router.refresh();
+      } else {
+        setEstado({ ok: false, texto: r.mensaje });
+      }
+    });
+  }
+
+  function ejecutarReactivar() {
+    iniciar(async () => {
+      const r = await reactivar(learnerId);
+      if (r.ok) router.refresh();
+      else setEstado({ ok: false, texto: r.mensaje });
+    });
+  }
+
+  if (retirada) {
+    return (
+      <Tarjeta titulo="DADA DE BAJA">
+        <p className="text-[12.5px] leading-[1.5] font-medium text-[rgba(19,28,36,.7)]">
+          Esta persona está dada de baja y no aparece en las listas activas.
+        </p>
+        {baja ? (
+          <div className="mt-3 rounded-[10px] bg-papel p-3 text-[12px] leading-[1.5] text-[rgba(19,28,36,.7)]">
+            {baja.motivo ? (
+              <p>
+                <strong>Motivo:</strong> {baja.motivo}
+              </p>
+            ) : null}
+            <p className="mt-1 text-[11.5px] text-[rgba(19,28,36,.5)]">
+              {baja.fecha} · por {baja.por}
+            </p>
+          </div>
+        ) : null}
+        <Aviso estado={estado} />
+        <button
+          type="button"
+          onClick={ejecutarReactivar}
+          disabled={ocupado}
+          className="mt-4 cursor-pointer rounded-[9px] bg-azul-900 px-[15px] py-[11px] text-[12.5px] leading-none font-semibold text-white disabled:opacity-60"
+        >
+          {ocupado ? "Reactivando…" : "Reactivar"}
+        </button>
+      </Tarjeta>
+    );
+  }
+
+  return (
+    <Tarjeta titulo="DAR DE BAJA">
+      <p className="mb-3 text-[12px] leading-[1.5] font-medium text-[rgba(19,28,36,.55)]">
+        Para alguien que ya no quiere seguir ningún proceso en la iglesia. Queda
+        registrado con su motivo en el listado de dados de baja, y se puede
+        reactivar si regresa. Se desactiva su acceso al sistema si tiene.
+      </p>
+      <Campo etiqueta="Motivo de la baja">
+        <textarea
+          className="campo"
+          rows={2}
+          value={motivo}
+          onChange={(e) => setMotivo(e.target.value)}
+          placeholder="Por qué se le da de baja"
+        />
+      </Campo>
+      <Aviso estado={estado} />
+      <button
+        type="button"
+        onClick={ejecutarBaja}
+        disabled={ocupado || motivo.trim().length < 3}
+        className="mt-4 cursor-pointer rounded-[9px] bg-[rgb(180,60,47)] px-[15px] py-[11px] text-[12.5px] leading-none font-semibold text-white disabled:opacity-60"
+      >
+        {ocupado ? "Dando de baja…" : "Dar de baja"}
+      </button>
+    </Tarjeta>
   );
 }
 

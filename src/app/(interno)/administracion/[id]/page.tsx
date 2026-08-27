@@ -92,6 +92,20 @@ export default async function PaginaPersonaAdmin({
           hitosCompletados={[...persona.hitosCompletados]}
           mentores={mentores.map((m) => ({ id: m.id, nombre: m.nombre }))}
           mentorActualId={persona.mentorActualId}
+          estado={persona.estado}
+          baja={
+            persona.baja
+              ? {
+                  motivo: persona.baja.motivo,
+                  fecha: persona.baja.fecha.toLocaleDateString("es-CO", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  }),
+                  por: persona.baja.por,
+                }
+              : null
+          }
         />
       </div>
     </main>

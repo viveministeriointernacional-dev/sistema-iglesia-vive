@@ -1,5 +1,6 @@
 import {
   FaithHouseStatus,
+  LearnerStatus,
   Operation72Status,
   Phase,
   Role,
@@ -50,9 +51,14 @@ export async function cargarRed(
   const esVistaCompleta = usuario.role === Role.PASTOR || usuario.role === Role.ADMIN;
 
   const aprendices = await prisma.learnerProfile.findMany({
-    where: esVistaCompleta
-      ? {}
-      : { mentorRelationships: { some: { mentorId: usuario.id, endedAt: null } } },
+    // Quien está dado de baja (Retirado) no aparece en la red: vive en el
+    // listado aparte de administración.
+    where: {
+      status: { not: LearnerStatus.RETIRADO },
+      ...(esVistaCompleta
+        ? {}
+        : { mentorRelationships: { some: { mentorId: usuario.id, endedAt: null } } }),
+    },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,

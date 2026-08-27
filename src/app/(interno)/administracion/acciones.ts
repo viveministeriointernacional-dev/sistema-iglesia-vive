@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import {
+  LearnerStatus,
   MilestoneKind,
   MilestoneStatus,
+  Operation72Status,
   Phase,
   Role,
 } from "@iglesia/prisma-client";
@@ -475,6 +477,159 @@ export async function asignarMentor(
     });
 
     revalidatePath(`/administracion/${aprendiz.personId}`);
+    return { ok: true };
+  });
+}
+
+/// Da de baja a una persona que no quiere seguir ningún proceso. La marca como
+/// Retirada con un motivo, cierra su relación de mentoría y su Operación 72
+/// abiertas (para que salga de las listas y tableros), y desactiva su acceso al
+/// sistema si tenía. No se borra nada: el expediente y el historial quedan.
+export async function darDeBaja(
+  learnerId: string,
+  motivo: string,
+): Promise<ResultadoAdmin> {
+  return conAdmin(async (usuario) => {
+    const razon = motivo.trim();
+    if (razon.length < 3) {
+      return { ok: false, mensaje: "Escribe el motivo por el que se da de baja." };
+    }
+
+    const prisma = await getPrisma();
+    const aprendiz = await prisma.learnerProfile.findUnique({
+      where: { id: learnerId },
+      select: {
+        id: true,
+        status: true,
+        personId: true,
+        person: { select: { user: { select: { id: true, active: true } } } },
+      },
+    });
+    if (!aprendiz) {
+      return { ok: false, mensaje: "No se encontró el proceso de la persona." };
+    }
+    if (aprendiz.status === LearnerStatus.RETIRADO) {
+      return { ok: false, mensaje: "Esta persona ya está dada de baja." };
+    }
+
+    const ahora = new Date();
+    const cuenta = aprendiz.person.user;
+    // No se desactiva a sí mismo: evita quedar fuera por accidente.
+    const desactivarAcceso = Boolean(cuenta && cuenta.active && cuenta.id !== usuario.id);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.learnerProfile.update({
+        where: { id: learnerId },
+        data: { status: LearnerStatus.RETIRADO },
+      });
+
+      await tx.learnerStatusChange.create({
+        data: {
+          learnerId,
+          fromStatus: aprendiz.status,
+          toStatus: LearnerStatus.RETIRADO,
+          reason: razon,
+          decidedById: usuario.id,
+        },
+      });
+
+      // Sale de las listas activas: se cierra la mentoría y la Operación 72.
+      await tx.mentorRelationship.updateMany({
+        where: { learnerId, endedAt: null },
+        data: { endedAt: ahora, reason: "Dado de baja" },
+      });
+      await tx.operation72.updateMany({
+        where: {
+          learnerId,
+          status: {
+            notIn: [Operation72Status.ENTREGADA, Operation72Status.CERRADA],
+          },
+        },
+        data: { status: Operation72Status.CERRADA, detail: "Dado de baja" },
+      });
+
+      if (desactivarAcceso && cuenta) {
+        await tx.appUser.update({
+          where: { id: cuenta.id },
+          data: { active: false },
+        });
+      }
+
+      await auditar(tx, {
+        actorId: usuario.id,
+        action: "administracion.dado_de_baja",
+        entityType: "learner_profile",
+        entityId: learnerId,
+        metadata: { motivo: razon, accesoDesactivado: desactivarAcceso },
+      });
+    });
+
+    revalidatePath(`/administracion/${aprendiz.personId}`);
+    revalidatePath("/administracion");
+    revalidatePath("/administracion/dados-de-baja");
+    return { ok: true };
+  });
+}
+
+/// Reactiva a una persona que había sido dada de baja: vuelve a estado Activo,
+/// deja registro de la reactivación y le devuelve el acceso al sistema si lo
+/// tenía. No restaura sola la mentoría ni la Operación 72: eso se reasigna a
+/// mano si la persona retoma su proceso.
+export async function reactivar(learnerId: string): Promise<ResultadoAdmin> {
+  return conAdmin(async (usuario) => {
+    const prisma = await getPrisma();
+    const aprendiz = await prisma.learnerProfile.findUnique({
+      where: { id: learnerId },
+      select: {
+        id: true,
+        status: true,
+        personId: true,
+        person: { select: { user: { select: { id: true, active: true } } } },
+      },
+    });
+    if (!aprendiz) {
+      return { ok: false, mensaje: "No se encontró el proceso de la persona." };
+    }
+    if (aprendiz.status !== LearnerStatus.RETIRADO) {
+      return { ok: false, mensaje: "Esta persona no está dada de baja." };
+    }
+
+    const cuenta = aprendiz.person.user;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.learnerProfile.update({
+        where: { id: learnerId },
+        data: { status: LearnerStatus.ACTIVO },
+      });
+
+      await tx.learnerStatusChange.create({
+        data: {
+          learnerId,
+          fromStatus: LearnerStatus.RETIRADO,
+          toStatus: LearnerStatus.ACTIVO,
+          reason: "Reactivada",
+          decidedById: usuario.id,
+        },
+      });
+
+      if (cuenta && !cuenta.active) {
+        await tx.appUser.update({
+          where: { id: cuenta.id },
+          data: { active: true },
+        });
+      }
+
+      await auditar(tx, {
+        actorId: usuario.id,
+        action: "administracion.reactivado",
+        entityType: "learner_profile",
+        entityId: learnerId,
+      });
+    });
+
+    revalidatePath(`/administracion/${aprendiz.personId}`);
+    revalidatePath("/administracion");
+    revalidatePath("/administracion/dados-de-baja");
     return { ok: true };
   });
 }
