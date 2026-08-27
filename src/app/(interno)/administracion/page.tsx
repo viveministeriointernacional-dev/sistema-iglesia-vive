@@ -1,10 +1,18 @@
 import Link from "next/link";
 import { ETIQUETA_ROL, requerirRol, ROLES_ADMIN } from "@/lib/auth";
 import { buscarPersonasAdmin } from "@/lib/administracion";
-import { telefonoParcial } from "@/lib/expediente";
 
 export const metadata = { title: "Administración · Iglesia Vive" };
 export const dynamic = "force-dynamic";
+
+/// Enmascara el teléfono en la lista (se define aquí para no arrastrar el
+/// módulo del expediente, más pesado, al arrancar esta ruta).
+function telefonoParcial(telefono: string | null) {
+  if (!telefono) return null;
+  const digitos = telefono.replace(/\D/g, "");
+  if (digitos.length < 7) return telefono;
+  return `${telefono.slice(0, telefono.length - 4).trimEnd()} ••• ${digitos.slice(-4)}`;
+}
 
 export default async function PaginaAdministracion({
   searchParams,
