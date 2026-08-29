@@ -41,8 +41,19 @@ async function cadenaDeConexion(): Promise<string> {
 async function crearCliente(): Promise<PrismaClient> {
   // El socket se cierra solo al terminar la petición: en workerd los objetos de
   // E/S mueren con el contexto que los creó.
+  // `max: 1` es clave en Cloudflare: sin esto, `pg` abre un pool de hasta 10
+  // conexiones POR PETICIÓN. Con cientos de peticiones se agota el pooler de
+  // Supabase (error «max clients reached», que en el navegador se ve como 1102).
+  // Una conexión por petición es suficiente —Prisma serializa las consultas de
+  // esa petición— y mantiene el uso de conexiones bajo control. Los tiempos de
+  // espera cortos liberan la conexión pronto en vez de dejarla colgada.
   return new PrismaClient({
-    adapter: new PrismaPg({ connectionString: await cadenaDeConexion() }),
+    adapter: new PrismaPg({
+      connectionString: await cadenaDeConexion(),
+      max: 1,
+      idleTimeoutMillis: 5_000,
+      connectionTimeoutMillis: 10_000,
+    }),
   });
 }
 
