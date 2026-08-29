@@ -139,6 +139,12 @@ export default async function PaginaAdministracion({
                 </span>
               ) : null}
 
+              {persona.retirado ? (
+                <span className="rounded-[20px] bg-rojo-fondo px-2 py-1 text-[10px] leading-none font-bold text-rojo">
+                  Dado de baja
+                </span>
+              ) : null}
+
               {!persona.activo ? (
                 <span className="rounded-[20px] bg-ambar-fondo px-2 py-1 text-[10px] leading-none font-bold text-ambar-texto">
                   Inactivo

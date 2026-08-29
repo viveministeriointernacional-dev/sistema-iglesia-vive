@@ -57,6 +57,8 @@ export type FilaAdmin = {
   activo: boolean;
   fase: Phase | null;
   tieneAcceso: boolean;
+  /// Dada de baja (Retirada). Solo aparece en el listado al buscarla.
+  retirado: boolean;
 };
 
 /// Tamaños de página que ofrece el listado de personas.
@@ -78,12 +80,15 @@ export async function buscarPersonasAdmin(
 ): Promise<PaginaAdmin> {
   const texto = consulta.trim();
   const digitos = normalizarTelefono(texto);
+  const buscando = texto.length >= 2;
   const tam = (TAMANOS_PAGINA as readonly number[]).includes(size) ? size : 20;
   const prisma = await getPrisma();
 
   const where = {
     active: true,
-    ...(texto.length >= 2
+    // En el listado normal no se muestran los dados de baja (Retirados); solo
+    // aparecen cuando se buscan por nombre, celular o correo.
+    ...(buscando
       ? {
           OR: [
             { firstName: { contains: texto, mode: "insensitive" as const } },
@@ -97,7 +102,7 @@ export async function buscarPersonasAdmin(
               : []),
           ],
         }
-      : {}),
+      : { NOT: { learnerProfile: { status: LearnerStatus.RETIRADO } } }),
   };
 
   const total = await prisma.person.count({ where });
@@ -106,7 +111,7 @@ export async function buscarPersonasAdmin(
 
   const personas = await prisma.person.findMany({
     where,
-    orderBy: texto.length >= 2 ? { firstName: "asc" } : { createdAt: "desc" },
+    orderBy: buscando ? { firstName: "asc" } : { createdAt: "desc" },
     skip: (pag - 1) * tam,
     take: tam,
     select: {
@@ -115,7 +120,7 @@ export async function buscarPersonasAdmin(
       lastName: true,
       callPhone: true,
       email: true,
-      learnerProfile: { select: { id: true, phase: true } },
+      learnerProfile: { select: { id: true, phase: true, status: true } },
       user: { select: { role: true, active: true } },
     },
   });
@@ -135,6 +140,7 @@ export async function buscarPersonasAdmin(
       activo: persona.user?.active ?? true,
       fase: persona.learnerProfile?.phase ?? null,
       tieneAcceso: Boolean(persona.user),
+      retirado: persona.learnerProfile?.status === LearnerStatus.RETIRADO,
     })),
   };
 }
