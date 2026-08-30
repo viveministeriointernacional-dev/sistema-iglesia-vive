@@ -5,7 +5,7 @@ import {
   Phase,
   Role,
 } from "@iglesia/prisma-client";
-import { nombreCompleto, normalizarTelefono } from "@/lib/dominio";
+import { nombreCompleto, normalizarBusqueda } from "@/lib/dominio";
 import { getPrisma } from "@/lib/prisma";
 
 /// Hitos que un administrador puede marcar o quitar a mano desde el panel.
@@ -79,29 +79,17 @@ export async function buscarPersonasAdmin(
   size = 20,
 ): Promise<PaginaAdmin> {
   const texto = consulta.trim();
-  const digitos = normalizarTelefono(texto);
   const buscando = texto.length >= 2;
   const tam = (TAMANOS_PAGINA as readonly number[]).includes(size) ? size : 20;
   const prisma = await getPrisma();
 
   const where = {
     active: true,
-    // En el listado normal no se muestran los dados de baja (Retirados); solo
-    // aparecen cuando se buscan por nombre, celular o correo.
+    // Búsqueda tolerante (sin importar mayúsculas, tildes ni exactitud) sobre
+    // nombre, correo y teléfonos a la vez. En el listado normal no se muestran
+    // los dados de baja (Retirados); solo aparecen cuando se buscan.
     ...(buscando
-      ? {
-          OR: [
-            { firstName: { contains: texto, mode: "insensitive" as const } },
-            { lastName: { contains: texto, mode: "insensitive" as const } },
-            { email: { contains: texto, mode: "insensitive" as const } },
-            ...(digitos
-              ? [
-                  { callPhone: { contains: digitos } },
-                  { whatsappPhone: { contains: digitos } },
-                ]
-              : []),
-          ],
-        }
+      ? { searchText: { contains: normalizarBusqueda(texto) } }
       : { NOT: { learnerProfile: { status: LearnerStatus.RETIRADO } } }),
   };
 

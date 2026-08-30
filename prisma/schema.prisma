@@ -176,6 +176,10 @@ model Person {
   /// Horario escrito a mano cuando ninguna franja sirve («después de las 7»).
   callScheduleNote String?     @map("call_schedule_note")
   active        Boolean       @default(true)
+  /// Texto de búsqueda (nombre + correo + teléfonos) en minúsculas y sin
+  /// tildes. Lo mantiene un trigger en la base de datos; no se escribe desde la
+  /// app. Sirve para buscar sin importar mayúsculas, acentos ni exactitud.
+  searchText    String?       @map("search_text")
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
 

@@ -2,7 +2,7 @@
 
 import { Prisma, Role } from "@iglesia/prisma-client";
 import { obtenerUsuarioActual } from "@/lib/auth";
-import { nombreCompleto, normalizarTelefono } from "@/lib/dominio";
+import { nombreCompleto, normalizarBusqueda } from "@/lib/dominio";
 import { telefonoParcial } from "@/lib/expediente";
 import { getPrisma } from "@/lib/prisma";
 
@@ -51,16 +51,9 @@ export async function buscarPersonas(
         ],
       };
 
-  // Solo se busca por teléfono cuando hay dígitos suficientes para que la
-  // coincidencia signifique algo; con uno o dos dígitos sobra el ruido.
-  const digitos = normalizarTelefono(texto);
-  const porTelefono =
-    digitos && digitos.length >= 3
-      ? [
-          { callPhone: { contains: digitos } },
-          { whatsappPhone: { contains: digitos } },
-        ]
-      : [];
+  // Búsqueda tolerante: sin importar mayúsculas, tildes ni exactitud, y sobre
+  // nombre, correo y teléfonos a la vez (todo vive en `search_text`).
+  const consultaNormalizada = normalizarBusqueda(texto);
 
   const prisma = await getPrisma();
   const aprendices = await prisma.learnerProfile.findMany({
@@ -70,11 +63,7 @@ export async function buscarPersonas(
         {
           person: {
             active: true,
-            OR: [
-              { firstName: { contains: texto, mode: "insensitive" } },
-              { lastName: { contains: texto, mode: "insensitive" } },
-              ...porTelefono,
-            ],
+            searchText: { contains: consultaNormalizada },
           },
         },
       ],

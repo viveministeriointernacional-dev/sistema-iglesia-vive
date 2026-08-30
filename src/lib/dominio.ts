@@ -131,6 +131,18 @@ export function normalizarTelefono(valor: string | null | undefined) {
   return digitos.length ? digitos : null;
 }
 
+/// Normaliza un texto para buscar: minúsculas y SIN tildes. Debe coincidir con
+/// lo que guarda `person.search_text` en la base de datos (que usa `unaccent`),
+/// para que buscar «jose narvaez» encuentre «José Narváez» sin importar tildes,
+/// mayúsculas ni exactitud.
+export function normalizarBusqueda(texto: string): string {
+  return texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 /// Los últimos dígitos, que es lo que de verdad identifica un número.
 ///
 /// La misma persona aparece como «+57 311 555 4433», «3115554433» o
