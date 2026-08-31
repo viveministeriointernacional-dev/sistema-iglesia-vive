@@ -51,12 +51,20 @@ export default async function PaginaAdministracion({
               con HighLevel
             </p>
           </div>
-          <Link
-            href="/administracion/dados-de-baja"
-            className="shrink-0 rounded-[9px] border border-[rgba(19,28,36,.16)] px-[14px] py-[10px] text-[12px] leading-none font-semibold text-tinta hover:border-azul-700 hover:text-azul-700"
-          >
-            Dados de baja
-          </Link>
+          <div className="flex shrink-0 items-center gap-2">
+            <Link
+              href="/administracion/llamadas"
+              className="rounded-[9px] border border-[rgba(19,28,36,.16)] px-[14px] py-[10px] text-[12px] leading-none font-semibold text-tinta hover:border-azul-700 hover:text-azul-700"
+            >
+              Llamadas
+            </Link>
+            <Link
+              href="/administracion/dados-de-baja"
+              className="rounded-[9px] border border-[rgba(19,28,36,.16)] px-[14px] py-[10px] text-[12px] leading-none font-semibold text-tinta hover:border-azul-700 hover:text-azul-700"
+            >
+              Dados de baja
+            </Link>
+          </div>
         </header>
 
         <form className="mt-5 max-w-[460px]" action="/administracion">
