@@ -411,7 +411,7 @@ async function VistaIndividual({
                     Fecha
                   </th>
                   <th className="py-2 px-3 text-[10.5px] leading-none font-bold tracking-[.05em] text-[rgba(19,28,36,.45)] uppercase">
-                    Contacto
+                    A quién se llamó
                   </th>
                   <th className="py-2 px-3 text-[10.5px] leading-none font-bold tracking-[.05em] text-[rgba(19,28,36,.45)] uppercase">
                     Sentido
