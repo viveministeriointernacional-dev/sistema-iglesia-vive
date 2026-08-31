@@ -100,6 +100,7 @@ model AppUser {
   inscripcionesEvento   EventRegistration[]  @relation("InscribioAEvento")
   asistenciasEvento     EventRegistration[]  @relation("MarcoAsistenciaEvento")
   auditoria             AuditLog[]
+  llamadas              CallLog[]
 
   @@index([role, active])
   @@map("app_user")
@@ -213,6 +214,48 @@ model HighLevelContact {
   @@unique([locationId, contactId])
   @@index([personId])
   @@map("highlevel_contact")
+}
+
+/// Registro de llamadas que HighLevel envía por webhook. Cada evento de llamada
+/// (saliente o entrante) queda aquí para el tablero de administración: quién
+/// llamó, a qué contacto, cuánto duró y cómo terminó. El personal se resuelve
+/// por `highlevel_user_id` de `app_user`; si no se puede mapear, `app_user_id`
+/// queda nulo pero la llamada igual se guarda con su id de HighLevel crudo.
+model CallLog {
+  id             String   @id @default(uuid())
+  /// Origen del dato. Hoy siempre "highlevel"; deja la puerta abierta a otros.
+  provider       String   @default("highlevel")
+  /// Id de la llamada en el proveedor. Con `provider` forma la clave para no
+  /// duplicar si el webhook reintenta.
+  externalId     String   @map("external_id")
+  locationId     String?  @map("location_id")
+  /// Id del usuario de HighLevel que atendió/realizó la llamada, tal como llega.
+  highlevelUserId String? @map("highlevel_user_id")
+  /// Usuario del sistema resuelto a partir de `highlevel_user_id`. Nulo si el
+  /// que llamó no tiene cuenta enlazada.
+  appUserId      String?  @map("app_user_id")
+  contactId      String?  @map("contact_id")
+  /// "inbound" o "outbound" (normalizado en minúsculas).
+  direction      String?
+  /// Estado de la llamada: completed, no-answer, busy, failed, voicemail…
+  status         String?
+  /// Si la llamada fue contestada (derivado del estado/duración).
+  answered       Boolean  @default(false)
+  durationSeconds Int     @default(0) @map("duration_seconds")
+  fromNumber     String?  @map("from_number")
+  toNumber       String?  @map("to_number")
+  recordingUrl   String?  @map("recording_url")
+  /// Momento de la llamada. Se usa para todos los filtros por fecha.
+  startedAt      DateTime @map("started_at")
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  appUser AppUser? @relation(fields: [appUserId], references: [id])
+
+  @@unique([provider, externalId])
+  @@index([appUserId, startedAt])
+  @@index([startedAt])
+  @@map("call_log")
 }
 
 enum Phase {
