@@ -2,6 +2,13 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "sistema-iglesia-vive",
   "main": ".open-next/worker.js",
+  // Compila el worker de OpenNext antes de cualquier `wrangler deploy` o
+  // `wrangler versions upload`. Así el despliegue genera `.open-next/worker.js`
+  // por sí mismo aunque el «Build command» del panel de Workers Builds esté
+  // vacío (que fue justo lo que rompía el despliegue).
+  "build": {
+    "command": "npx opennextjs-cloudflare build"
+  },
   "compatibility_date": "2026-08-15",
   // nodejs_compat es obligatorio: Next y el adaptador `pg` de Prisma usan APIs
   // de Node (sockets TCP, streams, crypto).
