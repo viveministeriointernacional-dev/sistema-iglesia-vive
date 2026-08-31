@@ -1,4 +1,5 @@
-import { Role } from "@iglesia/prisma-client";
+import { Prisma, Role } from "@iglesia/prisma-client";
+import { colaDeTelefono } from "@/lib/dominio";
 import { getPrisma } from "@/lib/prisma";
 
 /// Tablero de llamadas de HighLevel (solo administración). Reúne el
@@ -258,6 +259,48 @@ export async function detalleLlamadasPersona(
     ]),
   );
 
+  // Respaldo: cuando la llamada no trae contacto enlazado por id, se busca a
+  // quién se llamó por el número marcado (saliente = «to», entrante = «from»),
+  // comparando solo la cola de dígitos, como en el resto del sistema.
+  const numeroDeLaLlamada = (r: (typeof registros)[number]) =>
+    r.direction === "inbound" ? r.fromNumber : r.toNumber;
+  const colasPendientes = Array.from(
+    new Set(
+      registros
+        .filter((r) => !(r.contactId && nombrePorContacto.has(r.contactId)))
+        .map((r) => colaDeTelefono(numeroDeLaLlamada(r)))
+        .filter((v): v is string => Boolean(v)),
+    ),
+  );
+  const nombrePorTelefono = new Map<string, string>();
+  if (colasPendientes.length) {
+    const porTelefono = await prisma.$queryRaw<
+      { nombre: string; cola_call: string | null; cola_wa: string | null }[]
+    >`
+      SELECT (first_name || ' ' || coalesce(last_name, '')) AS nombre,
+             right(regexp_replace(coalesce(call_phone, ''), '[^0-9]', '', 'g'), 10) AS cola_call,
+             right(regexp_replace(coalesce(whatsapp_phone, ''), '[^0-9]', '', 'g'), 10) AS cola_wa
+      FROM person
+      WHERE right(regexp_replace(coalesce(call_phone, ''), '[^0-9]', '', 'g'), 10) IN (${Prisma.join(colasPendientes)})
+         OR right(regexp_replace(coalesce(whatsapp_phone, ''), '[^0-9]', '', 'g'), 10) IN (${Prisma.join(colasPendientes)})
+    `;
+    for (const fila of porTelefono) {
+      const nombre = fila.nombre.trim();
+      if (fila.cola_call) nombrePorTelefono.set(fila.cola_call, nombre);
+      if (fila.cola_wa && !nombrePorTelefono.has(fila.cola_wa)) {
+        nombrePorTelefono.set(fila.cola_wa, nombre);
+      }
+    }
+  }
+
+  const nombreDeContacto = (r: (typeof registros)[number]) => {
+    if (r.contactId && nombrePorContacto.has(r.contactId)) {
+      return nombrePorContacto.get(r.contactId) ?? null;
+    }
+    const cola = colaDeTelefono(numeroDeLaLlamada(r));
+    return cola ? nombrePorTelefono.get(cola) ?? null : null;
+  };
+
   const llamadas: LlamadaDetalle[] = registros.map((r) => ({
     id: r.id,
     startedAt: r.startedAt,
@@ -265,7 +308,7 @@ export async function detalleLlamadasPersona(
     status: r.status,
     answered: r.answered,
     durationSeconds: r.durationSeconds,
-    contactNombre: r.contactId ? nombrePorContacto.get(r.contactId) ?? null : null,
+    contactNombre: nombreDeContacto(r),
     toNumber: r.toNumber,
     fromNumber: r.fromNumber,
   }));
