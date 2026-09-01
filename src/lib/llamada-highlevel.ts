@@ -121,6 +121,9 @@ export type LlamadaNormalizada = {
   /// Nombre del usuario (respaldo si no cruza por id ni por correo).
   callerName: string | null;
   contactId: string | null;
+  /// Nombre del contacto llamado, tal como lo manda HighLevel (respaldo cuando
+  /// no está en el sistema y no se puede resolver por id).
+  contactName: string | null;
   direction: "inbound" | "outbound" | null;
   status: string | null;
   answered: boolean;
@@ -145,6 +148,18 @@ export function normalizarLlamadaHighLevel(entrada: unknown): LlamadaNormalizada
   });
 
   const contactId = texto(obtener(indice, "contactId", "contact_id"));
+  // Nombre del contacto: lo que mande el CRM explícito, o el nombre estándar
+  // del contacto (full_name / first+last) que HighLevel suele adjuntar.
+  const nombrePartes = [
+    texto(obtener(indice, "firstName", "first_name")),
+    texto(obtener(indice, "lastName", "last_name")),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+  const contactName =
+    texto(obtener(indice, "contactName", "contact_name", "fullName", "full_name")) ??
+    (nombrePartes || null);
   const fromNumber = texto(obtener(indice, "from", "fromNumber", "from_number"));
   const toNumber = texto(obtener(indice, "to", "toNumber", "to_number"));
 
@@ -258,6 +273,7 @@ export function normalizarLlamadaHighLevel(entrada: unknown): LlamadaNormalizada
     callerEmail,
     callerName,
     contactId,
+    contactName,
     direction,
     status,
     answered,
