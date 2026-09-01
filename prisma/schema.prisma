@@ -239,6 +239,10 @@ model CallLog {
   /// enlazado como personal del sistema.
   callerName     String?  @map("caller_name")
   contactId      String?  @map("contact_id")
+  /// Nombre del contacto llamado, tal como lo manda HighLevel. Respaldo para
+  /// mostrar a quién se llamó cuando el contacto no está en el sistema (no se
+  /// puede resolver el nombre por su id).
+  contactName    String?  @map("contact_name")
   /// "inbound" o "outbound" (normalizado en minúsculas).
   direction      String?
   /// Estado de la llamada: completed, no-answer, busy, failed, voicemail…

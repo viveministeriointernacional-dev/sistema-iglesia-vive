@@ -304,6 +304,7 @@ export async function detalleLlamadasPersona(
       toNumber: true,
       fromNumber: true,
       contactId: true,
+      contactName: true,
       callerName: true,
     },
   });
@@ -376,7 +377,10 @@ export async function detalleLlamadasPersona(
       return nombrePorContacto.get(r.contactId) ?? null;
     }
     const cola = colaDeTelefono(numeroDeLaLlamada(r));
-    return cola ? nombrePorTelefono.get(cola) ?? null : null;
+    const porTelefono = cola ? nombrePorTelefono.get(cola) : null;
+    // Respaldo: el nombre que mandó el CRM en la propia llamada, para contactos
+    // que no están en el sistema (no se pudieron resolver por id ni por número).
+    return porTelefono ?? r.contactName?.trim() ?? null;
   };
 
   const llamadas: LlamadaDetalle[] = registros.map((r) => ({
