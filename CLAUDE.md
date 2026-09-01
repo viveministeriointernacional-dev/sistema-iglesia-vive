@@ -146,6 +146,11 @@ eventos, y administración. Documentación de producto en `design/`
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-01** — Deploy del tablero por fin activo (Deploy command = `npx wrangler
+  deploy`, PR #31). Bug encontrado: el webhook `/api/integraciones/highlevel/llamada`
+  no estaba en `RUTAS_PUBLICAS` de `src/lib/supabase/sesion.ts`, así que el
+  middleware lo redirigía a `/ingresar` (307). Se agregó a la lista. **Recordatorio:
+  todo webhook público nuevo debe añadirse a `RUTAS_PUBLICAS`.**
 - **2026-09-01** — Creado este `CLAUDE.md` (memoria persistente). Añadido tablero
   de llamadas (PR #28/#29) y arreglo de despliegue vía `wrangler.jsonc build.command`
   (PR #30). Enlazado `highlevel_user_id` de Nora. Pendiente: activar el deploy
