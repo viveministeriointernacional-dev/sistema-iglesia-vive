@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { EventKind } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
 import { requerirRol } from "@/lib/auth";
-import { nombreCompleto } from "@/lib/dominio";
+import { nombreCompleto, ZONA_HORARIA } from "@/lib/dominio";
 import {
   cargarEvento,
   ETIQUETA_EVENTO,
@@ -20,6 +20,7 @@ const FECHA = new Intl.DateTimeFormat("es-CO", {
   month: "long",
   hour: "numeric",
   minute: "2-digit",
+  timeZone: ZONA_HORARIA,
 });
 
 export async function generateMetadata({

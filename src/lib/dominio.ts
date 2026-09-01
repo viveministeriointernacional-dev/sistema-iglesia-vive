@@ -6,6 +6,12 @@ import {
   InvitationKind,
 } from "@iglesia/prisma-client";
 
+/// Zona horaria de la iglesia (Neiva–Huila, Colombia, UTC-5). El servidor
+/// (Cloudflare Workers / Node) corre en UTC, así que TODO formateo de fecha u
+/// hora visible al usuario debe fijar esta zona; si no, las horas salen 5 h
+/// adelantadas. Usar siempre `timeZone: ZONA_HORARIA` en los formateadores.
+export const ZONA_HORARIA = "America/Bogota";
+
 /// Etiquetas de los seis puntos de entrada del paso 3 del registro, en el orden
 /// del diseño (rejilla 3×2).
 export const PUNTOS_DE_ENTRADA: { valor: EntryPoint; etiqueta: string }[] = [

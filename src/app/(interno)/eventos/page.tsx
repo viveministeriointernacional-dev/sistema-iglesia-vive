@@ -8,6 +8,7 @@ import {
   puedeProgramar,
   ROLES_OPERAN_EVENTOS,
 } from "@/lib/eventos";
+import { ZONA_HORARIA } from "@/lib/dominio";
 import { BuscadorPersonas } from "@/components/buscador-personas";
 import { NuevoEvento } from "./nuevo-evento";
 
@@ -20,6 +21,7 @@ const FECHA = new Intl.DateTimeFormat("es-CO", {
   month: "short",
   hour: "numeric",
   minute: "2-digit",
+  timeZone: ZONA_HORARIA,
 });
 
 type EventoDeLista = Awaited<ReturnType<typeof cargarEventos>>["proximos"][number];
