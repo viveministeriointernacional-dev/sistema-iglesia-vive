@@ -146,6 +146,13 @@ eventos, y administración. Documentación de producto en `design/`
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-01** — Tablero de llamadas VIVO y probado punta a punta (webhook →
+  `call_log` → asignado a la persona por `highlevel_user_id`). Llegaron llamadas
+  reales pero con valores `{{}}` (merge-tags sin resolver: en el workflow de
+  HighLevel las Custom Data tenían la clave pero el valor del `{{ }}` vacío). Se
+  blindó el parser (`texto()` en `llamada-highlevel.ts`) para ignorar `{{...}}`.
+  **Acción del usuario pendiente:** mapear bien los valores en el paso Webhook de
+  HighLevel (seleccionar el campo real en cada `{{ }}`).
 - **2026-09-01** — Deploy del tablero por fin activo (Deploy command = `npx wrangler
   deploy`, PR #31). Bug encontrado: el webhook `/api/integraciones/highlevel/llamada`
   no estaba en `RUTAS_PUBLICAS` de `src/lib/supabase/sesion.ts`, así que el
