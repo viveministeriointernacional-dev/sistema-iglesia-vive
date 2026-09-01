@@ -45,7 +45,7 @@ next-env.d.ts
 
 # Reglas para agentes generadas por Next
 /AGENTS.md
-/CLAUDE.md
+# CLAUDE.md se versiona a propósito: es la memoria persistente del proyecto.
 
 # Cloudflare / OpenNext
 .open-next/
