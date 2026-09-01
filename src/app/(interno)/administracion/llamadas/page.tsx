@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ETIQUETA_ROL, requerirRol, ROLES_ADMIN } from "@/lib/auth";
+import { ZONA_HORARIA } from "@/lib/dominio";
 import {
   detalleLlamadasPersona,
   formatoDuracion,
@@ -131,7 +132,7 @@ export default async function PaginaLlamadas({
   const { desde: desdeP, hasta: hastaP, persona, hl } = await searchParams;
   const rango = rangoDesdeParametros(desdeP, hastaP);
 
-  const rangoTexto = `${rango.desde.toLocaleDateString("es-CO")} – ${rango.hasta.toLocaleDateString("es-CO")}`;
+  const rangoTexto = `${rango.desde.toLocaleDateString("es-CO", { timeZone: ZONA_HORARIA })} – ${rango.hasta.toLocaleDateString("es-CO", { timeZone: ZONA_HORARIA })}`;
 
   if (persona || hl) {
     return (
@@ -454,6 +455,7 @@ async function VistaIndividual({
                         month: "short",
                         hour: "2-digit",
                         minute: "2-digit",
+                        timeZone: ZONA_HORARIA,
                       })}
                     </td>
                     <td className="py-[9px] px-3 font-semibold text-tinta">

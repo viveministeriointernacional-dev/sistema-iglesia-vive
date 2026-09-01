@@ -8,6 +8,7 @@ import {
 } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
 import type { UsuarioSesion } from "@/lib/auth";
+import { ZONA_HORARIA } from "@/lib/dominio";
 import { horasRestantes, urgenciaDe } from "@/lib/op72";
 
 export const FASES: { valor: Phase; etiqueta: string }[] = [
@@ -125,6 +126,7 @@ const FORMATO_CITA = new Intl.DateTimeFormat("es-CO", {
   month: "short",
   hour: "numeric",
   minute: "2-digit",
+  timeZone: ZONA_HORARIA,
 });
 
 export type HitoLineaDeTiempo = {

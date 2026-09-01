@@ -12,6 +12,7 @@ import {
   FASES,
   HITOS_DEL_RECORRIDO,
 } from "@/lib/expediente";
+import { ZONA_HORARIA } from "@/lib/dominio";
 import { cargarMiEscuela } from "@/lib/entrenar";
 import { ETIQUETA_EVENTO, proximoEventoDe } from "@/lib/eventos";
 import { cargarMiAlpha, miHistoria, miProximoPaso } from "@/lib/mi-proceso";
@@ -30,6 +31,7 @@ const FECHA_LARGA = new Intl.DateTimeFormat("es-CO", {
   month: "long",
   hour: "numeric",
   minute: "2-digit",
+  timeZone: ZONA_HORARIA,
 });
 
 /// El recorrido visto por la persona que lo está viviendo (§10).

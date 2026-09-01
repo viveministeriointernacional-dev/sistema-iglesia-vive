@@ -146,6 +146,22 @@ eventos, y administración. Documentación de producto en `design/`
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-01** — **Hora Colombia** en toda la UI. El servidor (Workers/Node)
+  corre en UTC, así que los formateadores `Intl.DateTimeFormat("es-CO", …)` sin
+  `timeZone` mostraban las horas 5 h adelantadas. Se añadió `ZONA_HORARIA =
+  "America/Bogota"` (UTC-5 fijo, sin horario de verano) en `src/lib/dominio.ts`
+  y se fijó `timeZone: ZONA_HORARIA` en todos los formateadores que muestran
+  hora (tablero de llamadas, `expediente` FORMATO_CITA, `operacion-72/acciones`
+  FORMATO_VISITA, `eventos`, `eventos/[id]`, `mi-proceso` FECHA_LARGA, `registro`
+  FORMATO_VISITA). Además el filtro por día del tablero de llamadas
+  (`rangoDesdeParametros` en `src/lib/llamadas.ts`) interpretaba el día en UTC;
+  ahora fija el offset `-05:00` en los límites (`T00:00:00-05:00` /
+  `T23:59:59.999-05:00`) para que el día seleccionado cubra el día completo en
+  Colombia. **Regla:** todo formateo de fecha/hora nuevo debe usar
+  `timeZone: ZONA_HORARIA`. Ojo: NO aplicar la zona a campos de solo-fecha
+  (p. ej. `birthDate`, guardados a medianoche UTC) porque se correrían un día
+  hacia atrás — solo a marcas de tiempo reales.
+
 - **2026-09-01** — Registros por webhook fallaban con **500** («No se pudo guardar
   el registro»). Causa: la transacción de alta (~12 consultas) superaba el
   **timeout por defecto de 5 s de Prisma** con la latencia del pooler → P2028 →

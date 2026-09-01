@@ -9,7 +9,7 @@ import {
 import type { ClientePrisma } from "@/lib/prisma";
 import { asignarConsolidador } from "@/lib/asignacion";
 import { auditar, encolarEventoIntegracion } from "@/lib/audit";
-import { colaDeTelefono, nombreCompleto } from "@/lib/dominio";
+import { colaDeTelefono, nombreCompleto, ZONA_HORARIA } from "@/lib/dominio";
 import { DURACION_OPERACION_72_HORAS, ETIQUETA_LLAMADA } from "@/lib/op72";
 import type { VisitaDesdeCrm } from "@/lib/highlevel";
 import type { DatosRegistroValidados } from "@/lib/validacion-registro";
@@ -17,6 +17,7 @@ import type { DatosRegistroValidados } from "@/lib/validacion-registro";
 const FORMATO_VISITA = new Intl.DateTimeFormat("es-CO", {
   day: "2-digit",
   month: "short",
+  timeZone: ZONA_HORARIA,
 });
 
 /// Cuando la línea confirma una visita en el CRM, la persona pasa a «visita

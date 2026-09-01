@@ -12,7 +12,7 @@ import {
 import { getPrisma } from "@/lib/prisma";
 import { auditar, encolarEventoIntegracion } from "@/lib/audit";
 import { correoMentorAsignado } from "@/lib/correo";
-import { nombreCompleto } from "@/lib/dominio";
+import { nombreCompleto, ZONA_HORARIA } from "@/lib/dominio";
 import {
   ErrorDePermiso,
   requerirRolEnAccion,
@@ -46,6 +46,7 @@ const FORMATO_VISITA = new Intl.DateTimeFormat("es-CO", {
   month: "short",
   hour: "numeric",
   minute: "2-digit",
+  timeZone: ZONA_HORARIA,
 });
 
 export type ResultadoAccion = { ok: true } | { ok: false; mensaje: string };

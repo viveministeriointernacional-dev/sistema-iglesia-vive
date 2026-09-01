@@ -22,9 +22,12 @@ export function rangoDesdeParametros(
   desdeParam?: string,
   hastaParam?: string,
 ): RangoFechas {
+  // Los límites del día se interpretan en hora Colombia (UTC-5 fijo, sin horario
+  // de verano). Si no se fija el offset, el servidor los toma en UTC y el rango
+  // queda corrido 5 h (un día "2026-09-01" empezaría a las 7 pm del día anterior).
   const base = rangoPorDefecto();
-  const desde = desdeParam ? new Date(`${desdeParam}T00:00:00`) : base.desde;
-  const hasta = hastaParam ? new Date(`${hastaParam}T23:59:59.999`) : base.hasta;
+  const desde = desdeParam ? new Date(`${desdeParam}T00:00:00-05:00`) : base.desde;
+  const hasta = hastaParam ? new Date(`${hastaParam}T23:59:59.999-05:00`) : base.hasta;
   return {
     desde: Number.isNaN(desde.getTime()) ? base.desde : desde,
     hasta: Number.isNaN(hasta.getTime()) ? base.hasta : hasta,
