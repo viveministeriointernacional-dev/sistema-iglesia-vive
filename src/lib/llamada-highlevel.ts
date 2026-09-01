@@ -196,13 +196,21 @@ export function normalizarLlamadaHighLevel(entrada: unknown): LlamadaNormalizada
   // Quién hizo/atendió la llamada. HighLevel a veces manda el id (una cadena sin
   // espacios), a veces el nombre ("Santiago Viveros"). Se separan: un valor con
   // espacios es un nombre, no un id.
+  // Se prefiere el usuario del EVENTO de llamada (quien marcó / quien contestó),
+  // no el dueño del contacto. En HighLevel esas variables son «Phone Call User
+  // Id/Name» y «Phone Call Answered By User Id/Name»; el workflow las manda con
+  // las claves que se elijan (userId, userName, answeredById, answeredByName).
   const crudoUsuario = texto(
     obtener(
       indice,
       "hluserid",
       "userId",
       "user_id",
+      "phonecalluserid",
       "agentId",
+      "answeredByUserId",
+      "answered_by_user_id",
+      "answeredById",
       "assignedUserId",
       "assigned_user_id",
       "assignedTo",
@@ -215,8 +223,18 @@ export function normalizarLlamadaHighLevel(entrada: unknown): LlamadaNormalizada
     obtener(indice, "hluseremail", "userEmail", "user_email"),
   );
   const callerName =
-    texto(obtener(indice, "hlusername")) ??
-    (crudoUsuario && /\s/.test(crudoUsuario) ? crudoUsuario : null);
+    texto(
+      obtener(
+        indice,
+        "userName",
+        "user_name",
+        "phonecallusername",
+        "answeredByName",
+        "answered_by_name",
+        "answeredByUserName",
+        "hlusername",
+      ),
+    ) ?? (crudoUsuario && /\s/.test(crudoUsuario) ? crudoUsuario : null);
 
   // Id estable de la llamada para no duplicar en reintentos. Si el CRM no manda
   // uno, se arma con lo que identifica al evento.
