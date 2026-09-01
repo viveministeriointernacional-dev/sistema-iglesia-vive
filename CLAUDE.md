@@ -146,6 +146,14 @@ eventos, y administración. Documentación de producto en `design/`
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-01** — Registros por webhook fallaban con **500** («No se pudo guardar
+  el registro»). Causa: la transacción de alta (~12 consultas) superaba el
+  **timeout por defecto de 5 s de Prisma** con la latencia del pooler → P2028 →
+  rollback. El registro tardaba ~7 s. Fix: `$transaction(..., { timeout: 30_000,
+  maxWait: 15_000 })` en `registro-nuevo/route.ts` y `registro-interno/acciones.ts`.
+  Palanca de fondo: **Hyperdrive** (bajar latencia). Nota: los 9 registros del 30
+  ago nunca entraron porque el webhook estaba caído esos días.
+
 - **2026-09-01** — Tablero de llamadas VIVO y probado punta a punta (webhook →
   `call_log` → asignado a la persona por `highlevel_user_id`). Llegaron llamadas
   reales pero con valores `{{}}` (merge-tags sin resolver: en el workflow de
