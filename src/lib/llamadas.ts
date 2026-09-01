@@ -33,6 +33,11 @@ export function rangoDesdeParametros(
 
 export type FilaLlamadasPersona = {
   appUserId: string | null;
+  /// Id de HighLevel del que llamó, cuando no está enlazado como personal.
+  highlevelUserId: string | null;
+  /// Si el que llamó tiene cuenta en el sistema. Los no enlazados igual se
+  /// listan (se "crean" desde la llamada) con el nombre que manda el CRM.
+  enlazado: boolean;
   nombre: string;
   rol: Role | null;
   llamadas: number;
@@ -62,6 +67,10 @@ export type ResumenLlamadas = {
 
 type FilaCruda = {
   app_user_id: string | null;
+  /// Id de HighLevel para las llamadas sin personal enlazado.
+  hl_user: string | null;
+  /// Nombre que manda el CRM para el que llamó (para los no enlazados).
+  nombre_hl: string | null;
   llamadas: number;
   contestadas: number;
   salientes: number;
@@ -80,9 +89,14 @@ export async function resumenLlamadas({
 }: RangoFechas): Promise<ResumenLlamadas> {
   const prisma = await getPrisma();
 
-  // Una sola pasada agregada por persona (incluye la fila de no asignados).
+  // Una sola pasada agregada por «quien llamó»: los enlazados se agrupan por su
+  // cuenta del sistema; los NO enlazados, por su id de HighLevel (y se guarda el
+  // nombre que manda el CRM). Así cada persona que llama aparece en el tablero,
+  // sea o no del área de consolidación.
   const filas = await prisma.$queryRaw<FilaCruda[]>`
     SELECT app_user_id,
+           CASE WHEN app_user_id IS NULL THEN highlevel_user_id END AS hl_user,
+           max(caller_name) FILTER (WHERE app_user_id IS NULL) AS nombre_hl,
            count(*)::int AS llamadas,
            count(*) FILTER (WHERE answered)::int AS contestadas,
            count(*) FILTER (WHERE direction = 'outbound')::int AS salientes,
@@ -90,7 +104,7 @@ export async function resumenLlamadas({
            coalesce(sum(duration_seconds), 0)::int AS duracion_total
     FROM call_log
     WHERE started_at >= ${desde} AND started_at <= ${hasta}
-    GROUP BY app_user_id
+    GROUP BY app_user_id, CASE WHEN app_user_id IS NULL THEN highlevel_user_id END
   `;
 
   const contactos = await prisma.$queryRaw<{ n: number }[]>`
@@ -109,40 +123,51 @@ export async function resumenLlamadas({
   const nombrePorId = new Map(personal.map((p) => [p.id, p]));
 
   const porId = new Map<string, FilaCruda>();
+  const noEnlazados: FilaCruda[] = [];
   let sinAsignarCruda: FilaCruda | null = null;
   for (const fila of filas) {
     if (fila.app_user_id) porId.set(fila.app_user_id, fila);
+    else if (fila.hl_user) noEnlazados.push(fila);
     else sinAsignarCruda = fila;
   }
 
   // Se listan TODOS los del personal registrado (aunque no hayan llamado), para
   // ver el comportamiento de cada uno; luego se ordena por nº de llamadas.
-  const porPersona: FilaLlamadasPersona[] = personal
-    .map((p) => {
-      const c = porId.get(p.id);
-      const llamadas = c?.llamadas ?? 0;
-      const duracionTotal = c?.duracion_total ?? 0;
-      return {
+  const porPersona: FilaLlamadasPersona[] = personal.map((p) => {
+    const c = porId.get(p.id);
+    const llamadas = c?.llamadas ?? 0;
+    const duracionTotal = c?.duracion_total ?? 0;
+    return {
+      appUserId: p.id,
+      highlevelUserId: null,
+      enlazado: true,
+      nombre: p.fullName,
+      rol: p.role,
+      llamadas,
+      contestadas: c?.contestadas ?? 0,
+      salientes: c?.salientes ?? 0,
+      entrantes: c?.entrantes ?? 0,
+      duracionTotal,
+      duracionPromedio: promedio(duracionTotal, llamadas),
+    };
+  });
+
+  // Un app_user pudo quedar guardado en una llamada aunque ya no tenga
+  // highlevel_user_id (o no esté en `personal`): igual se muestra por su nombre.
+  const faltantes = Array.from(porId.keys()).filter((id) => !nombrePorId.has(id));
+  if (faltantes.length) {
+    const extra = await prisma.appUser.findMany({
+      where: { id: { in: faltantes } },
+      select: { id: true, fullName: true, role: true },
+    });
+    for (const p of extra) {
+      const c = porId.get(p.id)!;
+      porPersona.push({
         appUserId: p.id,
+        highlevelUserId: null,
+        enlazado: true,
         nombre: p.fullName,
         rol: p.role,
-        llamadas,
-        contestadas: c?.contestadas ?? 0,
-        salientes: c?.salientes ?? 0,
-        entrantes: c?.entrantes ?? 0,
-        duracionTotal,
-        duracionPromedio: promedio(duracionTotal, llamadas),
-      };
-    })
-    .sort((a, b) => b.llamadas - a.llamadas || a.nombre.localeCompare(b.nombre));
-
-  // Puede haber llamadas de un usuario de HighLevel sin cuenta enlazada.
-  for (const [id, c] of porId) {
-    if (!nombrePorId.has(id)) {
-      porPersona.push({
-        appUserId: id,
-        nombre: "Personal sin enlazar",
-        rol: null,
         llamadas: c.llamadas,
         contestadas: c.contestadas,
         salientes: c.salientes,
@@ -152,6 +177,28 @@ export async function resumenLlamadas({
       });
     }
   }
+
+  // Personas que llamaron dentro del CRM pero no están enlazadas como personal:
+  // se listan por el nombre que manda HighLevel (se "crean" desde la llamada).
+  for (const c of noEnlazados) {
+    porPersona.push({
+      appUserId: null,
+      highlevelUserId: c.hl_user,
+      enlazado: false,
+      nombre: c.nombre_hl?.trim() || "Usuario del CRM",
+      rol: null,
+      llamadas: c.llamadas,
+      contestadas: c.contestadas,
+      salientes: c.salientes,
+      entrantes: c.entrantes,
+      duracionTotal: c.duracion_total,
+      duracionPromedio: promedio(c.duracion_total, c.llamadas),
+    });
+  }
+
+  porPersona.sort(
+    (a, b) => b.llamadas - a.llamadas || a.nombre.localeCompare(b.nombre),
+  );
 
   const totalLlamadas = filas.reduce((s, f) => s + f.llamadas, 0);
   const totalContestadas = filas.reduce((s, f) => s + f.contestadas, 0);
@@ -169,12 +216,14 @@ export async function resumenLlamadas({
       duracionTotal: totalDuracion,
       duracionPromedio: promedio(totalDuracion, totalLlamadas),
       contactosAlcanzados: contactos[0]?.n ?? 0,
-      personalActivo: porPersona.filter((p) => p.appUserId && p.llamadas > 0).length,
+      personalActivo: porPersona.filter((p) => p.llamadas > 0).length,
     },
     porPersona,
     sinAsignar: sinAsignarCruda
       ? {
           appUserId: null,
+          highlevelUserId: null,
+          enlazado: false,
           nombre: "Sin asignar",
           rol: null,
           llamadas: sinAsignarCruda.llamadas,
@@ -211,19 +260,35 @@ export type DetallePersona = {
 
 /// Historial individual: métricas de una persona más sus últimas llamadas, con
 /// el nombre del contacto cuando se puede resolver por el id de HighLevel.
+///
+/// El selector es la cuenta del sistema (`appUserId`) para el personal enlazado,
+/// o el id de HighLevel (`highlevelUserId`) para quien llamó sin estar enlazado.
 export async function detalleLlamadasPersona(
-  appUserId: string,
+  selector: { appUserId?: string; highlevelUserId?: string },
   { desde, hasta }: RangoFechas,
 ): Promise<DetallePersona | null> {
   const prisma = await getPrisma();
-  const persona = await prisma.appUser.findUnique({
-    where: { id: appUserId },
-    select: { id: true, fullName: true, role: true },
-  });
-  if (!persona) return null;
+
+  const filtro =
+    selector.appUserId != null
+      ? { appUserId: selector.appUserId }
+      : selector.highlevelUserId != null
+        ? { appUserId: null, highlevelUserId: selector.highlevelUserId }
+        : null;
+  if (!filtro) return null;
+
+  let persona: { id: string; nombre: string; rol: Role | null } | null = null;
+  if (selector.appUserId != null) {
+    const u = await prisma.appUser.findUnique({
+      where: { id: selector.appUserId },
+      select: { id: true, fullName: true, role: true },
+    });
+    if (!u) return null;
+    persona = { id: u.id, nombre: u.fullName, rol: u.role };
+  }
 
   const registros = await prisma.callLog.findMany({
-    where: { appUserId, startedAt: { gte: desde, lte: hasta } },
+    where: { ...filtro, startedAt: { gte: desde, lte: hasta } },
     orderBy: { startedAt: "desc" },
     take: 200,
     select: {
@@ -236,8 +301,18 @@ export async function detalleLlamadasPersona(
       toNumber: true,
       fromNumber: true,
       contactId: true,
+      callerName: true,
     },
   });
+
+  // Para un llamador NO enlazado, su "persona" se arma con el id de HighLevel y
+  // el nombre que quedó guardado en alguna de sus llamadas.
+  if (!persona) {
+    const nombre =
+      registros.find((r) => r.callerName?.trim())?.callerName?.trim() ||
+      "Usuario del CRM";
+    persona = { id: selector.highlevelUserId!, nombre, rol: null };
+  }
 
   // Resuelve el nombre del contacto por su id de HighLevel (una sola consulta).
   const contactIds = Array.from(
@@ -318,11 +393,13 @@ export async function detalleLlamadasPersona(
   const duracionTotal = llamadas.reduce((s, l) => s + l.durationSeconds, 0);
 
   return {
-    persona: { id: persona.id, nombre: persona.fullName, rol: persona.role },
+    persona,
     fila: {
-      appUserId: persona.id,
-      nombre: persona.fullName,
-      rol: persona.role,
+      appUserId: selector.appUserId ?? null,
+      highlevelUserId: selector.highlevelUserId ?? null,
+      enlazado: selector.appUserId != null,
+      nombre: persona.nombre,
+      rol: persona.rol,
       llamadas: llamadasTotal,
       contestadas,
       salientes: llamadas.filter((l) => l.direction === "outbound").length,

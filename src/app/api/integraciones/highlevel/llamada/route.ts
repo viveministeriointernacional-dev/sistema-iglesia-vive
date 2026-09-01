@@ -91,6 +91,7 @@ export async function POST(request: Request) {
     locationId: llamada.locationId,
     highlevelUserId: llamada.highlevelUserId,
     appUserId: usuario?.id ?? null,
+    callerName: llamada.callerName,
     contactId: llamada.contactId,
     direction: llamada.direction,
     status: llamada.status,
