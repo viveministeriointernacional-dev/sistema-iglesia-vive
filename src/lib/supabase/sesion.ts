@@ -7,6 +7,7 @@ const RUTAS_PUBLICAS = [
   "/auth",
   "/api/registro",
   "/api/integraciones/highlevel/registro-nuevo",
+  "/api/integraciones/highlevel/llamada",
 ];
 
 export function esRutaPublica(pathname: string) {
