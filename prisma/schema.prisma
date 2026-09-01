@@ -234,6 +234,10 @@ model CallLog {
   /// Usuario del sistema resuelto a partir de `highlevel_user_id`. Nulo si el
   /// que llamó no tiene cuenta enlazada.
   appUserId      String?  @map("app_user_id")
+  /// Nombre de quien hizo/atendió la llamada, tal como lo manda HighLevel. Deja
+  /// mostrar en el tablero a cualquiera que llame en el CRM aunque no esté
+  /// enlazado como personal del sistema.
+  callerName     String?  @map("caller_name")
   contactId      String?  @map("contact_id")
   /// "inbound" o "outbound" (normalizado en minúsculas).
   direction      String?

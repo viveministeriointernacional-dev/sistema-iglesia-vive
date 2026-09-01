@@ -136,12 +136,16 @@ export async function guardarRegistro(
     }
   }
 
-  const creado = await prisma.$transaction((tx) =>
-    crearRegistroEnTransaccion(tx, datos, {
-      actorId: usuario.id,
-      duplicadoConfirmadoPorHumano:
-        opciones.confirmadoNoDuplicado ?? false,
-    }),
+  const creado = await prisma.$transaction(
+    (tx) =>
+      crearRegistroEnTransaccion(tx, datos, {
+        actorId: usuario.id,
+        duplicadoConfirmadoPorHumano:
+          opciones.confirmadoNoDuplicado ?? false,
+      }),
+    // Margen amplio: el alta hace varias consultas y el pooler de Supabase
+    // puede pasar de los 5 s por defecto y abortar la transacción.
+    { timeout: 30_000, maxWait: 15_000 },
   );
 
   // La persona registrada en el sistema nace también como contacto en

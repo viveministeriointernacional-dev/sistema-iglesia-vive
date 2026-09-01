@@ -349,7 +349,12 @@ export async function POST(request: Request) {
       await programarVisitaDesdeCrm(tx, creado.learnerId, visita);
 
       return { estado: "creado" as const, ...creado };
-    });
+    },
+    // El alta hace varias consultas seguidas y, con la latencia del pooler de
+    // Supabase, puede pasar de los 5 s por defecto de una transacción de Prisma
+    // y abortar con timeout (el registro se caía con 500). Se dan márgenes
+    // amplios para esperar la conexión y completar el alta.
+    { timeout: 30_000, maxWait: 15_000 });
 
     if (resultado.estado === "requiere_revision") {
       return NextResponse.json(

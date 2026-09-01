@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { colaDeTelefono } from "@/lib/dominio";
 
 /// Normaliza el evento de llamada que HighLevel manda por webhook.
 ///
@@ -62,10 +63,21 @@ function indiceDeCampos(payload: Objeto) {
       if (!indice.has(clv)) indice.set(clv, valor);
     }
   }
-  // El id del usuario suele venir anidado como user.id: se guarda con una clave
-  // propia (ya normalizada) que luego busca `obtener`.
+  // El trigger de llamada de HighLevel no siempre manda el id del usuario. Suele
+  // venir el objeto `user` con email y nombre. Se guardan aparte (con claves ya
+  // normalizadas) para poder resolver quién llamó por id, por correo o por
+  // nombre. Lo mismo con el id de la location, que llega anidado.
   const userId = texto(user.id) ?? texto(user.userId);
   if (userId) indice.set("hluserid", userId);
+  const userEmail = texto(user.email);
+  if (userEmail) indice.set("hluseremail", userEmail);
+  const userName = [texto(user.firstName), texto(user.lastName)]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+  if (userName) indice.set("hlusername", userName);
+  const location = objeto(payload.location);
+  if (location?.id) indice.set("hllocationid", texto(location.id));
   return indice;
 }
 
@@ -103,6 +115,11 @@ export type LlamadaNormalizada = {
   externalId: string;
   locationId: string | null;
   highlevelUserId: string | null;
+  /// Correo del usuario que hizo/atendió la llamada. El trigger de HighLevel no
+  /// manda el id, pero sí el correo: sirve para cruzar con `app_user`.
+  callerEmail: string | null;
+  /// Nombre del usuario (respaldo si no cruza por id ni por correo).
+  callerName: string | null;
   contactId: string | null;
   direction: "inbound" | "outbound" | null;
   status: string | null;
@@ -124,18 +141,33 @@ export function normalizarLlamadaHighLevel(entrada: unknown): LlamadaNormalizada
   const indice = indiceDeCampos(payload);
 
   const { locationId } = contextoSchema.parse({
-    locationId: texto(obtener(indice, "locationId", "location_id")),
+    locationId: texto(obtener(indice, "hllocationid", "locationId", "location_id")),
   });
+
+  const contactId = texto(obtener(indice, "contactId", "contact_id"));
+  const fromNumber = texto(obtener(indice, "from", "fromNumber", "from_number"));
+  const toNumber = texto(obtener(indice, "to", "toNumber", "to_number"));
 
   const direccionCruda = texto(
     obtener(indice, "direction", "callDirection", "call_direction"),
   );
   const dirN = direccionCruda ? normalizarClave(direccionCruda) : "";
-  const direction: LlamadaNormalizada["direction"] = dirN.startsWith("out")
+  let direction: LlamadaNormalizada["direction"] = dirN.startsWith("out")
     ? "outbound"
     : dirN.startsWith("in")
       ? "inbound"
       : null;
+  // Si el CRM no manda la dirección (llega vacía), se infiere por los números:
+  // el teléfono del contacto en `to` = saliente; en `from` = entrante.
+  if (!direction) {
+    const colaContacto = colaDeTelefono(
+      texto(obtener(indice, "phone", "contactPhone", "contact_phone")),
+    );
+    if (colaContacto) {
+      if (colaDeTelefono(toNumber) === colaContacto) direction = "outbound";
+      else if (colaDeTelefono(fromNumber) === colaContacto) direction = "inbound";
+    }
+  }
 
   const status = texto(
     obtener(indice, "callStatus", "call_status", "status", "messageStatus"),
@@ -161,23 +193,48 @@ export function normalizarLlamadaHighLevel(entrada: unknown): LlamadaNormalizada
       ),
     ) ?? new Date();
 
-  const highlevelUserId = texto(
+  // Quién hizo/atendió la llamada. HighLevel a veces manda el id (una cadena sin
+  // espacios), a veces el nombre ("Santiago Viveros"). Se separan: un valor con
+  // espacios es un nombre, no un id.
+  // Se prefiere el usuario del EVENTO de llamada (quien marcó / quien contestó),
+  // no el dueño del contacto. En HighLevel esas variables son «Phone Call User
+  // Id/Name» y «Phone Call Answered By User Id/Name»; el workflow las manda con
+  // las claves que se elijan (userId, userName, answeredById, answeredByName).
+  const crudoUsuario = texto(
     obtener(
       indice,
       "hluserid",
       "userId",
       "user_id",
+      "phonecalluserid",
       "agentId",
+      "answeredByUserId",
+      "answered_by_user_id",
+      "answeredById",
       "assignedUserId",
       "assigned_user_id",
       "assignedTo",
       "assigned_to",
     ),
   );
-
-  const contactId = texto(obtener(indice, "contactId", "contact_id"));
-  const fromNumber = texto(obtener(indice, "from", "fromNumber", "from_number"));
-  const toNumber = texto(obtener(indice, "to", "toNumber", "to_number"));
+  const highlevelUserId =
+    crudoUsuario && !/\s/.test(crudoUsuario) ? crudoUsuario : null;
+  const callerEmail = texto(
+    obtener(indice, "hluseremail", "userEmail", "user_email"),
+  );
+  const callerName =
+    texto(
+      obtener(
+        indice,
+        "userName",
+        "user_name",
+        "phonecallusername",
+        "answeredByName",
+        "answered_by_name",
+        "answeredByUserName",
+        "hlusername",
+      ),
+    ) ?? (crudoUsuario && /\s/.test(crudoUsuario) ? crudoUsuario : null);
 
   // Id estable de la llamada para no duplicar en reintentos. Si el CRM no manda
   // uno, se arma con lo que identifica al evento.
@@ -198,6 +255,8 @@ export function normalizarLlamadaHighLevel(entrada: unknown): LlamadaNormalizada
     externalId,
     locationId,
     highlevelUserId,
+    callerEmail,
+    callerName,
     contactId,
     direction,
     status,

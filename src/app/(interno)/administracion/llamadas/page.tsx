@@ -57,10 +57,12 @@ function FiltroFechas({
   desde,
   hasta,
   persona,
+  hl,
 }: {
   desde: Date;
   hasta: Date;
   persona?: string;
+  hl?: string;
 }) {
   return (
     <form
@@ -68,6 +70,7 @@ function FiltroFechas({
       action="/administracion/llamadas"
     >
       {persona ? <input type="hidden" name="persona" value={persona} /> : null}
+      {hl ? <input type="hidden" name="hl" value={hl} /> : null}
       <label className="flex flex-col gap-1">
         <span className="text-[10.5px] leading-none font-bold tracking-[.05em] text-[rgba(19,28,36,.45)] uppercase">
           Desde
@@ -100,12 +103,17 @@ function FiltroFechas({
   );
 }
 
-function urlPersona(id: string, desde: Date, hasta: Date) {
+function urlPersona(
+  fila: { appUserId: string | null; highlevelUserId: string | null },
+  desde: Date,
+  hasta: Date,
+) {
   const p = new URLSearchParams({
-    persona: id,
     desde: paraInput(desde),
     hasta: paraInput(hasta),
   });
+  if (fila.appUserId) p.set("persona", fila.appUserId);
+  else if (fila.highlevelUserId) p.set("hl", fila.highlevelUserId);
   return `/administracion/llamadas?${p.toString()}`;
 }
 
@@ -116,17 +124,22 @@ export default async function PaginaLlamadas({
     desde?: string;
     hasta?: string;
     persona?: string;
+    hl?: string;
   }>;
 }) {
   await requerirRol(ROLES_ADMIN);
-  const { desde: desdeP, hasta: hastaP, persona } = await searchParams;
+  const { desde: desdeP, hasta: hastaP, persona, hl } = await searchParams;
   const rango = rangoDesdeParametros(desdeP, hastaP);
 
   const rangoTexto = `${rango.desde.toLocaleDateString("es-CO")} – ${rango.hasta.toLocaleDateString("es-CO")}`;
 
-  if (persona) {
+  if (persona || hl) {
     return (
-      <VistaIndividual persona={persona} rango={rango} rangoTexto={rangoTexto} />
+      <VistaIndividual
+        selector={persona ? { appUserId: persona } : { highlevelUserId: hl }}
+        rango={rango}
+        rangoTexto={rangoTexto}
+      />
     );
   }
 
@@ -248,13 +261,13 @@ function TablaPersonas({
         <tbody>
           {filas.map((fila) => (
             <tr
-              key={fila.appUserId ?? "sin"}
+              key={fila.appUserId ?? fila.highlevelUserId ?? "sin"}
               className="border-b border-[rgba(19,28,36,.07)]"
             >
               <td className="py-[10px] pr-3">
-                {fila.appUserId ? (
+                {fila.appUserId || fila.highlevelUserId ? (
                   <Link
-                    href={urlPersona(fila.appUserId, desde, hasta)}
+                    href={urlPersona(fila, desde, hasta)}
                     className="font-semibold text-tinta hover:text-azul-700"
                   >
                     {fila.nombre}
@@ -265,6 +278,10 @@ function TablaPersonas({
                 {fila.rol ? (
                   <span className="ml-2 text-[11px] font-semibold text-[rgba(19,28,36,.45)]">
                     {ETIQUETA_ROL[fila.rol]}
+                  </span>
+                ) : !fila.enlazado && fila.highlevelUserId ? (
+                  <span className="ml-2 rounded-[5px] bg-[rgba(19,28,36,.06)] px-[6px] py-[2px] text-[10px] font-bold text-[rgba(19,28,36,.5)]">
+                    NO ENLAZADO
                   </span>
                 ) : null}
               </td>
@@ -314,15 +331,15 @@ function TablaPersonas({
 }
 
 async function VistaIndividual({
-  persona,
+  selector,
   rango,
   rangoTexto,
 }: {
-  persona: string;
+  selector: { appUserId?: string; highlevelUserId?: string };
   rango: { desde: Date; hasta: Date };
   rangoTexto: string;
 }) {
-  const detalle = await detalleLlamadasPersona(persona, rango);
+  const detalle = await detalleLlamadasPersona(selector, rango);
 
   if (!detalle || !detalle.persona) {
     return (
@@ -366,7 +383,8 @@ async function VistaIndividual({
         <FiltroFechas
           desde={rango.desde}
           hasta={rango.hasta}
-          persona={persona}
+          persona={selector.appUserId}
+          hl={selector.highlevelUserId}
         />
 
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">

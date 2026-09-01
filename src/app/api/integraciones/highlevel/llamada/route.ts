@@ -68,11 +68,21 @@ export async function POST(request: Request) {
 
   const prisma = await getPrisma();
 
-  // Se resuelve quién hizo la llamada por su id de HighLevel. Si no tiene cuenta
-  // enlazada, la llamada igual se guarda (queda sin personal asignado).
-  const usuario = llamada.highlevelUserId
-    ? await prisma.appUser.findUnique({
-        where: { highlevelUserId: llamada.highlevelUserId },
+  // Se resuelve quién hizo la llamada. El trigger de HighLevel casi nunca manda
+  // el id del usuario, pero sí su correo o su nombre: se cruza por cualquiera de
+  // los tres. Si no se puede, la llamada igual se guarda (queda sin asignar).
+  const criterios: Prisma.AppUserWhereInput[] = [
+    ...(llamada.highlevelUserId
+      ? [{ highlevelUserId: llamada.highlevelUserId }]
+      : []),
+    ...(llamada.callerEmail
+      ? [{ email: llamada.callerEmail.toLowerCase() }]
+      : []),
+    ...(llamada.callerName ? [{ fullName: llamada.callerName }] : []),
+  ];
+  const usuario = criterios.length
+    ? await prisma.appUser.findFirst({
+        where: { OR: criterios },
         select: { id: true },
       })
     : null;
@@ -81,6 +91,7 @@ export async function POST(request: Request) {
     locationId: llamada.locationId,
     highlevelUserId: llamada.highlevelUserId,
     appUserId: usuario?.id ?? null,
+    callerName: llamada.callerName,
     contactId: llamada.contactId,
     direction: llamada.direction,
     status: llamada.status,
