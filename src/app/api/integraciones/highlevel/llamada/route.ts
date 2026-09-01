@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@iglesia/prisma-client";
 import { variableDeEntorno } from "@/lib/entorno";
 import { normalizarLlamadaHighLevel } from "@/lib/llamada-highlevel";
 import { getPrisma } from "@/lib/prisma";
@@ -89,6 +90,10 @@ export async function POST(request: Request) {
     toNumber: llamada.toNumber,
     recordingUrl: llamada.recordingUrl,
     startedAt: llamada.startedAt,
+    // Se guarda el envío tal cual llega del CRM. Sirve de auditoría y, sobre
+    // todo, para diagnosticar el mapeo del workflow (ver qué campos manda de
+    // verdad HighLevel en cada llamada).
+    metadata: (entrada ?? null) as Prisma.InputJsonValue,
   };
 
   try {
