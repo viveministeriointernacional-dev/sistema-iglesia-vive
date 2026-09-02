@@ -43,7 +43,14 @@ function objeto(valor: unknown): Objeto | null {
 }
 
 function texto(valor: unknown): string | null {
-  if (typeof valor === "string") return valor.trim() || null;
+  if (typeof valor === "string") {
+    const limpio = valor.trim();
+    // HighLevel manda el merge-tag sin resolver (`{{campo}}`) cuando el contacto
+    // no tiene ese dato. No es un valor real: se ignora para que un campo vacío
+    // no se guarde como basura ni tumbe el registro (p. ej. birthDate).
+    if (!limpio || /^\{\{.*\}\}$/.test(limpio)) return null;
+    return limpio;
+  }
   if (typeof valor === "number" || typeof valor === "boolean") {
     return String(valor);
   }
@@ -52,6 +59,32 @@ function texto(valor: unknown): string | null {
 
 function textoOpcional(valor: unknown) {
   return texto(valor) ?? undefined;
+}
+
+/// Fecha de nacimiento tolerante. HighLevel puede mandarla en ISO
+/// (`1990-05-15`), con hora, o en formato colombiano `dd/mm/aaaa`. Se normaliza
+/// a ISO; si no se puede interpretar, se devuelve `undefined` para que un dato
+/// mal formado NO tumbe todo el registro (es un campo opcional).
+function fechaNacimientoOpcional(valor: unknown): string | undefined {
+  const dato = texto(valor);
+  if (!dato) return undefined;
+  // dd/mm/aaaa o dd-mm-aaaa → aaaa-mm-dd
+  const co = dato.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (co) {
+    const [, dia, mes, anio] = co;
+    const iso = `${anio}-${mes.padStart(2, "0")}-${dia.padStart(2, "0")}`;
+    return Number.isNaN(Date.parse(iso)) ? undefined : iso;
+  }
+  return Number.isNaN(Date.parse(dato)) ? undefined : dato;
+}
+
+/// Correo tolerante: devuelve el correo solo si tiene forma válida; si no, ""
+/// (el esquema lo trata como ausente). Evita que un correo mal formado que
+/// mande el CRM tumbe todo el registro.
+function correoOpcional(valor: unknown): string {
+  const dato = texto(valor);
+  if (!dato) return "";
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dato) ? dato : "";
 }
 
 function normalizarClave(clave: string) {
@@ -200,7 +233,7 @@ export function normalizarPayloadHighLevel(entrada: unknown) {
       masculino: Gender.HOMBRE,
       male: Gender.HOMBRE,
     }),
-    birthDate: textoOpcional(
+    birthDate: fechaNacimientoOpcional(
       obtener(indice, "birthDate", "birth_date", "dateOfBirth", "fechaNacimiento"),
     ),
     callPhone: textoOpcional(
@@ -209,7 +242,9 @@ export function normalizarPayloadHighLevel(entrada: unknown) {
     whatsappPhone: textoOpcional(
       obtener(indice, "whatsappPhone", "whatsapp_phone", "whatsapp"),
     ),
-    email: texto(obtener(indice, "email", "correo")) ?? "",
+    // Solo se pasa el correo si tiene forma válida; uno mal formado se ignora
+    // (opcional) en vez de tumbar todo el registro.
+    email: correoOpcional(obtener(indice, "email", "correo")),
     callSchedules: listaHorarios(
       obtener(indice, "callSchedules", "call_schedules", "horarioLlamada"),
     ),
