@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { MilestoneKind, Phase, Role } from "@iglesia/prisma-client";
 import { FormularioDatosPersona } from "@/components/formulario-datos-persona";
 import type { DatosPersona } from "@/lib/persona";
+import { generarContrasena, LARGO_MINIMO_CONTRASENA } from "@/lib/contrasena";
 import {
   alternarHito,
   asignarMentor,
@@ -14,6 +15,7 @@ import {
   guardarDatosPersona,
   guardarRolYPermisos,
   reactivar,
+  restablecerContrasena,
 } from "../acciones";
 
 const ROLES: { v: Role; l: string }[] = [
@@ -97,7 +99,10 @@ export function EditorPersona({
     <div className="mt-6 flex flex-col gap-4">
       <SeccionDatos personId={personId} inicial={datos} />
       {cuenta ? (
-        <SeccionRol cuenta={cuenta} />
+        <>
+          <SeccionRol cuenta={cuenta} />
+          <SeccionContrasena personId={personId} email={cuenta.email} />
+        </>
       ) : (
         <SeccionCrearAcceso personId={personId} />
       )}
@@ -433,6 +438,144 @@ function SeccionRol({ cuenta }: { cuenta: Cuenta }) {
         {guardando ? "Guardando…" : "Guardar rol y permisos"}
       </button>
     </Tarjeta>
+  );
+}
+
+function SeccionContrasena({
+  personId,
+  email,
+}: {
+  personId: string;
+  email: string;
+}) {
+  const [automatica, setAutomatica] = useState(true);
+  const [password, setPassword] = useState(() => generarContrasena());
+  const [enviarPorCorreo, setEnviarPorCorreo] = useState(true);
+  const [estado, setEstado] = useState<null | { ok: boolean; texto: string }>(null);
+  const [guardando, iniciar] = useTransition();
+
+  function elegirModo(auto: boolean) {
+    setAutomatica(auto);
+    setEstado(null);
+    setPassword(auto ? generarContrasena() : "");
+  }
+
+  function restablecer() {
+    setEstado(null);
+    iniciar(async () => {
+      const r = await restablecerContrasena(personId, { password, enviarPorCorreo });
+      setEstado(
+        r.ok
+          ? {
+              ok: true,
+              texto: enviarPorCorreo
+                ? "Contraseña restablecida y enviada por correo."
+                : "Contraseña restablecida. Entrégasela tú.",
+            }
+          : { ok: false, texto: r.mensaje },
+      );
+    });
+  }
+
+  return (
+    <Tarjeta titulo="ACCESO Y CONTRASEÑA">
+      <div className="flex items-baseline gap-[10px] rounded-[10px] bg-azul-050 px-[14px] py-3">
+        <span className="shrink-0 text-[11.5px] leading-[1.3] font-semibold text-[rgba(19,28,36,.5)]">
+          Correo de ingreso
+        </span>
+        <span className="text-[13px] leading-[1.3] font-bold break-all text-tinta">
+          {email}
+        </span>
+      </div>
+
+      <p className="mt-4 text-[12.5px] leading-[1.5] font-medium text-[rgba(19,28,36,.55)]">
+        Restablece su contraseña cuando la olvidó o no puede entrar.
+      </p>
+
+      <div className="mt-3 flex flex-col gap-2">
+        <Opcion
+          etiqueta="Generar una contraseña automática"
+          activo={automatica}
+          onChange={() => elegirModo(true)}
+        />
+        <Opcion
+          etiqueta="Escribirla yo"
+          activo={!automatica}
+          onChange={() => elegirModo(false)}
+        />
+      </div>
+
+      <label className="mt-3 block">
+        <span className="etiqueta-campo">Contraseña nueva</span>
+        {automatica ? (
+          <div className="campo flex items-center justify-between gap-3">
+            <span className="font-mono tracking-[.5px]">{password}</span>
+            <button
+              type="button"
+              onClick={() => setPassword(generarContrasena())}
+              className="shrink-0 cursor-pointer text-[11.5px] font-semibold text-azul-700"
+            >
+              Generar otra
+            </button>
+          </div>
+        ) : (
+          <input
+            className="campo"
+            value={password}
+            minLength={LARGO_MINIMO_CONTRASENA}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder={`Mínimo ${LARGO_MINIMO_CONTRASENA} caracteres`}
+          />
+        )}
+      </label>
+
+      <div className="mt-3">
+        <Interruptor
+          etiqueta="Enviarle la contraseña por correo"
+          activo={enviarPorCorreo}
+          onChange={setEnviarPorCorreo}
+        />
+      </div>
+
+      <p className="aviso-ambar mt-[14px] text-[12px] leading-[1.45] font-semibold text-ambar-texto">
+        La contraseña anterior deja de funcionar de inmediato.
+      </p>
+
+      <Aviso estado={estado} />
+      <button
+        type="button"
+        onClick={restablecer}
+        disabled={guardando || password.length < LARGO_MINIMO_CONTRASENA}
+        className="mt-4 cursor-pointer rounded-[9px] bg-azul-900 px-[15px] py-[11px] text-[12.5px] leading-none font-semibold text-white disabled:opacity-60"
+      >
+        {guardando ? "Restableciendo…" : "Restablecer contraseña"}
+      </button>
+    </Tarjeta>
+  );
+}
+
+/// Igual que `Interruptor` pero para elegir entre opciones excluyentes.
+function Opcion({
+  etiqueta,
+  activo,
+  onChange,
+}: {
+  etiqueta: string;
+  activo: boolean;
+  onChange: () => void;
+}) {
+  return (
+    <label className="flex cursor-pointer items-center gap-2 rounded-[10px] border border-[rgba(19,28,36,.14)] bg-white px-[12px] py-[9px]">
+      <input
+        type="radio"
+        checked={activo}
+        onChange={onChange}
+        className="h-4 w-4"
+      />
+      <span className="text-[12.5px] leading-[1.3] font-semibold text-tinta">
+        {etiqueta}
+      </span>
+    </label>
   );
 }
 

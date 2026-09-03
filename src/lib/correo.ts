@@ -40,6 +40,11 @@ async function enviarCorreo(datos: {
   }
 }
 
+/// Dirección pública del sistema. Vive aquí porque los correos son el único
+/// sitio donde hace falta una URL absoluta.
+export const URL_SISTEMA =
+  "https://sistema-iglesia-vive.viveministeriointernacional.workers.dev";
+
 function escapar(texto: string): string {
   return texto
     .replace(/&/g, "&amp;")
@@ -69,7 +74,7 @@ export async function correoCredenciales(datos: {
     html: MARCO(`
       <p>Hola ${escapar(datos.nombre)}, se creó tu acceso al sistema.</p>
       <p><strong>Ingresa aquí:</strong><br/>
-        <a href="https://sistema-iglesia-vive.viveministeriointernacional.workers.dev/ingresar">
+        <a href="${URL_SISTEMA}/ingresar">
           Abrir el sistema
         </a>
       </p>
@@ -102,7 +107,52 @@ export async function correoMentorAsignado(datos: {
         ${datos.correoPersona ? `<tr><td style="padding:4px 12px 4px 0;color:#8a929a">Correo</td><td>${escapar(datos.correoPersona)}</td></tr>` : ""}
       </table>
       ${datos.detalle ? `<p style="font-size:13px;color:#4a5560">${escapar(datos.detalle)}</p>` : ""}
-      <p><a href="https://sistema-iglesia-vive.viveministeriointernacional.workers.dev/mi-red">Ver en Mi red</a></p>
+      <p><a href="${URL_SISTEMA}/mi-red">Ver en Mi red</a></p>
+    `),
+  });
+}
+
+/// Correo con la contraseña nueva cuando un administrador la restablece.
+export async function correoContrasenaRestablecida(datos: {
+  to: string;
+  nombre: string;
+  email: string;
+  password: string;
+}): Promise<void> {
+  await enviarCorreo({
+    to: datos.to,
+    subject: "Tu contraseña de Iglesia Vive fue restablecida",
+    html: MARCO(`
+      <p>Hola ${escapar(datos.nombre)}, un administrador restableció tu contraseña.</p>
+      <table style="margin:16px 0;font-size:14px">
+        <tr><td style="padding:4px 12px 4px 0;color:#8a929a">Usuario</td><td><strong>${escapar(datos.email)}</strong></td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#8a929a">Contraseña nueva</td><td><strong>${escapar(datos.password)}</strong></td></tr>
+      </table>
+      <p><a href="${URL_SISTEMA}/ingresar">Entrar al sistema</a></p>
+      <p style="font-size:13px;color:#8a929a">La contraseña anterior ya no funciona. Si no pediste este cambio, avísale al administrador.</p>
+    `),
+  });
+}
+
+/// Enlace para que la persona cree ella misma una contraseña nueva.
+export async function correoRecuperarContrasena(datos: {
+  to: string;
+  nombre: string;
+  enlace: string;
+}): Promise<void> {
+  await enviarCorreo({
+    to: datos.to,
+    subject: "Recupera tu contraseña de Iglesia Vive",
+    html: MARCO(`
+      <p>Hola ${escapar(datos.nombre)}, recibimos una solicitud para cambiar tu contraseña.</p>
+      <p style="margin:20px 0">
+        <a href="${datos.enlace}"
+           style="background:#0e2a4e;color:#fff;text-decoration:none;padding:13px 22px;border-radius:10px;font-weight:bold;display:inline-block">
+          Crear una contraseña nueva
+        </a>
+      </p>
+      <p style="font-size:13px;color:#8a929a">El enlace vence en una hora y solo sirve una vez.</p>
+      <p style="font-size:13px;color:#8a929a">Si no lo pediste, ignora este correo: tu contraseña sigue igual.</p>
     `),
   });
 }

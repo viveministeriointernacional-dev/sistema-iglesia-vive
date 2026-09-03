@@ -18,7 +18,12 @@ import {
   ROLES_ADMIN,
   type UsuarioSesion,
 } from "@/lib/auth";
-import { correoCredenciales, correoMentorAsignado } from "@/lib/correo";
+import {
+  correoContrasenaRestablecida,
+  correoCredenciales,
+  correoMentorAsignado,
+} from "@/lib/correo";
+import { LARGO_MINIMO_CONTRASENA } from "@/lib/contrasena";
 import { nombreCompleto } from "@/lib/dominio";
 import { actualizarDatosPersona, type DatosPersona } from "@/lib/persona";
 import { getPrisma } from "@/lib/prisma";
@@ -144,6 +149,90 @@ export type NuevoAcceso = {
 
 /// Crea el acceso (cuenta de Supabase + usuario del sistema) para una persona
 /// que hoy no tiene login, y le asigna su rol y permisos.
+export type RestablecerContrasena = {
+  password: string;
+  enviarPorCorreo: boolean;
+};
+
+/// Restablece la contraseña de alguien que ya tiene acceso.
+///
+/// La contraseña anterior deja de servir en el momento en que Supabase acepta
+/// el cambio. Se le avisa por correo si el administrador lo pide; el correo es
+/// best-effort, así que el resultado no depende de que salga.
+export async function restablecerContrasena(
+  personId: string,
+  datos: RestablecerContrasena,
+): Promise<ResultadoAdmin> {
+  return conAdmin(async (usuario) => {
+    if (datos.password.length < LARGO_MINIMO_CONTRASENA) {
+      return {
+        ok: false,
+        mensaje: `La contraseña debe tener al menos ${LARGO_MINIMO_CONTRASENA} caracteres.`,
+      };
+    }
+
+    const prisma = await getPrisma();
+    const persona = await prisma.person.findUnique({
+      where: { id: personId },
+      select: {
+        firstName: true,
+        lastName: true,
+        user: { select: { id: true, email: true, authUserId: true } },
+      },
+    });
+    if (!persona) return { ok: false, mensaje: "No se encontró la persona." };
+    if (!persona.user) {
+      return { ok: false, mensaje: "Esta persona todavía no tiene acceso al sistema." };
+    }
+    if (!persona.user.authUserId) {
+      return {
+        ok: false,
+        mensaje:
+          "Su acceso no está enlazado con el proveedor de identidad. Vuelve a crearle el acceso.",
+      };
+    }
+
+    const admin = await crearSupabaseAdmin();
+    if (!admin) {
+      return {
+        ok: false,
+        mensaje:
+          "Falta configurar el secreto SUPABASE_SERVICE_ROLE_KEY en el Worker para poder cambiar contraseñas.",
+      };
+    }
+
+    const cambiado = await admin.auth.admin.updateUserById(persona.user.authUserId, {
+      password: datos.password,
+    });
+    if (cambiado.error) {
+      return {
+        ok: false,
+        mensaje: `No se pudo cambiar la contraseña: ${cambiado.error.message}`,
+      };
+    }
+
+    await auditar(prisma, {
+      actorId: usuario.id,
+      action: "administracion.contrasena_restablecida",
+      entityType: "person",
+      entityId: personId,
+      metadata: { email: persona.user.email, avisadaPorCorreo: datos.enviarPorCorreo },
+    });
+
+    if (datos.enviarPorCorreo) {
+      await correoContrasenaRestablecida({
+        to: persona.user.email,
+        nombre: nombreCompleto(persona),
+        email: persona.user.email,
+        password: datos.password,
+      });
+    }
+
+    revalidatePath(`/administracion/${personId}`);
+    return { ok: true };
+  });
+}
+
 export async function crearAcceso(
   personId: string,
   datos: NuevoAcceso,
