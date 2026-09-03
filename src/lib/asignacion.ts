@@ -1,4 +1,4 @@
-import { Gender, Role } from "@iglesia/prisma-client";
+import { Gender, Phase, Role } from "@iglesia/prisma-client";
 import type { ClientePrisma } from "@/lib/prisma";
 import { ESTADOS_EN_TABLERO } from "@/lib/op72";
 
@@ -47,8 +47,11 @@ async function candidatosConCarga(
   }));
 }
 
-/// Consolidadores disponibles del mismo género, con su carga actual
-/// (personas con Operación 72 en curso).
+/// Consolidadores disponibles del mismo género, con su carga actual.
+///
+/// Carga = personas **en fase GANAR** con su Operación 72 en curso. Al pasar a
+/// FORTALECER la persona deja de ser de consolidación (la acompaña su mentor),
+/// así que deja de pesar aquí aunque su Operación 72 hubiera quedado abierta.
 export async function consolidadoresDisponibles(
   db: ClientePrisma,
   genero: Gender | null,
@@ -58,6 +61,7 @@ export async function consolidadoresDisponibles(
       by: ["consolidatorId"],
       where: {
         consolidatorId: { in: ids },
+        phase: Phase.GANAR,
         operation72: { status: { in: [...ESTADOS_EN_TABLERO] } },
       },
       _count: { _all: true },
