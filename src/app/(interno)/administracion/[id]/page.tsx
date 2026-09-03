@@ -84,6 +84,7 @@ export default async function PaginaPersonaAdmin({
                   active: persona.user.active,
                   canLeadAlpha: persona.user.canLeadAlpha,
                   canLeadFaithHouse: persona.user.canLeadFaithHouse,
+                  canMentor: persona.user.canMentor,
                   coordinatesConsolidation: persona.user.coordinatesConsolidation,
                 }
               : null

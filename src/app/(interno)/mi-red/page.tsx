@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Phase } from "@iglesia/prisma-client";
-import { requerirRol, ROLES_CON_RED } from "@/lib/auth";
+import { requerirPermiso, tieneRed } from "@/lib/auth";
 import { cargarRed, DIAS_SIN_CONTACTO, type PersonaDeLaRed } from "@/lib/red";
 import { cargarEquipo } from "@/lib/equipo";
 import { BuscadorPersonas } from "@/components/buscador-personas";
@@ -68,7 +68,7 @@ function FilaDePersona({ persona }: { persona: PersonaDeLaRed }) {
 }
 
 export default async function PaginaMiRed() {
-  const usuario = await requerirRol(ROLES_CON_RED);
+  const usuario = await requerirPermiso(tieneRed);
   const red = await cargarRed(usuario);
   const equipo = await cargarEquipo(usuario);
 

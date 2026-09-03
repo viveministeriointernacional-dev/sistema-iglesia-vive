@@ -1,5 +1,5 @@
 import { LearnerStatus, Role } from "@iglesia/prisma-client";
-import type { UsuarioSesion } from "@/lib/auth";
+import { DONDE_PUEDE_MENTOREAR, type UsuarioSesion } from "@/lib/auth";
 import { nombreCompleto } from "@/lib/dominio";
 import type { ClientePrisma } from "@/lib/prisma";
 import { getPrisma } from "@/lib/prisma";
@@ -10,11 +10,11 @@ export type MentorElegible = {
   role: Role;
 };
 
-/// Quiénes pueden ser mentores: cualquier persona activa con rol de mentor,
-/// pastor o administrador. Asignar el rol es lo que la habilita para aparecer
-/// aquí; no se exige una fase, para que también entren pastores, administradores
-/// y líderes sin proceso propio.
-export const ROLES_MENTOR: Role[] = [Role.MENTOR, Role.PASTOR, Role.ADMIN];
+/// Quiénes pueden ser mentores: por rol (mentor, pastor, administrador) o por
+/// el permiso acumulable `canMentor`, que deja que un consolidador acompañe
+/// discípulos sin dejar de ser consolidador. No se exige una fase, para que
+/// también entren pastores, administradores y líderes sin proceso propio.
+export { ROLES_MENTOR } from "@/lib/auth";
 
 export async function mentoresElegibles(
   db: ClientePrisma,
@@ -22,7 +22,7 @@ export async function mentoresElegibles(
   const usuarios = await db.appUser.findMany({
     where: {
       active: true,
-      role: { in: ROLES_MENTOR },
+      ...DONDE_PUEDE_MENTOREAR,
     },
     select: { id: true, fullName: true, role: true },
     orderBy: { fullName: "asc" },

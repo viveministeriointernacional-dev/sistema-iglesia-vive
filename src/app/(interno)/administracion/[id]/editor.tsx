@@ -62,6 +62,7 @@ type Cuenta = {
   active: boolean;
   canLeadAlpha: boolean;
   canLeadFaithHouse: boolean;
+  canMentor: boolean;
   coordinatesConsolidation: boolean;
 };
 
@@ -390,6 +391,7 @@ function PermisosCampos({
     active: boolean;
     canLeadAlpha: boolean;
     canLeadFaithHouse: boolean;
+  canMentor: boolean;
     coordinatesConsolidation: boolean;
   };
   onChange: (parcial: Partial<typeof valores>) => void;
@@ -432,6 +434,11 @@ function PermisosCampos({
           onChange={(v) => onChange({ canLeadFaithHouse: v })}
         />
         <Interruptor
+          etiqueta="Puede ser mentor (acompaña discípulos)"
+          activo={valores.canMentor}
+          onChange={(v) => onChange({ canMentor: v })}
+        />
+        <Interruptor
           etiqueta="Coordina la consolidación (ve a todos los consolidadores)"
           activo={valores.coordinatesConsolidation}
           onChange={(v) => onChange({ coordinatesConsolidation: v })}
@@ -453,6 +460,7 @@ function SeccionRol({ cuenta }: { cuenta: Cuenta }) {
     active: cuenta.active,
     canLeadAlpha: cuenta.canLeadAlpha,
     canLeadFaithHouse: cuenta.canLeadFaithHouse,
+    canMentor: cuenta.canMentor,
     coordinatesConsolidation: cuenta.coordinatesConsolidation,
   });
   const [estado, setEstado] = useState<null | { ok: boolean; texto: string }>(null);
@@ -495,6 +503,7 @@ function SeccionCrearAcceso({ personId }: { personId: string }) {
     active: true,
     canLeadAlpha: false,
     canLeadFaithHouse: false,
+    canMentor: false,
     coordinatesConsolidation: false,
   });
   const [estado, setEstado] = useState<null | { ok: boolean; texto: string }>(null);

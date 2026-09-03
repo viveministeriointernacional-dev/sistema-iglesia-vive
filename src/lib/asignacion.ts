@@ -1,4 +1,5 @@
 import { Gender, Phase, Role } from "@iglesia/prisma-client";
+import { DONDE_PUEDE_MENTOREAR } from "@/lib/auth";
 import type { ClientePrisma } from "@/lib/prisma";
 import { ESTADOS_EN_TABLERO } from "@/lib/op72";
 
@@ -15,13 +16,15 @@ export type CargaDeUsuario = {
 /// carga; un líder puede reasignar después.
 async function candidatosConCarga(
   db: ClientePrisma,
-  rol: Role,
+  /// Quién es candidato: un rol exacto, o un filtro de Prisma cuando la
+  /// capacidad también se concede por permiso (mentor).
+  quienes: Role | Record<string, unknown>,
   genero: Gender | null,
   contarCarga: (ids: string[]) => Promise<Map<string, number>>,
 ): Promise<CargaDeUsuario[]> {
   const candidatos = await db.appUser.findMany({
     where: {
-      role: rol,
+      ...(typeof quienes === "string" ? { role: quienes } : quienes),
       active: true,
       ...(genero ? { person: { gender: genero } } : {}),
     },
@@ -77,9 +80,10 @@ export async function consolidadoresDisponibles(
 }
 
 /// Mentores del mismo género con su carga actual (relaciones de discipulado
-/// abiertas).
+/// abiertas). Incluye a quien acompaña por el permiso `canMentor`, no solo por
+/// rol: un consolidador puede ser mentor sin dejar de ser consolidador.
 export async function mentoresDisponibles(db: ClientePrisma, genero: Gender | null) {
-  return candidatosConCarga(db, Role.MENTOR, genero, async (ids) => {
+  return candidatosConCarga(db, DONDE_PUEDE_MENTOREAR, genero, async (ids) => {
     const grupos = await db.mentorRelationship.groupBy({
       by: ["mentorId"],
       where: { mentorId: { in: ids }, endedAt: null },
@@ -193,7 +197,11 @@ export async function proponerMentor(
 /// misma mentora, la línea se conserva en ella.
 async function mentorDeLaLinea(db: ClientePrisma, invitadorPersonId: string) {
   const usuarioInvitador = await db.appUser.findFirst({
-    where: { personId: invitadorPersonId, active: true, role: Role.MENTOR },
+    where: {
+      personId: invitadorPersonId,
+      active: true,
+      ...DONDE_PUEDE_MENTOREAR,
+    },
     select: {
       id: true,
       fullName: true,

@@ -6,7 +6,7 @@ import {
   Role,
 } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
-import type { UsuarioSesion } from "@/lib/auth";
+import { puedeMentorear, type UsuarioSesion } from "@/lib/auth";
 import type { DatosExpediente } from "@/lib/expediente";
 
 /// La siguiente fase del recorrido. La última no tiene siguiente: de
@@ -28,7 +28,8 @@ export async function puedeCambiarFase(
   learnerId: string,
 ): Promise<boolean> {
   if (usuario.role === Role.PASTOR || usuario.role === Role.ADMIN) return true;
-  if (usuario.role !== Role.MENTOR) return false;
+  // Acompañar como mentor puede venir del rol o del permiso `canMentor`.
+  if (!puedeMentorear(usuario)) return false;
 
   const prisma = await getPrisma();
   const relacion = await prisma.mentorRelationship.findFirst({

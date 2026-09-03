@@ -12,13 +12,13 @@ import {
 import { HITOS_EDITABLES } from "@/lib/administracion";
 import { auditar } from "@/lib/audit";
 import {
+  DONDE_PUEDE_MENTOREAR,
   ErrorDePermiso,
   requerirRolEnAccion,
   ROLES_ADMIN,
   type UsuarioSesion,
 } from "@/lib/auth";
 import { correoCredenciales, correoMentorAsignado } from "@/lib/correo";
-import { ROLES_MENTOR } from "@/lib/equipo";
 import { nombreCompleto } from "@/lib/dominio";
 import { exportarDatosPersona } from "@/lib/highlevel-salida";
 import { getPrisma } from "@/lib/prisma";
@@ -117,6 +117,7 @@ export type RolYPermisos = {
   active: boolean;
   canLeadAlpha: boolean;
   canLeadFaithHouse: boolean;
+  canMentor: boolean;
   coordinatesConsolidation: boolean;
 };
 
@@ -152,6 +153,7 @@ export async function guardarRolYPermisos(
         active: datos.active,
         canLeadAlpha: datos.canLeadAlpha,
         canLeadFaithHouse: datos.canLeadFaithHouse,
+        canMentor: datos.canMentor,
         coordinatesConsolidation: datos.coordinatesConsolidation,
       },
     });
@@ -165,6 +167,7 @@ export async function guardarRolYPermisos(
         role: datos.role,
         canLeadAlpha: datos.canLeadAlpha,
         canLeadFaithHouse: datos.canLeadFaithHouse,
+        canMentor: datos.canMentor,
         coordinatesConsolidation: datos.coordinatesConsolidation,
         active: datos.active,
       },
@@ -250,6 +253,7 @@ export async function crearAcceso(
           active: datos.active,
           canLeadAlpha: datos.canLeadAlpha,
           canLeadFaithHouse: datos.canLeadFaithHouse,
+          canMentor: datos.canMentor,
           coordinatesConsolidation: datos.coordinatesConsolidation,
           personId: persona.id,
         },
@@ -426,7 +430,7 @@ export async function asignarMentor(
       where: {
         id: mentorUserId,
         active: true,
-        role: { in: ROLES_MENTOR },
+        ...DONDE_PUEDE_MENTOREAR,
       },
       select: { id: true, email: true, fullName: true },
     });

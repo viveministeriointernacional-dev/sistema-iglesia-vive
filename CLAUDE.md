@@ -146,6 +146,27 @@ eventos, y administración. Documentación de producto en `design/`
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-03** — **Ser mentor pasa a ser un permiso acumulable** (decisión del
+  usuario: «un consolidador puede ser al mismo tiempo mentor o líder de Alpha»).
+  Antes el rol era **uno solo**, así que consolidador+mentor era imposible.
+  Alpha y Casa de Fe ya eran permisos (`can_lead_*`), así que **eso ya funcionaba**;
+  lo que faltaba era mentor. Se añadió `app_user.can_mentor` (migración
+  `20260903150000_permiso_mentor`, aplicada). **Pastor NO se hizo acumulable**
+  (el usuario lo dejó para después: implica autoridad sobre toda la iglesia).
+  **Fuente única de verdad en `src/lib/auth.ts`** — usar SIEMPRE estos helpers en
+  vez de comparar roles a mano:
+  - `puedeMentorear(usuario)` = rol MENTOR/PASTOR/ADMIN **o** `canMentor`.
+  - `DONDE_PUEDE_MENTOREAR` = el mismo filtro para consultas de Prisma.
+  - `tieneRed(usuario)` = ve `/mi-red` (rol con red o `canMentor`).
+  - `puedeConfirmarEntrega(usuario)` = confirma la entrega a mentor.
+  Aplicado en: `equipo.mentoresElegibles`, `asignacion.mentoresDisponibles` y
+  `mentorDeLaLinea`, `fases.puedeCambiarFase`, `operacion-72/acciones` (propuesta
+  y confirmación de entrega), `administracion/acciones`, y las páginas
+  `mi-red` / `mi-proceso` / `layout` (que antes filtraban por `ROLES_CON_RED`).
+  `candidatosConCarga` ahora acepta un rol **o** un filtro de Prisma.
+  UI: casilla **«Puede ser mentor (acompaña discípulos)»** en administración,
+  junto a las de Alpha y Casa de Fe.
+
 - **2026-09-03** — **Regla del recorrido definida por el usuario:** al pasar de
   **GANAR → FORTALECER** la persona **deja de ser de consolidación** (la acompaña
   su mentor, que luego le asigna líder de Alpha o de Casa de Fe) y la **carga del
