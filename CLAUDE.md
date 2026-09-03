@@ -146,6 +146,40 @@ eventos, y administración. Documentación de producto en `design/`
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-03** — **Regla del recorrido definida por el usuario:** al pasar de
+  **GANAR → FORTALECER** la persona **deja de ser de consolidación** (la acompaña
+  su mentor, que luego le asigna líder de Alpha o de Casa de Fe) y la **carga del
+  consolidador debe bajar**. Bug encontrado: la carga se calculaba solo por el
+  estado de la Operación 72, que quedaba **abierta** al avanzar de fase → 5
+  personas en FORTALECER/ENTRENAR/MULTIPLICAR seguían pesando en su consolidador.
+  Fix (doble):
+  1. `expediente/[id]/acciones.ts`: al salir de GANAR se cierra la Operación 72
+     como **ENTREGADA** («Entregada a mentor · pasa a Fortalecer») + auditoría
+     `operacion72.entregada`.
+  2. `asignacion.ts` → `consolidadoresDisponibles`: la carga cuenta solo personas
+     en **fase GANAR** con Op72 en curso (red de seguridad si alguna quedara abierta).
+  **El vínculo con el consolidador se CONSERVA** como historial del expediente.
+  **Trazabilidad de fase: ya existía** — tabla `phase_change` (fromPhase, toPhase,
+  decidedById, `decidedAt` con fecha y hora, nota) + `learner_profile.phaseStartedAt`
+  + auditoría `fase.cambiada`. No hubo que construirla.
+  Datos corregidos: las 5 Op72 abiertas se cerraron con auditoría.
+
+- **2026-09-03** — **Consolidadores: lista completa y datos corregidos.** Ojo con
+  las consultas: cruzar `app_user` con `person` por INNER JOIN **oculta** a los
+  consolidadores sin ficha. Había 3 sin ficha (y por eso **fuera del reparto
+  automático**, que filtra por género): **Ana Lucía Gutiérrez**, **Nini Guerrón**
+  y **Carlos Suárez**. Arreglado: Ana enlazada a su ficha existente (mismo celular
+  +573102328666, sin crear duplicado); Carlos enlazado a su ficha «Carlos enrique»
+  (mismo correo) y nombre corregido a «Carlos Enrique Suárez»; Nini con ficha nueva.
+  Laura Charry: se le puso género MUJER (también estaba fuera del reparto).
+  **Johana Ramírez**: se le quitó el rol de consolidadora (rol → APRENDIZ) **pero
+  conserva acceso** al sistema; sus **19 personas se reasignaron** por la regla del
+  sistema (mismo género → menor carga; sin género → solo menor carga), con **19
+  registros de auditoría `consolidador.reasignado`** (persona, género, consolidador
+  anterior y nuevo con sus ids, criterio y motivo).
+  **Pendiente:** la ficha de «Cristina Ramírez losada» tiene el correo de Nini
+  (`ninijguerrons@gmail.com`); el usuario prefirió no tocarla por ahora.
+
 - **2026-09-03** — **Registros de HighLevel VIVOS**. Se agregó por fin el paso
   **Webhook** al workflow «1. Se llenó Formulario Registro Nuevo» (antes no
   existía: el flujo inscribía y terminaba en pasos de «Mensaje», por eso nunca

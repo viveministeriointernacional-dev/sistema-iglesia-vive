@@ -6,7 +6,8 @@ import {
   LearnerStatus,
   MilestoneKind,
   MilestoneStatus,
-  type Phase,
+  Operation72Status,
+  Phase,
 } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
 import { auditar, encolarEventoIntegracion } from "@/lib/audit";
@@ -355,6 +356,35 @@ export async function cambiarDeFase(
       entityId: learnerId,
       metadata: { desde, hasta, nota: nota.trim() || null },
     });
+
+    // Al salir de GANAR la persona deja de ser de consolidación: la acompaña su
+    // mentor. La Operación 72 es el proceso de esa fase, así que se cierra como
+    // ENTREGADA: sale del tablero y deja de contar en la carga del consolidador.
+    // El vínculo con el consolidador se conserva como historial del expediente.
+    if (desde === Phase.GANAR) {
+      const entregada = await tx.operation72.updateMany({
+        where: {
+          learnerId,
+          status: { notIn: [Operation72Status.ENTREGADA, Operation72Status.CERRADA] },
+        },
+        data: {
+          status: Operation72Status.ENTREGADA,
+          detail: "Entregada a mentor · pasa a Fortalecer",
+        },
+      });
+      if (entregada.count > 0) {
+        await auditar(tx, {
+          actorId: usuario.id,
+          action: "operacion72.entregada",
+          entityType: "learner_profile",
+          entityId: learnerId,
+          metadata: {
+            motivo: "Cambio de fase GANAR → FORTALECER",
+            cerradaAt: ahora.toISOString(),
+          },
+        });
+      }
+    }
 
     await encolarEventoIntegracion(tx, "fase_cambiada", {
       learnerId,
