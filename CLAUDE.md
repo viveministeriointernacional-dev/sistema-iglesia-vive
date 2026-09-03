@@ -81,6 +81,8 @@ eventos, y administración. Documentación de producto en `design/`
   Header `x-iglesia-webhook-secret` = env `HIGHLEVEL_WEBHOOK_SECRET` (valor vive en
   Cloudflare, **no** en el repo). Workflow en HighLevel: «Se llenó Formulario
   Registro Nuevo» → paso Webhook.
+- **Seguimiento de la línea (visitas):** `POST /api/integraciones/highlevel/visita`.
+  Mismo secreto. Ver bitácora 2026-09-03.
 - **Llamadas:** `POST /api/integraciones/highlevel/llamada`. Mismo secreto.
   Guarda en tabla `call_log`. Workflow en HighLevel: trigger **«Detalles de la
   llamada»** → acción **Webhook** (POST, header del secreto, y datos:
@@ -152,6 +154,45 @@ eventos, y administración. Documentación de producto en `design/`
 - Validar deploy sin credenciales: `npx wrangler deploy --dry-run --outdir /tmp/x`
 
 ## 12. Bitácora (añadir lo nuevo arriba)
+
+- **2026-09-03** — **Tarjetas de Operación 72 explícitas, baja desde el tablero y
+  webhook de visitas** (mockup aprobado por el usuario:
+  claude.ai/code/artifact/62dc9ac9-0589-4d37-a854-6c10d3fd6d14).
+  1. **Tarjeta** (`operacion-72/page.tsx` + `tarjeta.tsx`): cada dato con rótulo
+     — CELULAR, CONSOLIDA (nombre real), LO/LA INVITÓ, LLEGÓ POR, EDAD (solo si se
+     conoce; se acabó el «0 años»). Dato ausente = «No quedó registrado» (antes
+     «Sin registrar» a secas era el punto de entrada). Bloque **ÚLTIMO
+     MOVIMIENTO** = último `contact_attempt` con quién y cuándo
+     (`tituloDelMovimiento` en `op72.ts`; `momentoLegible`/`telefonoLegible` en
+     `dominio.ts`); en VISITA PENDIENTE muestra **VISITA ACORDADA** (fecha, lugar,
+     y si la agendó la línea desde el CRM: `byUserId` nulo). Chip ahora dice
+     «QUEDAN n H» / «VENCIÓ HACE n DÍAS». Ya **no se usa `operation72.detail`**
+     en la tarjeta (sigue guardándose para el expediente). Hallazgo: el texto
+     «bienvenida por WhatsApp enviada» era **fijo y falso** (el sistema no envía
+     WhatsApp); ahora dice «Registrada · consolidador asignado».
+  2. **Dar de baja desde el tablero**: núcleo compartido en `src/lib/baja.ts`
+     (`darDeBajaAprendiz`), usado por administración y por
+     `darDeBajaDesdeTablero` (mismo alcance que las demás acciones del tablero).
+     Motivo **obligatorio** de lista cerrada `MOTIVOS_DE_BAJA` (`op72.ts`) +
+     nota opcional; auditoría `operacion72.dado_de_baja`. Los motivos son
+     propuesta mía; el usuario no los ha revisado aún.
+  3. **Webhook `POST /api/integraciones/highlevel/visita`** para los formularios
+     «Registro Visita» / «Primera Llamada» / «Asignar a Línea» sobre contactos
+     que ya existen. Mismo secreto. Reconoce a la persona por `highlevel_contact`
+     o, si no está enlazada, por celular/correo (solo si hay UNA candidata).
+     Parser `normalizarSeguimientoHighLevel` (`highlevel.ts`, lee los mismos
+     campos personalizados que ya usaba el registro). `programarVisitaDesdeCrm`
+     ahora devuelve `"visita" | "llamada" | null` y **también aplica la llamada
+     sola**: contestó → CONTACTADA, no contestó → SEGUIMIENTO (idempotente por
+     resultado+fecha). Añadido a `RUTAS_PUBLICAS`. Auditoría
+     `highlevel.seguimiento_recibido`. `secretoValido` ahora vive en
+     `src/lib/webhook.ts` (las tres rutas lo comparten).
+  **Pendiente del usuario:** crear en HighLevel el workflow con trigger
+  «Formulario enviado» (Registro Visita) → acción Webhook a esa URL con
+  `contactId={{contact.id}}`, `locationId={{location.id}}`, `phone`, `email`,
+  `formName` y los campos «Confirmación de visita», «Fecha visita», «Estado
+  Primera Llamada Linea», «Fecha Primera Llamada Linea», «Observación Primera
+  LLamada Linea».
 
 - **2026-09-03** — **El correo del sistema por fin funciona (nunca había enviado
   uno).** El usuario restableció una contraseña desde administración, la pantalla

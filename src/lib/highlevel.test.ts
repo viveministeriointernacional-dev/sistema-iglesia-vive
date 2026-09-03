@@ -1,13 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  CallOutcome,
   CallSchedule,
   ChurchAttendance,
   EntryPoint,
   Gender,
   InvitationKind,
 } from "@iglesia/prisma-client";
-import { normalizarPayloadHighLevel } from "./highlevel";
+import {
+  normalizarPayloadHighLevel,
+  normalizarSeguimientoHighLevel,
+} from "./highlevel";
 
 test("normaliza el cuerpo canónico del webhook", () => {
   const resultado = normalizarPayloadHighLevel({
@@ -73,5 +77,33 @@ test("rechaza envíos sin identidad estable de HighLevel", () => {
       locationId: "ubicacion-1",
       firstName: "Sin contacto",
     }),
+  );
+});
+
+test("el seguimiento de la línea reconoce la visita confirmada y la llamada", () => {
+  const resultado = normalizarSeguimientoHighLevel({
+    contactId: "contacto-9",
+    locationId: "ubicacion-1",
+    formName: "Registro Visita",
+    phone: "+57 313 452 1673",
+    email: "{{contact.email}}",
+    "Confirmación de visita": "Sí, confirmada",
+    "Fecha visita": "2026-08-29T16:00:00-05:00",
+    "Estado Primera Llamada Linea": "Contestó bien",
+    "Observación Primera LLamada Linea": "Quedó en venir el sábado.",
+  });
+
+  assert.equal(resultado.contexto.contactId, "contacto-9");
+  assert.equal(resultado.contexto.phone, "+57 313 452 1673");
+  // Un merge-tag sin resolver no es un correo.
+  assert.equal(resultado.contexto.email, null);
+  assert.equal(resultado.visita.confirmacion, "confirmada");
+  assert.equal(resultado.visita.estadoLinea, CallOutcome.CONTESTO_BIEN);
+  assert.equal(resultado.visita.observacionLinea, "Quedó en venir el sábado.");
+});
+
+test("el seguimiento exige saber de qué contacto se trata", () => {
+  assert.throws(() =>
+    normalizarSeguimientoHighLevel({ "Confirmación de visita": "Sí" }),
   );
 });

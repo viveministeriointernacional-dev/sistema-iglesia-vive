@@ -20,51 +20,99 @@ const FORMATO_VISITA = new Intl.DateTimeFormat("es-CO", {
   timeZone: ZONA_HORARIA,
 });
 
-/// Cuando la línea confirma una visita en el CRM, la persona pasa a «visita
-/// pendiente» con su fecha. Es el mismo movimiento que hace un consolidador a
-/// mano desde el tablero (`agendarVisita`), pero disparado por el webhook.
+export type ResultadoSeguimientoCrm = "visita" | "llamada" | null;
+
+/// Aplica lo que la línea registró en el CRM sobre una persona que ya está en
+/// Operación 72. Es el mismo movimiento que haría un consolidador a mano desde
+/// el tablero, pero disparado por el webhook:
 ///
-/// Solo avanza desde antes de la visita (INICIADA o CONTACTADA): nunca pisa una
-/// visita ya agendada, una entrega ni un cierre. Devuelve si aplicó el cambio.
+/// - Si la línea **confirmó la visita** (presencial o virtual), la persona pasa
+///   a VISITA PENDIENTE con su fecha. Nunca pisa una visita ya agendada, una
+///   entrega ni un cierre.
+/// - Si solo registró **cómo salió la llamada**, se guarda el intento y aplica
+///   la regla del tablero: contestó → CONTACTADA; no contestó → SEGUIMIENTO.
+///
+/// Devuelve qué aplicó, o `null` si no había nada que hacer.
 export async function programarVisitaDesdeCrm(
   db: ClientePrisma,
   learnerId: string,
   visita: VisitaDesdeCrm,
-): Promise<boolean> {
-  if (visita.confirmacion !== "confirmada" && visita.confirmacion !== "virtual") {
-    return false;
-  }
-
+): Promise<ResultadoSeguimientoCrm> {
   const op = await db.operation72.findUnique({
     where: { learnerId },
     select: { id: true, status: true },
   });
-  if (
-    !op ||
-    (op.status !== Operation72Status.INICIADA &&
-      op.status !== Operation72Status.SEGUIMIENTO &&
-      op.status !== Operation72Status.CONTACTADA)
-  ) {
-    return false;
+  if (!op) return null;
+
+  const antesDeLaVisita =
+    op.status === Operation72Status.INICIADA ||
+    op.status === Operation72Status.SEGUIMIENTO ||
+    op.status === Operation72Status.CONTACTADA;
+  if (!antesDeLaVisita) return null;
+
+  const visitaConfirmada =
+    visita.confirmacion === "confirmada" || visita.confirmacion === "virtual";
+  const esperaContacto = op.status !== Operation72Status.CONTACTADA;
+
+  // La llamada de la línea, si el CRM manda cómo salió. Se guarda una sola vez:
+  // el mismo formulario puede reenviarse y no debe duplicar el intento.
+  let llamadaRegistrada = false;
+  if (visita.estadoLinea) {
+    const contesto = visita.estadoLinea !== CallOutcome.NO_CONTESTO;
+    const ocurrioEl = fechaValida(visita.fechaLinea) ?? new Date();
+    const repetida = await db.contactAttempt.findFirst({
+      where: {
+        operation72Id: op.id,
+        outcome: visita.estadoLinea,
+        byUserId: null,
+        occurredAt: ocurrioEl,
+      },
+      select: { id: true },
+    });
+    if (!repetida) {
+      await db.contactAttempt.create({
+        data: {
+          operation72Id: op.id,
+          type: contesto ? ContactType.LLAMADA : ContactType.INTENTO_LLAMADA,
+          outcome: visita.estadoLinea,
+          result: `${ETIQUETA_LLAMADA[visita.estadoLinea]} (línea)`,
+          note: visita.observacionLinea,
+          occurredAt: ocurrioEl,
+        },
+      });
+      llamadaRegistrada = true;
+    }
+
+    if (!visitaConfirmada && esperaContacto) {
+      await db.operation72.update({
+        where: { id: op.id },
+        data: {
+          status: contesto
+            ? Operation72Status.CONTACTADA
+            : Operation72Status.SEGUIMIENTO,
+          detail: [ETIQUETA_LLAMADA[visita.estadoLinea], visita.observacionLinea]
+            .filter(Boolean)
+            .join(" · "),
+        },
+      });
+      await auditar(db, {
+        actorId: null,
+        action: "operacion72.contacto_registrado",
+        entityType: "operation72",
+        entityId: op.id,
+        metadata: {
+          origen: "highlevel",
+          resultado: visita.estadoLinea,
+          contactada: contesto,
+        },
+      });
+    }
   }
+
+  if (!visitaConfirmada) return llamadaRegistrada ? "llamada" : null;
 
   const esVirtual = visita.confirmacion === "virtual";
   const fecha = fechaValida(visita.fechaVisita);
-
-  // La llamada de la línea, si el CRM manda cómo salió.
-  if (visita.estadoLinea) {
-    const contesto = visita.estadoLinea !== CallOutcome.NO_CONTESTO;
-    await db.contactAttempt.create({
-      data: {
-        operation72Id: op.id,
-        type: contesto ? ContactType.LLAMADA : ContactType.INTENTO_LLAMADA,
-        outcome: visita.estadoLinea,
-        result: `${ETIQUETA_LLAMADA[visita.estadoLinea]} (línea)`,
-        note: visita.observacionLinea,
-        occurredAt: fechaValida(visita.fechaLinea) ?? new Date(),
-      },
-    });
-  }
 
   await db.contactAttempt.create({
     data: {
@@ -97,13 +145,13 @@ export async function programarVisitaDesdeCrm(
     entityId: op.id,
     metadata: {
       origen: "highlevel",
-      form: "Registro Llamada Linea",
+      form: "Registro Visita",
       fechaVisita: visita.fechaVisita,
       virtual: esVirtual,
     },
   });
 
-  return true;
+  return "visita";
 }
 
 function fechaValida(valor: string | null): Date | null {
@@ -260,9 +308,11 @@ export async function crearRegistroEnTransaccion(
       learnerId: aprendiz.id,
       startedAt: ahora,
       deadlineAt,
+      // Solo lo que el sistema sabe que hizo. El WhatsApp de bienvenida, si
+      // sale, lo manda HighLevel por su cuenta: aquí no se puede afirmar.
       detail: elegido
-        ? "Consolidador asignado · bienvenida por WhatsApp enviada"
-        : "Sin consolidador disponible · requiere asignación de un líder",
+        ? "Registrada · consolidador asignado"
+        : "Registrada · sin consolidador disponible, requiere asignación de un líder",
       lineKnown: Boolean(invitador),
     },
   });

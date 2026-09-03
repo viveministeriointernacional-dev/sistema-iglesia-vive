@@ -2,13 +2,20 @@ import Link from "next/link";
 import { type Prisma, Role } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
 import { requerirRol, ROLES_CONSOLIDACION, veTodaLaConsolidacion } from "@/lib/auth";
-import { nombreCompleto, normalizarBusqueda, textoDeEntrada } from "@/lib/dominio";
+import {
+  momentoLegible,
+  nombreCompleto,
+  normalizarBusqueda,
+  telefonoLegible,
+  textoDeEntrada,
+} from "@/lib/dominio";
 import {
   COLUMNAS_OP72,
   ESTADOS_EN_TABLERO,
   edadDesde,
   porcentajeAvance,
   textoChip,
+  tituloDelMovimiento,
   tituloLinea,
   TRANSICIONES,
   urgenciaDe,
@@ -90,8 +97,8 @@ export default async function TableroOperacion72({
   const seleccionDeTarjeta = {
     id: true,
     status: true,
+    startedAt: true,
     deadlineAt: true,
-    detail: true,
     lineKnown: true,
     proposedMentorId: true,
     proposedMentorNote: true,
@@ -104,8 +111,16 @@ export default async function TableroOperacion72({
         entryPoint: true,
         entryPointOther: true,
         lineOfOrigin: true,
+        consolidator: { select: { fullName: true } },
         person: {
-          select: { firstName: true, lastName: true, birthDate: true },
+          select: {
+            firstName: true,
+            lastName: true,
+            birthDate: true,
+            gender: true,
+            callPhone: true,
+            whatsappPhone: true,
+          },
         },
       },
     },
@@ -163,24 +178,124 @@ export default async function TableroOperacion72({
   );
   const operaciones = gruposPorColumna.flat();
 
+  // El último movimiento de cada tarjeta (qué pasó, quién y cuándo) y cuántas
+  // llamadas lleva. Una sola consulta para todas las tarjetas visibles: es lo
+  // que reemplaza al resumen libre `detail`, que mezclaba el hecho con la
+  // observación y no decía quién ni cuándo.
+  const intentos = operaciones.length
+    ? await prisma.contactAttempt.findMany({
+        where: { operation72Id: { in: operaciones.map((o) => o.id) } },
+        orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }],
+        select: {
+          operation72Id: true,
+          type: true,
+          outcome: true,
+          result: true,
+          note: true,
+          occurredAt: true,
+          scheduledAt: true,
+          place: true,
+          isVirtual: true,
+          byUser: { select: { fullName: true } },
+        },
+      })
+    : [];
+  const ultimoPorOperacion = new Map<string, (typeof intentos)[number]>();
+  const llamadasPorOperacion = new Map<string, number>();
+  const visitaPorOperacion = new Map<string, (typeof intentos)[number]>();
+  for (const intento of intentos) {
+    if (!ultimoPorOperacion.has(intento.operation72Id)) {
+      ultimoPorOperacion.set(intento.operation72Id, intento);
+    }
+    if (intento.type === "LLAMADA" || intento.type === "INTENTO_LLAMADA") {
+      llamadasPorOperacion.set(
+        intento.operation72Id,
+        (llamadasPorOperacion.get(intento.operation72Id) ?? 0) + 1,
+      );
+    }
+    if (intento.type === "VISITA" && !visitaPorOperacion.has(intento.operation72Id)) {
+      visitaPorOperacion.set(intento.operation72Id, intento);
+    }
+  }
+
   const tarjetas: TarjetaPersona[] = operaciones.map((operacion) => {
     const { learner } = operacion;
-    const edad = edadDesde(learner.person.birthDate, ahora);
+    const persona = learner.person;
+    const edad = edadDesde(persona.birthDate, ahora);
     const transicion = TRANSICIONES[operacion.status];
+    const celular = telefonoLegible(persona.callPhone ?? persona.whatsappPhone);
+    const ultimo = ultimoPorOperacion.get(operacion.id) ?? null;
+    const visita = visitaPorOperacion.get(operacion.id) ?? null;
+    const llamadas = llamadasPorOperacion.get(operacion.id) ?? 0;
+
+    const invito =
+      persona.gender === "MUJER" ? "LA INVITÓ" : persona.gender === "HOMBRE" ? "LO INVITÓ" : "INVITÓ";
+
+    const datos: TarjetaPersona["datos"] = [
+      { rotulo: "CELULAR", valor: celular, ausente: !celular },
+      {
+        rotulo: "CONSOLIDA",
+        valor: learner.consolidator?.fullName ?? null,
+        ausente: !learner.consolidator,
+        faltante: "Sin consolidador asignado",
+      },
+      { rotulo: invito, valor: learner.lineOfOrigin?.trim() || null, ausente: !learner.lineOfOrigin?.trim() },
+      {
+        rotulo: "LLEGÓ POR",
+        valor: learner.entryPoint ? textoDeEntrada(learner.entryPoint, learner.entryPointOther) : null,
+        ausente: !learner.entryPoint,
+      },
+    ];
+    // La edad solo cuando se conoce: un «0 años» por una fecha en blanco es un
+    // dato inventado, y eso es peor que ninguno.
+    if (edad !== null) datos.push({ rotulo: "EDAD", valor: `${edad} años`, ausente: false });
+
+    // Mientras hay visita acordada, la tarjeta muestra la visita: es lo que el
+    // consolidador necesita ver. En las demás columnas, el último movimiento.
+    const visitaAcordada =
+      operacion.status === "VISITA_PENDIENTE" && visita
+        ? {
+            cuando: visita.scheduledAt ? momentoLegible(visita.scheduledAt, ahora) : "fecha por confirmar",
+            donde: visita.isVirtual ? "virtual" : visita.place?.trim() || null,
+            // Las visitas que llegan del CRM no traen usuario: las agendó la línea.
+            quien: visita.byUser?.fullName ?? null,
+            desdeCrm: !visita.byUser,
+            nota: visita.note?.trim() || null,
+          }
+        : null;
+
+    const movimiento = ultimo
+      ? {
+          titulo: tituloDelMovimiento({
+            type: ultimo.type,
+            outcome: ultimo.outcome,
+            result: ultimo.result,
+            // El intento que se está describiendo es el último: los previos
+            // son todos los demás.
+            intentosPrevios: Math.max(llamadas - 1, 0),
+          }),
+          quien: ultimo.byUser?.fullName ?? (ultimo.type === "VISITA" ? "La línea, desde el CRM" : null),
+          cuando: momentoLegible(ultimo.occurredAt, ahora),
+          observacion: ultimo.note?.trim() || null,
+        }
+      : {
+          titulo: learner.consolidator
+            ? "Registrada · consolidador asignado"
+            : "Registrada · sin consolidador disponible",
+          quien: null,
+          cuando: momentoLegible(operacion.startedAt, ahora),
+          observacion: null,
+        };
 
     return {
       operacionId: operacion.id,
       learnerId: learner.id,
       estado: operacion.status,
-      nombre: nombreCompleto(learner.person),
-      origen: [
-        textoDeEntrada(learner.entryPoint, learner.entryPointOther),
-        learner.lineOfOrigin ? `invitada por ${learner.lineOfOrigin}` : null,
-        edad !== null ? `${edad} años` : null,
-      ]
-        .filter(Boolean)
-        .join(" · "),
-      detalle: operacion.detail,
+      nombre: nombreCompleto(persona),
+      registrada: momentoLegible(operacion.startedAt, ahora),
+      datos,
+      movimiento,
+      visitaAcordada,
       chip: textoChip(operacion.deadlineAt, ahora),
       urgencia: urgenciaDe(operacion.deadlineAt, ahora),
       avance: porcentajeAvance(operacion.deadlineAt, ahora),

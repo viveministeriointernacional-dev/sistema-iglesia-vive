@@ -161,3 +161,42 @@ export function colaDeTelefono(valor: string | null | undefined) {
   if (!digitos) return null;
   return digitos.slice(-DIGITOS_COMPARABLES);
 }
+
+const FORMATO_DIA_MES = new Intl.DateTimeFormat("es-CO", {
+  day: "numeric",
+  month: "short",
+  timeZone: ZONA_HORARIA,
+});
+const FORMATO_HORA = new Intl.DateTimeFormat("es-CO", {
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+  timeZone: ZONA_HORARIA,
+});
+const FORMATO_DIA_CLAVE = new Intl.DateTimeFormat("en-CA", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  timeZone: ZONA_HORARIA,
+});
+
+/// Un momento como se dice en voz alta: «hoy, 9:14 a. m.», «ayer, 4:32 p. m.»,
+/// «1 sep, 7:40 p. m.». Siempre en hora de Colombia.
+export function momentoLegible(fecha: Date, ahora: Date = new Date()): string {
+  const hora = FORMATO_HORA.format(fecha).replace(/\.\s?m\./g, ". m.");
+  const dia = FORMATO_DIA_CLAVE.format(fecha);
+  if (dia === FORMATO_DIA_CLAVE.format(ahora)) return `hoy, ${hora}`;
+  const ayer = new Date(ahora.getTime() - 86_400_000);
+  if (dia === FORMATO_DIA_CLAVE.format(ayer)) return `ayer, ${hora}`;
+  return `${FORMATO_DIA_MES.format(fecha).replace(" de ", " ").replace(".", "")}, ${hora}`;
+}
+
+/// Un celular colombiano en grupos de tres, sin el indicativo de país cuando
+/// es +57: «313 452 1673». Cualquier otro formato se devuelve tal cual.
+export function telefonoLegible(valor: string | null | undefined): string | null {
+  const digitos = normalizarTelefono(valor);
+  if (!digitos) return null;
+  const local = digitos.length === 12 && digitos.startsWith("57") ? digitos.slice(2) : digitos;
+  if (local.length !== 10) return valor?.trim() || null;
+  return `${local.slice(0, 3)} ${local.slice(3, 6)} ${local.slice(6)}`;
+}

@@ -1,4 +1,4 @@
-import { CallOutcome, Operation72Status } from "@iglesia/prisma-client";
+import { CallOutcome, ContactType, Operation72Status } from "@iglesia/prisma-client";
 
 export const DURACION_OPERACION_72_HORAS = 72;
 const MS_POR_HORA = 3_600_000;
@@ -16,9 +16,17 @@ export function urgenciaDe(deadlineAt: Date, ahora: Date = new Date()): Urgencia
   return ms <= 12 * MS_POR_HORA ? "urgente" : "normal";
 }
 
+/// Texto del chip de plazo. Dice qué mide: «71 H» a secas no distingue si son
+/// las horas que quedan o las que pasaron, y «VENCIDA» no dice desde cuándo —
+/// una deuda de ayer y una de hace tres meses no se atienden igual.
 export function textoChip(deadlineAt: Date, ahora: Date = new Date()) {
-  if (urgenciaDe(deadlineAt, ahora) === "vencida") return "VENCIDA";
-  return `${Math.max(horasRestantes(deadlineAt, ahora), 0)} H`;
+  const restantes = horasRestantes(deadlineAt, ahora);
+  if (restantes > 0) return `QUEDAN ${restantes} H`;
+
+  const vencidas = -restantes;
+  if (vencidas < 24) return `VENCIÓ HACE ${Math.max(vencidas, 1)} H`;
+  const dias = Math.floor(vencidas / 24);
+  return `VENCIÓ HACE ${dias} ${dias === 1 ? "DÍA" : "DÍAS"}`;
 }
 
 /// Relleno de la barra de avance: (72 − horas restantes) / 72, mínimo 6 %.
@@ -103,6 +111,18 @@ export function contactaDeVerdad(resultado: CallOutcome) {
   return RESULTADOS_DE_LLAMADA.find((r) => r.valor === resultado)?.contacta ?? false;
 }
 
+/// Motivos para dar de baja desde el tablero. Son una lista cerrada a
+/// propósito: con motivos comparables se puede saber, meses después, cuántas
+/// personas se perdieron por no contestar y cuántas por no querer seguir.
+export const MOTIVOS_DE_BAJA = [
+  "No desea continuar el proceso",
+  "No fue posible contactarla",
+  "Vive fuera de la ciudad",
+  "Los datos no corresponden a una persona real",
+  "Ya asiste a otra iglesia",
+  "Otro motivo",
+] as const;
+
 export function tituloLinea(lineKnown: boolean) {
   return lineKnown
     ? "LÍNEA CONOCIDA · SE CONSERVA"
@@ -115,4 +135,39 @@ export function edadDesde(birthDate: Date | null | undefined, ahora = new Date()
   const mes = ahora.getMonth() - birthDate.getMonth();
   if (mes < 0 || (mes === 0 && ahora.getDate() < birthDate.getDate())) edad -= 1;
   return edad >= 0 && edad < 130 ? edad : null;
+}
+
+/// Cómo se nombra un movimiento en la tarjeta. El tablero mostraba el resumen
+/// libre de la Operación 72 («No contestó · Se llamó en 3 ocasiones…»), que
+/// mezcla el hecho con la observación y no dice quién ni cuándo. Aquí sale solo
+/// el hecho; el resto lo pone la tarjeta en sus propias líneas.
+export function tituloDelMovimiento(intento: {
+  type: ContactType;
+  outcome: CallOutcome | null;
+  result: string | null;
+  intentosPrevios?: number;
+}): string {
+  if (intento.type === ContactType.VISITA) return "Visita agendada";
+  if (intento.type === ContactType.INTENTO_VISITA) return "Visita intentada";
+  if (intento.type === ContactType.MENSAJE) return "Mensaje enviado";
+  if (intento.type === ContactType.CONVERSACION) return "Conversación";
+
+  if (
+    intento.type === ContactType.LLAMADA ||
+    intento.type === ContactType.INTENTO_LLAMADA
+  ) {
+    const cual = ordinalDeIntento(intento.intentosPrevios ?? 0);
+    const salida = intento.outcome ? ETIQUETA_LLAMADA[intento.outcome].toLowerCase() : null;
+    return salida ? `${cual} · ${salida}` : cual;
+  }
+
+  return intento.result?.trim() || "Movimiento registrado";
+}
+
+/// «1.ª llamada», «2.º intento»… Con una sola llamada no hace falta numerar.
+function ordinalDeIntento(previos: number): string {
+  const numero = previos + 1;
+  if (numero <= 1) return "Llamada";
+  const sufijo = numero === 2 ? "2.º" : numero === 3 ? "3.er" : `${numero}.º`;
+  return `${sufijo} intento`;
 }

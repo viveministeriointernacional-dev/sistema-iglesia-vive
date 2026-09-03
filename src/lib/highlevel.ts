@@ -387,3 +387,31 @@ function extraerVisita(indice: Map<string, unknown>): VisitaDesdeCrm {
     ),
   };
 }
+
+/// Payload del webhook de seguimiento de la línea («Registro Visita»,
+/// «Primera Llamada», «Asignar a Línea»): los formularios que se llenan sobre
+/// un contacto que YA está en el sistema. No trae el registro completo —solo
+/// hace falta saber de quién se trata y qué pasó con la llamada o la visita—.
+export function normalizarSeguimientoHighLevel(entrada: unknown) {
+  const payload = objeto(entrada);
+  if (!payload) throw new Error("El cuerpo debe ser un objeto JSON.");
+  const indice = indiceDeCampos(payload);
+
+  const contactId = texto(obtener(indice, "contactId", "contact_id"));
+  const locationId = texto(obtener(indice, "locationId", "location_id"));
+  if (!contactId || !locationId) {
+    throw new Error("Faltan contactId o locationId del contacto.");
+  }
+
+  return {
+    contexto: {
+      contactId,
+      locationId,
+      formName: texto(obtener(indice, "formName", "form_name")),
+      // Para reconocer a la persona si el contacto aún no está enlazado.
+      phone: texto(obtener(indice, "phone", "telefono", "celular")),
+      email: correoOpcional(obtener(indice, "email", "correo")) || null,
+    },
+    visita: extraerVisita(indice),
+  };
+}

@@ -5,6 +5,7 @@ import { colaDeTelefono } from "@/lib/dominio";
 import { variableDeEntorno } from "@/lib/entorno";
 import { normalizarPayloadHighLevel } from "@/lib/highlevel";
 import { getPrisma } from "@/lib/prisma";
+import { secretoValido } from "@/lib/webhook";
 import {
   buscarDuplicados,
   crearRegistroEnTransaccion,
@@ -14,15 +15,6 @@ import {
 export const runtime = "nodejs";
 
 const MAXIMO_CUERPO = 128 * 1024;
-
-function secretoValido(recibido: string | null, esperado: string) {
-  if (!recibido || recibido.length !== esperado.length) return false;
-  let diferencia = 0;
-  for (let indice = 0; indice < esperado.length; indice += 1) {
-    diferencia |= recibido.charCodeAt(indice) ^ esperado.charCodeAt(indice);
-  }
-  return diferencia === 0;
-}
 
 function datosAusentes(persona: {
   lastName: string | null;
@@ -187,10 +179,10 @@ export async function POST(request: Request) {
               enlace.person.learnerProfile.id,
               visita,
             )
-          : false;
+          : null;
 
         return {
-          estado: visitaAgendada
+          estado: visitaAgendada === "visita"
             ? ("visita_agendada" as const)
             : ("ya_importado" as const),
           personId: enlace.personId,
