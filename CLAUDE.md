@@ -146,6 +146,34 @@ eventos, y administración. Documentación de producto en `design/`
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-03** — **Registros de HighLevel VIVOS**. Se agregó por fin el paso
+  **Webhook** al workflow «1. Se llenó Formulario Registro Nuevo» (antes no
+  existía: el flujo inscribía y terminaba en pasos de «Mensaje», por eso nunca
+  llegaba nada). Entraron Pedro Pérez y Maria Julieth Duran, ambos con
+  **Operación 72 = INICIADA**. Dos bugs encontrados y arreglados en el camino:
+  1. **422 «La fecha de nacimiento no es válida»** (PR #37): si el contacto no
+     tenía fecha, HighLevel mandaba el merge-tag **sin resolver**
+     (`{{contact.date_of_birth}}` literal) y el validador estricto tumbaba TODO
+     el alta. Fix: `texto()` en `highlevel.ts` ignora `{{...}}`; `birthDate` se
+     normaliza tolerante (ISO, con hora, o `dd/mm/aaaa`); email mal formado se
+     ignora en vez de abortar.
+  2. **Persona sin consolidador** (PR #38): cuando el contacto no tiene usuario
+     asignado, HighLevel manda **la palabra literal `"null"`**. El parser la
+     tomaba como id real → `ownerId="null"` → creía que había dueño → **saltaba
+     el reparto automático**. También ensuciaba textos (`churchName="null"`).
+     Fix: `texto()` trata `"null"`/`"undefined"` como vacío, en el parser de
+     registro **y** en el de llamadas. Limpiadas 2 filas contaminadas.
+  **Mapeo del webhook de registro** (Custom Data): `contactId={{contact.id}}`,
+  `locationId={{location.id}}`, `formId` fijo, `firstName`, `lastName`, `email`,
+  `phone`, `ownerId={{contact.assigned_to}}`, más los campos del formulario
+  (que viven como **campos personalizados del CONTACTO**, no «del formulario»).
+  **No** hace falta `submissionId` (no existe variable) y `HIGHLEVEL_REGISTRO_FORM_ID`
+  **no está configurada** en Cloudflare, así que el `formId` no se valida.
+  **Ojo (no es bug):** todas las consolidadoras MUJER están **llenas o sobre cupo**
+  (12/12, 12/12, 12/12, 17/12, 18/12), así que una mujer nueva entra con
+  «Sin consolidador con cupo · requiere asignación de un líder». Hay que subir
+  `capacity` o asignar a mano.
+
 - **2026-09-01** — **Hora Colombia** en toda la UI. El servidor (Workers/Node)
   corre en UTC, así que los formateadores `Intl.DateTimeFormat("es-CO", …)` sin
   `timeZone` mostraban las horas 5 h adelantadas. Se añadió `ZONA_HORARIA =
