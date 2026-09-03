@@ -42,6 +42,10 @@ export const ROLES_CONSOLIDACION: Role[] = [
   Role.ADMIN,
 ];
 
+/// Quiénes pueden registrar «solo la ficha» (sin Operación 72): quien luego
+/// le va a dar rol y permisos a esa persona.
+export const ROLES_REGISTRO_SOLO_FICHA: Role[] = [Role.ADMIN, Role.PASTOR];
+
 /// Quiénes acompañan como mentores POR SU ROL. Además, cualquiera con el
 /// permiso `canMentor` también acompaña: ser mentor es acumulable, igual que
 /// liderar Alpha o Casa de Fe. Usa `puedeMentorear` en vez de esta lista.

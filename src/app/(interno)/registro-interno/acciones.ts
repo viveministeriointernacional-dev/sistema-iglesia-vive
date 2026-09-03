@@ -6,7 +6,12 @@ import { Role } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
 import { auditar } from "@/lib/audit";
 import { exportarContactoNuevo } from "@/lib/highlevel-salida";
-import { ErrorDePermiso, requerirRolEnAccion, ROLES_CONSOLIDACION } from "@/lib/auth";
+import {
+  ErrorDePermiso,
+  requerirRolEnAccion,
+  ROLES_CONSOLIDACION,
+  ROLES_REGISTRO_SOLO_FICHA,
+} from "@/lib/auth";
 import { nombreCompleto, normalizarTelefono } from "@/lib/dominio";
 import {
   buscarDuplicados,
@@ -95,11 +100,13 @@ export async function buscarInvitador(
 
 export async function guardarRegistro(
   entrada: DatosRegistro,
-  opciones: { confirmadoNoDuplicado?: boolean } = {},
+  opciones: { confirmadoNoDuplicado?: boolean; soloFicha?: boolean } = {},
 ): Promise<ResultadoRegistro> {
   let usuario;
   try {
-    usuario = await requerirRolEnAccion(ROLES_CONSOLIDACION);
+    usuario = await requerirRolEnAccion(
+      opciones.soloFicha ? ROLES_REGISTRO_SOLO_FICHA : ROLES_CONSOLIDACION,
+    );
   } catch (error) {
     if (error instanceof ErrorDePermiso) {
       return { ok: false, errores: {}, mensaje: error.message };
@@ -142,6 +149,7 @@ export async function guardarRegistro(
         actorId: usuario.id,
         duplicadoConfirmadoPorHumano:
           opciones.confirmadoNoDuplicado ?? false,
+        sinOperacion72: opciones.soloFicha ?? false,
       }),
     // Margen amplio: el alta hace varias consultas y el pooler de Supabase
     // puede pasar de los 5 s por defecto y abortar la transacción.
@@ -151,6 +159,13 @@ export async function guardarRegistro(
   // La persona registrada en el sistema nace también como contacto en
   // HighLevel (best-effort, fuera de la transacción).
   await exportarContactoNuevo(creado.learnerId);
+
+  // Solo la ficha: la persona no va al tablero, va a Administración, donde
+  // quien la registró le asigna rol y permisos de una vez.
+  if (opciones.soloFicha) {
+    revalidatePath("/administracion");
+    redirect(`/administracion/${creado.personId}`);
+  }
 
   revalidatePath("/operacion-72");
   redirect("/operacion-72");

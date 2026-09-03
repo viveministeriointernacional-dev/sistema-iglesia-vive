@@ -155,6 +155,22 @@ eventos, y administración. Documentación de producto en `design/`
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-03** — **Registro interno «solo la ficha» (sin Operación 72).**
+  Pedido del usuario: registrar gente del equipo desde la plataforma sin que
+  entre a consolidación, para asignarle rol/permisos en Administración. Mockup
+  aprobado: claude.ai/code/artifact/6c304435-b2ca-4048-b523-690a18964463.
+  - `crearRegistroEnTransaccion` acepta `sinOperacion72: true`: crea persona +
+    `learner_profile` (para que Administración muestre sus secciones), hito
+    REGISTRO, auditoría `persona.registrada` con `sinOperacion72: true`; **no**
+    crea Op72, **no** asigna consolidador, **no** encola `operacion72_iniciada`.
+  - Pregunta «¿Qué hacemos con este registro?» al final del paso ORIGEN del
+    asistente (`PasoDestino`), por defecto «Iniciar Operación 72». Solo la ven
+    **ADMIN y PASTOR** (`ROLES_REGISTRO_SOLO_FICHA` en `src/lib/auth.ts` — no
+    puede vivir en `acciones.ts` porque un archivo `"use server"` solo exporta
+    funciones async). El botón cambia a «Guardar solo la ficha» y redirige a
+    `/administracion/<personId>`.
+  - El webhook de HighLevel sigue creando siempre con Operación 72.
+
 - **2026-09-03** — **«Database error loading user» al restablecer contraseña.**
   Al intentar restablecer la contraseña de Nora Bonilla desde administración,
   Supabase Auth respondió ese error. Causa: **12 cuentas de `auth.users`**
