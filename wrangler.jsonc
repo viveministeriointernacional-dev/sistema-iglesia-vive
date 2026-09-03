@@ -2,12 +2,13 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "sistema-iglesia-vive",
   "main": ".open-next/worker.js",
-  // Compila el worker de OpenNext antes de cualquier `wrangler deploy` o
-  // `wrangler versions upload`. Así el despliegue genera `.open-next/worker.js`
-  // por sí mismo aunque el «Build command» del panel de Workers Builds esté
-  // vacío (que fue justo lo que rompía el despliegue).
+  // Antes de cualquier `wrangler deploy`: (1) aplica en la base las
+  // migraciones que falten (`scripts/migrar.mjs`, necesita el secreto de build
+  // DATABASE_URL; sin él avisa y sigue) y (2) compila el worker de OpenNext.
+  // Así cada despliegue deja la base al día y genera `.open-next/worker.js`
+  // aunque el «Build command» del panel esté vacío.
   "build": {
-    "command": "npx opennextjs-cloudflare build"
+    "command": "node scripts/migrar.mjs && npx opennextjs-cloudflare build"
   },
   "compatibility_date": "2026-08-15",
   // nodejs_compat es obligatorio: Next y el adaptador `pg` de Prisma usan APIs

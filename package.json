@@ -14,10 +14,11 @@
     "db:migrate:dev": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
-    "cf:build": "opennextjs-cloudflare build",
-    "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
-    "db:generate": "prisma generate"
+    "cf:build": "node scripts/migrar.mjs && opennextjs-cloudflare build",
+    "cf:preview": "node scripts/migrar.mjs && opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "cf:deploy": "node scripts/migrar.mjs && opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "db:generate": "prisma generate",
+    "db:migrar": "node scripts/migrar.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",
