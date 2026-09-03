@@ -1,18 +1,40 @@
 import { variableDeEntorno } from "@/lib/entorno";
 
-/// Envío de correo, best-effort. Usa Resend (una API sencilla que funciona en
-/// el Worker). Si no están configurados los secretos `RESEND_API_KEY` y
-/// `EMAIL_FROM`, no hace nada; y si el envío falla, se registra pero no rompe
-/// la acción que lo disparó. Cambiar de proveedor es cambiar solo esta función.
+/// Qué pasó con un envío. Cuando falla se dice **por qué**: un correo que no
+/// sale sin dejar rastro es imposible de diagnosticar desde fuera, y la pantalla
+/// que lo pidió necesita poder avisarle a la persona en vez de dar por hecho
+/// que llegó.
+export type ResultadoCorreo =
+  | { enviado: true }
+  | { enviado: false; motivo: string };
+
+/// Envío de correo por Resend (una API sencilla que funciona en el Worker).
+/// Nunca lanza: la acción que lo disparó (crear un acceso, cambiar una
+/// contraseña) ya hizo su trabajo y no debe deshacerse porque el correo falle.
+/// Devuelve el resultado para que quien llama decida qué decirle al usuario.
+/// Cambiar de proveedor es cambiar solo esta función.
 async function enviarCorreo(datos: {
   to: string;
   subject: string;
   html: string;
-}): Promise<boolean> {
+}): Promise<ResultadoCorreo> {
   const apiKey = await variableDeEntorno("RESEND_API_KEY");
   const from = await variableDeEntorno("EMAIL_FROM");
-  if (!apiKey || !from) return false;
-  if (!datos.to) return false;
+  if (!apiKey || !from) {
+    const faltan = [
+      apiKey ? null : "RESEND_API_KEY",
+      from ? null : "EMAIL_FROM",
+    ]
+      .filter(Boolean)
+      .join(" y ");
+    return {
+      enviado: false,
+      motivo: `el sistema de correo no está configurado (falta ${faltan} en el Worker).`,
+    };
+  }
+  if (!datos.to) {
+    return { enviado: false, motivo: "no hay una dirección de correo a la cual enviarlo." };
+  }
 
   try {
     const respuesta = await fetch("https://api.resend.com/emails", {
@@ -31,13 +53,28 @@ async function enviarCorreo(datos: {
     if (!respuesta.ok) {
       const detalle = await respuesta.text().catch(() => "");
       console.error("Resend rechazó el correo", respuesta.status, detalle.slice(0, 300));
-      return false;
+      return {
+        enviado: false,
+        motivo: `Resend rechazó el envío (error ${respuesta.status}): ${motivoDeResend(detalle)}`,
+      };
     }
-    return true;
+    return { enviado: true };
   } catch (error) {
     console.error("No se pudo enviar el correo", error);
-    return false;
+    return { enviado: false, motivo: "no se pudo conectar con el servicio de correo." };
   }
+}
+
+/// Saca el mensaje de la respuesta de error de Resend (viene como JSON con
+/// `message`). Si no se puede leer, se devuelve el texto crudo recortado.
+function motivoDeResend(cuerpo: string): string {
+  try {
+    const json = JSON.parse(cuerpo) as { message?: unknown };
+    if (typeof json.message === "string" && json.message) return json.message;
+  } catch {
+    // No era JSON; sirve el texto tal cual.
+  }
+  return cuerpo.slice(0, 200) || "sin detalle";
 }
 
 /// Dirección pública del sistema. Vive aquí porque los correos son el único
@@ -67,8 +104,8 @@ export async function correoCredenciales(datos: {
   nombre: string;
   email: string;
   password: string;
-}): Promise<void> {
-  await enviarCorreo({
+}): Promise<ResultadoCorreo> {
+  return enviarCorreo({
     to: datos.to,
     subject: "Tu acceso al sistema de Iglesia Vive",
     html: MARCO(`
@@ -95,8 +132,8 @@ export async function correoMentorAsignado(datos: {
   telefono: string | null;
   correoPersona: string | null;
   detalle: string | null;
-}): Promise<void> {
-  await enviarCorreo({
+}): Promise<ResultadoCorreo> {
+  return enviarCorreo({
     to: datos.to,
     subject: `Nueva persona para acompañar: ${datos.personaNombre}`,
     html: MARCO(`
@@ -118,8 +155,8 @@ export async function correoContrasenaRestablecida(datos: {
   nombre: string;
   email: string;
   password: string;
-}): Promise<void> {
-  await enviarCorreo({
+}): Promise<ResultadoCorreo> {
+  return enviarCorreo({
     to: datos.to,
     subject: "Tu contraseña de Iglesia Vive fue restablecida",
     html: MARCO(`
@@ -139,8 +176,8 @@ export async function correoRecuperarContrasena(datos: {
   to: string;
   nombre: string;
   enlace: string;
-}): Promise<void> {
-  await enviarCorreo({
+}): Promise<ResultadoCorreo> {
+  return enviarCorreo({
     to: datos.to,
     subject: "Recupera tu contraseña de Iglesia Vive",
     html: MARCO(`

@@ -60,18 +60,24 @@ export async function pedirEnlace(
     return RESPUESTA_NEUTRA;
   }
 
-  await correoRecuperarContrasena({
+  const correo = await correoRecuperarContrasena({
     to: email,
     nombre: cuenta.fullName,
     enlace: `${URL_SISTEMA}/nueva-clave?token=${encodeURIComponent(token)}`,
   });
 
+  // La respuesta al usuario es siempre la misma (no se puede revelar si el
+  // correo existe), así que el porqué de un envío fallido solo queda aquí.
   await auditar(prisma, {
     actorId: null,
     action: "acceso.recuperacion_solicitada",
     entityType: "app_user",
     entityId: cuenta.id,
-    metadata: { email },
+    metadata: {
+      email,
+      correoEnviado: correo.enviado,
+      motivoCorreo: correo.enviado ? null : correo.motivo,
+    },
   });
 
   return RESPUESTA_NEUTRA;
