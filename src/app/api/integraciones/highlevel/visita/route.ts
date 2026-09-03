@@ -51,18 +51,22 @@ export async function POST(request: Request) {
   const { contexto, visita } = normalizado;
 
   const prisma = await getPrisma();
+  const locationId =
+    contexto.locationId ?? (await variableDeEntorno("HIGHLEVEL_LOCATION_ID")) ?? null;
 
   // Primero por el enlace con el contacto del CRM; si no está enlazada
   // (personas cargadas antes de la integración), por celular o correo.
-  const enlace = await prisma.highLevelContact.findUnique({
-    where: {
-      locationId_contactId: {
-        locationId: contexto.locationId,
-        contactId: contexto.contactId,
-      },
-    },
-    select: { person: { select: { id: true, learnerProfile: { select: { id: true } } } } },
-  });
+  const enlace =
+    contexto.contactId && locationId
+      ? await prisma.highLevelContact.findUnique({
+          where: {
+            locationId_contactId: { locationId, contactId: contexto.contactId },
+          },
+          select: {
+            person: { select: { id: true, learnerProfile: { select: { id: true } } } },
+          },
+        })
+      : null;
 
   let persona = enlace?.person ?? null;
   if (!persona) {

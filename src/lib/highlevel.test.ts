@@ -107,3 +107,25 @@ test("el seguimiento exige saber de qué contacto se trata", () => {
     normalizarSeguimientoHighLevel({ "Confirmación de visita": "Sí" }),
   );
 });
+
+test("el seguimiento entiende el cuerpo estándar del webhook, sin mapeo manual", () => {
+  const resultado = normalizarSeguimientoHighLevel({
+    contact_id: "contacto-7",
+    first_name: "Laura",
+    phone: "+573134521673",
+    location: { id: "ubicacion-1", name: "Iglesia Vive" },
+    "Confirmación de visita": "Desea reunión virtual",
+    "Estado Primera Llamada Linea": "No contestó",
+  });
+  assert.equal(resultado.contexto.contactId, "contacto-7");
+  assert.equal(resultado.contexto.locationId, "ubicacion-1");
+  assert.equal(resultado.visita.confirmacion, "virtual");
+  assert.equal(resultado.visita.estadoLinea, CallOutcome.NO_CONTESTO);
+
+  // Sin ubicación en el cuerpo, la ruta usa la configurada.
+  const sinUbicacion = normalizarSeguimientoHighLevel({
+    contact_id: "contacto-8",
+    "Confirmación de visita": "Sí, visita confirmada",
+  });
+  assert.equal(sinUbicacion.contexto.locationId, null);
+});
