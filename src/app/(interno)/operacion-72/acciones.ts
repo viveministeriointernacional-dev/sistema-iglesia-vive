@@ -23,10 +23,12 @@ import {
   type UsuarioSesion,
 } from "@/lib/auth";
 import { proponerMentor } from "@/lib/asignacion";
+import { darDeBajaAprendiz } from "@/lib/baja";
 import { exportarPrimeraLlamada, exportarVisita } from "@/lib/highlevel-salida";
 import {
   contactaDeVerdad,
   ETIQUETA_LLAMADA,
+  MOTIVOS_DE_BAJA,
   RESULTADOS_DE_LLAMADA,
 } from "@/lib/op72";
 
@@ -520,5 +522,53 @@ export async function entregarAMentor(
   }
 
   revalidatePath("/operacion-72");
+  return { ok: true };
+}
+
+/// Da de baja desde el tablero, con la misma regla de alcance de las demás
+/// acciones: un consolidador solo sobre sus personas; coordinación, pastor y
+/// administrador sobre cualquiera. El motivo viene de una lista cerrada para
+/// que después se pueda contar por qué se pierden personas.
+export async function darDeBajaDesdeTablero(
+  learnerId: string,
+  datos: { motivo: string; nota: string },
+): Promise<ResultadoAccion> {
+  let usuario: UsuarioSesion;
+  try {
+    usuario = await requerirRolEnAccion(ROLES_CONSOLIDACION);
+  } catch (error) {
+    if (error instanceof ErrorDePermiso) return { ok: false, mensaje: error.message };
+    throw error;
+  }
+
+  if (!(MOTIVOS_DE_BAJA as readonly string[]).includes(datos.motivo)) {
+    return { ok: false, mensaje: "Elige un motivo de la lista." };
+  }
+
+  const prisma = await getPrisma();
+  const aprendiz = await prisma.learnerProfile.findUnique({
+    where: { id: learnerId },
+    select: { consolidatorId: true },
+  });
+  const esSuya =
+    aprendiz &&
+    (usuario.role !== Role.CONSOLIDADOR ||
+      veTodaLaConsolidacion(usuario) ||
+      aprendiz.consolidatorId === usuario.id);
+  if (!esSuya) return { ok: false, mensaje: "Esta persona no está en tu lista." };
+
+  const resultado = await darDeBajaAprendiz(prisma, {
+    learnerId,
+    motivo: datos.motivo,
+    nota: datos.nota,
+    actorId: usuario.id,
+    accion: "operacion72.dado_de_baja",
+  });
+  if (!resultado.ok) return resultado;
+
+  revalidatePath("/operacion-72");
+  revalidatePath(`/expediente/${learnerId}`);
+  revalidatePath("/administracion");
+  revalidatePath("/administracion/dados-de-baja");
   return { ok: true };
 }

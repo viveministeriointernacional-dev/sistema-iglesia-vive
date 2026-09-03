@@ -3,6 +3,7 @@ import type { Prisma } from "@iglesia/prisma-client";
 import { variableDeEntorno } from "@/lib/entorno";
 import { normalizarLlamadaHighLevel } from "@/lib/llamada-highlevel";
 import { getPrisma } from "@/lib/prisma";
+import { secretoValido } from "@/lib/webhook";
 
 export const runtime = "nodejs";
 
@@ -10,15 +11,6 @@ const MAXIMO_CUERPO = 128 * 1024;
 
 /// Comparación en tiempo constante para no filtrar la longitud ni el contenido
 /// del secreto por el tiempo de respuesta.
-function secretoValido(recibido: string | null, esperado: string) {
-  if (!recibido || recibido.length !== esperado.length) return false;
-  let diferencia = 0;
-  for (let indice = 0; indice < esperado.length; indice += 1) {
-    diferencia |= recibido.charCodeAt(indice) ^ esperado.charCodeAt(indice);
-  }
-  return diferencia === 0;
-}
-
 /// Recibe cada evento de llamada de HighLevel y lo guarda en `call_log` para el
 /// tablero de administración. Se protege con el mismo secreto de webhook que el
 /// registro de personas (`x-iglesia-webhook-secret`).
