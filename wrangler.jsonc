@@ -19,6 +19,16 @@
   },
   "observability": {
     "enabled": true
+  },
+
+  // Remitente de los correos del sistema (Resend). Va aquí y no en el panel
+  // porque `wrangler deploy` **reemplaza** las variables de texto del Worker
+  // por las de este archivo: una `EMAIL_FROM` puesta a mano en el panel
+  // sobrevive hasta el siguiente despliegue y luego desaparece sin aviso.
+  // No es un secreto (es una dirección pública); la clave sí lo es y vive
+  // como Secret, que `wrangler deploy` sí conserva.
+  "vars": {
+    "EMAIL_FROM": "Iglesia Vive <no-responder@send.micasavive.com>"
   }
 
   // Conexión a Postgres. Hyperdrive mantiene el pool del lado de Cloudflare;
