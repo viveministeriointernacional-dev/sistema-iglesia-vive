@@ -46,9 +46,18 @@ function texto(valor: unknown): string | null {
   if (typeof valor === "string") {
     const limpio = valor.trim();
     // HighLevel manda el merge-tag sin resolver (`{{campo}}`) cuando el contacto
-    // no tiene ese dato. No es un valor real: se ignora para que un campo vacío
-    // no se guarde como basura ni tumbe el registro (p. ej. birthDate).
-    if (!limpio || /^\{\{.*\}\}$/.test(limpio)) return null;
+    // no tiene ese dato, y la palabra literal "null"/"undefined" cuando el campo
+    // existe pero está vacío (p. ej. un contacto sin usuario asignado). Ninguno
+    // es un valor real: se ignoran para que un campo vacío no se guarde como
+    // basura, no tumbe el registro (birthDate) ni finja un dueño inexistente
+    // (ownerId="null" saltaba el reparto automático de consolidador).
+    if (
+      !limpio ||
+      /^\{\{.*\}\}$/.test(limpio) ||
+      /^(null|undefined)$/i.test(limpio)
+    ) {
+      return null;
+    }
     return limpio;
   }
   if (typeof valor === "number" || typeof valor === "boolean") {
