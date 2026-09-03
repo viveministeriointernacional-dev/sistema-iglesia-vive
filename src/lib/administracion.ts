@@ -233,6 +233,7 @@ export async function cargarPersonaAdmin(personId: string) {
           capacity: true,
           canLeadAlpha: true,
           canLeadFaithHouse: true,
+          canMentor: true,
           coordinatesConsolidation: true,
         },
       },

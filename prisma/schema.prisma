@@ -57,6 +57,10 @@ model AppUser {
   /// Liderar Casa de Fe es también un permiso, no un rol: habilita a la persona
   /// para llevar Casa de Fe, sin cambiar lo que es dentro de la iglesia.
   canLeadFaithHouse Boolean @default(false) @map("can_lead_faith_house")
+  /// Acompañar como mentor es también un permiso: un consolidador (o quien sea)
+  /// puede tener discípulos sin dejar de ser lo que es. El rol MENTOR/PASTOR/
+  /// ADMIN ya lo habilita por sí solo; esta casilla suma a los demás.
+  canMentor Boolean @default(false) @map("can_mentor")
   /// Coordina la consolidación: un consolidador que revisa el trabajo de todos.
   /// Con este permiso ve y opera Operación 72 y los expedientes de todos los
   /// consolidadores, no solo los que tiene asignados. No cambia su rol ni le da

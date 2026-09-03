@@ -18,6 +18,9 @@ export type UsuarioSesion = {
   /// Coordina la consolidación: consolidador que revisa a todos, no solo lo
   /// suyo. Independiente del rol.
   coordinaConsolidacion: boolean;
+  /// Permiso para acompañar como mentor, independiente del rol: deja que un
+  /// consolidador tenga discípulos sin dejar de ser consolidador.
+  canMentor: boolean;
 };
 
 /// Quién administra el sistema: personas, roles, permisos y procesos.
@@ -39,8 +42,29 @@ export const ROLES_CONSOLIDACION: Role[] = [
   Role.ADMIN,
 ];
 
+/// Quiénes acompañan como mentores POR SU ROL. Además, cualquiera con el
+/// permiso `canMentor` también acompaña: ser mentor es acumulable, igual que
+/// liderar Alpha o Casa de Fe. Usa `puedeMentorear` en vez de esta lista.
+export const ROLES_MENTOR: Role[] = [Role.MENTOR, Role.PASTOR, Role.ADMIN];
+
+/// Acompaña discípulos: por su rol, o por el permiso acumulable `canMentor`.
+/// Así un consolidador puede ser mentor sin dejar de ser consolidador.
+export function puedeMentorear(usuario: UsuarioSesion): boolean {
+  return ROLES_MENTOR.includes(usuario.role) || usuario.canMentor;
+}
+
+/// Filtro de Prisma equivalente a `puedeMentorear`, para consultar candidatos.
+export const DONDE_PUEDE_MENTOREAR = {
+  OR: [{ role: { in: ROLES_MENTOR } }, { canMentor: true }],
+};
+
 /// Quién tiene una red de acompañamiento que mirar.
 export const ROLES_CON_RED: Role[] = [Role.MENTOR, Role.PASTOR, Role.ADMIN];
+
+/// Tiene red que mirar: por rol, o porque acompaña como mentor por permiso.
+export function tieneRed(usuario: UsuarioSesion): boolean {
+  return ROLES_CON_RED.includes(usuario.role) || usuario.canMentor;
+}
 
 /// Quién puede buscar personas y abrir expedientes desde el buscador. Coincide
 /// con quienes `accesoAExpediente` deja ver algún expediente: los aprendices y
@@ -55,11 +79,17 @@ export const ROLES_BUSCADOR: Role[] = [
 /// Quién puede confirmar la entrega a mentor. La asignación la propone el
 /// sistema; la decisión final la confirma un líder
 /// (ESPECIFICACION_PRODUCTO.md §5.6).
+/// Usa `puedeConfirmarEntrega`: el permiso `canMentor` también habilita.
 export const ROLES_CONFIRMAN_ENTREGA: Role[] = [
   Role.MENTOR,
   Role.PASTOR,
   Role.ADMIN,
 ];
+
+/// Confirma la entrega a mentor: por rol, o por el permiso `canMentor`.
+export function puedeConfirmarEntrega(usuario: UsuarioSesion): boolean {
+  return ROLES_CONFIRMAN_ENTREGA.includes(usuario.role) || usuario.canMentor;
+}
 
 /// Usuario autenticado en Supabase resuelto contra `app_user`.
 ///
@@ -88,6 +118,7 @@ export const obtenerUsuarioActual = cache(
         teamId: true,
         canLeadAlpha: true,
         canLeadFaithHouse: true,
+        canMentor: true,
         coordinatesConsolidation: true,
         active: true,
         authUserId: true,
@@ -118,6 +149,7 @@ export const obtenerUsuarioActual = cache(
       canLeadAlpha: registro.canLeadAlpha,
       canLeadFaithHouse: registro.canLeadFaithHouse,
       coordinaConsolidacion: registro.coordinatesConsolidation,
+      canMentor: registro.canMentor,
     };
   },
 );

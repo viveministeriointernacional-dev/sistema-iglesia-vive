@@ -14,15 +14,15 @@ import { auditar, encolarEventoIntegracion } from "@/lib/audit";
 import { correoMentorAsignado } from "@/lib/correo";
 import { nombreCompleto, ZONA_HORARIA } from "@/lib/dominio";
 import {
+  DONDE_PUEDE_MENTOREAR,
   ErrorDePermiso,
+  puedeConfirmarEntrega,
   requerirRolEnAccion,
-  ROLES_CONFIRMAN_ENTREGA,
   ROLES_CONSOLIDACION,
   veTodaLaConsolidacion,
   type UsuarioSesion,
 } from "@/lib/auth";
 import { proponerMentor } from "@/lib/asignacion";
-import { ROLES_MENTOR } from "@/lib/equipo";
 import { exportarPrimeraLlamada, exportarVisita } from "@/lib/highlevel-salida";
 import {
   contactaDeVerdad,
@@ -381,7 +381,7 @@ export async function entregarAMentor(
       where: {
         id: elegido,
         active: true,
-        role: { in: ROLES_MENTOR },
+        ...DONDE_PUEDE_MENTOREAR,
       },
       select: { id: true },
     });
@@ -403,7 +403,7 @@ export async function entregarAMentor(
       };
     }
     // Sin línea conocida, la asignación por perfil la confirma un líder.
-    if (!operacion.lineKnown && !ROLES_CONFIRMAN_ENTREGA.includes(usuario.role)) {
+    if (!operacion.lineKnown && !puedeConfirmarEntrega(usuario)) {
       return {
         ok: false,
         mensaje:

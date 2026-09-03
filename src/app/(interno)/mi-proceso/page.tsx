@@ -5,7 +5,7 @@ import {
   MilestoneStatus,
 } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
-import { ETIQUETA_ROL, requerirUsuario, ROLES_CON_RED } from "@/lib/auth";
+import { ETIQUETA_ROL, requerirUsuario, tieneRed } from "@/lib/auth";
 import {
   cargarExpediente,
   diasEnFase,
@@ -51,7 +51,7 @@ export default async function MiProceso() {
     : null;
 
   if (!propio) {
-    if (ROLES_CON_RED.includes(usuario.role)) redirect("/mi-red");
+    if (tieneRed(usuario)) redirect("/mi-red");
     return <SinExpediente nombre={usuario.fullName} rol={usuario.role} />;
   }
 

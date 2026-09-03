@@ -6,7 +6,7 @@ import {
   ETIQUETA_ROL,
   requerirUsuario,
   ROLES_ADMIN,
-  ROLES_CON_RED,
+  tieneRed,
   ROLES_CONSOLIDACION,
 } from "@/lib/auth";
 import { puedeVerAlpha } from "@/lib/alpha";
@@ -31,7 +31,7 @@ export default async function LayoutInterno({
   const usuario = await requerirUsuario();
 
   const pestanas = [
-    ...(ROLES_CON_RED.includes(usuario.role)
+    ...(tieneRed(usuario)
       ? [
           { href: "/mi-red", etiqueta: "Mi red" },
           { href: "/red", etiqueta: "Árbol" },
