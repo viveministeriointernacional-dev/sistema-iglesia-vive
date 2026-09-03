@@ -154,11 +154,23 @@ export async function programarVisitaDesdeCrm(
   return "visita";
 }
 
-function fechaValida(valor: string | null): Date | null {
+/// Fecha que manda el CRM. Los campos de fecha del formulario llegan sin hora
+/// (`2026-08-29`, o `29/08/2026` si alguien lo escribió a mano): interpretados
+/// en UTC caerían a las 7 p. m. del día ANTERIOR en Colombia. Una fecha sin
+/// hora se ancla al mediodía en hora de Colombia; una con hora se respeta.
+export function fechaDesdeCrm(valor: string | null): Date | null {
   if (!valor) return null;
-  const fecha = new Date(valor);
+  const dato = valor.trim();
+  const co = dato.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  const iso = co
+    ? `${co[3]}-${co[2].padStart(2, "0")}-${co[1].padStart(2, "0")}`
+    : dato;
+  const soloDia = /^\d{4}-\d{2}-\d{2}$/.test(iso);
+  const fecha = new Date(soloDia ? `${iso}T12:00:00-05:00` : iso);
   return Number.isNaN(fecha.getTime()) ? null : fecha;
 }
+
+const fechaValida = fechaDesdeCrm;
 
 export type PosibleDuplicado = {
   id: string;

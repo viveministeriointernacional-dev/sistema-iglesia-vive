@@ -349,7 +349,12 @@ export function normalizarPayloadHighLevel(entrada: unknown) {
 /// webhook llega de una u otra forma.
 function extraerVisita(indice: Map<string, unknown>): VisitaDesdeCrm {
   const conf = texto(
-    obtener(indice, "Confirmación de visita", "yzgZvkQikaYXnK0fNL81"),
+    obtener(
+      indice,
+      "Confirmación de visita",
+      "contact.confirmacion_de_visita",
+      "yzgZvkQikaYXnK0fNL81",
+    ),
   );
   const confN = conf ? normalizarClave(conf) : "";
   const confirmacion: VisitaDesdeCrm["confirmacion"] = confN.includes("virtual")
@@ -363,10 +368,21 @@ function extraerVisita(indice: Map<string, unknown>): VisitaDesdeCrm {
   return {
     confirmacion,
     fechaVisita: texto(
-      obtener(indice, "Fecha visita", "RoA76CCpoBd2DvraoQEF"),
+      obtener(
+        indice,
+        "Fecha visita",
+        "Fecha de la visita",
+        "contact.fecha_visita",
+        "RoA76CCpoBd2DvraoQEF",
+      ),
     ),
     estadoLinea: enumPorEtiqueta(
-      obtener(indice, "Estado Primera Llamada Linea", "U1VhdP5dRedFZ30ihJbJ"),
+      obtener(
+        indice,
+        "Estado Primera Llamada Linea",
+        "contact.estado_primera_llamada_linea",
+        "U1VhdP5dRedFZ30ihJbJ",
+      ),
       {
         contestobien: CallOutcome.CONTESTO_BIEN,
         contestoyreprogramo: CallOutcome.CONTESTO_REPROGRAMO,
@@ -376,12 +392,18 @@ function extraerVisita(indice: Map<string, unknown>): VisitaDesdeCrm {
       },
     ),
     fechaLinea: texto(
-      obtener(indice, "Fecha Primera Llamada Linea", "mXbNh4wigwrtXUpfMSqD"),
+      obtener(
+        indice,
+        "Fecha Primera Llamada Linea",
+        "contact.fecha_primera_llamada_linea",
+        "mXbNh4wigwrtXUpfMSqD",
+      ),
     ),
     observacionLinea: texto(
       obtener(
         indice,
         "Observación Primera LLamada Linea",
+        "contact.observacion_primera_llamada_linea",
         "r0FlVnHCzP6tqnTMHqdJ",
       ),
     ),
