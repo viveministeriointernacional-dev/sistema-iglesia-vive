@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { ingresar, type EstadoIngreso } from "./acciones";
@@ -55,6 +56,15 @@ export function FormularioIngreso({ siguiente }: { siguiente: string }) {
       ) : null}
 
       <BotonEntrar />
+
+      <p className="mt-4 text-center">
+        <Link
+          href="/recuperar"
+          className="text-[12.5px] leading-none font-semibold text-azul-700"
+        >
+          ¿Olvidaste tu contraseña?
+        </Link>
+      </p>
     </form>
   );
 }
