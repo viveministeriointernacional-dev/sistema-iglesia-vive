@@ -124,27 +124,94 @@ export async function correoCredenciales(datos: {
   });
 }
 
-/// Correo al mentor avisándole de una persona que le fue asignada a mentoría.
-export async function correoMentorAsignado(datos: {
+/// Correo con el que el mentor recibe a una persona. Cinco bloques: quién es,
+/// qué le pedimos, cómo le fue en Operación 72, petición de oración y botones.
+/// El contenido lo arma `enviarCorreoDeEntrega` (src/lib/correo-entrega.ts).
+export async function correoEntregaAMentor(datos: {
   to: string;
   mentorNombre: string;
   personaNombre: string;
-  telefono: string | null;
-  correoPersona: string | null;
-  detalle: string | null;
+  genero: "MUJER" | "HOMBRE" | null;
+  entregadaPor: string | null;
+  quienEs: { rotulo: string; valor: string }[];
+  historial: {
+    titulo: string;
+    quien: string | null;
+    cuando: string;
+    observacion: string | null;
+  }[];
+  peticionDeOracion: string | null;
+  learnerId: string;
 }): Promise<ResultadoCorreo> {
+  const pronombre = datos.genero === "HOMBRE" ? "LO" : datos.genero === "MUJER" ? "LA" : "LE";
+  const asunto = `TE ENTREGAMOS A ${datos.personaNombre.toUpperCase()} PARA QUE ${pronombre} MENTOREES`;
+  const ella = datos.genero === "HOMBRE" ? "lo" : "la";
+  const nombreDePila = datos.personaNombre.split(" ")[0] ?? datos.personaNombre;
+
+  const filas = datos.quienEs
+    .map(
+      (fila) =>
+        `<tr><td style="padding:4px 12px 4px 0;color:#8a929a;white-space:nowrap;vertical-align:top">${escapar(fila.rotulo)}</td><td style="padding:4px 0"><strong>${escapar(fila.valor)}</strong></td></tr>`,
+    )
+    .join("");
+
+  const eventos = datos.historial
+    .map(
+      (evento) => `
+        <tr>
+          <td style="padding:0 10px 14px 0;vertical-align:top"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#1b4a7a;margin-top:6px"></span></td>
+          <td style="padding:0 0 14px 0">
+            <div style="font-size:13px;font-weight:bold;color:#131c24">${escapar(evento.titulo)}</div>
+            <div style="font-size:11.5px;color:#8a929a;margin-top:2px">${escapar([evento.quien, evento.cuando].filter(Boolean).join(" · "))}</div>
+            ${evento.observacion ? `<div style="font-size:12.5px;color:#4a5560;margin-top:5px">«${escapar(evento.observacion)}»</div>` : ""}
+          </td>
+        </tr>`,
+    )
+    .join("");
+
+  const boton = (texto: string, href: string, principal = false) =>
+    `<a href="${href}" style="display:block;text-align:center;text-decoration:none;border-radius:10px;padding:13px 18px;font-size:13px;font-weight:bold;margin-top:8px;${
+      principal
+        ? "background:#0e2a4e;color:#ffffff"
+        : "border:1px solid #c9ccd1;color:#131c24;background:#ffffff"
+    }">${escapar(texto)}</a>`;
+
   return enviarCorreo({
     to: datos.to,
-    subject: `Nueva persona para acompañar: ${datos.personaNombre}`,
+    subject: asunto,
     html: MARCO(`
-      <p>Hola ${escapar(datos.mentorNombre)}, se te asignó una nueva persona para acompañar en tu mentoría.</p>
-      <table style="margin:16px 0;font-size:14px">
-        <tr><td style="padding:4px 12px 4px 0;color:#8a929a">Persona</td><td><strong>${escapar(datos.personaNombre)}</strong></td></tr>
-        ${datos.telefono ? `<tr><td style="padding:4px 12px 4px 0;color:#8a929a">Teléfono</td><td>${escapar(datos.telefono)}</td></tr>` : ""}
-        ${datos.correoPersona ? `<tr><td style="padding:4px 12px 4px 0;color:#8a929a">Correo</td><td>${escapar(datos.correoPersona)}</td></tr>` : ""}
-      </table>
-      ${datos.detalle ? `<p style="font-size:13px;color:#4a5560">${escapar(datos.detalle)}</p>` : ""}
-      <p><a href="${URL_SISTEMA}/mi-red">Ver en Mi red</a></p>
+      <p style="font-size:15px;font-weight:bold;letter-spacing:.02em;color:#131c24">${escapar(asunto)}</p>
+      <p>Hola ${escapar(datos.mentorNombre)}, <strong>${escapar(datos.personaNombre)}</strong> terminó su proceso de Operación 72 y desde hoy queda asignad${datos.genero === "HOMBRE" ? "o" : "a"} a tu mentoría.</p>
+
+      <table style="margin:16px 0;font-size:14px;background:#eaf0f7;border-radius:12px;padding:12px 16px;width:100%">${filas}</table>
+
+      <p style="font-size:11px;font-weight:bold;letter-spacing:.1em;color:#8a929a;margin-top:22px">QUÉ TE PEDIMOS</p>
+      <p>${escapar(nombreDePila)} pasa a la fase <strong>Fortalecer</strong>. Tu tarea:</p>
+      <ol style="padding-left:20px;line-height:1.6">
+        <li><strong>Llámal${ella === "lo" ? "o" : "a"} y preséntate como su mentor</strong>, o preséntale a su líder de <strong>Casa de Fe</strong> o de <strong>Alpha</strong>.</li>
+        <li><strong>Vincúlal${ella === "lo" ? "o" : "a"} a un grupo</strong>: inscríbel${ella === "lo" ? "o" : "a"} en un <strong>Alpha</strong> o en una <strong>Casa de Fe</strong>.<br/><span style="font-size:13px;color:#4a5560">Solo si no está ya en un proceso: si alguien ${ella} viene acompañando, continúa con ese proceso.</span></li>
+        <li>Si va a estar con un líder de tu equipo, <strong>asígnale el líder</strong> desde su expediente para que el sistema sepa quién ${ella} acompaña.</li>
+      </ol>
+
+      <p style="font-size:11px;font-weight:bold;letter-spacing:.1em;color:#8a929a;margin-top:22px">CÓMO LE FUE EN OPERACIÓN 72</p>
+      <table style="border-collapse:collapse;margin-top:8px">${eventos}</table>
+
+      ${
+        datos.peticionDeOracion
+          ? `<div style="margin-top:18px;border:1px solid #b9d3a5;background:#f5f8f1;border-radius:12px;padding:12px 16px">
+              <p style="font-size:11px;font-weight:bold;letter-spacing:.1em;color:#4f7038;margin:0">PETICIÓN DE ORACIÓN</p>
+              <p style="margin:6px 0 0">«${escapar(datos.peticionDeOracion)}»</p>
+            </div>`
+          : ""
+      }
+
+      <div style="margin-top:22px">
+        ${boton("Abrir su expediente", `${URL_SISTEMA}/expediente/${datos.learnerId}`, true)}
+        ${boton(`Inscribirl${ella === "lo" ? "o" : "a"} en un Alpha`, `${URL_SISTEMA}/alpha`)}
+        ${boton(`Inscribirl${ella === "lo" ? "o" : "a"} en Casa de Fe`, `${URL_SISTEMA}/casa-de-fe`)}
+      </div>
+
+      <p style="font-size:12px;color:#8a929a;margin-top:22px">Las notas pastorales no viajan por correo: las ves en su expediente, donde cada apertura queda registrada.</p>
     `),
   });
 }

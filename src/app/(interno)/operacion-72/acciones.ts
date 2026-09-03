@@ -11,8 +11,8 @@ import {
 } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
 import { auditar, encolarEventoIntegracion } from "@/lib/audit";
-import { correoMentorAsignado } from "@/lib/correo";
-import { nombreCompleto, ZONA_HORARIA } from "@/lib/dominio";
+import { enviarCorreoDeEntrega } from "@/lib/correo-entrega";
+import { ZONA_HORARIA } from "@/lib/dominio";
 import {
   DONDE_PUEDE_MENTOREAR,
   ErrorDePermiso,
@@ -492,34 +492,14 @@ export async function entregarAMentor(
     });
   });
 
-  // Le avisamos al mentor por correo la persona que le fue asignada (best-effort).
-  const [mentor, persona] = await Promise.all([
-    prisma.appUser.findUnique({
-      where: { id: mentorId },
-      select: { email: true, fullName: true },
-    }),
-    prisma.person.findUnique({
-      where: { id: operacion.learner.personId },
-      select: {
-        firstName: true,
-        lastName: true,
-        callPhone: true,
-        whatsappPhone: true,
-        email: true,
-        prayerRequest: true,
-      },
-    }),
-  ]);
-  if (mentor && persona) {
-    await correoMentorAsignado({
-      to: mentor.email,
-      mentorNombre: mentor.fullName,
-      personaNombre: nombreCompleto(persona),
-      telefono: persona.callPhone ?? persona.whatsappPhone,
-      correoPersona: persona.email,
-      detalle: persona.prayerRequest,
-    });
-  }
+  // El mentor recibe por correo quién es, qué le pedimos y cómo le fue en
+  // Operación 72 (best-effort: si el correo falla, la entrega ya quedó hecha).
+  await enviarCorreoDeEntrega(prisma, {
+    learnerId: operacion.learnerId,
+    mentorId,
+    entregadaPorId: usuario.id,
+    conservaLinea,
+  });
 
   revalidatePath("/operacion-72");
   return { ok: true };
