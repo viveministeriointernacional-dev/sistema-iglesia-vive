@@ -21,9 +21,9 @@ import {
 import {
   correoContrasenaRestablecida,
   correoCredenciales,
-  correoMentorAsignado,
   type ResultadoCorreo,
 } from "@/lib/correo";
+import { enviarCorreoDeEntrega } from "@/lib/correo-entrega";
 import { LARGO_MINIMO_CONTRASENA } from "@/lib/contrasena";
 import { nombreCompleto } from "@/lib/dominio";
 import { actualizarDatosPersona, type DatosPersona } from "@/lib/persona";
@@ -536,14 +536,13 @@ export async function asignarMentor(
       });
     });
 
-    // Le avisamos al mentor por correo la persona que le fue asignada.
-    const correo = await correoMentorAsignado({
-      to: mentor.email,
-      mentorNombre: mentor.fullName,
-      personaNombre: nombreCompleto(aprendiz.person),
-      telefono: aprendiz.person.callPhone ?? aprendiz.person.whatsappPhone,
-      correoPersona: aprendiz.person.email,
-      detalle: aprendiz.person.prayerRequest,
+    // El mentor recibe por correo quién es, qué le pedimos y cómo le fue en
+    // Operación 72; es el mismo correo que sale al entregar desde el tablero.
+    const correo = await enviarCorreoDeEntrega(prisma, {
+      learnerId,
+      mentorId: mentorUserId,
+      entregadaPorId: usuario.id,
+      conservaLinea: false,
     });
 
     revalidatePath(`/administracion/${aprendiz.personId}`);

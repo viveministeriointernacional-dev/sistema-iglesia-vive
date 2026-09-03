@@ -155,6 +155,22 @@ eventos, y administración. Documentación de producto en `design/`
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-03** — **Correo de entrega a mentor, nuevo** (mockup aprobado:
+  claude.ai/code/artifact/7bd0a7d6-0107-4e9a-b0e8-5d9163bbeaf2). Sale al
+  entregar desde el tablero (`entregarAMentor`) y al asignar mentor desde
+  Administración (`asignarMentor`); ambos usan `enviarCorreoDeEntrega`
+  (`src/lib/correo-entrega.ts`), que carga todo y llama a
+  `correoEntregaAMentor` (`correo.ts`). Reemplaza a `correoMentorAsignado`
+  (eliminada). Asunto: «TE ENTREGAMOS A NOMBRE PARA QUE LA/LO MENTOREES».
+  Bloques: (1) quién es — Consolidó + entregada cuándo, celular, horario de
+  llamada, edad, quién la invitó (+ «se conserva su línea»), llegó por,
+  iglesia; (2) qué te pedimos — llamarla y presentarse o presentarle a su
+  líder, vincularla a Alpha o Casa de Fe **solo si no está ya en un proceso**,
+  asignarle líder; (3) historial de Operación 72 completo (registro + cada
+  `contact_attempt` con quién, cuándo y observación); (4) petición de oración;
+  (5) botones a expediente, /alpha y /casa-de-fe. **Decisión del usuario: las
+  notas pastorales NO van en el correo** (se ven en el expediente, auditadas).
+
 - **2026-09-03** — **Registro interno «solo la ficha» (sin Operación 72).**
   Pedido del usuario: registrar gente del equipo desde la plataforma sin que
   entre a consolidación, para asignarle rol/permisos en Administración. Mockup
