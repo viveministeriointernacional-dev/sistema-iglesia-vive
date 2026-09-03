@@ -36,6 +36,7 @@ export type AccionAuditada =
   | "highlevel.registro_repetido"
   | "registro_publico.recibido"
   | "administracion.datos_actualizados"
+  | "expediente.datos_actualizados"
   | "administracion.rol_actualizado"
   | "administracion.acceso_creado"
   | "administracion.hito_editado"

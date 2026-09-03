@@ -5,15 +5,6 @@ import { buscarPersonasAdmin, TAMANOS_PAGINA } from "@/lib/administracion";
 export const metadata = { title: "Administración · Iglesia Vive" };
 export const dynamic = "force-dynamic";
 
-/// Enmascara el teléfono en la lista (se define aquí para no arrastrar el
-/// módulo del expediente, más pesado, al arrancar esta ruta).
-function telefonoParcial(telefono: string | null) {
-  if (!telefono) return null;
-  const digitos = telefono.replace(/\D/g, "");
-  if (digitos.length < 7) return telefono;
-  return `${telefono.slice(0, telefono.length - 4).trimEnd()} ••• ${digitos.slice(-4)}`;
-}
-
 function urlPagina(consulta: string, size: number, page: number) {
   const params = new URLSearchParams();
   if (consulta) params.set("q", consulta);
@@ -127,7 +118,7 @@ export default async function PaginaAdministracion({
                   {persona.nombre}
                 </span>
                 <span className="mt-1 block text-[11.5px] leading-[1.3] font-medium text-[rgba(19,28,36,.5)]">
-                  {telefonoParcial(persona.telefono) ?? persona.email ?? "Sin contacto"}
+                  {persona.telefono ?? persona.email ?? "Sin contacto"}
                 </span>
               </span>
 

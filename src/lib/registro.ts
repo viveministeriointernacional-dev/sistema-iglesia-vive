@@ -42,6 +42,7 @@ export async function programarVisitaDesdeCrm(
   if (
     !op ||
     (op.status !== Operation72Status.INICIADA &&
+      op.status !== Operation72Status.SEGUIMIENTO &&
       op.status !== Operation72Status.CONTACTADA)
   ) {
     return false;

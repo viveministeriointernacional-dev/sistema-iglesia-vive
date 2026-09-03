@@ -159,8 +159,10 @@ export async function cargarExpediente(learnerId: string) {
       lineOfOrigin: true,
       person: {
         select: {
+          id: true,
           firstName: true,
           lastName: true,
+          gender: true,
           birthDate: true,
           callPhone: true,
           whatsappPhone: true,
@@ -405,9 +407,3 @@ export function diasEnFase(desde: Date, ahora = new Date()) {
   return Math.max(1, Math.floor((ahora.getTime() - desde.getTime()) / 86_400_000));
 }
 
-export function telefonoParcial(telefono: string | null) {
-  if (!telefono) return null;
-  const digitos = telefono.replace(/\D/g, "");
-  if (digitos.length < 7) return telefono;
-  return `${telefono.slice(0, telefono.length - 4).trimEnd()} ••• ${digitos.slice(-4)}`;
-}

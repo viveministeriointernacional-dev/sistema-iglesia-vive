@@ -22,7 +22,6 @@ import {
   FASES,
   HITOS_DEL_RECORRIDO,
   proximoPaso,
-  telefonoParcial,
 } from "@/lib/expediente";
 import { cargarServicios, ROLES_ENTRENAR } from "@/lib/entrenar";
 import {
@@ -35,6 +34,7 @@ import { CasaDeFe } from "./casa-de-fe";
 import { Servicio, type ServicioVista } from "./servicio";
 import type { TemaCasaDeFe } from "./acciones";
 import { NotasPastorales, RegistrarHito } from "./panel-lateral";
+import { DatosPersona } from "./datos-persona";
 
 export const dynamic = "force-dynamic";
 
@@ -436,20 +436,6 @@ export default async function PaginaExpediente({
                   {expediente.churchName ? ` · ${expediente.churchName}` : ""}
                 </dd>
               </div>
-              <div>
-                <dt className="text-[11px] leading-none font-semibold text-[rgba(19,28,36,.42)]">
-                  Contacto
-                </dt>
-                <dd className="mt-1 text-[12.5px] leading-[1.3] font-semibold text-tinta">
-                  {telefonoParcial(expediente.person.callPhone) ?? "Sin teléfono"}
-                  {textoDeHorario(
-                    expediente.person.callSchedules,
-                    expediente.person.callScheduleNote,
-                  )
-                    ? ` · ${textoDeHorario(expediente.person.callSchedules, expediente.person.callScheduleNote)}`
-                    : ""}
-                </dd>
-              </div>
               {expediente.consolidator ? (
                 <div>
                   <dt className="text-[11px] leading-none font-semibold text-[rgba(19,28,36,.42)]">
@@ -460,19 +446,30 @@ export default async function PaginaExpediente({
                   </dd>
                 </div>
               ) : null}
-              {expediente.person.prayerRequest && acceso.puedeVerNotas ? (
-                <div>
-                  <dt className="text-[11px] leading-none font-semibold text-[rgba(19,28,36,.42)]">
-                    Petición de oración
-                  </dt>
-                  <dd className="mt-1 text-[12.5px] leading-[1.35] font-medium text-tinta">
-                    {expediente.person.prayerRequest}
-                  </dd>
-                </div>
-              ) : null}
             </dl>
           </section>
 
+          <DatosPersona
+            learnerId={expediente.id}
+            puedeEditar={acceso.puedeEscribir}
+            horario={textoDeHorario(
+              expediente.person.callSchedules,
+              expediente.person.callScheduleNote,
+            )}
+            inicial={{
+              firstName: expediente.person.firstName,
+              lastName: expediente.person.lastName ?? "",
+              gender: expediente.person.gender ?? "",
+              birthDate: expediente.person.birthDate
+                ? expediente.person.birthDate.toISOString().slice(0, 10)
+                : "",
+              callPhone: expediente.person.callPhone ?? "",
+              whatsappPhone: expediente.person.whatsappPhone ?? "",
+              email: expediente.person.email ?? "",
+              address: expediente.person.address ?? "",
+              prayerRequest: expediente.person.prayerRequest ?? "",
+            }}
+          />
         </aside>
       </div>
     </main>

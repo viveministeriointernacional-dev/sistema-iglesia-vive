@@ -3,7 +3,6 @@
 import { Prisma, Role } from "@iglesia/prisma-client";
 import { obtenerUsuarioActual } from "@/lib/auth";
 import { nombreCompleto, normalizarBusqueda } from "@/lib/dominio";
-import { telefonoParcial } from "@/lib/expediente";
 import { getPrisma } from "@/lib/prisma";
 
 export type PersonaEncontrada = {
@@ -88,9 +87,7 @@ export async function buscarPersonas(
   return aprendices.map((aprendiz) => ({
     learnerId: aprendiz.id,
     nombre: nombreCompleto(aprendiz.person),
-    telefono: telefonoParcial(
-      aprendiz.person.callPhone ?? aprendiz.person.whatsappPhone,
-    ),
+    telefono: aprendiz.person.callPhone ?? aprendiz.person.whatsappPhone ?? null,
     fase: aprendiz.phase,
     estado: aprendiz.status,
   }));

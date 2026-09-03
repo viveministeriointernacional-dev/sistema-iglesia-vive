@@ -32,6 +32,7 @@ export function porcentajeAvance(deadlineAt: Date, ahora: Date = new Date()) {
 
 export const COLUMNAS_OP72 = [
   { estado: Operation72Status.INICIADA, titulo: "INICIADA" },
+  { estado: Operation72Status.SEGUIMIENTO, titulo: "SEGUIMIENTO" },
   { estado: Operation72Status.CONTACTADA, titulo: "CONTACTADA" },
   { estado: Operation72Status.VISITA_PENDIENTE, titulo: "VISITA PENDIENTE" },
   { estado: Operation72Status.LISTA_PARA_ENTREGA, titulo: "LISTA PARA ENTREGA" },
@@ -50,6 +51,13 @@ export const TRANSICIONES: Partial<Record<Operation72Status, Transicion>> = {
   [Operation72Status.INICIADA]: {
     siguiente: Operation72Status.CONTACTADA,
     etiqueta: "Registrar llamada",
+    detallePorDefecto: "Llamada registrada hoy · acordar visita",
+  },
+  // En seguimiento se vuelve a llamar: si contesta pasa a CONTACTADA; si no,
+  // se queda aquí con un intento más en el historial.
+  [Operation72Status.SEGUIMIENTO]: {
+    siguiente: Operation72Status.CONTACTADA,
+    etiqueta: "Volver a llamar",
     detallePorDefecto: "Llamada registrada hoy · acordar visita",
   },
   [Operation72Status.CONTACTADA]: {
@@ -71,9 +79,9 @@ export const TRANSICIONES: Partial<Record<Operation72Status, Transicion>> = {
 export const RESULTADOS_DE_LLAMADA: {
   valor: CallOutcome;
   etiqueta: string;
-  /// Solo un contacto real hace avanzar la tarjeta. «No contestó» queda
-  /// registrado como intento y la persona sigue esperando llamada: el tablero
-  /// no puede decir «contactada» si nadie respondió.
+  /// Solo un contacto real pasa la tarjeta a CONTACTADA. «No contestó» queda
+  /// registrado como intento y la persona pasa a SEGUIMIENTO (hay que volver a
+  /// llamar): el tablero no puede decir «contactada» si nadie respondió.
   contacta: boolean;
 }[] = [
   { valor: CallOutcome.CONTESTO_BIEN, etiqueta: "Contestó bien", contacta: true },
