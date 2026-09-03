@@ -155,6 +155,33 @@ eventos, y administración. Documentación de producto en `design/`
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-03** — **Pantalla «Actividad del día»** (`/administracion/actividad`,
+  solo ADMIN; mockup aprobado:
+  claude.ai/code/artifact/73f0ccb6-5d35-4341-b8d3-c509e13eccab). Lee la
+  bitácora `audit_log` por día (límites en hora Colombia), las llamadas reales
+  de `call_log` y los correos de `email_sent`, y los traduce a frases «quién
+  hizo qué, a quién y en qué quedó» en `src/lib/actividad.ts`
+  (`cargarActividad`: resuelve nombres por `entityType`
+  learner_profile/person/operation72/app_user/faith_house_group/alpha_program/
+  event y por ids en `metadata`). Contadores, filtros por tipo y por nombre,
+  agrupado por hora; clic en un movimiento abre la **vista previa** a la derecha
+  (`lista.tsx`): el correo tal cual salió (iframe `sandbox`), lo que se llenó en
+  la llamada (se enlaza el `contact_attempt` creado ±2 min), el resumen de la
+  visita, motivo de baja, etc. **Toda acción nueva de auditoría debe tener su
+  `case` en `cargarActividad`** o saldrá como texto crudo.
+  - Nuevas acciones auditadas: `alpha.grupo_creado` y `evento.creado` (antes
+    crear un Alpha o un evento no quedaba registrado).
+  - **Copia de cada correo enviado**: tabla `email_sent` (modelo `EmailSent`;
+    migración `20260903230000_correo_enviado` **creada pero NO aplicada: el
+    usuario rechazó aplicarla**). `enviarCorreo` acepta `registro`
+    (`RegistroDeCorreo`) y guarda la copia best-effort (si la tabla no existe,
+    solo `console.error`). Hoy la pasa `correoEntregaAMentor`
+    (`tipo: "entrega_a_mentor"`). La actividad tolera la tabla ausente
+    (`.catch(() => [])`). **Pendiente: aplicar la migración** para que la vista
+    previa de correos funcione.
+  - Las llamadas del CRM se muestran mezcladas (el usuario no pidió lo
+    contrario); se quitan filtrando por tipo.
+
 - **2026-09-03** — **Correo de entrega a mentor, nuevo** (mockup aprobado:
   claude.ai/code/artifact/7bd0a7d6-0107-4e9a-b0e8-5d9163bbeaf2). Sale al
   entregar desde el tablero (`entregarAMentor`) y al asignar mentor desde

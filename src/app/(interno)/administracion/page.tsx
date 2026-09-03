@@ -44,6 +44,12 @@ export default async function PaginaAdministracion({
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <Link
+              href="/administracion/actividad"
+              className="rounded-[9px] border border-[rgba(19,28,36,.16)] px-[14px] py-[10px] text-[12px] leading-none font-semibold text-tinta hover:border-azul-700 hover:text-azul-700"
+            >
+              Actividad
+            </Link>
+            <Link
               href="/administracion/llamadas"
               className="rounded-[9px] border border-[rgba(19,28,36,.16)] px-[14px] py-[10px] text-[12px] leading-none font-semibold text-tinta hover:border-azul-700 hover:text-azul-700"
             >

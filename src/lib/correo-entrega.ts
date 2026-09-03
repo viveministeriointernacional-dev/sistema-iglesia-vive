@@ -43,6 +43,7 @@ export async function enviarCorreoDeEntrega(
         churchAttendance: true,
         churchName: true,
         consolidator: { select: { fullName: true } },
+        personId: true,
         person: {
           select: {
             firstName: true,
@@ -181,5 +182,12 @@ export async function enviarCorreoDeEntrega(
     historial,
     peticionDeOracion: persona.prayerRequest?.trim() || null,
     learnerId: aprendiz.id,
+    registro: {
+      prisma,
+      tipo: "entrega_a_mentor",
+      personId: aprendiz.personId,
+      learnerId: aprendiz.id,
+      actorId: datos.entregadaPorId,
+    },
   });
 }
