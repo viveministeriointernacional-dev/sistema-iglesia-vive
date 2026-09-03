@@ -91,9 +91,10 @@ eventos, y administración. Documentación de producto en `design/`
   `app_user.highlevel_user_id`. Sirve para: asignar el consolidador dueño de un
   contacto, y mapear quién hizo cada llamada. Sin ese id, la persona **no aparece**
   en el tablero de llamadas.
-- **La API de HighLevel está bloqueada por egress** en este entorno (host
-  `services.leadconnectorhq.com` no permitido). No se puede jalar datos por API;
-  el token PIT vive fuera del repo (scratchpad `.ghl-token`), nunca commitear.
+- **La API de HighLevel SÍ se puede usar** desde este entorno (esto antes decía lo
+  contrario y era falso). `services.leadconnectorhq.com` responde con `curl`;
+  `urllib` de Python recibe 403 del proxy, así que usar `curl`. El token PIT vive
+  fuera del repo (scratchpad `.ghl-token`), nunca commitear.
 
 ## 7. Funcionalidades ya construidas (no rehacer)
 
@@ -151,6 +152,39 @@ eventos, y administración. Documentación de producto en `design/`
 - Validar deploy sin credenciales: `npx wrangler deploy --dry-run --outdir /tmp/x`
 
 ## 12. Bitácora (añadir lo nuevo arriba)
+
+- **2026-09-03** — **El correo del sistema por fin funciona (nunca había enviado
+  uno).** El usuario restableció una contraseña desde administración, la pantalla
+  dijo «enviada por correo» y no llegó nada. Causa: **`RESEND_API_KEY` y
+  `EMAIL_FROM` no existían en el Worker** — o sea que *ningún* correo del sistema
+  se había enviado jamás (credenciales, aviso a mentor, recuperación). Y no se
+  notaba porque `enviarCorreo` devolvía `false` en silencio y quien la llamaba
+  descartaba el resultado. Tres arreglos:
+  1. **`enviarCorreo` devuelve `ResultadoCorreo`** (`{enviado:true}` o
+     `{enviado:false, motivo}`) y los cuatro correos lo propagan. Las acciones de
+     administración lo suben a la pantalla como **aviso ámbar** («la contraseña sí
+     cambió, pero el correo no salió porque…») y lo guardan en la auditoría
+     (`correoEnviado`, `motivoCorreo`). En `/recuperar` la respuesta al usuario
+     debe seguir siendo siempre la misma, así que ahí el motivo **solo** queda en
+     la auditoría. (PR #46)
+  2. **Infraestructura de correo montada**: cuenta de Resend, dominio de envío
+     **`send.micasavive.com`** verificado. El DNS de micasavive.com se administra
+     **en HighLevel** (Settings → Domains → Registros DNS), no en Cloudflare.
+     Registros añadidos: TXT `resend._domainkey.send` (DKIM), MX `send.send`
+     (`feedback-smtp.us-east-1.amazonses.com`, prioridad 10), TXT `send.send`
+     (SPF) y TXT `_dmarc`. Los nombres van **cortos**, sin `.micasavive.com`.
+  3. **⚠️ REGLA: `wrangler deploy` conserva los Secrets pero REEMPLAZA las
+     variables de texto** del Worker por las de `wrangler.jsonc`. La `EMAIL_FROM`
+     puesta a mano en el panel **desapareció en el siguiente despliegue**, sin
+     aviso. Por eso `EMAIL_FROM` ahora vive en `wrangler.jsonc` → `vars` (no es
+     secreto). **Toda variable de texto nueva va ahí; solo los secretos van al
+     panel.** (PR #47)
+  **Verificado en producción**: se ejecutó el flujo real de `/recuperar` contra el
+  worker vivo y la auditoría registró `correoEnviado: true`.
+  Truco útil para probar una Server Action sin navegador: `GET` a la página,
+  sacar del HTML los campos ocultos `$ACTION_REF_1`, `$ACTION_1:0`, `$ACTION_1:1`
+  y `$ACTION_KEY`, y reenviarlos por `POST` con `curl -F` junto con los campos del
+  formulario (es la ruta sin JS de Next).
 
 - **2026-09-03** — **Cuatro ajustes de producto pedidos por el usuario (un solo PR):**
   1. **Ningún dato de la persona se oculta.** El teléfono se enmascaraba
