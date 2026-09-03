@@ -8,6 +8,7 @@ import {
   normalizarBusqueda,
   telefonoLegible,
   textoDeEntrada,
+  textoDeHorario,
 } from "@/lib/dominio";
 import {
   COLUMNAS_OP72,
@@ -120,6 +121,8 @@ export default async function TableroOperacion72({
             gender: true,
             callPhone: true,
             whatsappPhone: true,
+            callSchedules: true,
+            callScheduleNote: true,
           },
         },
       },
@@ -231,8 +234,13 @@ export default async function TableroOperacion72({
     const invito =
       persona.gender === "MUJER" ? "LA INVITÓ" : persona.gender === "HOMBRE" ? "LO INVITÓ" : "INVITÓ";
 
+    // Cuándo dijo la persona que se le puede llamar: va pegado al celular
+    // porque es lo segundo que se mira antes de marcar.
+    const horario = textoDeHorario(persona.callSchedules, persona.callScheduleNote);
+
     const datos: TarjetaPersona["datos"] = [
       { rotulo: "CELULAR", valor: celular, ausente: !celular },
+      { rotulo: "LLAMAR", valor: horario, ausente: !horario, faltante: "Sin horario preferido" },
       {
         rotulo: "CONSOLIDA",
         valor: learner.consolidator?.fullName ?? null,
