@@ -169,10 +169,18 @@ eventos, y administración. Documentación de producto en `design/`
   (que viven como **campos personalizados del CONTACTO**, no «del formulario»).
   **No** hace falta `submissionId` (no existe variable) y `HIGHLEVEL_REGISTRO_FORM_ID`
   **no está configurada** en Cloudflare, así que el `formId` no se valida.
-  **Ojo (no es bug):** todas las consolidadoras MUJER están **llenas o sobre cupo**
-  (12/12, 12/12, 12/12, 17/12, 18/12), así que una mujer nueva entra con
-  «Sin consolidador con cupo · requiere asignación de un líder». Hay que subir
-  `capacity` o asignar a mano.
+  **Regla de cupo (definida por el usuario, 3-sep):** el tope es **24** y es tope
+  solo de la **MENTORÍA** (un mentor acompaña hasta 24 discípulos en fase
+  Multiplicar). En
+  **consolidación NO es tope**: el reparto automático siempre asigna al del
+  **mismo género con menor carga**, aunque todos estén sobre 12 (la capacidad
+  queda como referencia visual, no como bloqueo). Implementado en
+  `src/lib/asignacion.ts`: `elegirPorCarga` (con tope, para mentores) vs
+  `elegirPorMenorCarga` (sin tope, para consolidadores). Contexto: todas las
+  consolidadoras MUJER estaban llenas/sobre cupo con el viejo tope de 12 y por eso
+  Maria Julieth entró sin consolidadora; se le asignó Jakeline Guerrero (la de
+  menor carga). El `capacity` de los 31 usuarios pasó de 12 a **24** (migración
+  `20260903120000_capacidad_24`, aplicada) y el default del esquema también.
 
 - **2026-09-01** — **Hora Colombia** en toda la UI. El servidor (Workers/Node)
   corre en UTC, así que los formateadores `Intl.DateTimeFormat("es-CO", …)` sin

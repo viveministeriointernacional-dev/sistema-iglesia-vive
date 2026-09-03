@@ -48,7 +48,7 @@ model AppUser {
   role       Role
   active     Boolean  @default(true)
   /// Capacidad máxima de acompañamiento simultáneo (consolidador / mentor).
-  capacity   Int      @default(12)
+  capacity   Int      @default(24)
   /// Liderar Alpha es un permiso, no un rol: un mentor, un consolidador o
   /// cualquiera del equipo puede llevar un grupo sin cambiar lo que es dentro
   /// de la iglesia. Quien lo tiene administra los grupos que le asignen; crear
