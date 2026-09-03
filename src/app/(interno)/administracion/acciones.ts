@@ -22,6 +22,7 @@ import {
   correoContrasenaRestablecida,
   correoCredenciales,
   correoMentorAsignado,
+  type ResultadoCorreo,
 } from "@/lib/correo";
 import { LARGO_MINIMO_CONTRASENA } from "@/lib/contrasena";
 import { nombreCompleto } from "@/lib/dominio";
@@ -29,7 +30,20 @@ import { actualizarDatosPersona, type DatosPersona } from "@/lib/persona";
 import { getPrisma } from "@/lib/prisma";
 import { crearSupabaseAdmin } from "@/lib/supabase/admin";
 
-export type ResultadoAdmin = { ok: true } | { ok: false; mensaje: string };
+export type ResultadoAdmin =
+  | { ok: true; aviso?: string }
+  | { ok: false; mensaje: string };
+
+/// Traduce un envío fallido en un aviso para la pantalla. La acción se hizo
+/// (la contraseña quedó cambiada, el acceso quedó creado), pero el correo no
+/// salió y hay que decirlo en vez de asegurar que llegó.
+function avisoDeCorreo(
+  resultado: ResultadoCorreo,
+  queNoLlego: string,
+): string | undefined {
+  if (resultado.enviado) return undefined;
+  return `Ojo: ${queNoLlego} no salió porque ${resultado.motivo}`;
+}
 
 /// Envuelve una acción de admin: exige el rol y traduce el error de permiso en
 /// un mensaje para el formulario.
@@ -211,25 +225,30 @@ export async function restablecerContrasena(
       };
     }
 
+    const correo: ResultadoCorreo = datos.enviarPorCorreo
+      ? await correoContrasenaRestablecida({
+          to: persona.user.email,
+          nombre: nombreCompleto(persona),
+          email: persona.user.email,
+          password: datos.password,
+        })
+      : { enviado: true };
+
     await auditar(prisma, {
       actorId: usuario.id,
       action: "administracion.contrasena_restablecida",
       entityType: "person",
       entityId: personId,
-      metadata: { email: persona.user.email, avisadaPorCorreo: datos.enviarPorCorreo },
+      metadata: {
+        email: persona.user.email,
+        avisadaPorCorreo: datos.enviarPorCorreo,
+        correoEnviado: correo.enviado,
+        motivoCorreo: correo.enviado ? null : correo.motivo,
+      },
     });
 
-    if (datos.enviarPorCorreo) {
-      await correoContrasenaRestablecida({
-        to: persona.user.email,
-        nombre: nombreCompleto(persona),
-        email: persona.user.email,
-        password: datos.password,
-      });
-    }
-
     revalidatePath(`/administracion/${personId}`);
-    return { ok: true };
+    return { ok: true, aviso: avisoDeCorreo(correo, "el correo con la contraseña") };
   });
 }
 
@@ -320,8 +339,8 @@ export async function crearAcceso(
       metadata: { email, role: datos.role },
     });
 
-    // Le avisamos por correo sus datos de ingreso (best-effort).
-    await correoCredenciales({
+    // Le avisamos por correo sus datos de ingreso.
+    const correo = await correoCredenciales({
       to: email,
       nombre: nombreCompleto(persona),
       email,
@@ -330,7 +349,7 @@ export async function crearAcceso(
 
     revalidatePath(`/administracion/${personId}`);
     revalidatePath("/administracion");
-    return { ok: true };
+    return { ok: true, aviso: avisoDeCorreo(correo, "el correo con los datos de ingreso") };
   });
 }
 
@@ -518,7 +537,7 @@ export async function asignarMentor(
     });
 
     // Le avisamos al mentor por correo la persona que le fue asignada.
-    await correoMentorAsignado({
+    const correo = await correoMentorAsignado({
       to: mentor.email,
       mentorNombre: mentor.fullName,
       personaNombre: nombreCompleto(aprendiz.person),
@@ -528,7 +547,7 @@ export async function asignarMentor(
     });
 
     revalidatePath(`/administracion/${aprendiz.personId}`);
-    return { ok: true };
+    return { ok: true, aviso: avisoDeCorreo(correo, "el aviso al mentor") };
   });
 }
 

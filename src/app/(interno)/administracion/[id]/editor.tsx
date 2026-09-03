@@ -142,7 +142,7 @@ function SeccionBaja({
 }) {
   const router = useRouter();
   const [motivo, setMotivo] = useState("");
-  const [estado, setEstado] = useState<null | { ok: boolean; texto: string }>(null);
+  const [estado, setEstado] = useState<null | EstadoAviso>(null);
   const [ocupado, iniciar] = useTransition();
 
   function ejecutarBaja() {
@@ -238,7 +238,7 @@ function SeccionMentor({
   actual: string | null;
 }) {
   const [elegido, setElegido] = useState(actual ?? "");
-  const [estado, setEstado] = useState<null | { ok: boolean; texto: string }>(null);
+  const [estado, setEstado] = useState<null | EstadoAviso>(null);
   const [guardando, iniciar] = useTransition();
 
   function guardar() {
@@ -299,12 +299,25 @@ function Tarjeta({ titulo, children }: { titulo: string; children: React.ReactNo
   );
 }
 
-function Aviso({ estado }: { estado: null | { ok: boolean; texto: string } }) {
+/// Resultado de una acción tal como se le muestra al usuario. `tono: "aviso"`
+/// es el caso intermedio: la acción sí se hizo, pero algo secundario falló
+/// (típicamente el correo) y hay que decirlo en vez de darlo por bueno.
+type EstadoAviso = {
+  ok: boolean;
+  texto: string;
+  tono?: "aviso";
+};
+
+function Aviso({ estado }: { estado: null | EstadoAviso }) {
   if (!estado) return null;
   return (
     <p
       className={`mt-3 text-[12px] leading-[1.4] font-semibold ${
-        estado.ok ? "text-verde-700" : "text-[rgb(180,40,40)]"
+        estado.tono === "aviso"
+          ? "text-ambar-texto"
+          : estado.ok
+            ? "text-verde-700"
+            : "text-[rgb(180,40,40)]"
       }`}
     >
       {estado.texto}
@@ -411,7 +424,7 @@ function SeccionRol({ cuenta }: { cuenta: Cuenta }) {
     canMentor: cuenta.canMentor,
     coordinatesConsolidation: cuenta.coordinatesConsolidation,
   });
-  const [estado, setEstado] = useState<null | { ok: boolean; texto: string }>(null);
+  const [estado, setEstado] = useState<null | EstadoAviso>(null);
   const [guardando, iniciar] = useTransition();
 
   function guardar() {
@@ -451,7 +464,7 @@ function SeccionContrasena({
   const [automatica, setAutomatica] = useState(true);
   const [password, setPassword] = useState(() => generarContrasena());
   const [enviarPorCorreo, setEnviarPorCorreo] = useState(true);
-  const [estado, setEstado] = useState<null | { ok: boolean; texto: string }>(null);
+  const [estado, setEstado] = useState<null | EstadoAviso>(null);
   const [guardando, iniciar] = useTransition();
 
   function elegirModo(auto: boolean) {
@@ -466,12 +479,18 @@ function SeccionContrasena({
       const r = await restablecerContrasena(personId, { password, enviarPorCorreo });
       setEstado(
         r.ok
-          ? {
-              ok: true,
-              texto: enviarPorCorreo
-                ? "Contraseña restablecida y enviada por correo."
-                : "Contraseña restablecida. Entrégasela tú.",
-            }
+          ? r.aviso
+            ? {
+                ok: true,
+                tono: "aviso",
+                texto: `Contraseña restablecida, pero no se envió por correo. ${r.aviso} Entrégasela tú.`,
+              }
+            : {
+                ok: true,
+                texto: enviarPorCorreo
+                  ? "Contraseña restablecida y enviada por correo."
+                  : "Contraseña restablecida. Entrégasela tú.",
+              }
           : { ok: false, texto: r.mensaje },
       );
     });
@@ -592,14 +611,18 @@ function SeccionCrearAcceso({ personId }: { personId: string }) {
     canMentor: false,
     coordinatesConsolidation: false,
   });
-  const [estado, setEstado] = useState<null | { ok: boolean; texto: string }>(null);
+  const [estado, setEstado] = useState<null | EstadoAviso>(null);
   const [guardando, iniciar] = useTransition();
 
   function crear() {
     iniciar(async () => {
       const r = await crearAcceso(personId, { email, password, ...v });
       if (r.ok) {
-        setEstado({ ok: true, texto: "Acceso creado." });
+        setEstado(
+          r.aviso
+            ? { ok: true, tono: "aviso", texto: `Acceso creado. ${r.aviso}` }
+            : { ok: true, texto: "Acceso creado." },
+        );
         router.refresh();
       } else {
         setEstado({ ok: false, texto: r.mensaje });
@@ -648,7 +671,7 @@ function SeccionProceso({
 }) {
   const [fase, setFase] = useState<Phase | "">(faseInicial ?? "");
   const [hechos, setHechos] = useState<Set<MilestoneKind>>(new Set(completados));
-  const [estado, setEstado] = useState<null | { ok: boolean; texto: string }>(null);
+  const [estado, setEstado] = useState<null | EstadoAviso>(null);
   const [ocupado, iniciar] = useTransition();
 
   function ponerFase(nueva: Phase) {
