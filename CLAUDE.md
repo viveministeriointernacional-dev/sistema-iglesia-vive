@@ -155,6 +155,18 @@ eventos, y administración. Documentación de producto en `design/`
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-03** — **«Database error loading user» al restablecer contraseña.**
+  Al intentar restablecer la contraseña de Nora Bonilla desde administración,
+  Supabase Auth respondió ese error. Causa: **12 cuentas de `auth.users`**
+  (creadas en bloque el 24-ago) tenían `NULL` en columnas técnicas
+  (`confirmation_token`, `recovery_token`, `email_change`,
+  `email_change_token_new`…) donde el motor de Supabase (GoTrue) exige texto
+  vacío `''`; al cargar el usuario, falla. Es el síntoma clásico de usuarios
+  insertados por SQL en vez de por la API. **Corregido con un `UPDATE …
+  coalesce(col, '')`** sobre esas 12 cuentas; 0 pendientes. **Regla:** si vuelve
+  a aparecer ese error, revisar `NULL` en esas columnas antes de tocar código.
+  Nunca insertar usuarios en `auth.users` por SQL: usar `auth.admin.createUser`.
+
 - **2026-09-03** — **Tarjetas de Operación 72 explícitas, baja desde el tablero y
   webhook de visitas** (mockup aprobado por el usuario:
   claude.ai/code/artifact/62dc9ac9-0589-4d37-a854-6c10d3fd6d14).
