@@ -25,6 +25,12 @@ eventos, y administración. Documentación de producto en `design/`
   **Merge** en GitHub. Desplegar = fusionar a `main`.
 - Prefiere soluciones definitivas y paso a paso; se frustra si repito cosas ya
   hechas o si algo queda a medias.
+- **MÉTODO MOCKUPS (pedido el 3-sep-2026, aplica siempre):** antes de implementar
+  **cualquier cambio de interfaz** (pantallas, tableros, formularios, secciones
+  nuevas), mostrarle primero un **mockup** para que lo apruebe, y solo después
+  escribir el código. Usar el skill `design` (canvas de mockups) para producirlo.
+  Los cambios que no tocan interfaz (datos, migraciones, webhooks, reglas de
+  negocio en servidor) no necesitan mockup: se hacen directo.
 
 ## 3. Arquitectura y plataformas
 
