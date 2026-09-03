@@ -69,14 +69,33 @@ export default async function TableroOperacion72() {
       _count: { _all: true },
     }),
     mentoresElegibles(prisma),
-    ...COLUMNAS_OP72.map((columna) =>
-      prisma.operation72.findMany({
-        where: { status: columna.estado, ...alcance },
+    ...COLUMNAS_OP72.map(async (columna) => {
+      // Primero quienes SIGUEN dentro de sus 72 horas (los que todavía se
+      // pueden atender a tiempo), del que menos margen tiene al que más. Con
+      // cientos de tarjetas vencidas acumuladas, ordenar solo por plazo dejaba
+      // a los registros nuevos al final y el límite por columna los cortaba:
+      // justo las personas que hay que llamar hoy quedaban invisibles.
+      const dentroDePlazo = await prisma.operation72.findMany({
+        where: { status: columna.estado, ...alcance, deadlineAt: { gte: ahora } },
         orderBy: { deadlineAt: "asc" },
         take: LIMITE_POR_COLUMNA,
         select: seleccionDeTarjeta,
-      }),
-    ),
+      });
+
+      const resto = LIMITE_POR_COLUMNA - dentroDePlazo.length;
+      if (resto <= 0) return dentroDePlazo;
+
+      // Y después las vencidas, de la más reciente a la más antigua: una deuda
+      // de esta semana se recupera; una de hace meses ya no es lo urgente.
+      const vencidas = await prisma.operation72.findMany({
+        where: { status: columna.estado, ...alcance, deadlineAt: { lt: ahora } },
+        orderBy: { deadlineAt: "desc" },
+        take: resto,
+        select: seleccionDeTarjeta,
+      });
+
+      return [...dentroDePlazo, ...vencidas];
+    }),
   ]);
 
   const totalPorEstado = new Map(
