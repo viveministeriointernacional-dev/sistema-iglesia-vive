@@ -419,19 +419,29 @@ export function normalizarSeguimientoHighLevel(entrada: unknown) {
   if (!payload) throw new Error("El cuerpo debe ser un objeto JSON.");
   const indice = indiceDeCampos(payload);
 
+  // La acción Webhook de HighLevel manda por sí sola el contacto completo
+  // («datos estándar»): ahí el contacto viene como `contact_id` y la ubicación
+  // anidada en `location.id`. Se aceptan las dos formas para que el paso del
+  // workflow funcione con solo la URL y el secreto, sin mapear nada a mano.
+  const location = objeto(payload.location);
   const contactId = texto(obtener(indice, "contactId", "contact_id"));
-  const locationId = texto(obtener(indice, "locationId", "location_id"));
-  if (!contactId || !locationId) {
-    throw new Error("Faltan contactId o locationId del contacto.");
+  const locationId =
+    texto(obtener(indice, "locationId", "location_id")) ??
+    texto(location?.id) ??
+    null;
+  const phone = texto(obtener(indice, "phone", "telefono", "celular"));
+  if (!contactId && !phone) {
+    throw new Error("No se sabe de qué contacto se trata: falta contact_id o phone.");
   }
 
   return {
     contexto: {
       contactId,
+      /// Puede faltar: la ruta usa entonces la ubicación configurada.
       locationId,
       formName: texto(obtener(indice, "formName", "form_name")),
       // Para reconocer a la persona si el contacto aún no está enlazado.
-      phone: texto(obtener(indice, "phone", "telefono", "celular")),
+      phone,
       email: correoOpcional(obtener(indice, "email", "correo")) || null,
     },
     visita: extraerVisita(indice),
