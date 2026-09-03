@@ -1,4 +1,16 @@
 import { variableDeEntorno } from "@/lib/entorno";
+import type { ClientePrisma } from "@/lib/prisma";
+
+/// Dónde guardar la copia del correo, para poder previsualizarlo después desde
+/// la actividad del día. Es opcional y best-effort: si la tabla no existe o el
+/// guardado falla, el correo igual se envía y no se rompe nada.
+export type RegistroDeCorreo = {
+  prisma: ClientePrisma;
+  tipo: string;
+  personId?: string | null;
+  learnerId?: string | null;
+  actorId?: string | null;
+};
 
 /// Qué pasó con un envío. Cuando falla se dice **por qué**: un correo que no
 /// sale sin dejar rastro es imposible de diagnosticar desde fuera, y la pantalla
@@ -14,6 +26,44 @@ export type ResultadoCorreo =
 /// Devuelve el resultado para que quien llama decida qué decirle al usuario.
 /// Cambiar de proveedor es cambiar solo esta función.
 async function enviarCorreo(datos: {
+  to: string;
+  subject: string;
+  html: string;
+  registro?: RegistroDeCorreo;
+}): Promise<ResultadoCorreo> {
+  const resultado = await enviarPorResend(datos);
+  if (datos.registro) await guardarCopia(datos, resultado);
+  return resultado;
+}
+
+async function guardarCopia(
+  datos: { to: string; subject: string; html: string; registro?: RegistroDeCorreo },
+  resultado: ResultadoCorreo,
+) {
+  const registro = datos.registro;
+  if (!registro) return;
+  try {
+    await registro.prisma.emailSent.create({
+      data: {
+        kind: registro.tipo,
+        to: datos.to,
+        subject: datos.subject,
+        html: datos.html,
+        sent: resultado.enviado,
+        failure: resultado.enviado ? null : resultado.motivo,
+        personId: registro.personId ?? null,
+        learnerId: registro.learnerId ?? null,
+        actorId: registro.actorId ?? null,
+      },
+    });
+  } catch (error) {
+    // Sin tabla (migración pendiente) o sin permiso: el correo ya salió, y la
+    // copia es solo para previsualizar. No se rompe la acción por esto.
+    console.error("No se pudo guardar la copia del correo", error);
+  }
+}
+
+async function enviarPorResend(datos: {
   to: string;
   subject: string;
   html: string;
@@ -142,6 +192,7 @@ export async function correoEntregaAMentor(datos: {
   }[];
   peticionDeOracion: string | null;
   learnerId: string;
+  registro?: RegistroDeCorreo;
 }): Promise<ResultadoCorreo> {
   const pronombre = datos.genero === "HOMBRE" ? "LO" : datos.genero === "MUJER" ? "LA" : "LE";
   const asunto = `TE ENTREGAMOS A ${datos.personaNombre.toUpperCase()} PARA QUE ${pronombre} MENTOREES`;
@@ -179,6 +230,7 @@ export async function correoEntregaAMentor(datos: {
   return enviarCorreo({
     to: datos.to,
     subject: asunto,
+    registro: datos.registro,
     html: MARCO(`
       <p style="font-size:15px;font-weight:bold;letter-spacing:.02em;color:#131c24">${escapar(asunto)}</p>
       <p>Hola ${escapar(datos.mentorNombre)}, <strong>${escapar(datos.personaNombre)}</strong> terminó su proceso de Operación 72 y desde hoy queda asignad${datos.genero === "HOMBRE" ? "o" : "a"} a tu mentoría.</p>

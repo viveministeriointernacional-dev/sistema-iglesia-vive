@@ -671,6 +671,26 @@ model FaithHouseGroupMember {
 
 // ---------------------------------------------- Auditoría e integraciones
 
+/// Copia de cada correo que envía el sistema, para previsualizarlo desde la
+/// actividad del día. `sent` dice si Resend lo aceptó; `failure`, por qué no.
+model EmailSent {
+  id        String   @id @default(uuid())
+  kind      String
+  to        String
+  subject   String
+  html      String
+  sent      Boolean
+  failure   String?
+  personId  String?  @map("person_id")
+  learnerId String?  @map("learner_id")
+  actorId   String?  @map("actor_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([learnerId, createdAt])
+  @@map("email_sent")
+}
+
 model AuditLog {
   id         String   @id @default(uuid())
   actorId    String?  @map("actor_id")

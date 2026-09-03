@@ -72,6 +72,14 @@ export async function crearEvento(datos: {
     },
   });
 
+  await auditar(prisma, {
+    actorId: usuario.id,
+    action: "evento.creado",
+    entityType: "event",
+    entityId: evento.id,
+    metadata: { titulo: evento.title, tipo: datos.kind, fecha: datos.fecha },
+  });
+
   revalidatePath("/eventos");
   revalidatePath(`/eventos/${evento.id}`);
   return { ok: true };

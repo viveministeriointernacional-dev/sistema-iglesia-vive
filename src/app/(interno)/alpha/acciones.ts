@@ -80,7 +80,7 @@ export async function crearGrupo(
     };
   }
 
-  await prisma.alphaProgram.create({
+  const grupo = await prisma.alphaProgram.create({
     data: {
       name: nombre.trim(),
       startDate: new Date(inicio),
@@ -88,6 +88,15 @@ export async function crearGrupo(
       createdById: usuario.id,
       teamId: lider.teamId ?? usuario.teamId,
     },
+    select: { id: true, name: true },
+  });
+
+  await auditar(prisma, {
+    actorId: usuario.id,
+    action: "alpha.grupo_creado",
+    entityType: "alpha_program",
+    entityId: grupo.id,
+    metadata: { nombre: grupo.name, inicio, liderId: lider.id },
   });
 
   revalidatePath("/alpha");
