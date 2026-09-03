@@ -363,6 +363,9 @@ model MentorRelationship {
 
 enum Operation72Status {
   INICIADA
+  /// Se llamó y no contestó: la persona sigue esperando contacto, pero ya con
+  /// un intento registrado. Una llamada contestada la pasa a CONTACTADA.
+  SEGUIMIENTO
   CONTACTADA
   VISITA_PENDIENTE
   LISTA_PARA_ENTREGA

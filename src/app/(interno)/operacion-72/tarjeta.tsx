@@ -109,7 +109,8 @@ export function TarjetaDePersona({
 
       {abierto ? (
         <div className="mt-3 rounded-[10px] bg-papel p-3">
-          {persona.estado === Operation72Status.INICIADA ? (
+          {persona.estado === Operation72Status.INICIADA ||
+          persona.estado === Operation72Status.SEGUIMIENTO ? (
             <FormularioDeLlamada
               enCurso={enCurso}
               alGuardar={(datos) =>

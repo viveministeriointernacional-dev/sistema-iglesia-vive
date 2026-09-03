@@ -20,7 +20,7 @@ import {
 } from "@/lib/auth";
 import { correoCredenciales, correoMentorAsignado } from "@/lib/correo";
 import { nombreCompleto } from "@/lib/dominio";
-import { exportarDatosPersona } from "@/lib/highlevel-salida";
+import { actualizarDatosPersona, type DatosPersona } from "@/lib/persona";
 import { getPrisma } from "@/lib/prisma";
 import { crearSupabaseAdmin } from "@/lib/supabase/admin";
 
@@ -43,67 +43,25 @@ async function conAdmin(
 
 const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export type DatosPersona = {
-  firstName: string;
-  lastName: string;
-  gender: "MUJER" | "HOMBRE" | "";
-  birthDate: string;
-  callPhone: string;
-  whatsappPhone: string;
-  email: string;
-  address: string;
-  prayerRequest: string;
-};
+export type { DatosPersona } from "@/lib/persona";
 
-/// Actualiza los datos de una persona y los refleja en HighLevel.
+/// Actualiza los datos de una persona y los refleja en HighLevel. La misma
+/// edición existe en el expediente para quien acompaña a la persona
+/// (`guardarDatosPersonaDesdeExpediente`); aquí la regla es «solo administrador».
 export async function guardarDatosPersona(
   personId: string,
   datos: DatosPersona,
 ): Promise<ResultadoAdmin> {
   return conAdmin(async (usuario) => {
-    if (!datos.firstName.trim()) {
-      return { ok: false, mensaje: "El nombre es obligatorio." };
-    }
-    if (datos.email.trim() && !CORREO.test(datos.email.trim())) {
-      return { ok: false, mensaje: "El correo no tiene un formato válido." };
-    }
-    if (datos.birthDate && Number.isNaN(Date.parse(datos.birthDate))) {
-      return { ok: false, mensaje: "La fecha de nacimiento no es válida." };
-    }
-
     const prisma = await getPrisma();
-    const persona = await prisma.person.findUnique({
-      where: { id: personId },
-      select: { id: true, learnerProfile: { select: { id: true } } },
-    });
-    if (!persona) return { ok: false, mensaje: "No se encontró la persona." };
-
-    await prisma.person.update({
-      where: { id: personId },
-      data: {
-        firstName: datos.firstName.trim(),
-        lastName: datos.lastName.trim() || null,
-        gender: datos.gender || null,
-        birthDate: datos.birthDate ? new Date(datos.birthDate) : null,
-        callPhone: datos.callPhone.trim() || null,
-        whatsappPhone: datos.whatsappPhone.trim() || null,
-        email: datos.email.trim() || null,
-        address: datos.address.trim() || null,
-        prayerRequest: datos.prayerRequest.trim() || null,
-      },
-    });
-
-    await auditar(prisma, {
-      actorId: usuario.id,
-      action: "administracion.datos_actualizados",
-      entityType: "person",
-      entityId: personId,
-    });
-
-    // Reflejo hacia HighLevel (best-effort, fuera de la edición).
-    if (persona.learnerProfile) {
-      await exportarDatosPersona(persona.learnerProfile.id);
-    }
+    const resultado = await actualizarDatosPersona(
+      prisma,
+      personId,
+      datos,
+      usuario.id,
+      "administracion.datos_actualizados",
+    );
+    if (!resultado.ok) return resultado;
 
     revalidatePath(`/administracion/${personId}`);
     revalidatePath("/administracion");

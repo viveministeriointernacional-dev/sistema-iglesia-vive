@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { MilestoneKind, Phase, Role } from "@iglesia/prisma-client";
+import { FormularioDatosPersona } from "@/components/formulario-datos-persona";
+import type { DatosPersona } from "@/lib/persona";
 import {
   alternarHito,
   asignarMentor,
@@ -312,71 +314,12 @@ function SeccionDatos({
   personId: string;
   inicial: DatosForm;
 }) {
-  const [form, setForm] = useState<DatosForm>(inicial);
-  const [estado, setEstado] = useState<null | { ok: boolean; texto: string }>(null);
-  const [guardando, iniciar] = useTransition();
-  const set = (campo: keyof DatosForm, valor: string) =>
-    setForm((previo) => ({ ...previo, [campo]: valor }));
-
-  function guardar() {
-    iniciar(async () => {
-      const r = await guardarDatosPersona(personId, {
-        ...form,
-        gender: form.gender as "MUJER" | "HOMBRE" | "",
-      });
-      setEstado(
-        r.ok
-          ? { ok: true, texto: "Datos guardados y enviados a HighLevel." }
-          : { ok: false, texto: r.mensaje },
-      );
-    });
-  }
-
   return (
     <Tarjeta titulo="DATOS DE LA PERSONA">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Campo etiqueta="Nombres">
-          <input className="campo" value={form.firstName} onChange={(e) => set("firstName", e.target.value)} />
-        </Campo>
-        <Campo etiqueta="Apellidos">
-          <input className="campo" value={form.lastName} onChange={(e) => set("lastName", e.target.value)} />
-        </Campo>
-        <Campo etiqueta="Género">
-          <select className="campo" value={form.gender} onChange={(e) => set("gender", e.target.value)}>
-            <option value="">Sin registrar</option>
-            <option value="MUJER">Mujer</option>
-            <option value="HOMBRE">Hombre</option>
-          </select>
-        </Campo>
-        <Campo etiqueta="Fecha de nacimiento">
-          <input type="date" className="campo" value={form.birthDate} onChange={(e) => set("birthDate", e.target.value)} />
-        </Campo>
-        <Campo etiqueta="Celular (llamadas)">
-          <input className="campo" value={form.callPhone} onChange={(e) => set("callPhone", e.target.value)} />
-        </Campo>
-        <Campo etiqueta="WhatsApp">
-          <input className="campo" value={form.whatsappPhone} onChange={(e) => set("whatsappPhone", e.target.value)} />
-        </Campo>
-        <Campo etiqueta="Correo">
-          <input className="campo" value={form.email} onChange={(e) => set("email", e.target.value)} />
-        </Campo>
-        <Campo etiqueta="Dirección">
-          <input className="campo" value={form.address} onChange={(e) => set("address", e.target.value)} />
-        </Campo>
-      </div>
-      <label className="mt-3 block">
-        <span className="etiqueta-campo">Petición de oración</span>
-        <textarea className="campo" rows={2} value={form.prayerRequest} onChange={(e) => set("prayerRequest", e.target.value)} />
-      </label>
-      <Aviso estado={estado} />
-      <button
-        type="button"
-        onClick={guardar}
-        disabled={guardando}
-        className="mt-4 cursor-pointer rounded-[9px] bg-azul-900 px-[15px] py-[11px] text-[12.5px] leading-none font-semibold text-white disabled:opacity-60"
-      >
-        {guardando ? "Guardando…" : "Guardar datos"}
-      </button>
+      <FormularioDatosPersona
+        inicial={{ ...inicial, gender: inicial.gender as DatosPersona["gender"] }}
+        guardar={(datos) => guardarDatosPersona(personId, datos)}
+      />
     </Tarjeta>
   );
 }

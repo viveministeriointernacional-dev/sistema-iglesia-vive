@@ -146,6 +146,39 @@ eventos, y administración. Documentación de producto en `design/`
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-03** — **Cuatro ajustes de producto pedidos por el usuario (un solo PR):**
+  1. **Ningún dato de la persona se oculta.** El teléfono se enmascaraba
+     (`telefonoParcial`, «323 ••• 8212») en el expediente, en la lista de
+     administración y en el buscador; se eliminó la función y se muestra completo.
+     El expediente ahora tiene la sección **«DATOS DE LA PERSONA»** con TODO
+     (nombre, género, nacimiento, celular, WhatsApp, correo, dirección, petición,
+     horario para llamar), y es **editable si `acceso.puedeEscribir`** (su
+     consolidador, su mentor, coordinación, pastor, admin). Núcleo compartido en
+     `src/lib/persona.ts` (`actualizarDatosPersona`: valida, guarda, audita y
+     refleja a HighLevel); formulario compartido
+     `src/components/formulario-datos-persona.tsx` (lo usan administración y el
+     expediente). Acción `guardarDatosPersonaDesdeExpediente` en
+     `expediente/[id]/acciones.ts`; auditoría `expediente.datos_actualizados`
+     (añadida al catálogo `AccionAuditada` de `src/lib/audit.ts` — **toda acción
+     nueva de auditoría debe añadirse ahí o no compila**).
+  2. **Filtros en el tablero de Operación 72** (`operacion-72/page.tsx`), por URL
+     (`?q=…&orden=…`, formulario GET sin JS): orden **por urgencia** (defecto:
+     dentro de plazo primero, luego vencidas recientes), **más reciente primero**
+     y **más antiguo primero** (por `startedAt`); búsqueda por **nombre** (vía
+     `person.search_text` normalizado) o **celular** (solo dígitos, con
+     `regexp_replace` en SQL porque el mismo número aparece con espacios/+57).
+     Aplica a todas las columnas, incluida SEGUIMIENTO. Grid pasa a 5 columnas.
+  3. **Nuevo estado `SEGUIMIENTO`** en `Operation72Status` (migración
+     `20260903180000_op72_seguimiento`, aplicada: `ADD VALUE … AFTER 'INICIADA'`).
+     Regla: al registrar una llamada desde INICIADA **o** SEGUIMIENTO,
+     **contestó → CONTACTADA**, **no contestó → SEGUIMIENTO** (antes «no contestó»
+     dejaba la tarjeta en INICIADA, indistinguible de quien nunca recibió intento).
+     Columna nueva entre INICIADA y CONTACTADA; transición «Volver a llamar»;
+     `tarjeta.tsx` muestra el formulario de llamada también en SEGUIMIENTO;
+     `programarVisitaDesdeCrm` también avanza desde SEGUIMIENTO.
+  **Recordatorio:** `ESTADOS_EN_TABLERO` se deriva de `COLUMNAS_OP72`, así que la
+  carga de consolidadores y el cierre al cambiar de fase ya incluyen SEGUIMIENTO.
+
 - **2026-09-03** — **Ser mentor pasa a ser un permiso acumulable** (decisión del
   usuario: «un consolidador puede ser al mismo tiempo mentor o líder de Alpha»).
   Antes el rol era **uno solo**, así que consolidador+mentor era imposible.

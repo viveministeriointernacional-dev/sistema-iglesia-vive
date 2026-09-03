@@ -23,6 +23,11 @@ import {
   puedeCambiarFase,
   requisitosDeFase,
 } from "@/lib/fases";
+import {
+  actualizarDatosPersona,
+  type DatosPersona,
+  type ResultadoGuardado,
+} from "@/lib/persona";
 
 export type NotaPastoral = {
   id: string;
@@ -46,6 +51,47 @@ async function usuarioConAcceso(learnerId: string) {
   if (!usuario) throw new ErrorDePermiso("Tu sesión expiró. Vuelve a entrar.");
   const acceso = await accesoAExpediente(usuario, learnerId);
   return { usuario, acceso };
+}
+
+/// Edita los datos básicos de la persona desde su expediente. Puede hacerlo
+/// quien puede escribir en ese expediente: su consolidador, su mentor, la
+/// coordinación, el pastor o el administrador. Nadie más.
+export async function guardarDatosPersonaDesdeExpediente(
+  learnerId: string,
+  datos: DatosPersona,
+): Promise<ResultadoGuardado> {
+  let contexto: Awaited<ReturnType<typeof usuarioConAcceso>>;
+  try {
+    contexto = await usuarioConAcceso(learnerId);
+  } catch (error) {
+    if (error instanceof ErrorDePermiso) return { ok: false, mensaje: error.message };
+    throw error;
+  }
+  const { usuario, acceso } = contexto;
+  if (!acceso.puedeEscribir) {
+    return { ok: false, mensaje: "No tienes permiso para editar los datos de esta persona." };
+  }
+
+  const prisma = await getPrisma();
+  const aprendiz = await prisma.learnerProfile.findUnique({
+    where: { id: learnerId },
+    select: { personId: true },
+  });
+  if (!aprendiz) return { ok: false, mensaje: "No se encontró el expediente." };
+
+  const resultado = await actualizarDatosPersona(
+    prisma,
+    aprendiz.personId,
+    datos,
+    usuario.id,
+    "expediente.datos_actualizados",
+  );
+  if (!resultado.ok) return resultado;
+
+  revalidatePath(`/expediente/${learnerId}`);
+  revalidatePath("/operacion-72");
+  revalidatePath("/administracion");
+  return { ok: true };
 }
 
 /// Revela las notas pastorales. Cada apertura queda auditada: es la contraparte

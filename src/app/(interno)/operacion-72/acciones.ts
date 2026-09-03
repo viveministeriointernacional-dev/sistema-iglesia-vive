@@ -143,15 +143,25 @@ export async function registrarLlamada(
     // Con una visita ya agendada, la tarjeta debe seguir mostrando la visita:
     // es lo que el consolidador necesita ver. Una llamada posterior queda en
     // el historial sin borrar esa cita del resumen.
-    const laLlamadaEsLoMasImportante =
+    // Mientras la persona espera contacto (INICIADA o SEGUIMIENTO), cada
+    // llamada decide la columna: contestó → CONTACTADA; no contestó →
+    // SEGUIMIENTO, para que quede claro que hay que volver a llamar y no se
+    // confunda con quien nunca ha recibido un intento.
+    const esperaContacto =
       operacion.status === Operation72Status.INICIADA ||
-      operacion.status === Operation72Status.CONTACTADA;
+      operacion.status === Operation72Status.SEGUIMIENTO;
+    const laLlamadaEsLoMasImportante =
+      esperaContacto || operacion.status === Operation72Status.CONTACTADA;
 
     await tx.operation72.update({
       where: { id: operacion.id },
       data: {
-        ...(contactada && operacion.status === Operation72Status.INICIADA
-          ? { status: Operation72Status.CONTACTADA }
+        ...(esperaContacto
+          ? {
+              status: contactada
+                ? Operation72Status.CONTACTADA
+                : Operation72Status.SEGUIMIENTO,
+            }
           : {}),
         ...(laLlamadaEsLoMasImportante
           ? { detail: [etiqueta, observacion].filter(Boolean).join(" · ") }
