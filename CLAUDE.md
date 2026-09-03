@@ -47,7 +47,8 @@ eventos, y administración. Documentación de producto en `design/`
 ## 4. Despliegue (leer antes de tocar deploy)
 
 - **Git-connected Workers Builds**: al hacer **push/merge a `main`**, Cloudflare
-  reconstruye y despliega solo (~5 min). No hay `migrate deploy` en el build.
+  reconstruye y despliega solo (~5 min). Las migraciones se aplican en ese
+  build con `scripts/migrar.mjs` (ver §5).
 - **Secretos** (env del worker): se toman **solo en el rebuild**. Cambiar un
   secreto en el panel NO afecta la versión viva hasta un nuevo build.
 - **Configuración de build correcta** (Cloudflare → worker → Settings → Builds):
@@ -72,8 +73,17 @@ eventos, y administración. Documentación de producto en `design/`
 - Si el PR de la rama ya está fusionado, **reiniciar la rama desde `main`**
   (`git fetch origin main && git checkout -B <rama> origin/main`) y poner el
   trabajo nuevo encima; abrir PR nuevo. Nunca apilar sobre historia ya fusionada.
-- Migraciones: crear el archivo en `prisma/migrations/` **y** aplicarla a Supabase
-  con el MCP (`apply_migration`) — no hay paso automático de migración en deploy.
+- **Migraciones: automáticas en cada despliegue.** Basta crear la carpeta en
+  `prisma/migrations/<timestamp>_<nombre>/migration.sql` y fusionar: el build
+  ejecuta `scripts/migrar.mjs` (vía `wrangler.jsonc` → `build.command` y
+  `npm run cf:build`), que aplica lo que falte y lo registra en la tabla
+  `app_migration`. Las 26 migraciones anteriores a `20260903230000` son la
+  «base» (ya estaban en Supabase; se registran sin ejecutar). Requiere el
+  **secreto de build `DATABASE_URL`** en Cloudflare (Settings → Builds → Build
+  variables and secrets; es distinto del secreto de runtime). Sin él, el script
+  avisa y no hace nada — el deploy no se rompe, pero la base no se migra.
+  Si una migración falla, el build falla a propósito. Ya no hace falta
+  `apply_migration` por MCP (el usuario lo tiene bloqueado por permisos).
 
 ## 6. Integración HighLevel (webhooks)
 
