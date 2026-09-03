@@ -258,8 +258,14 @@ export async function crearRegistroEnTransaccion(
     /// consolidador. Si se pasa (aunque sea `null`), se usa ese y no el reparto
     /// automático por género y carga. `undefined` = reparto automático.
     consolidadorForzado?: { id: string } | null;
+    /// Solo la ficha: gente del equipo o de la iglesia que no pasa por
+    /// consolidación. Se crea la persona y su expediente, pero NO se abre
+    /// Operación 72 ni se asigna consolidador; queda en Administración para
+    /// darle rol y permisos.
+    sinOperacion72?: boolean;
   },
 ) {
+  const soloFicha = opciones.sinOperacion72 === true;
   const fuerzaConsolidador = "consolidadorForzado" in opciones;
   const ahora = new Date();
   const deadlineAt = new Date(
@@ -293,11 +299,13 @@ export async function crearRegistroEnTransaccion(
     select: { id: true, gender: true },
   });
 
-  const elegido = fuerzaConsolidador
-    ? opciones.consolidadorForzado
-      ? { id: opciones.consolidadorForzado.id, carga: null as number | null }
-      : null
-    : await asignarConsolidador(db, persona.gender);
+  const elegido = soloFicha
+    ? null
+    : fuerzaConsolidador
+      ? opciones.consolidadorForzado
+        ? { id: opciones.consolidadorForzado.id, carga: null as number | null }
+        : null
+      : await asignarConsolidador(db, persona.gender);
   const aprendiz = await db.learnerProfile.create({
     data: {
       personId: persona.id,
@@ -315,19 +323,21 @@ export async function crearRegistroEnTransaccion(
     select: { id: true },
   });
 
-  await db.operation72.create({
-    data: {
-      learnerId: aprendiz.id,
-      startedAt: ahora,
-      deadlineAt,
-      // Solo lo que el sistema sabe que hizo. El WhatsApp de bienvenida, si
-      // sale, lo manda HighLevel por su cuenta: aquí no se puede afirmar.
-      detail: elegido
-        ? "Registrada · consolidador asignado"
-        : "Registrada · sin consolidador disponible, requiere asignación de un líder",
-      lineKnown: Boolean(invitador),
-    },
-  });
+  if (!soloFicha) {
+    await db.operation72.create({
+      data: {
+        learnerId: aprendiz.id,
+        startedAt: ahora,
+        deadlineAt,
+        // Solo lo que el sistema sabe que hizo. El WhatsApp de bienvenida, si
+        // sale, lo manda HighLevel por su cuenta: aquí no se puede afirmar.
+        detail: elegido
+          ? "Registrada · consolidador asignado"
+          : "Registrada · sin consolidador disponible, requiere asignación de un líder",
+        lineKnown: Boolean(invitador),
+      },
+    });
+  }
 
   await db.milestone.createMany({
     data: [
@@ -338,12 +348,16 @@ export async function crearRegistroEnTransaccion(
         achievedAt: ahora,
         recordedById: opciones.actorId,
       },
-      {
-        learnerId: aprendiz.id,
-        kind: MilestoneKind.OPERACION_72,
-        status: MilestoneStatus.EN_CURSO,
-        recordedById: opciones.actorId,
-      },
+      ...(soloFicha
+        ? []
+        : [
+            {
+              learnerId: aprendiz.id,
+              kind: MilestoneKind.OPERACION_72,
+              status: MilestoneStatus.EN_CURSO,
+              recordedById: opciones.actorId,
+            },
+          ]),
     ],
   });
 
@@ -357,6 +371,7 @@ export async function crearRegistroEnTransaccion(
     invitadorSinExpediente: Boolean(datos.invitedByName && !invitador),
     duplicadoConfirmadoPorHumano:
       opciones.duplicadoConfirmadoPorHumano ?? false,
+    sinOperacion72: soloFicha,
     ...opciones.metadata,
   };
 
@@ -384,19 +399,21 @@ export async function crearRegistroEnTransaccion(
     });
   }
 
-  await auditar(db, {
-    actorId: opciones.actorId,
-    action: "operacion72.iniciada",
-    entityType: "learner_profile",
-    entityId: aprendiz.id,
-    metadata: { deadlineAt: deadlineAt.toISOString() },
-  });
-
   await encolarEventoIntegracion(db, "aprendiz_creado", metadatosComunes);
-  await encolarEventoIntegracion(db, "operacion72_iniciada", {
-    learnerId: aprendiz.id,
-    deadlineAt: deadlineAt.toISOString(),
-  });
+
+  if (!soloFicha) {
+    await auditar(db, {
+      actorId: opciones.actorId,
+      action: "operacion72.iniciada",
+      entityType: "learner_profile",
+      entityId: aprendiz.id,
+      metadata: { deadlineAt: deadlineAt.toISOString() },
+    });
+    await encolarEventoIntegracion(db, "operacion72_iniciada", {
+      learnerId: aprendiz.id,
+      deadlineAt: deadlineAt.toISOString(),
+    });
+  }
 
   return { personId: persona.id, learnerId: aprendiz.id };
 }

@@ -80,9 +80,18 @@ const TITULOS: Record<number, { titulo: string; subtitulo: string }> = {
   },
 };
 
-export function AsistenteDeRegistro() {
+type Destino = "operacion72" | "ficha";
+
+export function AsistenteDeRegistro({
+  puedeElegirDestino = false,
+}: {
+  /// Solo administrador y pastor pueden registrar «solo la ficha» (sin
+  /// Operación 72). Para los demás, todo registro entra al tablero.
+  puedeElegirDestino?: boolean;
+}) {
   const router = useRouter();
   const [paso, setPaso] = useState(1);
+  const [destino, setDestino] = useState<Destino>("operacion72");
   const [datos, setDatos] = useState<Formulario>(INICIAL);
   const [errores, setErrores] = useState<Record<string, string>>({});
   const [mensaje, setMensaje] = useState<string | null>(null);
@@ -127,7 +136,7 @@ export function AsistenteDeRegistro() {
           birthDate: datos.birthDate || undefined,
           email: "",
         },
-        { confirmadoNoDuplicado },
+        { confirmadoNoDuplicado, soloFicha: puedeElegirDestino && destino === "ficha" },
       );
 
       if (resultado.ok) return;
@@ -215,6 +224,9 @@ export function AsistenteDeRegistro() {
             }}
           />
         ) : null}
+        {paso === 3 && puedeElegirDestino ? (
+          <PasoDestino destino={destino} alElegir={setDestino} />
+        ) : null}
 
         {duplicados ? (
           <AvisoDeDuplicados
@@ -244,11 +256,69 @@ export function AsistenteDeRegistro() {
             {paso === 3
               ? guardando
                 ? "Guardando…"
-                : "Guardar e iniciar Operación 72"
+                : puedeElegirDestino && destino === "ficha"
+                  ? "Guardar solo la ficha"
+                  : "Guardar e iniciar Operación 72"
               : "Continuar"}
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/// Qué hacer con el registro. Por defecto entra a Operación 72, así el
+/// registro de siempre no cambia; «solo la ficha» es para gente del equipo o
+/// de la iglesia que no pasa por consolidación y que luego recibe rol y
+/// permisos desde Administración.
+function PasoDestino({
+  destino,
+  alElegir,
+}: {
+  destino: Destino;
+  alElegir: (destino: Destino) => void;
+}) {
+  const opciones: { valor: Destino; titulo: string; detalle: string }[] = [
+    {
+      valor: "operacion72",
+      titulo: "Iniciar Operación 72",
+      detalle:
+        "Persona nueva. Se le asigna consolidador y entra al tablero para llamarla en 72 horas.",
+    },
+    {
+      valor: "ficha",
+      titulo: "Solo crear la ficha",
+      detalle:
+        "Gente del equipo o de la iglesia que no pasa por consolidación. Queda en Administración para darle rol y permisos.",
+    },
+  ];
+
+  return (
+    <div className="tarjeta mt-[14px] p-[22px]">
+      <span className="etiqueta-campo">¿Qué hacemos con este registro?</span>
+      <div className="mt-[11px] grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {opciones.map((opcion) => (
+          <button
+            key={opcion.valor}
+            type="button"
+            aria-pressed={destino === opcion.valor}
+            onClick={() => alElegir(opcion.valor)}
+            className="opcion opcion-amplia"
+          >
+            <span className="block text-[13px] font-bold">{opcion.titulo}</span>
+            <span className="mt-[5px] block text-[11.5px] leading-[1.4] font-medium text-[rgba(19,28,36,.5)]">
+              {opcion.detalle}
+            </span>
+          </button>
+        ))}
+      </div>
+      {destino === "ficha" ? (
+        <p className="aviso-ambar mt-3 text-[12px] leading-[1.5] font-medium text-ambar-texto">
+          No entra a Operación 72, no se le asigna consolidador y no cuenta en la
+          carga de nadie. Podrás darle acceso y rol desde su ficha en
+          Administración.
+        </p>
+      ) : null}
     </div>
   );
 }
