@@ -491,7 +491,7 @@ function SeccionCrearAcceso({ personId }: { personId: string }) {
   const [password, setPassword] = useState("");
   const [v, setV] = useState({
     role: "MENTOR" as Role,
-    capacity: 12,
+    capacity: 24,
     active: true,
     canLeadAlpha: false,
     canLeadFaithHouse: false,

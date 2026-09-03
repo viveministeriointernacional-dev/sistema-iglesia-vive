@@ -261,7 +261,7 @@ export async function crearRegistroEnTransaccion(
       deadlineAt,
       detail: elegido
         ? "Consolidador asignado · bienvenida por WhatsApp enviada"
-        : "Sin consolidador con cupo · requiere asignación de un líder",
+        : "Sin consolidador disponible · requiere asignación de un líder",
       lineKnown: Boolean(invitador),
     },
   });

@@ -67,7 +67,7 @@ async function crearUsuario(datos: {
       role: datos.role,
       personId: persona.id,
       teamId: datos.teamId,
-      capacity: datos.capacity ?? 12,
+      capacity: datos.capacity ?? 24,
     },
     select: { id: true },
   });

@@ -85,13 +85,11 @@ export async function mentoresDisponibles(db: ClientePrisma, genero: Gender | nu
   });
 }
 
-/// Elige el candidato con menor carga; a igual carga, el de mayor capacidad
-/// libre. Devuelve `null` si nadie del mismo género tiene cupo: en ese caso la
-/// asignación la resuelve un líder, no el sistema.
-export function elegirPorCarga(candidatos: CargaDeUsuario[]) {
-  const conCupo = candidatos.filter((c) => c.carga < c.capacity);
-  if (conCupo.length === 0) return null;
-  return conCupo.reduce((mejor, actual) => {
+/// El de menor carga; a igual carga, el de mayor capacidad libre. Sin filtrar
+/// por cupo: reparte entre los que haya.
+function menorCarga(candidatos: CargaDeUsuario[]) {
+  if (candidatos.length === 0) return null;
+  return candidatos.reduce((mejor, actual) => {
     if (actual.carga !== mejor.carga) return actual.carga < mejor.carga ? actual : mejor;
     return actual.capacity - actual.carga > mejor.capacity - mejor.carga
       ? actual
@@ -99,11 +97,34 @@ export function elegirPorCarga(candidatos: CargaDeUsuario[]) {
   });
 }
 
+/// Elige respetando el cupo: solo entre quienes tienen espacio libre. Devuelve
+/// `null` si nadie del mismo género tiene cupo, y entonces la asignación la
+/// resuelve un líder.
+///
+/// El tope (24) es la regla de la MENTORÍA: un mentor acompaña hasta 24
+/// discípulos en fase de multiplicación. Por eso solo se usa para mentores; la
+/// consolidación reparte sin tope (ver `elegirPorMenorCarga`).
+export function elegirPorCarga(candidatos: CargaDeUsuario[]) {
+  return menorCarga(candidatos.filter((c) => c.carga < c.capacity));
+}
+
+/// Elige al de menor carga SIN aplicar el cupo como tope. La consolidación
+/// nunca se puede quedar sin repartir: si todos los consolidadores están sobre
+/// su capacidad, la persona igual se asigna al que menos tenga (la capacidad
+/// queda como referencia para los líderes, no como bloqueo).
+export function elegirPorMenorCarga(candidatos: CargaDeUsuario[]) {
+  return menorCarga(candidatos);
+}
+
 /// Asignación automática de consolidador: respeta el género y balancea carga
 /// (ESPECIFICACION_PRODUCTO.md §5.4).
+///
+/// No aplica el cupo como tope: el tope de 24 es de la mentoría, no de la
+/// consolidación. Si todos están por encima de su capacidad, la persona igual
+/// se asigna al de menor carga en vez de quedar sin consolidador.
 export async function asignarConsolidador(db: ClientePrisma, genero: Gender | null) {
   const candidatos = await consolidadoresDisponibles(db, genero);
-  return elegirPorCarga(candidatos);
+  return elegirPorMenorCarga(candidatos);
 }
 
 export type PropuestaDeMentor = {

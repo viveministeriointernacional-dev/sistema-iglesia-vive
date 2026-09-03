@@ -146,6 +146,42 @@ eventos, y administración. Documentación de producto en `design/`
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-03** — **Registros de HighLevel VIVOS**. Se agregó por fin el paso
+  **Webhook** al workflow «1. Se llenó Formulario Registro Nuevo» (antes no
+  existía: el flujo inscribía y terminaba en pasos de «Mensaje», por eso nunca
+  llegaba nada). Entraron Pedro Pérez y Maria Julieth Duran, ambos con
+  **Operación 72 = INICIADA**. Dos bugs encontrados y arreglados en el camino:
+  1. **422 «La fecha de nacimiento no es válida»** (PR #37): si el contacto no
+     tenía fecha, HighLevel mandaba el merge-tag **sin resolver**
+     (`{{contact.date_of_birth}}` literal) y el validador estricto tumbaba TODO
+     el alta. Fix: `texto()` en `highlevel.ts` ignora `{{...}}`; `birthDate` se
+     normaliza tolerante (ISO, con hora, o `dd/mm/aaaa`); email mal formado se
+     ignora en vez de abortar.
+  2. **Persona sin consolidador** (PR #38): cuando el contacto no tiene usuario
+     asignado, HighLevel manda **la palabra literal `"null"`**. El parser la
+     tomaba como id real → `ownerId="null"` → creía que había dueño → **saltaba
+     el reparto automático**. También ensuciaba textos (`churchName="null"`).
+     Fix: `texto()` trata `"null"`/`"undefined"` como vacío, en el parser de
+     registro **y** en el de llamadas. Limpiadas 2 filas contaminadas.
+  **Mapeo del webhook de registro** (Custom Data): `contactId={{contact.id}}`,
+  `locationId={{location.id}}`, `formId` fijo, `firstName`, `lastName`, `email`,
+  `phone`, `ownerId={{contact.assigned_to}}`, más los campos del formulario
+  (que viven como **campos personalizados del CONTACTO**, no «del formulario»).
+  **No** hace falta `submissionId` (no existe variable) y `HIGHLEVEL_REGISTRO_FORM_ID`
+  **no está configurada** en Cloudflare, así que el `formId` no se valida.
+  **Regla de cupo (definida por el usuario, 3-sep):** el tope es **24** y es tope
+  solo de la **MENTORÍA** (un mentor acompaña hasta 24 discípulos en fase
+  Multiplicar). En
+  **consolidación NO es tope**: el reparto automático siempre asigna al del
+  **mismo género con menor carga**, aunque todos estén sobre 12 (la capacidad
+  queda como referencia visual, no como bloqueo). Implementado en
+  `src/lib/asignacion.ts`: `elegirPorCarga` (con tope, para mentores) vs
+  `elegirPorMenorCarga` (sin tope, para consolidadores). Contexto: todas las
+  consolidadoras MUJER estaban llenas/sobre cupo con el viejo tope de 12 y por eso
+  Maria Julieth entró sin consolidadora; se le asignó Jakeline Guerrero (la de
+  menor carga). El `capacity` de los 31 usuarios pasó de 12 a **24** (migración
+  `20260903120000_capacidad_24`, aplicada) y el default del esquema también.
+
 - **2026-09-01** — **Hora Colombia** en toda la UI. El servidor (Workers/Node)
   corre en UTC, así que los formateadores `Intl.DateTimeFormat("es-CO", …)` sin
   `timeZone` mostraban las horas 5 h adelantadas. Se añadió `ZONA_HORARIA =
