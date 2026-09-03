@@ -21,9 +21,16 @@ function texto(valor: unknown): string | null {
   if (typeof valor === "string") {
     const limpio = valor.trim();
     // HighLevel manda `{{campo}}` sin resolver cuando el paso Webhook tiene la
-    // clave pero el valor del `{{ }}` quedó vacío o mal mapeado. Eso no es un
-    // dato: se ignora para no guardar basura como estado="{{}}".
-    if (!limpio || /^\{\{.*\}\}$/.test(limpio)) return null;
+    // clave pero el valor del `{{ }}` quedó vacío o mal mapeado, y la palabra
+    // literal "null"/"undefined" cuando el campo existe pero está vacío. Eso no
+    // es un dato: se ignora para no guardar basura como estado="{{}}".
+    if (
+      !limpio ||
+      /^\{\{.*\}\}$/.test(limpio) ||
+      /^(null|undefined)$/i.test(limpio)
+    ) {
+      return null;
+    }
     return limpio;
   }
   if (typeof valor === "number" || typeof valor === "boolean") {
