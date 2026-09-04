@@ -232,8 +232,15 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   **Cuatro personas llamadas hoy no tienen columna y está bien**: Tatiana
   Torres, Laura Patricia Muñoz, Gilberto Matheus y Katherine García están
   **dadas de baja** (Op72 CERRADA), así que el registro se acepta y no mueve
-  nada. Si el equipo sigue llamando gente ya dada de baja, es tema de la lista
-  de llamadas, no del sistema.
+  nada. **Verificado por hora: en las cuatro la llamada fue ANTES de la baja**,
+  y la baja salió de esa misma llamada (1, 1, 21 y 3 minutos después; la nota de
+  baja repite lo que dijo la persona). O sea: **el equipo NO está llamando gente
+  ya retirada** — está llamando, enterándose y dando de baja en el acto, que es
+  el uso correcto. Bajas hechas por Nini Guerrón (1) y Nora Bonilla (3).
+  Efecto colateral: como los registros de Laura Patricia (11:53) y Tatiana
+  (11:55) cayeron en la ventana perdida y al reenviarlos la Op72 ya estaba
+  cerrada, **la observación de esas dos llamadas no quedó en el expediente**;
+  sí quedó, casi con las mismas palabras, en la nota de la baja.
   **La regla quedó comprobada en producción**: no contestó → SEGUIMIENTO ·
   contestó → CONTACTADA · visita confirmada → VISITA PENDIENTE, y una vez
   CONTACTADA un «no contestó» posterior **no** la devuelve.
