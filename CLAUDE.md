@@ -38,7 +38,8 @@ eventos, y administración. Documentación de producto en `design/`
 |---|---|
 | **Framework** | Next.js 16 (App Router, RSC, Server Actions), React 19, TypeScript, Tailwind 4 |
 | **ORM** | Prisma 7 con `@prisma/adapter-pg` (PrismaPg). Cliente en `node_modules/@iglesia/prisma-client` (generado en postinstall). Enums = uniones de literales. |
-| **Base de datos** | Supabase Postgres. **project_id = `cxtfftuexqmkktxumkfz`**, región `ca-central-1`. Plan **Paid**(ver nota). Conexión por Session pooler. Extensiones: `unaccent`, `pg_trgm` en `public`. |
+| **Base de datos** | Supabase Postgres. **project_id = `cxtfftuexqmkktxumkfz`**, región `ca-central-1`. Plan **FREE** (verificado 4-sep-2026 en la barra del
+panel; antes este archivo decía «Paid» y era falso — de ahí parte de la lentitud). Conexión por Session pooler. Extensiones: `unaccent`, `pg_trgm` en `public`. |
 | **Hosting** | Cloudflare Workers + OpenNext (`@opennextjs/cloudflare`). **account_id = `69e3fbf14345159222eaf8ff45a16bd9`**, worker **`sistema-iglesia-vive`**. Plan **Workers Paid ($5)** (confirmado por el usuario). |
 | **Emails** | Resend (best-effort; no-op si faltan `RESEND_API_KEY` / `EMAIL_FROM`). |
 | **CRM** | HighLevel (marca blanca **Nexus**, app.nexusia.com.co). **locationId = `TDMnYRth8ofWhJ86uJKb`**. |
@@ -142,7 +143,8 @@ eventos, y administración. Documentación de producto en `design/`
 
 - **Activación del deploy**: confirmar que el «Deploy command» del panel sea
   `npx wrangler deploy` (no `versions upload`) para que la versión se active.
-- **Lentitud**: ya están en Paid (CPU no es el límite). Siguiente palanca =
+- **Lentitud**: Cloudflare está en Workers Paid, pero **Supabase está en FREE**
+  (compute más pequeño y sin pooler dedicado). Palancas: subir Supabase a Pro, o
   **Hyperdrive** (cachea el pool de conexiones a Supabase en el borde). Plantilla
   comentada en `wrangler.jsonc`.
 - **Registros de HighLevel**: si dejan de entrar, revisar que el workflow de
@@ -179,6 +181,23 @@ eventos, y administración. Documentación de producto en `design/`
   Worker vivo y respondiendo (`/`, `/ingresar`, `/registro`,
   `/administracion/actividad` → 200; webhook de llamadas → 401). Proyecto de
   Supabase `ACTIVE_HEALTHY`, Postgres 17.6.
+  - **Causa encontrada**: el «Build command» del panel era
+    `npx opennextjs-cloudflare build`, que **no** ejecuta `scripts/migrar.mjs`.
+    Corregido a **`npm run cf:build`** (ese sí encadena migración + compilación).
+    Y el secreto de build `DATABASE_URL` **no existía** en Settings → Builds →
+    Variables and secrets (solo estaban `HIGHLEVEL_WEBHOOK_SECRET`,
+    `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` y `NEXT_PUBLIC_SUPABASE_URL`).
+  - **Ojo con el panel**: guardar un secreto crea una «versión» del Worker pero
+    **NO dispara un build**. Para que corran las migraciones hay que ir a
+    Deployments → ⋯ del último build de Git → **Retry build**.
+  - **Incidente**: se creó un secreto con el nombre mal escrito
+    (`SUPABASE_SERVICE_ROLE_KEYY`) y al limpiarlo **se borró también el bueno**,
+    dejando al Worker sin `SUPABASE_SERVICE_ROLE_KEY` (se caen restablecer
+    contraseña y crear accesos; el resto sigue). Se repuso con la llave
+    **legacy `service_role`** (Supabase → Settings → API Keys → pestaña «Legacy
+    anon, service_role API keys» → Reveal → Copy). **No** usar la nueva
+    `sb_secret_…` sin probarla antes, y **nunca** pulsar «Disable JWT-based API
+    keys».
 
 - **2026-09-03** — **Pantalla «Actividad del día»** (`/administracion/actividad`,
   solo ADMIN; mockup aprobado:
