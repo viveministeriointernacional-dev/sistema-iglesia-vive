@@ -53,7 +53,10 @@ panel; antes este archivo decía «Paid» y era falso — de ahí parte de la le
 - **Secretos** (env del worker): se toman **solo en el rebuild**. Cambiar un
   secreto en el panel NO afecta la versión viva hasta un nuevo build.
 - **Configuración de build correcta** (Cloudflare → worker → Settings → Builds):
-  - **Build command:** `npx opennextjs-cloudflare build` (genera `.open-next/worker.js`).
+  - **Build command:** `npm run cf:build` (= `node scripts/migrar.mjs && opennextjs-cloudflare
+    build`: aplica migraciones y genera `.open-next/worker.js`). ⚠️ Si aquí se pone
+    solo `npx opennextjs-cloudflare build`, **las migraciones no corren** (fue el
+    bug de sep-2026).
   - **Deploy command:** `npx wrangler deploy` (sube **y activa** al 100%).
     ⚠️ `npx wrangler versions upload` **sube pero NO activa** → el sitio no cambia.
   - `wrangler.jsonc` ya incluye `build.command = npx opennextjs-cloudflare build`
@@ -141,8 +144,6 @@ panel; antes este archivo decía «Paid» y era falso — de ahí parte de la le
 
 ## 9. Pendientes / temas abiertos
 
-- **Activación del deploy**: confirmar que el «Deploy command» del panel sea
-  `npx wrangler deploy` (no `versions upload`) para que la versión se active.
 - **Lentitud**: Cloudflare está en Workers Paid, pero **Supabase está en FREE**
   (compute más pequeño y sin pooler dedicado). Palancas: subir Supabase a Pro, o
   **Hyperdrive** (cachea el pool de conexiones a Supabase en el borde). Plantilla
@@ -150,6 +151,8 @@ panel; antes este archivo decía «Paid» y era falso — de ahí parte de la le
 - **Registros de HighLevel**: si dejan de entrar, revisar que el workflow de
   registro esté activo y enviando; algunos llegan y se marcan «duplicado» (409).
 - Rotar el `HIGHLEVEL_WEBHOOK_SECRET` (estuvo expuesto en capturas).
+- **Tabla huérfana `inbound_registration`** en Supabase: ya no está en el modelo
+  de Prisma. No estorba; se puede borrar cuando el usuario lo autorice.
 
 ## 10. Reglas duras
 
@@ -167,7 +170,33 @@ panel; antes este archivo decía «Paid» y era falso — de ahí parte de la le
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
-- **2026-09-04** — **Verificación de estado.** La tabla **`email_sent` ya existe**
+- **2026-09-04** — **Migraciones automáticas VIVAS y verificadas** (PR #57).
+  Tras fusionar, el build creó `app_migration` con **27 filas** (26 registradas
+  sin ejecutar + `20260903230000_correo_enviado` aplicada) en 2 s. Desde ahora,
+  **crear la carpeta de migración y fusionar a `main` basta**: nadie entra a
+  Supabase. Lo que faltaba era esto:
+  1. **El «Build command» del panel** era `npx opennextjs-cloudflare build`, que
+     **no** ejecuta `scripts/migrar.mjs`. Ahora es **`npm run cf:build`**.
+  2. **El secreto de build `DATABASE_URL`** no existía (Settings → Builds →
+     Variables and secrets). Es **distinto** del secreto de runtime; tener uno no
+     pone el otro.
+  3. **La migración de `email_sent` no era idempotente.** La tabla ya existía
+     (creada a mano) y el registro estaba vacío → el script iba a hacer
+     `CREATE TABLE` sobre algo existente → build caído y **sitio sin desplegar**.
+     Ahora usa `IF NOT EXISTS`. **REGLA: toda migración nueva debe poder
+     repetirse sin romper** (`IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`, etc.).
+  4. `pg` pasó a **dependencia directa** en `package.json` (antes llegaba de
+     rebote con `@prisma/adapter-pg`).
+  **Cómo diagnosticar esto en el futuro:** si `app_migration` **no existe**, el
+  script **nunca arrancó** (la crea en su primera instrucción, antes de aplicar
+  nada). Si existe pero le falta una migración, esa falló.
+  **Ojo con el panel de Cloudflare:** guardar un secreto crea una «versión» del
+  Worker pero **NO dispara un build**; y «Deployment History» solo lista
+  despliegues activados, así que los builds de rama no aparecen ahí. La vía
+  segura para forzar el build sigue siendo **fusionar a `main`**.
+
+- **2026-09-04** — **Verificación de estado** (diagnóstico; el desenlace está en
+  la entrada de arriba). La tabla **`email_sent` ya existe**
   en Supabase (11 columnas + los 3 índices de la migración) y **ya tiene copias
   de correo guardadas**, así que la vista previa de correos en «Actividad del
   día» funciona. **Pero la tabla `app_migration` NO existe**: eso significa que
