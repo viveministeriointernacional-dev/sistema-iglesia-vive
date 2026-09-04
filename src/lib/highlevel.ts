@@ -63,6 +63,15 @@ function texto(valor: unknown): string | null {
   if (typeof valor === "number" || typeof valor === "boolean") {
     return String(valor);
   }
+  // Los campos de opción múltiple de HighLevel (MULTIPLE_OPTIONS) llegan como
+  // arreglo, aunque el formulario solo deje marcar una. Sin esto, «Estado de la
+  // primera llamada» se leía como vacío y la tarjeta no se movía.
+  if (Array.isArray(valor)) {
+    for (const elemento of valor) {
+      const dato = texto(elemento);
+      if (dato) return dato;
+    }
+  }
   return null;
 }
 
@@ -376,12 +385,19 @@ function extraerVisita(indice: Map<string, unknown>): VisitaDesdeCrm {
         "RoA76CCpoBd2DvraoQEF",
       ),
     ),
+    // Dos formularios distintos preguntan lo mismo y cada uno tiene su propio
+    // campo en HighLevel: el de la línea (`…_linea`, micasavive.com/registro/
+    // primera-llamada/linea) y el del consolidador (micasavive.com/registro/
+    // primera-llamada). Se leen los dos: los dos deben mover la tarjeta.
     estadoLinea: enumPorEtiqueta(
       obtener(
         indice,
         "Estado Primera Llamada Linea",
         "contact.estado_primera_llamada_linea",
         "U1VhdP5dRedFZ30ihJbJ",
+        "Estado de la primera llamada",
+        "contact.estado_primera_llamada",
+        "YneMYC08ks1EsTRwjV2z",
       ),
       {
         contestobien: CallOutcome.CONTESTO_BIEN,
@@ -405,6 +421,9 @@ function extraerVisita(indice: Map<string, unknown>): VisitaDesdeCrm {
         "Observación Primera LLamada Linea",
         "contact.observacion_primera_llamada_linea",
         "r0FlVnHCzP6tqnTMHqdJ",
+        "Observación Primera Llamada + Petición",
+        "contact.observacion_primera_llamada_peticion",
+        "djw1m4fWBV29WnWHUL4S",
       ),
     ),
   };

@@ -59,13 +59,25 @@ export async function programarVisitaDesdeCrm(
   let llamadaRegistrada = false;
   if (visita.estadoLinea) {
     const contesto = visita.estadoLinea !== CallOutcome.NO_CONTESTO;
-    const ocurrioEl = fechaValida(visita.fechaLinea) ?? new Date();
+    const conFecha = fechaValida(visita.fechaLinea);
+    const ocurrioEl = conFecha ?? new Date();
+    // No duplicar si el mismo formulario se reenvía. Con fecha declarada se
+    // compara exacta; sin ella (el formulario del consolidador no pregunta la
+    // fecha) se usa la hora de llegada, que nunca coincide dos veces: ahí el
+    // criterio es «el mismo resultado, el mismo día».
     const repetida = await db.contactAttempt.findFirst({
       where: {
         operation72Id: op.id,
         outcome: visita.estadoLinea,
         byUserId: null,
-        occurredAt: ocurrioEl,
+        ...(conFecha
+          ? { occurredAt: conFecha }
+          : {
+              occurredAt: {
+                gte: new Date(ocurrioEl.getTime() - 12 * 60 * 60 * 1000),
+                lte: ocurrioEl,
+              },
+            }),
       },
       select: { id: true },
     });
