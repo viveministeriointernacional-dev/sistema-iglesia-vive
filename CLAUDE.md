@@ -211,6 +211,33 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-04** — **Auditoría de las llamadas del día: 6 personas estaban en la
+  columna equivocada; corregidas.** Se cruzaron los **33 envíos de formulario de
+  hoy** (26 personas distintas) contra la columna real de cada tarjeta.
+  **Resultado: 20 correctas, 6 mal.** Las 6 quedaron mal porque su registro
+  **nunca llegó al sistema**: cayeron en la **ventana 09:58–11:55** (hora
+  Colombia), justo cuando el paso Webhook del workflow de llamadas tenía la
+  URL y el secreto equivocados. Recuperadas reenviando el envío original:
+  - **Jaime Arturo** (contestó) INICIADA → **CONTACTADA**
+  - **Marly Yulieth** (contestó) INICIADA → **CONTACTADA**
+  - **Geraldine Fernández** (contestó 11:20) SEGUIMIENTO → **CONTACTADA**
+  - **Yenny Patricia** (no contestó) INICIADA → **SEGUIMIENTO**
+  - **Margarita Rojas** (no contestó) INICIADA → **SEGUIMIENTO**
+  - **Diego Alejandro Barrera** (no contestó) INICIADA → **SEGUIMIENTO**
+  **De 12:43 en adelante TODO entró bien**: cada envío deja su
+  `highlevel.seguimiento_recibido` 1–5 s después y la tarjeta se movió sola.
+  **No se reenvían** los envíos perdidos cuyo efecto ya estaba cubierto por otro
+  posterior que sí llegó (mismo resultado, mismas 12 h): duplicarían el intento
+  sin cambiar la columna.
+  **Cuatro personas llamadas hoy no tienen columna y está bien**: Tatiana
+  Torres, Laura Patricia Muñoz, Gilberto Matheus y Katherine García están
+  **dadas de baja** (Op72 CERRADA), así que el registro se acepta y no mueve
+  nada. Si el equipo sigue llamando gente ya dada de baja, es tema de la lista
+  de llamadas, no del sistema.
+  **La regla quedó comprobada en producción**: no contestó → SEGUIMIENTO ·
+  contestó → CONTACTADA · visita confirmada → VISITA PENDIENTE, y una vez
+  CONTACTADA un «no contestó» posterior **no** la devuelve.
+
 - **2026-09-04** — **`HIGHLEVEL_WEBHOOK_SECRET` ROTADO** (ya no es pendiente).
   Se generó uno nuevo de 48 caracteres y se cambió en los **cuatro** sitios:
   Cloudflare (Settings → Variables and Secrets, **Type = Secret**, nunca Text) y
