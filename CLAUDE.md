@@ -205,6 +205,29 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-04** — **LOS TRES FORMULARIOS QUEDARON VIVOS.** Cerrado el de
+  **llamadas** (`/registro/primera-llamada`), que era el hueco: probado punta a
+  punta con un envío real — **Geraldine Fernández** pasó sola a **SEGUIMIENTO**
+  con la observación completa (párrafo largo con tildes, sin cortes).
+  **Dos errores de configuración en el paso Webhook del workflow
+  `3. Formulario de Primera Llamada Enviado`**, ambos silenciosos:
+  1. La **URL apuntaba a `/registro-nuevo`** en vez de `/visita`. Habría
+     intentado crear una persona nueva en cada llamada registrada.
+  2. El **secreto era otro** (64 caracteres en vez de 48) → el sistema
+     devolvía **401** y los envíos se perdían sin dejar rastro.
+  **Cómo verificar un secreto sin exponerlo ni tocar datos:** `POST` al webhook
+  con ese header y un `contact_id` inexistente → **401 = secreto malo**,
+  **404 = secreto bueno** (autorizado, contacto no encontrado). Vale para los
+  tres webhooks.
+  **⚠️ PENDIENTE URGENTE: rotar `HIGHLEVEL_WEBHOOK_SECRET`.** Su valor completo
+  quedó legible en capturas de pantalla del 4-sep. Pasos: generar uno nuevo →
+  Cloudflare → Settings → Variables and Secrets → esperar el despliegue →
+  actualizarlo en los **tres** workflows de HighLevel.
+  **Pendiente menor:** el rótulo del movimiento dice **«No contestó (línea)»**
+  aunque venga del formulario del **consolidador**; el «(línea)» está cableado en
+  `programarVisitaDesdeCrm` (`registro.ts`) de cuando solo existía el formulario
+  de la línea. Hay que distinguir el origen.
+
 - **2026-09-04** — **El formulario del consolidador no movía nada** (caso María
   Julieth Durán, +57 320 473 2415). La llamaron **3 veces** el 3 y 4 de sep
   (Ana Lucía Gutiérrez, todas `no-answer`, en `call_log`) y su tarjeta seguía en
