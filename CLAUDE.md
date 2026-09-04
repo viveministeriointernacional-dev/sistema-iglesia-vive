@@ -170,6 +170,31 @@ panel; antes este archivo decía «Paid» y era falso — de ahí parte de la le
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-04** — **Recorrido de Operación 72 revisado punta a punta + limpieza
+  de datos.** El código hace exactamente lo que el usuario describe: registro →
+  **INICIADA**; llamada **no contestó → SEGUIMIENTO**, **contestó → CONTACTADA**;
+  formulario de visita → **VISITA PENDIENTE**; cerrar visita →
+  **LISTA PARA ENTREGA**; entregar → sale del tablero. Igual por los dos
+  caminos (tablero y webhook del CRM). Detalle correcto y deliberado: **una vez
+  CONTACTADA, un «no contestó» posterior NO la devuelve a SEGUIMIENTO** (queda
+  en el historial; ya se habló con ella).
+  **Dos bolsas de datos viejos encontradas en CONTACTADA (eran 292):**
+  1. **35 personas corregidas → SEGUIMIENTO.** Su única llamada era «No
+     contestó» (24-ago) y nunca contestaron; quedaron en CONTACTADA porque la
+     columna SEGUIMIENTO **no existía** entonces. Auditadas con la acción nueva
+     `operacion72.estado_corregido` (catálogo en `audit.ts` + `case` en
+     `actividad.ts`). Reparto: Freddy Cadena 9, Carlos Suárez 7, Santiago
+     Viveros 4, Nini Guerrón 4, Jakeline Guerrero 4, Johanna Quintero 3,
+     Emelin Parra 2, Laura Charry 1, Ruth Bonilla 1.
+  2. **184 personas del import masivo del 26-ago** («Primera llamada (importado
+     de HighLevel)», `outcome` NULL: no se sabe si contestaron).
+     **DECISIÓN DEL USUARIO (4-sep): se quedan en CONTACTADA, no se tocan.**
+     No volver a proponerlo.
+  Tablero tras la corrección: INICIADA 60 · SEGUIMIENTO 36 · CONTACTADA 257 ·
+  VISITA PENDIENTE 6 · LISTA PARA ENTREGA 0.
+  **Consulta útil para auditar el tablero** (última llamada por operación):
+  `distinct on (operation72_id) … order by operation72_id, occurred_at desc`.
+
 - **2026-09-04** — **Visitas desde el CRM: VIVO y probado punta a punta.** Se llenó
   el formulario real y la tarjeta de Valeria Atencio pasó sola a
   **VISITA_PENDIENTE** («Visita 5 de sept · virtual»), con dos `contact_attempt`:
