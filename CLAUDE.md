@@ -170,6 +170,34 @@ panel; antes este archivo decía «Paid» y era falso — de ahí parte de la le
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-04** — **Visitas desde el CRM: VIVO y probado punta a punta.** Se llenó
+  el formulario real y la tarjeta de Valeria Atencio pasó sola a
+  **VISITA_PENDIENTE** («Visita 5 de sept · virtual»), con dos `contact_attempt`:
+  la llamada de la línea (CONTESTO_BIEN + observación completa) y la visita
+  agendada (`is_virtual = true`). **No hizo falta mapear NADA en Custom Data**:
+  la acción Webhook de HighLevel manda el contacto completo y el parser
+  (`indiceDeCampos`) lo encuentra en `customFields` / `customData` / `data` /
+  `contact` / raíz, reconociendo cada campo por etiqueta, clave o id.
+  **Configuración final del workflow** (se le añadió el paso Webhook al workflow
+  **ya existente** `Se llenó Formulario Registro Llamada Línea`, en vez de crear
+  uno nuevo): POST a `…/api/integraciones/highlevel/visita`, header
+  `x-iglesia-webhook-secret`, **Custom Data vacío**.
+  **Tres trampas que costaron el rato** (revisar estas primero si algo falla):
+  1. **Nombres de formulario casi idénticos.** La URL
+     `micasavive.com/registro/primera-llamada/linea` aloja el formulario
+     **«Registro Llamada Línea»** (`07rGKuRchJO15bxL2Unj`), **NO** «Primera
+     Llamada» (`vBWEMOXsEg2Bq5affr7H`). El trigger apuntaba al equivocado.
+  2. **Workflow en `draft`.** No dispara aunque todo lo demás esté bien.
+     Verificable desde aquí: `GET services.leadconnectorhq.com/workflows/?locationId=…`
+     con el PIT — devuelve nombre y `status` de los 35 workflows (pero **no** los
+     pasos internos: el paso Webhook solo se comprueba enviando el formulario).
+  3. **URL equivocada.** `/registro-nuevo` es para altas; visitas van a `/visita`;
+     llamadas del CRM a `/llamada`.
+  Los envíos del formulario se pueden auditar con
+  `GET /forms/submissions?locationId=…` y los ids con `GET /forms/?locationId=…`.
+  Detalle menor: la fecha de visita queda a mediodía Colombia porque el
+  formulario solo captura el día, no la hora.
+
 - **2026-09-04** — **Migraciones automáticas VIVAS y verificadas** (PR #57).
   Tras fusionar, el build creó `app_migration` con **27 filas** (26 registradas
   sin ejecutar + `20260903230000_correo_enviado` aplicada) en 2 s. Desde ahora,
@@ -331,8 +359,9 @@ panel; antes este archivo decía «Paid» y era falso — de ahí parte de la le
      resultado+fecha). Añadido a `RUTAS_PUBLICAS`. Auditoría
      `highlevel.seguimiento_recibido`. `secretoValido` ahora vive en
      `src/lib/webhook.ts` (las tres rutas lo comparten).
-  **Pendiente del usuario:** crear en HighLevel el workflow con trigger
-  «Formulario enviado» (Registro Visita) → acción Webhook a esa URL con
+  **RESUELTO el 4-sep-2026** (ver entrada de arriba). Quedó así en HighLevel:
+  workflow `Se llenó Formulario Registro Llamada Línea` (publicado) → paso
+  Webhook a esa URL, **sin Custom Data**. Lo de abajo era el plan original con
   `contactId={{contact.id}}`, `locationId={{location.id}}`, `phone`, `email`,
   `formName` y los campos «Confirmación de visita», «Fecha visita», «Estado
   Primera Llamada Linea», «Fecha Primera Llamada Linea», «Observación Primera
