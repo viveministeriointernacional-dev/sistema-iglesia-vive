@@ -165,6 +165,21 @@ eventos, y administración. Documentación de producto en `design/`
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-04** — **Verificación de estado.** La tabla **`email_sent` ya existe**
+  en Supabase (11 columnas + los 3 índices de la migración) y **ya tiene copias
+  de correo guardadas**, así que la vista previa de correos en «Actividad del
+  día» funciona. **Pero la tabla `app_migration` NO existe**: eso significa que
+  `scripts/migrar.mjs` **todavía no se ha ejecutado en ningún build** (falta el
+  secreto de build `DATABASE_URL` en Cloudflare → Settings → Builds → Build
+  variables and secrets, o falta un build después de ponerlo). `email_sent` se
+  creó por fuera del script. **Consecuencia:** la próxima migración nueva NO se
+  aplicará sola hasta que ese secreto exista. Cuando se ejecute por primera vez,
+  el script registrará las 26 previas + `20260903230000_correo_enviado` sin
+  volver a ejecutarlas (`BASE`), así que no hay riesgo de duplicar.
+  Worker vivo y respondiendo (`/`, `/ingresar`, `/registro`,
+  `/administracion/actividad` → 200; webhook de llamadas → 401). Proyecto de
+  Supabase `ACTIVE_HEALTHY`, Postgres 17.6.
+
 - **2026-09-03** — **Pantalla «Actividad del día»** (`/administracion/actividad`,
   solo ADMIN; mockup aprobado:
   claude.ai/code/artifact/73f0ccb6-5d35-4341-b8d3-c509e13eccab). Lee la
