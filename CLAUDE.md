@@ -192,7 +192,6 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   comentada en `wrangler.jsonc`.
 - **Registros de HighLevel**: si dejan de entrar, revisar que el workflow de
   registro esté activo y enviando; algunos llegan y se marcan «duplicado» (409).
-- Rotar el `HIGHLEVEL_WEBHOOK_SECRET` (estuvo expuesto en capturas).
 - **Tabla huérfana `inbound_registration`** en Supabase: ya no está en el modelo
   de Prisma. No estorba; se puede borrar cuando el usuario lo autorice.
 
@@ -212,6 +211,102 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-04** — **Consolidador: sincronización de DOBLE VÍA con HighLevel**
+  (decisión del usuario: «que se sincronicen mutuamente; si se cambia acá, se
+  cambia allá, y viceversa»).
+  **Quién decide el consolidador: un flujo de HighLevel**, casi al instante del
+  registro. El sistema solo preguntaba **una vez, en el alta**, y nunca volvía a
+  escuchar ni a avisar.
+  - `sincronizarConsolidador` (`src/lib/consolidador.ts`) es ahora el **único**
+    camino para cambiar el consolidador. Audita `consolidador.reasignado` con
+    `metadata.origen` = `sistema` | `highlevel`.
+  - `exportarConsolidador` escribe el `assignedTo` del contacto cuando el cambio
+    nació acá. `consultarDuenoDelContacto` pregunta quién es el dueño.
+  - `POST /api/integraciones/highlevel/asignacion` recibe los cambios del CRM.
+    **Al paso Webhook le basta `contactId = {{contact.id}}`**: qué merge-tags
+    existen cambia entre versiones y disparadores (⚠️ **`{{contact.assigned_to}}`
+    NO existe en este panel** — lo confirmó el usuario), así que si el cuerpo no
+    trae usuario, el sistema **le pregunta a la API**, que es la respuesta
+    autorizada. Trigger: **«Contacto Modificado» → «Usuario asignado ha
+    cambiado»**.
+  - **El eco se corta con una sola regla**: si el valor que llega ya es el que
+    hay, no se escribe nada ni se devuelve nada. El segundo rebote se apaga solo.
+  - Un usuario de HighLevel sin mapear **no borra** el consolidador (422); si la
+    API no responde, tampoco se toca nada (503).
+  - ⚠️ **Requiere `HIGHLEVEL_API_TOKEN` en el Worker.** No aparecía en la
+    configuración, así que **toda la mitad «sistema → CRM» probablemente nunca
+    ha funcionado** (incluye `exportarDatosPersona`). Verificar en Cloudflare.
+  **Estado medido antes del arreglo** (414 fichas enlazadas): 186 coinciden,
+  **206 sin dueño en HighLevel** (193 son el import masivo de agosto, que nunca
+  pasó por el flujo) y **21 con dueño distinto** — las 21 son cambios hechos
+  **del lado del sistema** que nunca se le contaron al CRM.
+  **DECISIÓN DEL USUARIO: las de Johana Ramírez en el CRM se dejan quietas. No
+  volver a proponerlo ni recordarlo.**
+  **Lección de método:** `dateUpdated` de un contacto de HighLevel es la última
+  modificación **por cualquier motivo** — NO dice cuándo se asignó el usuario.
+  Deduje de ahí una «carrera» que no existía; la evidencia buena está en
+  `audit_log`, en `metadata.highLevelOwnerId` del `persona.registrada`.
+
+- **2026-09-04** — **Auditoría de las llamadas del día: 6 personas estaban en la
+  columna equivocada; corregidas.** Se cruzaron los **33 envíos de formulario de
+  hoy** (26 personas distintas) contra la columna real de cada tarjeta.
+  **Resultado: 20 correctas, 6 mal.** Las 6 quedaron mal porque su registro
+  **nunca llegó al sistema**: cayeron en la **ventana 09:58–11:55** (hora
+  Colombia), justo cuando el paso Webhook del workflow de llamadas tenía la
+  URL y el secreto equivocados. Recuperadas reenviando el envío original:
+  - **Jaime Arturo** (contestó) INICIADA → **CONTACTADA**
+  - **Marly Yulieth** (contestó) INICIADA → **CONTACTADA**
+  - **Geraldine Fernández** (contestó 11:20) SEGUIMIENTO → **CONTACTADA**
+  - **Yenny Patricia** (no contestó) INICIADA → **SEGUIMIENTO**
+  - **Margarita Rojas** (no contestó) INICIADA → **SEGUIMIENTO**
+  - **Diego Alejandro Barrera** (no contestó) INICIADA → **SEGUIMIENTO**
+  **De 12:43 en adelante TODO entró bien**: cada envío deja su
+  `highlevel.seguimiento_recibido` 1–5 s después y la tarjeta se movió sola.
+  **No se reenvían** los envíos perdidos cuyo efecto ya estaba cubierto por otro
+  posterior que sí llegó (mismo resultado, mismas 12 h): duplicarían el intento
+  sin cambiar la columna.
+  **Cuatro personas llamadas hoy no tienen columna y está bien**: Tatiana
+  Torres, Laura Patricia Muñoz, Gilberto Matheus y Katherine García están
+  **dadas de baja** (Op72 CERRADA), así que el registro se acepta y no mueve
+  nada. **Verificado por hora: en las cuatro la llamada fue ANTES de la baja**,
+  y la baja salió de esa misma llamada (1, 1, 21 y 3 minutos después; la nota de
+  baja repite lo que dijo la persona). O sea: **el equipo NO está llamando gente
+  ya retirada** — está llamando, enterándose y dando de baja en el acto, que es
+  el uso correcto. Bajas hechas por Nini Guerrón (1) y Nora Bonilla (3).
+  Efecto colateral: como los registros de Laura Patricia (11:53) y Tatiana
+  (11:55) cayeron en la ventana perdida y al reenviarlos la Op72 ya estaba
+  cerrada, **la observación de esas dos llamadas no quedó en el expediente**;
+  sí quedó, casi con las mismas palabras, en la nota de la baja.
+  **La regla quedó comprobada en producción**: no contestó → SEGUIMIENTO ·
+  contestó → CONTACTADA · visita confirmada → VISITA PENDIENTE, y una vez
+  CONTACTADA un «no contestó» posterior **no** la devuelve.
+
+- **2026-09-04** — **`HIGHLEVEL_WEBHOOK_SECRET` ROTADO** (ya no es pendiente).
+  Se generó uno nuevo de 48 caracteres y se cambió en los **cuatro** sitios:
+  Cloudflare (Settings → Variables and Secrets, **Type = Secret**, nunca Text) y
+  los **tres** workflows de HighLevel (paso Webhook → header
+  `x-iglesia-webhook-secret`). El valor **no vive en el repo**: está en
+  Cloudflare y en los workflows.
+  **Verificado** con la prueba de contacto inexistente en las tres rutas:
+  `/visita` 404, `/registro-nuevo` 422, `/llamada` 200 con el **nuevo**; y
+  **401 en las tres** con el viejo. O sea: el nuevo autoriza y el viejo ya no.
+  **Ventana de rotación: se perdieron 4 envíos de formulario** (rechazados con
+  401 mientras el secreto no coincidía). Se recuperaron todos leyendo
+  `GET /forms/submissions?locationId=…` con el PIT y **reenviándolos al webhook**
+  con el secreto nuevo:
+  - **Margarita Campos** → SEGUIMIENTO («se hizo 2 llamadas no contesto»).
+  - **Daniel Mejía** → VISITA PENDIENTE (visita del 5 de sept confirmada).
+  - **Tatiana Torres** y **Laura Patricia Muñoz** → `sin_cambios`, **correcto**:
+    su Operación 72 ya está **CERRADA**, así que la llamada no tenía tarjeta que
+    mover. La observación de esas dos llamadas sí quedó solo en HighLevel.
+  **Cómo auditar una pérdida de envíos** (receta reutilizable): cruzar
+  `GET /forms/submissions` (createdAt + contactId) contra
+  `select … from audit_log where action like 'highlevel%'` — cada envío que
+  llegó deja un `highlevel.seguimiento_recibido` **1–5 s después**; el que no
+  aparece, se perdió. Para reenviarlo basta un POST con el `contactId`,
+  `locationId` y los **ids de campo** tal como vienen en `others` (el parser los
+  reconoce por id).
+
 - **2026-09-04** — **LOS TRES FORMULARIOS QUEDARON VIVOS.** Cerrado el de
   **llamadas** (`/registro/primera-llamada`), que era el hueco: probado punta a
   punta con un envío real — **Geraldine Fernández** pasó sola a **SEGUIMIENTO**
@@ -226,7 +321,7 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   con ese header y un `contact_id` inexistente → **401 = secreto malo**,
   **404 = secreto bueno** (autorizado, contacto no encontrado). Vale para los
   tres webhooks.
-  **⚠️ PENDIENTE URGENTE: rotar `HIGHLEVEL_WEBHOOK_SECRET`.** Su valor completo
+  **⚠️ Rotar `HIGHLEVEL_WEBHOOK_SECRET` — HECHO el mismo 4-sep (ver arriba).** Su valor completo
   quedó legible en capturas de pantalla del 4-sep. Pasos: generar uno nuevo →
   Cloudflare → Settings → Variables and Secrets → esperar el despliegue →
   actualizarlo en los **tres** workflows de HighLevel.

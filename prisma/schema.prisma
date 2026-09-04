@@ -105,6 +105,7 @@ model AppUser {
   asistenciasEvento     EventRegistration[]  @relation("MarcoAsistenciaEvento")
   auditoria             AuditLog[]
   llamadas              CallLog[]
+  declaracionesRevisadas LeadershipDeclaration[] @relation("RevisoDeclaracion")
 
   @@index([role, active])
   @@map("app_user")
@@ -192,6 +193,7 @@ model Person {
   learnerProfile LearnerProfile?
   invitados      LearnerProfile[] @relation("InvitadaPor")
   highLevelContacts HighLevelContact[]
+  declaracionesLiderazgo LeadershipDeclaration[]
 
   @@index([callPhone])
   @@index([whatsappPhone])
@@ -971,4 +973,36 @@ model IntegrationEvent {
 
   @@index([status, createdAt])
   @@map("integration_event")
+}
+
+/// Lo que una persona del liderazgo declara sobre sí misma en el formulario
+/// público «Actualiza tus datos». Es una DECLARACIÓN, no un permiso: el
+/// formulario no puede activar nada dentro de la plataforma, así que esto queda
+/// PENDIENTE hasta que un administrador lo confirme o lo descarte desde el
+/// expediente.
+model LeadershipDeclaration {
+  id           String    @id @default(uuid())
+  personId     String    @map("person_id")
+  /// Lo que marcó: consolidación, líder de Alpha, líder de Casa de Fe, mentor,
+  /// ministerio. Texto libre controlado por `ROLES_DECLARABLES`.
+  roles        String[]  @default([])
+  /// La etapa que la persona dice tener. En una ficha que ya existía NO se
+  /// aplica sola: cambiar de fase deja rastro en `phase_change`, que exige un
+  /// responsable humano, así que espera aquí hasta que un administrador la
+  /// confirme. En una ficha nueva sí se usa como valor inicial y esto queda
+  /// nulo.
+  declaredPhase Phase?   @map("declared_phase")
+  note         String?
+  /// PENDIENTE · CONFIRMADA · DESCARTADA
+  status       String    @default("PENDIENTE")
+  reviewedById String?   @map("reviewed_by_id")
+  reviewedAt   DateTime? @map("reviewed_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  person     Person   @relation(fields: [personId], references: [id])
+  reviewedBy AppUser? @relation("RevisoDeclaracion", fields: [reviewedById], references: [id])
+
+  @@index([status, createdAt])
+  @@index([personId])
+  @@map("leadership_declaration")
 }

@@ -5,6 +5,9 @@ import type { ClientePrisma } from "@/lib/prisma";
 export type AccionAuditada =
   | "persona.registrada"
   | "consolidador.asignado"
+  // Cambio de consolidador ya existente. `metadata.origen` dice de qué lado
+  // nació: "sistema" o "highlevel" (ver src/lib/consolidador.ts).
+  | "consolidador.reasignado"
   | "operacion72.iniciada"
   | "operacion72.contacto_registrado"
   | "operacion72.visita_agendada"
@@ -42,6 +45,11 @@ export type AccionAuditada =
   | "highlevel.registro_repetido"
   | "highlevel.seguimiento_recibido"
   | "registro_publico.recibido"
+  // Formulario público del liderazgo: la persona actualiza su propia ficha y
+  // declara sus hitos. Lo que dice que hace queda pendiente de confirmar.
+  | "liderazgo.datos_actualizados"
+  | "liderazgo.declaracion_confirmada"
+  | "liderazgo.declaracion_descartada"
   | "administracion.datos_actualizados"
   | "expediente.datos_actualizados"
   | "administracion.rol_actualizado"

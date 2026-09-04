@@ -268,3 +268,85 @@ export async function exportarVisita(
     console.error("No se pudo exportar la visita a HighLevel", error);
   }
 }
+
+/// Escribe en HighLevel quién consolida a esta persona (el «usuario asignado»
+/// del contacto). Es la mitad «sistema → CRM» de la sincronización de doble vía
+/// descrita en `src/lib/consolidador.ts`.
+///
+/// Best-effort, como el resto de exportaciones: sin token no hace nada, y un
+/// fallo del CRM no deshace el cambio que ya quedó guardado en el sistema.
+/// Si el consolidador quedó en nulo, se manda `assignedTo` vacío para que allá
+/// también quede sin dueño.
+export async function exportarConsolidador(learnerId: string): Promise<void> {
+  const cred = await credenciales();
+  if (!cred) return;
+
+  try {
+    const prisma = await getPrisma();
+    const aprendiz = await prisma.learnerProfile.findUnique({
+      where: { id: learnerId },
+      select: {
+        consolidator: { select: { highlevelUserId: true } },
+        person: {
+          select: {
+            highLevelContacts: {
+              take: 1,
+              orderBy: { createdAt: "asc" },
+              select: { contactId: true },
+            },
+          },
+        },
+      },
+    });
+
+    const contactId = aprendiz?.person.highLevelContacts[0]?.contactId ?? null;
+    if (!contactId) return;
+
+    // Un consolidador sin id de HighLevel no existe para el CRM: mejor no
+    // tocar nada que borrarle el dueño al contacto por error.
+    const consolidador = aprendiz?.consolidator;
+    if (consolidador && !consolidador.highlevelUserId) return;
+
+    await pedir(
+      `/contacts/${contactId}`,
+      "PUT",
+      { assignedTo: consolidador?.highlevelUserId ?? "" },
+      cred.token,
+    );
+  } catch (error) {
+    console.error("No se pudo exportar el consolidador a HighLevel", error);
+  }
+}
+
+/// Le pregunta a HighLevel quién es el dueño de un contacto.
+///
+/// El webhook de asignación no puede depender de un merge-tag: qué etiquetas
+/// existen cambia entre versiones del CRM y entre disparadores, y una que no
+/// resuelve llega vacía sin avisar. Con el `contactId` —que sí llega siempre—
+/// se le pregunta a la API, que es la respuesta autorizada.
+///
+/// Devuelve el id de usuario de HighLevel, o `null` si el contacto no tiene
+/// dueño. Lanza si no se pudo preguntar, para poder distinguir «no tiene
+/// dueño» de «no pude averiguarlo».
+export async function consultarDuenoDelContacto(
+  contactId: string,
+): Promise<string | null> {
+  const cred = await credenciales();
+  if (!cred) throw new Error("Sin credenciales de HighLevel");
+
+  const respuesta = await fetch(`${BASE}/contacts/${contactId}`, {
+    headers: {
+      Authorization: `Bearer ${cred.token}`,
+      Version: VERSION,
+      Accept: "application/json",
+    },
+  });
+  if (!respuesta.ok) {
+    throw new Error(`HighLevel GET /contacts/${contactId} → ${respuesta.status}`);
+  }
+  const cuerpo = (await respuesta.json()) as {
+    contact?: { assignedTo?: unknown };
+  };
+  const dueno = cuerpo.contact?.assignedTo;
+  return typeof dueno === "string" && dueno.trim() ? dueno.trim() : null;
+}

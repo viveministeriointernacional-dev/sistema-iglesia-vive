@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const RUTAS_PUBLICAS = [
   "/registro",
+  "/actualizar-datos",
   "/ingresar",
   "/recuperar",
   "/nueva-clave",
@@ -11,6 +12,7 @@ const RUTAS_PUBLICAS = [
   "/api/integraciones/highlevel/registro-nuevo",
   "/api/integraciones/highlevel/llamada",
   "/api/integraciones/highlevel/visita",
+  "/api/integraciones/highlevel/asignacion",
 ];
 
 export function esRutaPublica(pathname: string) {
