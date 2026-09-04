@@ -12,6 +12,30 @@ import {
 /// adelantadas. Usar siempre `timeZone: ZONA_HORARIA` en los formateadores.
 export const ZONA_HORARIA = "America/Bogota";
 
+/// El día de hoy en Colombia, como `AAAA-MM-DD`. Sirve para poner por defecto
+/// (y como tope) los campos de fecha: el servidor corre en UTC, así que después
+/// de las 7 p. m. su «hoy» ya es el día siguiente para nosotros.
+export function hoyEnColombia(ahora: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: ZONA_HORARIA,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(ahora);
+}
+
+/// Convierte un `AAAA-MM-DD` de un campo de fecha en una marca de tiempo real.
+/// Si es hoy, se usa la hora actual (así el hito queda en su lugar dentro de la
+/// línea de tiempo del día); si es otro día, se ancla al **mediodía en hora de
+/// Colombia**, nunca a medianoche UTC, que se correría al día anterior.
+/// Devuelve `null` si el texto no es una fecha válida.
+export function fechaDeDia(valor: string, ahora: Date = new Date()): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(valor)) return null;
+  if (valor === hoyEnColombia(ahora)) return ahora;
+  const fecha = new Date(`${valor}T12:00:00-05:00`);
+  return Number.isNaN(fecha.getTime()) ? null : fecha;
+}
+
 /// Etiquetas de los seis puntos de entrada del paso 3 del registro, en el orden
 /// del diseño (rejilla 3×2).
 export const PUNTOS_DE_ENTRADA: { valor: EntryPoint; etiqueta: string }[] = [

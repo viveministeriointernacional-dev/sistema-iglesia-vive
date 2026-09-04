@@ -22,6 +22,7 @@ import {
   urgenciaDe,
 } from "@/lib/op72";
 import { mentoresElegibles } from "@/lib/equipo";
+import { TOPE_DE_BUSQUEDA, ubicarPersonas } from "@/lib/busqueda-op72";
 import { BuscadorPersonas } from "@/components/buscador-personas";
 import { TarjetaDePersona, type TarjetaPersona } from "./tarjeta";
 
@@ -107,10 +108,13 @@ export default async function TableroOperacion72({
 
   // Alcance por red: el consolidador ve solo sus personas asignadas; pastor,
   // administrador y coordinadoras de consolidación ven toda la iglesia.
-  const alcance =
-    usuario.role === Role.CONSOLIDADOR && !veTodaLaConsolidacion(usuario)
-      ? { learner: { consolidatorId: usuario.id } }
-      : {};
+  const soloSuRed = usuario.role === Role.CONSOLIDADOR && !veTodaLaConsolidacion(usuario);
+  const alcance = soloSuRed ? { learner: { consolidatorId: usuario.id } } : {};
+  // El mismo alcance, pero sobre el aprendiz: la búsqueda mira a personas que
+  // ya NO tienen Operación 72 abierta, así que no puede filtrar por ella.
+  const alcanceDelAprendiz: Prisma.LearnerProfileWhereInput = soloSuRed
+    ? { consolidatorId: usuario.id }
+    : {};
 
   // Búsqueda por nombre o celular dentro del tablero. El nombre (y el correo)
   // salen de `person.search_text`, que ya está sin tildes ni mayúsculas. El
@@ -392,6 +396,13 @@ export default async function TableroOperacion72({
     Boolean(estadoElegido) ||
     Boolean(columnaAmpliada);
 
+  // Al buscar, se dice dónde está cada persona aunque ya no esté en el tablero
+  // (fases posteriores, dada de baja, o ficha sin Operación 72). Antes esas
+  // búsquedas devolvían vacío y parecía que la persona no existiera.
+  const ubicaciones = consulta
+    ? await ubicarPersonas(prisma, consulta, alcanceDelAprendiz, ahora)
+    : [];
+
   // Vista enfocada: cuántas se ven, cuántas hay y cuántas faltan.
   const totalDelEstado = estadoElegido ? (totalPorEstado.get(estadoElegido) ?? 0) : 0;
   const mostradas = estadoElegido ? tarjetas.length : 0;
@@ -435,7 +446,9 @@ export default async function TableroOperacion72({
         </div>
 
         <div className="mt-5 max-w-[460px]">
-          <BuscadorPersonas />
+          {/* Dentro del tablero, elegir a alguien lo muestra AQUÍ (tarjeta y
+              fase) en vez de saltar al expediente. */}
+          <BuscadorPersonas destino="operacion-72" />
         </div>
 
         {/* Filtros del tablero: orden y búsqueda dentro de las columnas. Es un
@@ -484,6 +497,120 @@ export default async function TableroOperacion72({
             </Link>
           ) : null}
         </form>
+
+        {/* Resultado de la búsqueda: la tarjeta de cada persona y DÓNDE ESTÁ.
+            Incluye a quienes ya salieron del tablero, que antes no aparecían
+            por ningún lado. El tablero completo sigue debajo. */}
+        {consulta ? (
+          <section className="tarjeta mt-4 p-[18px]">
+            <div className="flex flex-wrap items-baseline justify-between gap-3">
+              <h2 className="text-[9.5px] leading-none font-extrabold tracking-[.06em] text-[rgba(19,28,36,.42)]">
+                RESULTADO DE LA BÚSQUEDA · {ubicaciones.length}{" "}
+                {ubicaciones.length === 1 ? "PERSONA" : "PERSONAS"}
+              </h2>
+              <Link
+                href="/operacion-72"
+                className="text-[11.5px] leading-none font-semibold text-azul-700"
+              >
+                Volver al tablero completo
+              </Link>
+            </div>
+
+            {ubicaciones.length === 0 ? (
+              <p className="mt-3 text-[12px] leading-[1.5] font-medium text-[rgba(19,28,36,.55)]">
+                Nadie coincide con «{consulta}» dentro de lo que puedes ver.
+              </p>
+            ) : (
+              <>
+                {ubicaciones.length === TOPE_DE_BUSQUEDA ? (
+                  <p className="mt-2 text-[11.5px] leading-[1.5] font-medium text-[rgba(19,28,36,.5)]">
+                    Se muestran las primeras {TOPE_DE_BUSQUEDA}. Si la persona
+                    que buscas no está, escribe el nombre más completo.
+                  </p>
+                ) : null}
+                <div className="mt-[14px] grid grid-cols-1 gap-[14px] sm:grid-cols-2 xl:grid-cols-3">
+                  {ubicaciones.map((donde) => (
+                    <article
+                      key={donde.learnerId}
+                      className={`rounded-[13px] border bg-white p-4 ${
+                        donde.insignia === "DADA DE BAJA"
+                          ? "border-[rgba(180,70,47,.45)]"
+                          : "border-[rgba(19,28,36,.1)]"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="min-w-0 text-[14px] leading-[1.2] font-semibold text-tinta">
+                          {donde.nombre}
+                        </h3>
+                        <span
+                          className={`shrink-0 rounded-[20px] px-2 py-1 text-[9.5px] leading-none font-bold whitespace-nowrap ${
+                            donde.insignia === "DADA DE BAJA"
+                              ? "bg-rojo-fondo text-rojo"
+                              : donde.enTablero
+                                ? "bg-azul-100 text-azul-700"
+                                : "bg-bosque-100 text-bosque-900"
+                          }`}
+                        >
+                          {donde.insignia}
+                        </span>
+                      </div>
+
+                      {donde.telefono ? (
+                        <p className="mt-[6px] text-[11.5px] leading-none font-semibold text-[rgba(19,28,36,.55)]">
+                          {donde.telefono}
+                        </p>
+                      ) : null}
+
+                      <div className="mt-3 border-t border-[rgba(19,28,36,.09)] pt-[11px]">
+                        <p className="text-[9.5px] leading-none font-extrabold tracking-[.06em] text-[rgba(19,28,36,.42)]">
+                          DÓNDE ESTÁ
+                        </p>
+                        <p className="mt-[7px] text-[14px] leading-[1.3] font-bold text-tinta">
+                          {donde.titulo}
+                        </p>
+                        {donde.subtitulo ? (
+                          <p className="mt-1 text-[11.5px] leading-[1.4] font-medium text-[rgba(19,28,36,.55)]">
+                            {donde.subtitulo}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <dl className="mt-[13px] flex flex-col gap-[7px]">
+                        {donde.filas.map((fila) => (
+                          <div key={fila.rotulo} className="flex items-baseline gap-2">
+                            <dt className="w-[78px] shrink-0 text-[9.5px] leading-[1.35] font-extrabold tracking-[.06em] text-[rgba(19,28,36,.42)]">
+                              {fila.rotulo}
+                            </dt>
+                            <dd className="m-0 text-[11.5px] leading-[1.35]">
+                              {fila.valor ? (
+                                <span className="font-semibold text-tinta">{fila.valor}</span>
+                              ) : (
+                                <span className="font-medium text-[rgba(19,28,36,.38)] italic">
+                                  No quedó registrado
+                                </span>
+                              )}
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+
+                      <p className="mt-[13px] text-[11.5px] leading-[1.5] font-medium text-[rgba(19,28,36,.55)]">
+                        {donde.nota}
+                      </p>
+
+                      <Link
+                        href={`/expediente/${donde.learnerId}`}
+                        className="mt-3 block rounded-[9px] border border-borde-control bg-white px-3 py-[10px] text-center text-[12px] leading-none font-bold text-azul-700"
+                      >
+                        Abrir expediente
+                      </Link>
+                    </article>
+                  ))}
+                </div>
+              </>
+            )}
+          </section>
+        ) : null}
 
         {/* Chips «Ver solo»: una etapa a la vez, a todo lo ancho. Es lo que
             permite llegar a las personas que no caben en la columna angosta.

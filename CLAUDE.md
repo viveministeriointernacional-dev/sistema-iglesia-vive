@@ -25,12 +25,19 @@ eventos, y administración. Documentación de producto en `design/`
   **Merge** en GitHub. Desplegar = fusionar a `main`.
 - Prefiere soluciones definitivas y paso a paso; se frustra si repito cosas ya
   hechas o si algo queda a medias.
-- **MÉTODO MOCKUPS (pedido el 3-sep-2026, aplica siempre):** antes de implementar
-  **cualquier cambio de interfaz** (pantallas, tableros, formularios, secciones
-  nuevas), mostrarle primero un **mockup** para que lo apruebe, y solo después
-  escribir el código. Usar el skill `design` (canvas de mockups) para producirlo.
-  Los cambios que no tocan interfaz (datos, migraciones, webhooks, reglas de
-  negocio en servidor) no necesitan mockup: se hacen directo.
+- **MÉTODO MOCKUPS (pedido el 3-sep-2026, afinado el 4-sep):** antes de
+  construir **algo nuevo en la interfaz** —una pantalla, una sección, un tablero,
+  un formulario nuevo, o un cambio que reorganiza lo que ya hay— mostrarle
+  primero un **mockup** para que lo apruebe, y solo después escribir el código.
+  Usar el skill `design` (canvas de mockups) para producirlo.
+  **Van DIRECTO, sin mockup** (dicho por el usuario, 4-sep: «Directo»):
+  - **Ajustes puntuales sobre pantallas que ya existen**: añadir o quitar un
+    campo de un formulario, cambiar un texto, un rótulo, un botón, el
+    comportamiento de un enlace.
+  - Todo lo que no toca interfaz: datos, migraciones, webhooks, reglas de
+    negocio en servidor.
+  Ante la duda entre «ajuste» y «algo nuevo», es ajuste si cabe en la pantalla
+  tal como está hoy y se puede describir en una frase.
 
 ## 3. Arquitectura y plataformas
 
@@ -204,6 +211,29 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 - Validar deploy sin credenciales: `npx wrangler deploy --dry-run --outdir /tmp/x`
 
 ## 12. Bitácora (añadir lo nuevo arriba)
+
+- **2026-09-04** — **LOS TRES FORMULARIOS QUEDARON VIVOS.** Cerrado el de
+  **llamadas** (`/registro/primera-llamada`), que era el hueco: probado punta a
+  punta con un envío real — **Geraldine Fernández** pasó sola a **SEGUIMIENTO**
+  con la observación completa (párrafo largo con tildes, sin cortes).
+  **Dos errores de configuración en el paso Webhook del workflow
+  `3. Formulario de Primera Llamada Enviado`**, ambos silenciosos:
+  1. La **URL apuntaba a `/registro-nuevo`** en vez de `/visita`. Habría
+     intentado crear una persona nueva en cada llamada registrada.
+  2. El **secreto era otro** (64 caracteres en vez de 48) → el sistema
+     devolvía **401** y los envíos se perdían sin dejar rastro.
+  **Cómo verificar un secreto sin exponerlo ni tocar datos:** `POST` al webhook
+  con ese header y un `contact_id` inexistente → **401 = secreto malo**,
+  **404 = secreto bueno** (autorizado, contacto no encontrado). Vale para los
+  tres webhooks.
+  **⚠️ PENDIENTE URGENTE: rotar `HIGHLEVEL_WEBHOOK_SECRET`.** Su valor completo
+  quedó legible en capturas de pantalla del 4-sep. Pasos: generar uno nuevo →
+  Cloudflare → Settings → Variables and Secrets → esperar el despliegue →
+  actualizarlo en los **tres** workflows de HighLevel.
+  **Pendiente menor:** el rótulo del movimiento dice **«No contestó (línea)»**
+  aunque venga del formulario del **consolidador**; el «(línea)» está cableado en
+  `programarVisitaDesdeCrm` (`registro.ts`) de cuando solo existía el formulario
+  de la línea. Hay que distinguir el origen.
 
 - **2026-09-04** — **El formulario del consolidador no movía nada** (caso María
   Julieth Durán, +57 320 473 2415). La llamaron **3 veces** el 3 y 4 de sep
