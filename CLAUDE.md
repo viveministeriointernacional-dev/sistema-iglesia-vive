@@ -192,7 +192,6 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   comentada en `wrangler.jsonc`.
 - **Registros de HighLevel**: si dejan de entrar, revisar que el workflow de
   registro esté activo y enviando; algunos llegan y se marcan «duplicado» (409).
-- Rotar el `HIGHLEVEL_WEBHOOK_SECRET` (estuvo expuesto en capturas).
 - **Tabla huérfana `inbound_registration`** en Supabase: ya no está en el modelo
   de Prisma. No estorba; se puede borrar cuando el usuario lo autorice.
 
@@ -212,6 +211,32 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-04** — **`HIGHLEVEL_WEBHOOK_SECRET` ROTADO** (ya no es pendiente).
+  Se generó uno nuevo de 48 caracteres y se cambió en los **cuatro** sitios:
+  Cloudflare (Settings → Variables and Secrets, **Type = Secret**, nunca Text) y
+  los **tres** workflows de HighLevel (paso Webhook → header
+  `x-iglesia-webhook-secret`). El valor **no vive en el repo**: está en
+  Cloudflare y en los workflows.
+  **Verificado** con la prueba de contacto inexistente en las tres rutas:
+  `/visita` 404, `/registro-nuevo` 422, `/llamada` 200 con el **nuevo**; y
+  **401 en las tres** con el viejo. O sea: el nuevo autoriza y el viejo ya no.
+  **Ventana de rotación: se perdieron 4 envíos de formulario** (rechazados con
+  401 mientras el secreto no coincidía). Se recuperaron todos leyendo
+  `GET /forms/submissions?locationId=…` con el PIT y **reenviándolos al webhook**
+  con el secreto nuevo:
+  - **Margarita Campos** → SEGUIMIENTO («se hizo 2 llamadas no contesto»).
+  - **Daniel Mejía** → VISITA PENDIENTE (visita del 5 de sept confirmada).
+  - **Tatiana Torres** y **Laura Patricia Muñoz** → `sin_cambios`, **correcto**:
+    su Operación 72 ya está **CERRADA**, así que la llamada no tenía tarjeta que
+    mover. La observación de esas dos llamadas sí quedó solo en HighLevel.
+  **Cómo auditar una pérdida de envíos** (receta reutilizable): cruzar
+  `GET /forms/submissions` (createdAt + contactId) contra
+  `select … from audit_log where action like 'highlevel%'` — cada envío que
+  llegó deja un `highlevel.seguimiento_recibido` **1–5 s después**; el que no
+  aparece, se perdió. Para reenviarlo basta un POST con el `contactId`,
+  `locationId` y los **ids de campo** tal como vienen en `others` (el parser los
+  reconoce por id).
+
 - **2026-09-04** — **LOS TRES FORMULARIOS QUEDARON VIVOS.** Cerrado el de
   **llamadas** (`/registro/primera-llamada`), que era el hueco: probado punta a
   punta con un envío real — **Geraldine Fernández** pasó sola a **SEGUIMIENTO**
@@ -226,7 +251,7 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   con ese header y un `contact_id` inexistente → **401 = secreto malo**,
   **404 = secreto bueno** (autorizado, contacto no encontrado). Vale para los
   tres webhooks.
-  **⚠️ PENDIENTE URGENTE: rotar `HIGHLEVEL_WEBHOOK_SECRET`.** Su valor completo
+  **⚠️ Rotar `HIGHLEVEL_WEBHOOK_SECRET` — HECHO el mismo 4-sep (ver arriba).** Su valor completo
   quedó legible en capturas de pantalla del 4-sep. Pasos: generar uno nuevo →
   Cloudflare → Settings → Variables and Secrets → esperar el despliegue →
   actualizarlo en los **tres** workflows de HighLevel.
