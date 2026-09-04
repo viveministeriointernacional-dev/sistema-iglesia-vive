@@ -9,13 +9,13 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-/// Formulario público del liderazgo. Es un enlace suelto, sin contraseña: la
-/// gente del equipo no entra a la plataforma, llena esto desde el celular.
+/// Enlace público, sin contraseña: el equipo de liderazgo no entra a la
+/// plataforma. La llave es el celular (ver `src/lib/liderazgo.ts`).
 export default function PaginaActualizarDatos() {
   return (
     <main className="min-h-screen bg-escritorio">
-      <div className="bg-azul-900 px-5 py-7 sm:px-8 sm:py-9">
-        <div className="mx-auto w-full max-w-[560px]">
+      <div className="mx-auto w-full max-w-[620px]">
+        <header className="bg-azul-900 px-[22px] py-7 sm:rounded-b-[18px]">
           <Image
             src="/logo-vive.png"
             alt="Vive Ministerio Internacional"
@@ -25,18 +25,18 @@ export default function PaginaActualizarDatos() {
             unoptimized
             className="h-auto w-[150px] max-w-full brightness-0 invert"
           />
-          <h1 className="mt-5 font-serif text-[27px] leading-[1.15] font-normal text-white sm:text-[32px]">
+          <h1 className="mt-5 font-serif text-[27px] leading-[1.15] font-normal text-white">
             Actualiza tus datos
           </h1>
           <p className="mt-[9px] text-[13px] leading-[1.55] font-medium text-white/70">
             Para el equipo de liderazgo. Cuéntanos quién eres y por dónde vas en
             tu proceso. Toma unos 4 minutos.
           </p>
-        </div>
-      </div>
+        </header>
 
-      <div className="mx-auto w-full max-w-[560px] px-4 pb-12 sm:px-5">
-        <FormularioLiderazgo />
+        <div className="px-[14px] pb-10">
+          <FormularioLiderazgo />
+        </div>
       </div>
     </main>
   );
