@@ -8,12 +8,19 @@ import {
 } from "./buscador-personas-accion";
 
 /// Buscador global de personas por nombre o teléfono. Vive en el encabezado de
-/// las vistas (árbol, red, operación 72, escuela, eventos) y lleva al expediente
-/// de quien se elija. El alcance lo decide el servidor según el rol.
+/// las vistas (árbol, red, operación 72, escuela, eventos). El alcance lo decide
+/// el servidor según el rol.
+///
+/// `destino` decide a dónde lleva elegir un resultado:
+/// - `expediente` (por defecto): abre su expediente, como siempre.
+/// - `operacion-72`: se queda en el tablero y lo filtra por esa persona, para
+///   ver su tarjeta y en qué fase está sin salir de la pantalla.
 export function BuscadorPersonas({
   placeholder = "Buscar persona por nombre o celular…",
+  destino = "expediente",
 }: {
   placeholder?: string;
+  destino?: "expediente" | "operacion-72";
 }) {
   const [consulta, setConsulta] = useState("");
   const [resultados, setResultados] = useState<PersonaEncontrada[] | null>(null);
@@ -116,7 +123,11 @@ export function BuscadorPersonas({
               {resultados.map((persona) => (
                 <li key={persona.learnerId}>
                   <Link
-                    href={`/expediente/${persona.learnerId}`}
+                    href={
+                      destino === "operacion-72"
+                        ? `/operacion-72?q=${encodeURIComponent(persona.nombre)}`
+                        : `/expediente/${persona.learnerId}`
+                    }
                     onClick={limpiar}
                     className="flex items-center justify-between gap-3 border-b border-[rgba(19,28,36,.07)] px-[14px] py-[11px] last:border-b-0 hover:bg-papel"
                   >
