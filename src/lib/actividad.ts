@@ -627,8 +627,25 @@ export async function cargarActividad(
         frase = [A(), t(" abrió las notas pastorales de "), P()];
         break;
       case "consolidador.reasignado": {
-        tipo = "op72"; etiqueta = "OP 72"; tono = "azul";
-        frase = [A(), t(" reasignó a "), P(), t(" al consolidador "), b(usuario("consolidadorNuevoId") ?? "?")];
+        // Dos formatos conviven: el de las reasignaciones hechas a mano en
+        // agosto/septiembre (`consolidadorNuevoId`) y el de la sincronización
+        // de doble vía (`origen` + `anterior`/`nuevo`, ver consolidador.ts).
+        const deCrm = texto(m.origen) === "highlevel";
+        tipo = deCrm ? "crm" : "op72";
+        etiqueta = deCrm ? "CRM" : "OP 72";
+        tono = deCrm ? "ambar" : "azul";
+        const ahora = texto(m.nuevo) ?? usuario("consolidadorNuevoId");
+        const antes = texto(m.anterior) ?? usuario("consolidadorAnteriorId");
+        frase = antes || texto(m.origen)
+          ? [
+              P(),
+              t(" → cambió de consolidador: "),
+              b(antes ?? "sin consolidador"),
+              t(" → "),
+              b(ahora ?? "sin consolidador"),
+              t(deCrm ? " · lo asignó HighLevel" : ""),
+            ]
+          : [A(), t(" reasignó a "), P(), t(" al consolidador "), b(ahora ?? "?")];
         break;
       }
       case "registro_publico.recibido":

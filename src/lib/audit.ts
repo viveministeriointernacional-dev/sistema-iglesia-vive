@@ -5,6 +5,9 @@ import type { ClientePrisma } from "@/lib/prisma";
 export type AccionAuditada =
   | "persona.registrada"
   | "consolidador.asignado"
+  // Cambio de consolidador ya existente. `metadata.origen` dice de qué lado
+  // nació: "sistema" o "highlevel" (ver src/lib/consolidador.ts).
+  | "consolidador.reasignado"
   | "operacion72.iniciada"
   | "operacion72.contacto_registrado"
   | "operacion72.visita_agendada"

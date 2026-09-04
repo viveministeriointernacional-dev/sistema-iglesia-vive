@@ -268,3 +268,52 @@ export async function exportarVisita(
     console.error("No se pudo exportar la visita a HighLevel", error);
   }
 }
+
+/// Escribe en HighLevel quién consolida a esta persona (el «usuario asignado»
+/// del contacto). Es la mitad «sistema → CRM» de la sincronización de doble vía
+/// descrita en `src/lib/consolidador.ts`.
+///
+/// Best-effort, como el resto de exportaciones: sin token no hace nada, y un
+/// fallo del CRM no deshace el cambio que ya quedó guardado en el sistema.
+/// Si el consolidador quedó en nulo, se manda `assignedTo` vacío para que allá
+/// también quede sin dueño.
+export async function exportarConsolidador(learnerId: string): Promise<void> {
+  const cred = await credenciales();
+  if (!cred) return;
+
+  try {
+    const prisma = await getPrisma();
+    const aprendiz = await prisma.learnerProfile.findUnique({
+      where: { id: learnerId },
+      select: {
+        consolidator: { select: { highlevelUserId: true } },
+        person: {
+          select: {
+            highLevelContacts: {
+              take: 1,
+              orderBy: { createdAt: "asc" },
+              select: { contactId: true },
+            },
+          },
+        },
+      },
+    });
+
+    const contactId = aprendiz?.person.highLevelContacts[0]?.contactId ?? null;
+    if (!contactId) return;
+
+    // Un consolidador sin id de HighLevel no existe para el CRM: mejor no
+    // tocar nada que borrarle el dueño al contacto por error.
+    const consolidador = aprendiz?.consolidator;
+    if (consolidador && !consolidador.highlevelUserId) return;
+
+    await pedir(
+      `/contacts/${contactId}`,
+      "PUT",
+      { assignedTo: consolidador?.highlevelUserId ?? "" },
+      cred.token,
+    );
+  } catch (error) {
+    console.error("No se pudo exportar el consolidador a HighLevel", error);
+  }
+}
