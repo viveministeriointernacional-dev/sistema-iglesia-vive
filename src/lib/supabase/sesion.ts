@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const RUTAS_PUBLICAS = [
   "/registro",
+  "/actualizar-datos",
   "/ingresar",
   "/recuperar",
   "/nueva-clave",
