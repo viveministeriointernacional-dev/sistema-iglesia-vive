@@ -211,6 +211,42 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-04** — **Consolidador: sincronización de DOBLE VÍA con HighLevel**
+  (decisión del usuario: «que se sincronicen mutuamente; si se cambia acá, se
+  cambia allá, y viceversa»).
+  **Quién decide el consolidador: un flujo de HighLevel**, casi al instante del
+  registro. El sistema solo preguntaba **una vez, en el alta**, y nunca volvía a
+  escuchar ni a avisar.
+  - `sincronizarConsolidador` (`src/lib/consolidador.ts`) es ahora el **único**
+    camino para cambiar el consolidador. Audita `consolidador.reasignado` con
+    `metadata.origen` = `sistema` | `highlevel`.
+  - `exportarConsolidador` escribe el `assignedTo` del contacto cuando el cambio
+    nació acá. `consultarDuenoDelContacto` pregunta quién es el dueño.
+  - `POST /api/integraciones/highlevel/asignacion` recibe los cambios del CRM.
+    **Al paso Webhook le basta `contactId = {{contact.id}}`**: qué merge-tags
+    existen cambia entre versiones y disparadores (⚠️ **`{{contact.assigned_to}}`
+    NO existe en este panel** — lo confirmó el usuario), así que si el cuerpo no
+    trae usuario, el sistema **le pregunta a la API**, que es la respuesta
+    autorizada. Trigger: **«Contacto Modificado» → «Usuario asignado ha
+    cambiado»**.
+  - **El eco se corta con una sola regla**: si el valor que llega ya es el que
+    hay, no se escribe nada ni se devuelve nada. El segundo rebote se apaga solo.
+  - Un usuario de HighLevel sin mapear **no borra** el consolidador (422); si la
+    API no responde, tampoco se toca nada (503).
+  - ⚠️ **Requiere `HIGHLEVEL_API_TOKEN` en el Worker.** No aparecía en la
+    configuración, así que **toda la mitad «sistema → CRM» probablemente nunca
+    ha funcionado** (incluye `exportarDatosPersona`). Verificar en Cloudflare.
+  **Estado medido antes del arreglo** (414 fichas enlazadas): 186 coinciden,
+  **206 sin dueño en HighLevel** (193 son el import masivo de agosto, que nunca
+  pasó por el flujo) y **21 con dueño distinto** — las 21 son cambios hechos
+  **del lado del sistema** que nunca se le contaron al CRM.
+  **DECISIÓN DEL USUARIO: las de Johana Ramírez en el CRM se dejan quietas. No
+  volver a proponerlo ni recordarlo.**
+  **Lección de método:** `dateUpdated` de un contacto de HighLevel es la última
+  modificación **por cualquier motivo** — NO dice cuándo se asignó el usuario.
+  Deduje de ahí una «carrera» que no existía; la evidencia buena está en
+  `audit_log`, en `metadata.highLevelOwnerId` del `persona.registrada`.
+
 - **2026-09-04** — **Auditoría de las llamadas del día: 6 personas estaban en la
   columna equivocada; corregidas.** Se cruzaron los **33 envíos de formulario de
   hoy** (26 personas distintas) contra la columna real de cada tarjeta.
