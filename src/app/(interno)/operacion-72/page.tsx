@@ -76,20 +76,32 @@ function cuantasDesde(valor: string | undefined): number {
 export default async function TableroOperacion72({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; orden?: string; estado?: string; n?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    orden?: string;
+    estado?: string;
+    ampliada?: string;
+    n?: string;
+  }>;
 }) {
   const usuario = await requerirRol(ROLES_CONSOLIDACION);
   const {
     q: consultaCruda,
     orden: ordenCrudo,
     estado: estadoCrudo,
+    ampliada: ampliadaCruda,
     n: cuantasCrudas,
   } = await searchParams;
   const consulta = (consultaCruda ?? "").trim();
   const orden = ordenDesde(ordenCrudo);
   // Con un estado elegido el tablero muestra esa sola etapa a todo lo ancho.
   const estadoElegido = estadoDesde(estadoCrudo);
-  const cuantas = estadoElegido ? cuantasDesde(cuantasCrudas) : BLOQUE;
+  // Sin salir de las cinco columnas, «Ver 60 más» alarga UNA sola columna en su
+  // sitio. Las demás se quedan en 60: así el tablero no se mueve bajo los pies
+  // y la memoria del Worker solo crece por un lado.
+  const columnaAmpliada = estadoElegido ? null : estadoDesde(ampliadaCruda);
+  const cuantas =
+    estadoElegido || columnaAmpliada ? cuantasDesde(cuantasCrudas) : BLOQUE;
   const ahora = new Date();
   const prisma = await getPrisma();
 
@@ -132,7 +144,8 @@ export default async function TableroOperacion72({
   // Al elegir un estado solo se carga ESA columna, y ahí el botón «Ver 60 más»
   // puede subir el tope sin acercarse al límite: son cinco veces menos tarjetas
   // por página.
-  const LIMITE_POR_COLUMNA = cuantas;
+  const limiteDe = (estado: Operation72Status) =>
+    estadoElegido || columnaAmpliada === estado ? cuantas : BLOQUE;
 
   // Qué columnas se dibujan: todas, o solo la del estado elegido.
   const columnasVisibles = estadoElegido
@@ -182,12 +195,13 @@ export default async function TableroOperacion72({
     mentoresElegibles(prisma),
     ...columnasVisibles.map(async (columna) => {
       const base = { status: columna.estado, ...alcance, ...busqueda };
+      const limite = limiteDe(columna.estado);
 
       if (orden !== "urgencia") {
         return prisma.operation72.findMany({
           where: base,
           orderBy: { startedAt: orden === "reciente" ? "desc" : "asc" },
-          take: LIMITE_POR_COLUMNA,
+          take: limite,
           select: seleccionDeTarjeta,
         });
       }
@@ -200,11 +214,11 @@ export default async function TableroOperacion72({
       const dentroDePlazo = await prisma.operation72.findMany({
         where: { ...base, deadlineAt: { gte: ahora } },
         orderBy: { deadlineAt: "asc" },
-        take: LIMITE_POR_COLUMNA,
+        take: limite,
         select: seleccionDeTarjeta,
       });
 
-      const resto = LIMITE_POR_COLUMNA - dentroDePlazo.length;
+      const resto = limite - dentroDePlazo.length;
       if (resto <= 0) return dentroDePlazo;
 
       // Y después las vencidas, de la más reciente a la más antigua: una deuda
@@ -372,7 +386,11 @@ export default async function TableroOperacion72({
   });
 
   const totalEnCurso = [...totalPorEstado.values()].reduce((a, b) => a + b, 0);
-  const hayFiltro = Boolean(consulta) || orden !== "urgencia" || Boolean(estadoElegido);
+  const hayFiltro =
+    Boolean(consulta) ||
+    orden !== "urgencia" ||
+    Boolean(estadoElegido) ||
+    Boolean(columnaAmpliada);
 
   // Vista enfocada: cuántas se ven, cuántas hay y cuántas faltan.
   const totalDelEstado = estadoElegido ? (totalPorEstado.get(estadoElegido) ?? 0) : 0;
@@ -533,7 +551,8 @@ export default async function TableroOperacion72({
             return (
               <section
                 key={columna.estado}
-                className={estadoElegido ? "contents" : undefined}
+                id={estadoElegido ? undefined : `col-${columna.estado}`}
+                className={estadoElegido ? "contents" : "scroll-mt-4"}
               >
                 {estadoElegido ? null : (
                   <>
@@ -564,12 +583,18 @@ export default async function TableroOperacion72({
                       ) : null}
                     </div>
 
+                    {/* Sigue desplegando ESTA columna, sin cambiar de vista:
+                        suma otro bloque a las que ya están. El ancla devuelve
+                        el desplazamiento a la misma columna tras recargar. */}
                     {ocultas > 0 ? (
                       <Link
-                        href={enlace({ estado: columna.estado })}
+                        href={`${enlace({
+                          ampliada: columna.estado,
+                          n: String(limiteDe(columna.estado) + BLOQUE),
+                        })}#col-${columna.estado}`}
                         className="mt-[10px] block rounded-[9px] border border-borde-control bg-white px-3 py-[10px] text-center text-[11.5px] leading-[1.3] font-bold text-azul-700"
                       >
-                        Ver las {total}
+                        Ver {Math.min(BLOQUE, ocultas)} más
                         <span className="block font-semibold text-[rgba(19,28,36,.45)]">
                           mostrando {personas.length} de {total}
                         </span>
