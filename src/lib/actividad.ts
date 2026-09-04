@@ -397,6 +397,18 @@ export async function cargarActividad(
         if (observacion) filas.push({ k: "Resumen", v: observacion });
         break;
       }
+      case "operacion72.estado_corregido": {
+        tipo = "op72"; etiqueta = "OP 72"; tono = "azul";
+        const de = texto(m.de);
+        const a = texto(m.a);
+        frase = [t("Se corrigió la columna de "), P(), t(" · "), b(`${de ?? "?"} → ${a ?? "?"}`)];
+        tituloDetalle = "Por qué se corrigió";
+        if (de) filas.push({ k: "Estaba en", v: de });
+        if (a) filas.push({ k: "Pasa a", v: a });
+        observacion = texto(m.motivo);
+        if (observacion) filas.push({ k: "Motivo", v: observacion });
+        break;
+      }
       case "operacion72.entregada": {
         tipo = "mentoria"; etiqueta = "MENTORÍA"; tono = "verde";
         const mentor = usuario("mentorId");

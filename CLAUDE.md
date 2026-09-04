@@ -53,7 +53,10 @@ panel; antes este archivo decía «Paid» y era falso — de ahí parte de la le
 - **Secretos** (env del worker): se toman **solo en el rebuild**. Cambiar un
   secreto en el panel NO afecta la versión viva hasta un nuevo build.
 - **Configuración de build correcta** (Cloudflare → worker → Settings → Builds):
-  - **Build command:** `npx opennextjs-cloudflare build` (genera `.open-next/worker.js`).
+  - **Build command:** `npm run cf:build` (= `node scripts/migrar.mjs && opennextjs-cloudflare
+    build`: aplica migraciones y genera `.open-next/worker.js`). ⚠️ Si aquí se pone
+    solo `npx opennextjs-cloudflare build`, **las migraciones no corren** (fue el
+    bug de sep-2026).
   - **Deploy command:** `npx wrangler deploy` (sube **y activa** al 100%).
     ⚠️ `npx wrangler versions upload` **sube pero NO activa** → el sitio no cambia.
   - `wrangler.jsonc` ya incluye `build.command = npx opennextjs-cloudflare build`
@@ -141,8 +144,6 @@ panel; antes este archivo decía «Paid» y era falso — de ahí parte de la le
 
 ## 9. Pendientes / temas abiertos
 
-- **Activación del deploy**: confirmar que el «Deploy command» del panel sea
-  `npx wrangler deploy` (no `versions upload`) para que la versión se active.
 - **Lentitud**: Cloudflare está en Workers Paid, pero **Supabase está en FREE**
   (compute más pequeño y sin pooler dedicado). Palancas: subir Supabase a Pro, o
   **Hyperdrive** (cachea el pool de conexiones a Supabase en el borde). Plantilla
@@ -150,6 +151,8 @@ panel; antes este archivo decía «Paid» y era falso — de ahí parte de la le
 - **Registros de HighLevel**: si dejan de entrar, revisar que el workflow de
   registro esté activo y enviando; algunos llegan y se marcan «duplicado» (409).
 - Rotar el `HIGHLEVEL_WEBHOOK_SECRET` (estuvo expuesto en capturas).
+- **Tabla huérfana `inbound_registration`** en Supabase: ya no está en el modelo
+  de Prisma. No estorba; se puede borrar cuando el usuario lo autorice.
 
 ## 10. Reglas duras
 
@@ -167,7 +170,86 @@ panel; antes este archivo decía «Paid» y era falso — de ahí parte de la le
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
-- **2026-09-04** — **Verificación de estado.** La tabla **`email_sent` ya existe**
+- **2026-09-04** — **Recorrido de Operación 72 revisado punta a punta + limpieza
+  de datos.** El código hace exactamente lo que el usuario describe: registro →
+  **INICIADA**; llamada **no contestó → SEGUIMIENTO**, **contestó → CONTACTADA**;
+  formulario de visita → **VISITA PENDIENTE**; cerrar visita →
+  **LISTA PARA ENTREGA**; entregar → sale del tablero. Igual por los dos
+  caminos (tablero y webhook del CRM). Detalle correcto y deliberado: **una vez
+  CONTACTADA, un «no contestó» posterior NO la devuelve a SEGUIMIENTO** (queda
+  en el historial; ya se habló con ella).
+  **Dos bolsas de datos viejos encontradas en CONTACTADA (eran 292):**
+  1. **35 personas corregidas → SEGUIMIENTO.** Su única llamada era «No
+     contestó» (24-ago) y nunca contestaron; quedaron en CONTACTADA porque la
+     columna SEGUIMIENTO **no existía** entonces. Auditadas con la acción nueva
+     `operacion72.estado_corregido` (catálogo en `audit.ts` + `case` en
+     `actividad.ts`). Reparto: Freddy Cadena 9, Carlos Suárez 7, Santiago
+     Viveros 4, Nini Guerrón 4, Jakeline Guerrero 4, Johanna Quintero 3,
+     Emelin Parra 2, Laura Charry 1, Ruth Bonilla 1.
+  2. **184 personas del import masivo del 26-ago** («Primera llamada (importado
+     de HighLevel)», `outcome` NULL: no se sabe si contestaron).
+     **DECISIÓN DEL USUARIO (4-sep): se quedan en CONTACTADA, no se tocan.**
+     No volver a proponerlo.
+  Tablero tras la corrección: INICIADA 60 · SEGUIMIENTO 36 · CONTACTADA 257 ·
+  VISITA PENDIENTE 6 · LISTA PARA ENTREGA 0.
+  **Consulta útil para auditar el tablero** (última llamada por operación):
+  `distinct on (operation72_id) … order by operation72_id, occurred_at desc`.
+
+- **2026-09-04** — **Visitas desde el CRM: VIVO y probado punta a punta.** Se llenó
+  el formulario real y la tarjeta de Valeria Atencio pasó sola a
+  **VISITA_PENDIENTE** («Visita 5 de sept · virtual»), con dos `contact_attempt`:
+  la llamada de la línea (CONTESTO_BIEN + observación completa) y la visita
+  agendada (`is_virtual = true`). **No hizo falta mapear NADA en Custom Data**:
+  la acción Webhook de HighLevel manda el contacto completo y el parser
+  (`indiceDeCampos`) lo encuentra en `customFields` / `customData` / `data` /
+  `contact` / raíz, reconociendo cada campo por etiqueta, clave o id.
+  **Configuración final del workflow** (se le añadió el paso Webhook al workflow
+  **ya existente** `Se llenó Formulario Registro Llamada Línea`, en vez de crear
+  uno nuevo): POST a `…/api/integraciones/highlevel/visita`, header
+  `x-iglesia-webhook-secret`, **Custom Data vacío**.
+  **Tres trampas que costaron el rato** (revisar estas primero si algo falla):
+  1. **Nombres de formulario casi idénticos.** La URL
+     `micasavive.com/registro/primera-llamada/linea` aloja el formulario
+     **«Registro Llamada Línea»** (`07rGKuRchJO15bxL2Unj`), **NO** «Primera
+     Llamada» (`vBWEMOXsEg2Bq5affr7H`). El trigger apuntaba al equivocado.
+  2. **Workflow en `draft`.** No dispara aunque todo lo demás esté bien.
+     Verificable desde aquí: `GET services.leadconnectorhq.com/workflows/?locationId=…`
+     con el PIT — devuelve nombre y `status` de los 35 workflows (pero **no** los
+     pasos internos: el paso Webhook solo se comprueba enviando el formulario).
+  3. **URL equivocada.** `/registro-nuevo` es para altas; visitas van a `/visita`;
+     llamadas del CRM a `/llamada`.
+  Los envíos del formulario se pueden auditar con
+  `GET /forms/submissions?locationId=…` y los ids con `GET /forms/?locationId=…`.
+  Detalle menor: la fecha de visita queda a mediodía Colombia porque el
+  formulario solo captura el día, no la hora.
+
+- **2026-09-04** — **Migraciones automáticas VIVAS y verificadas** (PR #57).
+  Tras fusionar, el build creó `app_migration` con **27 filas** (26 registradas
+  sin ejecutar + `20260903230000_correo_enviado` aplicada) en 2 s. Desde ahora,
+  **crear la carpeta de migración y fusionar a `main` basta**: nadie entra a
+  Supabase. Lo que faltaba era esto:
+  1. **El «Build command» del panel** era `npx opennextjs-cloudflare build`, que
+     **no** ejecuta `scripts/migrar.mjs`. Ahora es **`npm run cf:build`**.
+  2. **El secreto de build `DATABASE_URL`** no existía (Settings → Builds →
+     Variables and secrets). Es **distinto** del secreto de runtime; tener uno no
+     pone el otro.
+  3. **La migración de `email_sent` no era idempotente.** La tabla ya existía
+     (creada a mano) y el registro estaba vacío → el script iba a hacer
+     `CREATE TABLE` sobre algo existente → build caído y **sitio sin desplegar**.
+     Ahora usa `IF NOT EXISTS`. **REGLA: toda migración nueva debe poder
+     repetirse sin romper** (`IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`, etc.).
+  4. `pg` pasó a **dependencia directa** en `package.json` (antes llegaba de
+     rebote con `@prisma/adapter-pg`).
+  **Cómo diagnosticar esto en el futuro:** si `app_migration` **no existe**, el
+  script **nunca arrancó** (la crea en su primera instrucción, antes de aplicar
+  nada). Si existe pero le falta una migración, esa falló.
+  **Ojo con el panel de Cloudflare:** guardar un secreto crea una «versión» del
+  Worker pero **NO dispara un build**; y «Deployment History» solo lista
+  despliegues activados, así que los builds de rama no aparecen ahí. La vía
+  segura para forzar el build sigue siendo **fusionar a `main`**.
+
+- **2026-09-04** — **Verificación de estado** (diagnóstico; el desenlace está en
+  la entrada de arriba). La tabla **`email_sent` ya existe**
   en Supabase (11 columnas + los 3 índices de la migración) y **ya tiene copias
   de correo guardadas**, así que la vista previa de correos en «Actividad del
   día» funciona. **Pero la tabla `app_migration` NO existe**: eso significa que
@@ -302,8 +384,9 @@ panel; antes este archivo decía «Paid» y era falso — de ahí parte de la le
      resultado+fecha). Añadido a `RUTAS_PUBLICAS`. Auditoría
      `highlevel.seguimiento_recibido`. `secretoValido` ahora vive en
      `src/lib/webhook.ts` (las tres rutas lo comparten).
-  **Pendiente del usuario:** crear en HighLevel el workflow con trigger
-  «Formulario enviado» (Registro Visita) → acción Webhook a esa URL con
+  **RESUELTO el 4-sep-2026** (ver entrada de arriba). Quedó así en HighLevel:
+  workflow `Se llenó Formulario Registro Llamada Línea` (publicado) → paso
+  Webhook a esa URL, **sin Custom Data**. Lo de abajo era el plan original con
   `contactId={{contact.id}}`, `locationId={{location.id}}`, `phone`, `email`,
   `formName` y los campos «Confirmación de visita», «Fecha visita», «Estado
   Primera Llamada Linea», «Fecha Primera Llamada Linea», «Observación Primera
