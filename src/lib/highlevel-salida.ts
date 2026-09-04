@@ -317,3 +317,36 @@ export async function exportarConsolidador(learnerId: string): Promise<void> {
     console.error("No se pudo exportar el consolidador a HighLevel", error);
   }
 }
+
+/// Le pregunta a HighLevel quién es el dueño de un contacto.
+///
+/// El webhook de asignación no puede depender de un merge-tag: qué etiquetas
+/// existen cambia entre versiones del CRM y entre disparadores, y una que no
+/// resuelve llega vacía sin avisar. Con el `contactId` —que sí llega siempre—
+/// se le pregunta a la API, que es la respuesta autorizada.
+///
+/// Devuelve el id de usuario de HighLevel, o `null` si el contacto no tiene
+/// dueño. Lanza si no se pudo preguntar, para poder distinguir «no tiene
+/// dueño» de «no pude averiguarlo».
+export async function consultarDuenoDelContacto(
+  contactId: string,
+): Promise<string | null> {
+  const cred = await credenciales();
+  if (!cred) throw new Error("Sin credenciales de HighLevel");
+
+  const respuesta = await fetch(`${BASE}/contacts/${contactId}`, {
+    headers: {
+      Authorization: `Bearer ${cred.token}`,
+      Version: VERSION,
+      Accept: "application/json",
+    },
+  });
+  if (!respuesta.ok) {
+    throw new Error(`HighLevel GET /contacts/${contactId} → ${respuesta.status}`);
+  }
+  const cuerpo = (await respuesta.json()) as {
+    contact?: { assignedTo?: unknown };
+  };
+  const dueno = cuerpo.contact?.assignedTo;
+  return typeof dueno === "string" && dueno.trim() ? dueno.trim() : null;
+}

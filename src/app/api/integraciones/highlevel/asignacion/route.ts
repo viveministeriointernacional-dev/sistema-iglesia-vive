@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { sincronizarConsolidador } from "@/lib/consolidador";
 import { variableDeEntorno } from "@/lib/entorno";
+import { consultarDuenoDelContacto } from "@/lib/highlevel-salida";
 import { getPrisma } from "@/lib/prisma";
 import { secretoValido } from "@/lib/webhook";
 
@@ -37,9 +38,12 @@ function primero(objeto: Record<string, unknown>, ...claves: string[]) {
 /// corta en `sincronizarConsolidador`: si el valor que llega ya es el que hay,
 /// no se escribe nada ni se devuelve nada.
 ///
-/// Mapeo en el paso Webhook de HighLevel:
-///   contactId = {{contact.id}} · userId = {{contact.assigned_to}}
-/// (también se aceptan `assignedTo` / `ownerId` por si el flujo los manda así).
+/// **Mapeo en el paso Webhook de HighLevel: basta `contactId = {{contact.id}}`.**
+/// Qué merge-tags existen cambia entre versiones del CRM y entre disparadores,
+/// así que el dueño NO se toma del cuerpo salvo que venga: si el cuerpo no
+/// trae un usuario utilizable, se le pregunta a la API de HighLevel por el
+/// contacto, que es la respuesta autorizada. Si el flujo sí manda el usuario
+/// (`userId`, `assignedTo`, `ownerId`…), se usa y se ahorra la consulta.
 export async function POST(request: Request) {
   const secreto = await variableDeEntorno("HIGHLEVEL_WEBHOOK_SECRET");
   if (!secreto) {
@@ -112,23 +116,44 @@ export async function POST(request: Request) {
     );
   }
 
-  const consolidador = highlevelUserId
+  // Si el cuerpo no trajo un usuario utilizable, se le pregunta a HighLevel.
+  // Ojo con la diferencia: «el contacto no tiene dueño» es un dato válido y se
+  // aplica; «no pude averiguarlo» no se aplica, para no borrar por un fallo de
+  // red lo que el sistema ya tenía bien.
+  let duenoEnCrm = highlevelUserId;
+  if (!duenoEnCrm) {
+    try {
+      duenoEnCrm = await consultarDuenoDelContacto(contactId);
+    } catch (error) {
+      console.error("No se pudo consultar el dueño del contacto", error);
+      return NextResponse.json(
+        {
+          ok: false,
+          estado: "no_se_pudo_consultar",
+          error: "No pudimos preguntarle a HighLevel quién es el dueño.",
+        },
+        { status: 503 },
+      );
+    }
+  }
+
+  const consolidador = duenoEnCrm
     ? await prisma.appUser.findUnique({
-        where: { highlevelUserId },
+        where: { highlevelUserId: duenoEnCrm },
         select: { id: true },
       })
     : null;
 
   // El contacto trae dueño pero ese usuario no está mapeado en el sistema:
   // dejarlo como está y avisar, en vez de borrarle el consolidador.
-  if (highlevelUserId && !consolidador) {
+  if (duenoEnCrm && !consolidador) {
     return NextResponse.json(
       {
         ok: false,
         estado: "usuario_sin_mapear",
         error:
           "Ese usuario de HighLevel no está enlazado a nadie del equipo (falta su highlevel_user_id).",
-        highlevelUserId,
+        highlevelUserId: duenoEnCrm,
       },
       { status: 422 },
     );
