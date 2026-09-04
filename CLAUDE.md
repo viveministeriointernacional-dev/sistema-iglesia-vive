@@ -91,6 +91,41 @@ panel; antes este archivo decía «Paid» y era falso — de ahí parte de la le
 
 ## 6. Integración HighLevel (webhooks)
 
+### Los TRES formularios públicos (mapa: link → formulario → webhook)
+
+**Esto es lo primero que hay que mirar cuando «algo no llega».** Los nombres se
+parecen muchísimo y ya nos costó tiempo dos veces.
+
+| Link público (micasavive.com) | Formulario en HighLevel | Campos propios (`contact.…`) | Webhook del sistema | Qué hace |
+|---|---|---|---|---|
+| `/registro/nuevo` | **Registro Nuevo** (`R3al3ZYXNvV72rNUFi4p`) | `gender`, `invitado_por`, `tipo_de_invitacion`, `iglesia_actual`, `telefono_2_whatsapp`, `hora_llamada`, `peticion_oracion` | `/registro-nuevo` | **Alta de persona nueva** → crea la ficha + Operación 72 en **INICIADA** y reparte consolidador. **Es el formulario que usa el equipo de consolidación** para meter gente nueva. |
+| `/registro/primera-llamada` | **Primera Llamada** (`vBWEMOXsEg2Bq5affr7H`) | `estado_primera_llamada` (**MULTIPLE_OPTIONS** → llega como arreglo), `observacion_primera_llamada_peticion`, `casa_de_fe` | `/visita` | **EL formulario de llamadas.** Contestó → CONTACTADA · no contestó → SEGUIMIENTO. |
+| `/registro/primera-llamada/linea` | **Registro Llamada Línea** (`07rGKuRchJO15bxL2Unj`) | `confirmacion_de_visita`, `fecha_visita` (+ `estado_primera_llamada_linea`, `fecha_…`, `observacion_…`) | `/visita` | **EL formulario de visitas** → VISITA PENDIENTE. Su nombre engaña: dice «Llamada Línea» pero se usa **solo para visitas**. |
+
+**Reparto definido por el usuario (4-sep) — cada formulario tiene UN oficio:**
+- `/registro/nuevo` → **registrar personas nuevas** (crea la Op72 en INICIADA).
+- `/registro/primera-llamada` → **registrar llamadas**, y es el **ÚNICO** para eso.
+- `/registro/primera-llamada/linea` → **registrar visitas**, y es **exclusivo** para eso.
+
+⚠️ **El nombre del tercero engaña**: el formulario se llama «Registro Llamada
+Línea» y la URL dice `primera-llamada`, pero **es el de visitas**. Sus campos de
+llamada (`estado_primera_llamada_linea`…) el parser los sigue aceptando como red
+de seguridad —si vienen, registran el intento y mueven la tarjeta igual—, pero
+en el uso real ese formulario se llena para agendar la visita.
+
+⚠️ **«Primera Llamada» y «Registro Llamada Línea» son formularios DISTINTOS con
+campos DISTINTOS.** `extraerVisita` (`highlevel.ts`) lee los dos juegos de
+campos, por etiqueta, clave o id. Si aparece un formulario nuevo, hay que
+añadir sus claves ahí o lo que se llene se descarta en silencio.
+
+**Regla de negocio (definida por el usuario, 4-sep):** el equipo de
+consolidación **NO tiene acceso a la plataforma**; trabaja solo con estos
+links. Por eso **el formulario es el registro**: es lo único que mueve la
+tarjeta. Las marcaciones del discador de HighLevel llegan a `call_log` y se ven
+en `/administracion/llamadas`, pero **NO mueven Operación 72** — son evidencia
+de que se llamó, y sirven para detectar a quien marca pero no registra.
+
+
 - **Registro de personas:** `POST /api/integraciones/highlevel/registro-nuevo`.
   Header `x-iglesia-webhook-secret` = env `HIGHLEVEL_WEBHOOK_SECRET` (valor vive en
   Cloudflare, **no** en el repo). Workflow en HighLevel: «Se llenó Formulario
@@ -169,6 +204,32 @@ panel; antes este archivo decía «Paid» y era falso — de ahí parte de la le
 - Validar deploy sin credenciales: `npx wrangler deploy --dry-run --outdir /tmp/x`
 
 ## 12. Bitácora (añadir lo nuevo arriba)
+
+- **2026-09-04** — **El formulario del consolidador no movía nada** (caso María
+  Julieth Durán, +57 320 473 2415). La llamaron **3 veces** el 3 y 4 de sep
+  (Ana Lucía Gutiérrez, todas `no-answer`, en `call_log`) y su tarjeta seguía en
+  **INICIADA** sin un solo `contact_attempt`. Causa: `/registro/primera-llamada`
+  y `/registro/primera-llamada/linea` son **formularios distintos** y el parser
+  solo conocía los campos «…_linea» (ver el mapa de los tres formularios en §6).
+  Tres arreglos en un solo commit:
+  1. `extraerVisita` lee también `estado_primera_llamada` y
+     `observacion_primera_llamada_peticion`.
+  2. **`texto()` acepta arreglos**: `estado_primera_llamada` es
+     `MULTIPLE_OPTIONS` en HighLevel y llega como `["No contestó"]`, no como
+     texto — se leía vacío.
+  3. **Anti-duplicados sin fecha**: ese formulario no pregunta la fecha, así que
+     se usaba `new Date()` y la comparación exacta nunca coincidía → un reenvío
+     habría duplicado el intento. Sin fecha declarada el criterio pasa a ser
+     «mismo resultado en las últimas 12 h».
+  **PENDIENTE CRÍTICO del usuario:** agregarle el paso **Webhook** al workflow
+  que escucha «Primera Llamada» (parece `3. Formulario de Primera Llamada
+  Enviado`), apuntando a `/visita` con el header del secreto y **Custom Data
+  vacío**. **Mientras eso no exista, NINGUNA llamada llega al sistema** — y el
+  usuario confirmó (4-sep) que ese es el **único** formulario con el que se
+  registran llamadas. Tenía 5 envíos del 3-sep que nunca entraron. Esto explica
+  por qué el tablero se ve «congelado» aunque el equipo esté llamando.
+  **Ofrecido y NO construido:** guardar la respuesta de **«¿Desea iniciar Casa de
+  Fe?»** (`contact.casa_de_fe`), que hoy se descarta.
 
 - **2026-09-04** — **Recorrido de Operación 72 revisado punta a punta + limpieza
   de datos.** El código hace exactamente lo que el usuario describe: registro →
