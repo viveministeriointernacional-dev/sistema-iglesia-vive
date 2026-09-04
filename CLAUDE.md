@@ -100,11 +100,18 @@ parecen muchísimo y ya nos costó tiempo dos veces.
 |---|---|---|---|---|
 | `/registro/nuevo` | **Registro Nuevo** (`R3al3ZYXNvV72rNUFi4p`) | `gender`, `invitado_por`, `tipo_de_invitacion`, `iglesia_actual`, `telefono_2_whatsapp`, `hora_llamada`, `peticion_oracion` | `/registro-nuevo` | **Alta de persona nueva** → crea la ficha + Operación 72 en **INICIADA** y reparte consolidador. **Es el formulario que usa el equipo de consolidación** para meter gente nueva. |
 | `/registro/primera-llamada` | **Primera Llamada** (`vBWEMOXsEg2Bq5affr7H`) | `estado_primera_llamada` (**MULTIPLE_OPTIONS** → llega como arreglo), `observacion_primera_llamada_peticion`, `casa_de_fe` | `/visita` | **EL formulario de llamadas.** Contestó → CONTACTADA · no contestó → SEGUIMIENTO. |
-| `/registro/primera-llamada/linea` | **Registro Llamada Línea** (`07rGKuRchJO15bxL2Unj`) | `estado_primera_llamada_linea`, `fecha_primera_llamada_linea`, `observacion_primera_llamada_linea`, `confirmacion_de_visita`, `fecha_visita` | `/visita` | **Visitas de la línea** → VISITA PENDIENTE. Trae además campos de llamada, que el parser también acepta. |
+| `/registro/primera-llamada/linea` | **Registro Llamada Línea** (`07rGKuRchJO15bxL2Unj`) | `confirmacion_de_visita`, `fecha_visita` (+ `estado_primera_llamada_linea`, `fecha_…`, `observacion_…`) | `/visita` | **EL formulario de visitas** → VISITA PENDIENTE. Su nombre engaña: dice «Llamada Línea» pero se usa **solo para visitas**. |
 
-**Precisión del usuario (4-sep):** `/registro/primera-llamada` es el **ÚNICO**
-formulario con el que se registran llamadas. `/registro/primera-llamada/linea`
-es el de **visitas** de la línea (aunque también traiga campos de llamada).
+**Reparto definido por el usuario (4-sep) — cada formulario tiene UN oficio:**
+- `/registro/nuevo` → **registrar personas nuevas** (crea la Op72 en INICIADA).
+- `/registro/primera-llamada` → **registrar llamadas**, y es el **ÚNICO** para eso.
+- `/registro/primera-llamada/linea` → **registrar visitas**, y es **exclusivo** para eso.
+
+⚠️ **El nombre del tercero engaña**: el formulario se llama «Registro Llamada
+Línea» y la URL dice `primera-llamada`, pero **es el de visitas**. Sus campos de
+llamada (`estado_primera_llamada_linea`…) el parser los sigue aceptando como red
+de seguridad —si vienen, registran el intento y mueven la tarjeta igual—, pero
+en el uso real ese formulario se llena para agendar la visita.
 
 ⚠️ **«Primera Llamada» y «Registro Llamada Línea» son formularios DISTINTOS con
 campos DISTINTOS.** `extraerVisita` (`highlevel.ts`) lee los dos juegos de
