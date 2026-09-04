@@ -99,8 +99,12 @@ parecen muchísimo y ya nos costó tiempo dos veces.
 | Link público (micasavive.com) | Formulario en HighLevel | Campos propios (`contact.…`) | Webhook del sistema | Qué hace |
 |---|---|---|---|---|
 | `/registro/nuevo` | **Registro Nuevo** (`R3al3ZYXNvV72rNUFi4p`) | `gender`, `invitado_por`, `tipo_de_invitacion`, `iglesia_actual`, `telefono_2_whatsapp`, `hora_llamada`, `peticion_oracion` | `/registro-nuevo` | **Alta de persona nueva** → crea la ficha + Operación 72 en **INICIADA** y reparte consolidador. **Es el formulario que usa el equipo de consolidación** para meter gente nueva. |
-| `/registro/primera-llamada` | **Primera Llamada** (`vBWEMOXsEg2Bq5affr7H`) | `estado_primera_llamada` (**MULTIPLE_OPTIONS** → llega como arreglo), `observacion_primera_llamada_peticion`, `casa_de_fe` | `/visita` | Llamada del **consolidador**: contestó → CONTACTADA, no contestó → SEGUIMIENTO. |
-| `/registro/primera-llamada/linea` | **Registro Llamada Línea** (`07rGKuRchJO15bxL2Unj`) | `estado_primera_llamada_linea`, `fecha_primera_llamada_linea`, `observacion_primera_llamada_linea`, `confirmacion_de_visita`, `fecha_visita` | `/visita` | Llamada **y/o visita** de la línea: visita confirmada → VISITA PENDIENTE. |
+| `/registro/primera-llamada` | **Primera Llamada** (`vBWEMOXsEg2Bq5affr7H`) | `estado_primera_llamada` (**MULTIPLE_OPTIONS** → llega como arreglo), `observacion_primera_llamada_peticion`, `casa_de_fe` | `/visita` | **EL formulario de llamadas.** Contestó → CONTACTADA · no contestó → SEGUIMIENTO. |
+| `/registro/primera-llamada/linea` | **Registro Llamada Línea** (`07rGKuRchJO15bxL2Unj`) | `estado_primera_llamada_linea`, `fecha_primera_llamada_linea`, `observacion_primera_llamada_linea`, `confirmacion_de_visita`, `fecha_visita` | `/visita` | **Visitas de la línea** → VISITA PENDIENTE. Trae además campos de llamada, que el parser también acepta. |
+
+**Precisión del usuario (4-sep):** `/registro/primera-llamada` es el **ÚNICO**
+formulario con el que se registran llamadas. `/registro/primera-llamada/linea`
+es el de **visitas** de la línea (aunque también traiga campos de llamada).
 
 ⚠️ **«Primera Llamada» y «Registro Llamada Línea» son formularios DISTINTOS con
 campos DISTINTOS.** `extraerVisita` (`highlevel.ts`) lee los dos juegos de
@@ -210,10 +214,13 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
      se usaba `new Date()` y la comparación exacta nunca coincidía → un reenvío
      habría duplicado el intento. Sin fecha declarada el criterio pasa a ser
      «mismo resultado en las últimas 12 h».
-  **Pendiente del usuario:** agregarle el paso **Webhook** al workflow
-  `3. Formulario de Primera Llamada Enviado` (el que escucha «Primera Llamada»),
-  apuntando a `/visita`. Sin eso ese formulario sigue sin llegar: tiene 5 envíos
-  del 3-sep que nunca entraron.
+  **PENDIENTE CRÍTICO del usuario:** agregarle el paso **Webhook** al workflow
+  que escucha «Primera Llamada» (parece `3. Formulario de Primera Llamada
+  Enviado`), apuntando a `/visita` con el header del secreto y **Custom Data
+  vacío**. **Mientras eso no exista, NINGUNA llamada llega al sistema** — y el
+  usuario confirmó (4-sep) que ese es el **único** formulario con el que se
+  registran llamadas. Tenía 5 envíos del 3-sep que nunca entraron. Esto explica
+  por qué el tablero se ve «congelado» aunque el equipo esté llamando.
   **Ofrecido y NO construido:** guardar la respuesta de **«¿Desea iniciar Casa de
   Fe?»** (`contact.casa_de_fe`), que hoy se descarta.
 
