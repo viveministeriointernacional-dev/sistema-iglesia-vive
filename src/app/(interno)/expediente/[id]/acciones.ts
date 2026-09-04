@@ -10,6 +10,7 @@ import {
   Phase,
 } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
+import { fechaDeDia, hoyEnColombia } from "@/lib/dominio";
 import { auditar, encolarEventoIntegracion } from "@/lib/audit";
 import { ErrorDePermiso, obtenerUsuarioActual } from "@/lib/auth";
 import {
@@ -178,6 +179,10 @@ export async function registrarHito(
   learnerId: string,
   kind: MilestoneKind,
   detalle: string,
+  /// Cuándo ocurrió, como `AAAA-MM-DD`. Casi siempre se registra después del
+  /// hecho (un bautismo del mes pasado, un encuentro de febrero), así que la
+  /// fecha la pone quien registra y no puede ser la de hoy por defecto.
+  fecha: string,
 ): Promise<ResultadoSimple> {
   const { usuario, acceso } = await usuarioConAcceso(learnerId);
 
@@ -194,6 +199,16 @@ export async function registrarHito(
   }
 
   const ahora = new Date();
+  const ocurrioEl = fechaDeDia(fecha, ahora);
+  if (!ocurrioEl) {
+    return { ok: false, mensaje: "La fecha del hito no es válida." };
+  }
+  // Un hito no puede haber ocurrido mañana. Se compara contra el día en hora de
+  // Colombia, no contra el reloj del servidor (que va en UTC).
+  if (fecha > hoyEnColombia(ahora)) {
+    return { ok: false, mensaje: "La fecha del hito no puede ser futura." };
+  }
+
   const prisma = await getPrisma();
 
   await prisma.$transaction(async (tx) => {
@@ -203,13 +218,13 @@ export async function registrarHito(
         learnerId,
         kind,
         status: MilestoneStatus.COMPLETADO,
-        achievedAt: ahora,
+        achievedAt: ocurrioEl,
         detail: detalle.trim() || null,
         recordedById: usuario.id,
       },
       update: {
         status: MilestoneStatus.COMPLETADO,
-        achievedAt: ahora,
+        achievedAt: ocurrioEl,
         detail: detalle.trim() || null,
         recordedById: usuario.id,
       },
@@ -220,7 +235,7 @@ export async function registrarHito(
       action: "hito.registrado",
       entityType: "learner_profile",
       entityId: learnerId,
-      metadata: { hito: kind, etiqueta: ETIQUETA_HITO[kind] },
+      metadata: { hito: kind, etiqueta: ETIQUETA_HITO[kind], fecha },
     });
   });
 

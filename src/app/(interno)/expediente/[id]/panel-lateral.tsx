@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { MilestoneKind } from "@iglesia/prisma-client";
+import { hoyEnColombia } from "@/lib/dominio";
 import {
   agregarNota,
   registrarHito,
@@ -197,8 +198,10 @@ export function NotasPastorales({
 /// Marcar un hito deja fecha y responsable. Los hitos que dependen de autoridad
 /// pastoral no están en esta lista.
 export function RegistrarHito({ learnerId }: { learnerId: string }) {
+  const hoy = hoyEnColombia();
   const [abierto, setAbierto] = useState(false);
   const [kind, setKind] = useState<MilestoneKind>(MilestoneKind.ENCUENTRO);
+  const [fecha, setFecha] = useState(hoy);
   const [detalle, setDetalle] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [enCurso, iniciar] = useTransition();
@@ -206,12 +209,13 @@ export function RegistrarHito({ learnerId }: { learnerId: string }) {
   function guardar() {
     setError(null);
     iniciar(async () => {
-      const resultado = await registrarHito(learnerId, kind, detalle);
+      const resultado = await registrarHito(learnerId, kind, detalle, fecha);
       if (!resultado.ok) {
         setError(resultado.mensaje);
         return;
       }
       setDetalle("");
+      setFecha(hoy);
       setAbierto(false);
     });
   }
@@ -243,6 +247,20 @@ export function RegistrarHito({ learnerId }: { learnerId: string }) {
             </option>
           ))}
         </select>
+      </label>
+
+      {/* La fecha la pone quien registra: casi siempre el hito ya ocurrió
+          (un bautismo del mes pasado, un encuentro de febrero). Por defecto
+          hoy, y nunca en el futuro. */}
+      <label className="mt-3 block">
+        <span className="etiqueta-campo">Fecha del hito</span>
+        <input
+          type="date"
+          value={fecha}
+          max={hoy}
+          onChange={(evento) => setFecha(evento.target.value)}
+          className="campo font-medium"
+        />
       </label>
 
       <label className="mt-3 block">
