@@ -233,9 +233,20 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
     hay, no se escribe nada ni se devuelve nada. El segundo rebote se apaga solo.
   - Un usuario de HighLevel sin mapear **no borra** el consolidador (422); si la
     API no responde, tampoco se toca nada (503).
-  - ⚠️ **Requiere `HIGHLEVEL_API_TOKEN` en el Worker.** No aparecía en la
-    configuración, así que **toda la mitad «sistema → CRM» probablemente nunca
-    ha funcionado** (incluye `exportarDatosPersona`). Verificar en Cloudflare.
+  - **`HIGHLEVEL_API_TOKEN` SÍ existe en el Worker** (confirmado por el usuario
+    el 4-sep). Con él funciona la consulta a la API y la mitad «sistema → CRM».
+  **VIVO Y PROBADO EN PRODUCCIÓN (4-sep):**
+  1. Prueba propia: POST con **solo `contactId`** → el sistema consultó la API y
+     movió a **María Julieth Durán** de Jakeline Guerrero a **Ana Lucía
+     Gutiérrez** (que es quien de verdad la llamaba). El envío repetido devolvió
+     **`sin_cambios`**: el anti-eco funciona.
+  2. Prueba del usuario: cambió el usuario asignado de un contacto en HighLevel
+     y **el workflow disparó solo** — **Juan Felipe Rojas** pasó de Freddy Cadena
+     a **Santiago Viveros**, con `origen: highlevel` en la auditoría.
+  El usuario dejó el cuerpo con `contactId` + `userId`. **No se puede saber por
+  la bitácora cuál de los dos caminos trajo el dato** (merge-tag o consulta a la
+  API) y da igual: el resultado es el mismo, que era el objetivo de no depender
+  de la etiqueta.
   **Estado medido antes del arreglo** (414 fichas enlazadas): 186 coinciden,
   **206 sin dueño en HighLevel** (193 son el import masivo de agosto, que nunca
   pasó por el flujo) y **21 con dueño distinto** — las 21 son cambios hechos
