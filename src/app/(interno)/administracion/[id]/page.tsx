@@ -5,6 +5,9 @@ import { cargarPersonaAdmin } from "@/lib/administracion";
 import { nombreCompleto } from "@/lib/dominio";
 import { mentoresElegibles } from "@/lib/equipo";
 import { getPrisma } from "@/lib/prisma";
+import { ETIQUETA_ETAPA, ETIQUETA_ROL } from "@/lib/liderazgo";
+import { ZONA_HORARIA } from "@/lib/dominio";
+import { DeclaracionDeLiderazgo } from "./declaracion";
 import { EditorPersona } from "./editor";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +37,17 @@ export default async function PaginaPersonaAdmin({
   if (!persona) notFound();
 
   const aprendiz = persona.learnerProfile;
-  const mentores = aprendiz ? await mentoresElegibles(await getPrisma()) : [];
+  const prisma = await getPrisma();
+  const mentores = aprendiz ? await mentoresElegibles(prisma) : [];
+
+  // Lo que la persona declaró de sí misma en el formulario público de
+  // liderazgo y todavía nadie ha confirmado. Se muestra la más reciente: si
+  // llenó el formulario dos veces, lo que vale es lo último que dijo.
+  const declaracion = await prisma.leadershipDeclaration.findFirst({
+    where: { personId: persona.id, status: "PENDIENTE" },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, roles: true, declaredPhase: true, createdAt: true },
+  });
 
   return (
     <main className="px-5 py-7 pb-16 sm:px-[26px]">
@@ -57,6 +70,26 @@ export default async function PaginaPersonaAdmin({
             {persona.mentorActual ? ` · Mentor: ${persona.mentorActual}` : ""}
           </p>
         </header>
+
+        {declaracion ? (
+          <DeclaracionDeLiderazgo
+            personId={persona.id}
+            nombre={persona.nombre}
+            declaracion={{
+              id: declaracion.id,
+              roles: declaracion.roles.map((rol) => ETIQUETA_ROL[rol] ?? rol),
+              etapa: declaracion.declaredPhase
+                ? ETIQUETA_ETAPA[declaracion.declaredPhase] ??
+                  declaracion.declaredPhase
+                : null,
+              cuando: new Intl.DateTimeFormat("es-CO", {
+                timeZone: ZONA_HORARIA,
+                day: "numeric",
+                month: "long",
+              }).format(declaracion.createdAt),
+            }}
+          />
+        ) : null}
 
         <EditorPersona
           personId={persona.id}

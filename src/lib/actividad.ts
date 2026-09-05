@@ -648,6 +648,35 @@ export async function cargarActividad(
           : [A(), t(" reasignó a "), P(), t(" al consolidador "), b(ahora ?? "?")];
         break;
       }
+      case "liderazgo.datos_actualizados": {
+        tipo = "personas"; etiqueta = "LIDERAZGO"; tono = "azul";
+        const creada = m.creada === true;
+        const quien = texto(m.nombre) ?? "Alguien del liderazgo";
+        frase = [
+          b(quien),
+          t(creada
+            ? " se registró desde el formulario de liderazgo"
+            : " actualizó sus datos desde el formulario de liderazgo"),
+        ];
+        tituloDetalle = "Lo que llenó";
+        const hitos = Array.isArray(m.hitos) ? m.hitos : [];
+        if (hitos.length) filas.push({ k: "Hitos", v: hitos.join(" · ") });
+        const roles = Array.isArray(m.rolesDeclarados) ? m.rolesDeclarados : [];
+        if (roles.length) filas.push({ k: "Dice que sirve en", v: roles.join(", ") });
+        if (texto(m.etapaAplicada)) filas.push({ k: "Etapa", v: String(m.etapaAplicada) });
+        if (texto(m.etapaPendiente)) filas.push({ k: "Etapa declarada (sin confirmar)", v: String(m.etapaPendiente) });
+        const cambios = Array.isArray(m.cambios) ? m.cambios : [];
+        if (cambios.length) filas.push({ k: "Cambió", v: cambios.join(", ") });
+        break;
+      }
+      case "liderazgo.declaracion_confirmada":
+        tipo = "personas"; etiqueta = "LIDERAZGO"; tono = "verde";
+        frase = [A(), t(" confirmó lo que declaró "), P()];
+        break;
+      case "liderazgo.declaracion_descartada":
+        tipo = "personas"; etiqueta = "LIDERAZGO"; tono = "gris";
+        frase = [A(), t(" descartó lo que declaró "), P()];
+        break;
       case "registro_publico.recibido":
         tipo = "personas"; etiqueta = "REGISTRO"; tono = "azul";
         frase = [b("El formulario público"), t(" recibió un registro"), ...(sujeto ? [t(" de "), P()] : [])];
