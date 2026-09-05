@@ -11,6 +11,7 @@ import {
 import { HITOS_EDITABLES } from "@/lib/administracion";
 import { auditar } from "@/lib/audit";
 import { darDeBajaAprendiz } from "@/lib/baja";
+import { resolverDeclaracion } from "@/lib/liderazgo";
 import {
   DONDE_PUEDE_MENTOREAR,
   ErrorDePermiso,
@@ -636,5 +637,32 @@ export async function reactivar(learnerId: string): Promise<ResultadoAdmin> {
     revalidatePath("/administracion");
     revalidatePath("/administracion/dados-de-baja");
     return { ok: true };
+  });
+}
+
+/// Resuelve una declaración del formulario de liderazgo: confirmarla aplica los
+/// permisos y la etapa que la persona declaró; descartarla la archiva sin tocar
+/// nada. Solo administradores (ya lo exige `conAdmin`).
+export async function resolverDeclaracionDeLiderazgo(
+  declaracionId: string,
+  confirmar: boolean,
+  personId: string,
+): Promise<ResultadoAdmin> {
+  return conAdmin(async (usuario) => {
+    const prisma = await getPrisma();
+    const resultado = await resolverDeclaracion(prisma, {
+      declaracionId,
+      actorId: usuario.id,
+      confirmar,
+    });
+    if (!resultado.ok) return { ok: false, mensaje: resultado.mensaje };
+
+    revalidatePath(`/administracion/${personId}`);
+    return {
+      ok: true,
+      aviso: resultado.aplicado.includes("sin_cuenta")
+        ? "Confirmado, pero esta persona todavía no tiene acceso al sistema: créale la cuenta para que los permisos tengan dónde aplicarse."
+        : undefined,
+    };
   });
 }

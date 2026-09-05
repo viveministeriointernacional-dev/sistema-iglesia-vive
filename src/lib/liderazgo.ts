@@ -487,3 +487,126 @@ export async function guardarActualizacionDeLiderazgo(
     { timeout: 30_000, maxWait: 15_000 },
   );
 }
+
+export type ResultadoResolucion =
+  | { ok: true; aplicado: string[] }
+  | { ok: false; mensaje: string };
+
+/// Un administrador resuelve una declaración pendiente: **confirmar** aplica de
+/// verdad lo que la persona dijo, **descartar** la archiva sin tocar nada.
+///
+/// Al confirmar se hacen dos cosas que el formulario no podía hacer solo:
+/// 1. **Los permisos** (`can_lead_alpha`, `can_lead_faith_house`, `can_mentor`),
+///    y solo si la persona tiene cuenta en el sistema: sin cuenta no hay a qué
+///    ponérselos, y se avisa.
+/// 2. **La etapa**, con su `PhaseChange` — ahora sí hay un responsable humano
+///    que lo respalda, que es justo lo que faltaba para poder aplicarla.
+export async function resolverDeclaracion(
+  prisma: ClientePrisma,
+  entrada: { declaracionId: string; actorId: string; confirmar: boolean },
+): Promise<ResultadoResolucion> {
+  const declaracion = await prisma.leadershipDeclaration.findUnique({
+    where: { id: entrada.declaracionId },
+    select: {
+      id: true,
+      status: true,
+      roles: true,
+      declaredPhase: true,
+      person: {
+        select: {
+          id: true,
+          user: { select: { id: true } },
+          learnerProfile: { select: { id: true, phase: true } },
+        },
+      },
+    },
+  });
+  if (!declaracion) {
+    return { ok: false, mensaje: "Esa declaración ya no existe." };
+  }
+  if (declaracion.status !== "PENDIENTE") {
+    return { ok: false, mensaje: "Esa declaración ya fue resuelta." };
+  }
+
+  if (!entrada.confirmar) {
+    await prisma.leadershipDeclaration.update({
+      where: { id: declaracion.id },
+      data: {
+        status: "DESCARTADA",
+        reviewedById: entrada.actorId,
+        reviewedAt: new Date(),
+      },
+    });
+    await auditar(prisma, {
+      actorId: entrada.actorId,
+      action: "liderazgo.declaracion_descartada",
+      entityType: "person",
+      entityId: declaracion.person.id,
+      metadata: { roles: declaracion.roles },
+    });
+    return { ok: true, aplicado: [] };
+  }
+
+  const aplicado: string[] = [];
+
+  const permisos = declaracion.roles
+    .map((rol) => ROLES_DECLARABLES.find((r) => r.valor === rol)?.permiso)
+    .filter((permiso): permiso is NonNullable<typeof permiso> =>
+      Boolean(permiso),
+    );
+
+  if (permisos.length) {
+    if (declaracion.person.user) {
+      await prisma.appUser.update({
+        where: { id: declaracion.person.user.id },
+        data: Object.fromEntries(permisos.map((permiso) => [permiso, true])),
+      });
+      aplicado.push(...permisos);
+    } else {
+      // Sin cuenta no hay dónde poner los permisos. No es un fallo: se confirma
+      // lo demás y se avisa, para que quien administra le cree el acceso.
+      aplicado.push("sin_cuenta");
+    }
+  }
+
+  const aprendiz = declaracion.person.learnerProfile;
+  if (
+    declaracion.declaredPhase &&
+    aprendiz &&
+    aprendiz.phase !== declaracion.declaredPhase
+  ) {
+    await prisma.phaseChange.create({
+      data: {
+        learnerId: aprendiz.id,
+        fromPhase: aprendiz.phase,
+        toPhase: declaracion.declaredPhase,
+        decidedById: entrada.actorId,
+        note: "Confirmado desde el formulario de liderazgo",
+      },
+    });
+    await prisma.learnerProfile.update({
+      where: { id: aprendiz.id },
+      data: { phase: declaracion.declaredPhase, phaseStartedAt: new Date() },
+    });
+    aplicado.push(`etapa:${declaracion.declaredPhase}`);
+  }
+
+  await prisma.leadershipDeclaration.update({
+    where: { id: declaracion.id },
+    data: {
+      status: "CONFIRMADA",
+      reviewedById: entrada.actorId,
+      reviewedAt: new Date(),
+    },
+  });
+
+  await auditar(prisma, {
+    actorId: entrada.actorId,
+    action: "liderazgo.declaracion_confirmada",
+    entityType: "person",
+    entityId: declaracion.person.id,
+    metadata: { roles: declaracion.roles, aplicado },
+  });
+
+  return { ok: true, aplicado };
+}
