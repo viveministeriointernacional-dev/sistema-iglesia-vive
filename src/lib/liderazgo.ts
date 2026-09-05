@@ -6,6 +6,7 @@ import {
   Prisma,
 } from "@iglesia/prisma-client";
 import { auditar } from "@/lib/audit";
+import { exportarDatosPersona } from "@/lib/highlevel-salida";
 import { colaDeTelefono, nombreCompleto, ZONA_HORARIA } from "@/lib/dominio";
 import type { ClientePrisma } from "@/lib/prisma";
 
@@ -271,7 +272,7 @@ export async function guardarActualizacionDeLiderazgo(
   const existente = candidatas[0] ?? null;
   const cambios: { rotulo: string; valor: string }[] = [];
 
-  return prisma.$transaction(
+  const guardado = await prisma.$transaction(
     async (tx) => {
       let personId: string;
       let learnerId: string;
@@ -482,10 +483,29 @@ export async function guardarActualizacionDeLiderazgo(
         rolesDeclarados: roles.map((rol) => ETIQUETA_ROL[rol] ?? rol),
         etapaPendiente,
         etapaAplicada,
+        learnerId,
       };
     },
     { timeout: 30_000, maxWait: 15_000 },
   );
+
+  // El liderazgo también entra al CRM (decisión del usuario, 5-sep-2026): si la
+  // persona ya tiene contacto se le actualizan los datos, y si no lo tiene se le
+  // crea. `exportarDatosPersona` hace las dos cosas — crea el contacto cuando no
+  // hay enlace todavía.
+  //
+  // Va **fuera** de la transacción a propósito: es una llamada de red, y
+  // sostenerla dentro dejaría ocupada la única conexión de base de datos que
+  // tiene la petición. Y es best-effort, como todas las exportaciones: si el CRM
+  // falla, lo que se guardó en el sistema queda igual.
+  //
+  // Los hitos y la etapa NO se exportan: no existen en HighLevel.
+  const { learnerId: _learnerId, ...resultado } = guardado;
+  await exportarDatosPersona(_learnerId).catch((error) => {
+    console.error("No se pudo reflejar el registro de liderazgo en HighLevel", error);
+  });
+
+  return resultado;
 }
 
 export type ResultadoResolucion =
