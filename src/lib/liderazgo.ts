@@ -6,6 +6,7 @@ import {
   Prisma,
 } from "@iglesia/prisma-client";
 import { auditar } from "@/lib/audit";
+import { exportarDatosPersona } from "@/lib/highlevel-salida";
 import { colaDeTelefono, nombreCompleto, ZONA_HORARIA } from "@/lib/dominio";
 import type { ClientePrisma } from "@/lib/prisma";
 
@@ -271,7 +272,7 @@ export async function guardarActualizacionDeLiderazgo(
   const existente = candidatas[0] ?? null;
   const cambios: { rotulo: string; valor: string }[] = [];
 
-  return prisma.$transaction(
+  const guardado = await prisma.$transaction(
     async (tx) => {
       let personId: string;
       let learnerId: string;
@@ -482,10 +483,152 @@ export async function guardarActualizacionDeLiderazgo(
         rolesDeclarados: roles.map((rol) => ETIQUETA_ROL[rol] ?? rol),
         etapaPendiente,
         etapaAplicada,
+        learnerId,
       };
     },
     { timeout: 30_000, maxWait: 15_000 },
   );
+
+  // El liderazgo también entra al CRM (decisión del usuario, 5-sep-2026): si la
+  // persona ya tiene contacto se le actualizan los datos, y si no lo tiene se le
+  // crea. `exportarDatosPersona` hace las dos cosas — crea el contacto cuando no
+  // hay enlace todavía.
+  //
+  // Va **fuera** de la transacción a propósito: es una llamada de red, y
+  // sostenerla dentro dejaría ocupada la única conexión de base de datos que
+  // tiene la petición. Y es best-effort, como todas las exportaciones: si el CRM
+  // falla, lo que se guardó en el sistema queda igual.
+  //
+  // Los hitos y la etapa NO se exportan: no existen en HighLevel.
+  const { learnerId: _learnerId, ...resultado } = guardado;
+  await exportarDatosPersona(_learnerId).catch((error) => {
+    console.error("No se pudo reflejar el registro de liderazgo en HighLevel", error);
+  });
+
+  return resultado;
+}
+
+export type ResultadoResolucion =
+  | { ok: true; aplicado: string[] }
+  | { ok: false; mensaje: string };
+
+/// Un administrador resuelve una declaración pendiente: **confirmar** aplica de
+/// verdad lo que la persona dijo, **descartar** la archiva sin tocar nada.
+///
+/// Al confirmar se hacen dos cosas que el formulario no podía hacer solo:
+/// 1. **Los permisos** (`can_lead_alpha`, `can_lead_faith_house`, `can_mentor`),
+///    y solo si la persona tiene cuenta en el sistema: sin cuenta no hay a qué
+///    ponérselos, y se avisa.
+/// 2. **La etapa**, con su `PhaseChange` — ahora sí hay un responsable humano
+///    que lo respalda, que es justo lo que faltaba para poder aplicarla.
+export async function resolverDeclaracion(
+  prisma: ClientePrisma,
+  entrada: { declaracionId: string; actorId: string; confirmar: boolean },
+): Promise<ResultadoResolucion> {
+  const declaracion = await prisma.leadershipDeclaration.findUnique({
+    where: { id: entrada.declaracionId },
+    select: {
+      id: true,
+      status: true,
+      roles: true,
+      declaredPhase: true,
+      person: {
+        select: {
+          id: true,
+          user: { select: { id: true } },
+          learnerProfile: { select: { id: true, phase: true } },
+        },
+      },
+    },
+  });
+  if (!declaracion) {
+    return { ok: false, mensaje: "Esa declaración ya no existe." };
+  }
+  if (declaracion.status !== "PENDIENTE") {
+    return { ok: false, mensaje: "Esa declaración ya fue resuelta." };
+  }
+
+  if (!entrada.confirmar) {
+    await prisma.leadershipDeclaration.update({
+      where: { id: declaracion.id },
+      data: {
+        status: "DESCARTADA",
+        reviewedById: entrada.actorId,
+        reviewedAt: new Date(),
+      },
+    });
+    await auditar(prisma, {
+      actorId: entrada.actorId,
+      action: "liderazgo.declaracion_descartada",
+      entityType: "person",
+      entityId: declaracion.person.id,
+      metadata: { roles: declaracion.roles },
+    });
+    return { ok: true, aplicado: [] };
+  }
+
+  const aplicado: string[] = [];
+
+  const permisos = declaracion.roles
+    .map((rol) => ROLES_DECLARABLES.find((r) => r.valor === rol)?.permiso)
+    .filter((permiso): permiso is NonNullable<typeof permiso> =>
+      Boolean(permiso),
+    );
+
+  if (permisos.length) {
+    if (declaracion.person.user) {
+      await prisma.appUser.update({
+        where: { id: declaracion.person.user.id },
+        data: Object.fromEntries(permisos.map((permiso) => [permiso, true])),
+      });
+      aplicado.push(...permisos);
+    } else {
+      // Sin cuenta no hay dónde poner los permisos. No es un fallo: se confirma
+      // lo demás y se avisa, para que quien administra le cree el acceso.
+      aplicado.push("sin_cuenta");
+    }
+  }
+
+  const aprendiz = declaracion.person.learnerProfile;
+  if (
+    declaracion.declaredPhase &&
+    aprendiz &&
+    aprendiz.phase !== declaracion.declaredPhase
+  ) {
+    await prisma.phaseChange.create({
+      data: {
+        learnerId: aprendiz.id,
+        fromPhase: aprendiz.phase,
+        toPhase: declaracion.declaredPhase,
+        decidedById: entrada.actorId,
+        note: "Confirmado desde el formulario de liderazgo",
+      },
+    });
+    await prisma.learnerProfile.update({
+      where: { id: aprendiz.id },
+      data: { phase: declaracion.declaredPhase, phaseStartedAt: new Date() },
+    });
+    aplicado.push(`etapa:${declaracion.declaredPhase}`);
+  }
+
+  await prisma.leadershipDeclaration.update({
+    where: { id: declaracion.id },
+    data: {
+      status: "CONFIRMADA",
+      reviewedById: entrada.actorId,
+      reviewedAt: new Date(),
+    },
+  });
+
+  await auditar(prisma, {
+    actorId: entrada.actorId,
+    action: "liderazgo.declaracion_confirmada",
+    entityType: "person",
+    entityId: declaracion.person.id,
+    metadata: { roles: declaracion.roles, aplicado },
+  });
+
+  return { ok: true, aplicado };
 }
 
 export type ResultadoResolucion =

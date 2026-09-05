@@ -211,6 +211,21 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-05** — **El formulario de liderazgo ahora SÍ escribe en HighLevel**
+  (decisión del usuario: exportar todo, crear y actualizar).
+  Se había quedado sin exportar nada, a diferencia de los otros tres caminos que
+  crean o actualizan el contacto. Ahora `guardarActualizacionDeLiderazgo` llama
+  a `exportarDatosPersona` **fuera de la transacción** (es red: sostenerla dentro
+  dejaría ocupada la única conexión de BD de la petición) y best-effort.
+  `exportarDatosPersona` cubre los dos casos por sí sola: si ya hay enlace
+  actualiza el contacto, y si no lo hay llama a `exportarContactoNuevo`, que usa
+  **`/contacts/upsert`** — así un líder que ya existe en el CRM se reconoce por
+  teléfono o correo y **no se duplica**.
+  **Los hitos y la etapa NO se exportan**: no existen en HighLevel.
+  Consecuencia asumida: el liderazgo queda mezclado con los contactos de
+  consolidación en el CRM. Se le ofrecieron al usuario tres opciones (no
+  exportar / exportar todo / solo actualizar sin crear) y eligió exportar todo.
+
 - **2026-09-04** — **Consolidador: sincronización de DOBLE VÍA con HighLevel**
   (decisión del usuario: «que se sincronicen mutuamente; si se cambia acá, se
   cambia allá, y viceversa»).
