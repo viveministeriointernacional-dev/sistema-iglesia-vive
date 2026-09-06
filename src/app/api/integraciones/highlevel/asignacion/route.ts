@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auditar } from "@/lib/audit";
 import { sincronizarConsolidador } from "@/lib/consolidador";
 import { variableDeEntorno } from "@/lib/entorno";
 import { consultarDuenoDelContacto } from "@/lib/highlevel-salida";
@@ -146,7 +147,19 @@ export async function POST(request: Request) {
 
   // El contacto trae dueño pero ese usuario no está mapeado en el sistema:
   // dejarlo como está y avisar, en vez de borrarle el consolidador.
+  //
+  // Se AUDITA además de responder: la respuesta del webhook se la queda
+  // HighLevel y nadie la ve, así que un id mal copiado puede pasar semanas sin
+  // que nadie note que las asignaciones de esa persona no están entrando. Pasó
+  // con Nora Bonilla (una `l` donde iba una `I`, 6-sep-2026).
   if (duenoEnCrm && !consolidador) {
+    await auditar(prisma, {
+      actorId: null,
+      action: "highlevel.usuario_sin_mapear",
+      entityType: "learner_profile",
+      entityId: learnerId,
+      metadata: { highlevelUserId: duenoEnCrm, contactId },
+    });
     return NextResponse.json(
       {
         ok: false,

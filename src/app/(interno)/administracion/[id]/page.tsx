@@ -5,7 +5,7 @@ import { cargarPersonaAdmin } from "@/lib/administracion";
 import { nombreCompleto } from "@/lib/dominio";
 import { mentoresElegibles } from "@/lib/equipo";
 import { getPrisma } from "@/lib/prisma";
-import { ETIQUETA_ETAPA, ETIQUETA_ROL } from "@/lib/liderazgo";
+import { ETIQUETA_ETAPA, ETIQUETA_ROL } from "@/lib/liderazgo-catalogo";
 import { ZONA_HORARIA } from "@/lib/dominio";
 import { DeclaracionDeLiderazgo } from "./declaracion";
 import { EditorPersona } from "./editor";

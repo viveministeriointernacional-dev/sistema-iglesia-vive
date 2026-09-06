@@ -44,6 +44,10 @@ export type AccionAuditada =
   | "highlevel.contacto_vinculado"
   | "highlevel.registro_repetido"
   | "highlevel.seguimiento_recibido"
+  // El CRM asignó un usuario que no está enlazado a nadie del equipo. No se
+  // toca el consolidador, pero queda a la vista en «Actividad del día» en vez
+  // de perderse en la respuesta del webhook.
+  | "highlevel.usuario_sin_mapear"
   | "registro_publico.recibido"
   // Formulario público del liderazgo: la persona actualiza su propia ficha y
   // declara sus hitos. Lo que dice que hace queda pendiente de confirmar.

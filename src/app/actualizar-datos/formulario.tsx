@@ -6,7 +6,7 @@ import {
   HITOS_DECLARABLES,
   NOMBRES_DE_MES,
   ROLES_DECLARABLES,
-} from "@/lib/liderazgo";
+} from "@/lib/liderazgo-catalogo";
 import { guardarDatosDeLiderazgo, type EstadoLiderazgo } from "./acciones";
 
 const INICIAL: EstadoLiderazgo = { fase: "vacio" };
