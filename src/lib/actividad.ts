@@ -677,6 +677,18 @@ export async function cargarActividad(
         tipo = "personas"; etiqueta = "LIDERAZGO"; tono = "gris";
         frase = [A(), t(" descartó lo que declaró "), P()];
         break;
+      case "highlevel.usuario_sin_mapear":
+        tipo = "crm"; etiqueta = "CRM"; tono = "rojo";
+        frase = [
+          b("HighLevel"),
+          t(" asignó "),
+          P(),
+          t(" a un usuario que no está enlazado con nadie del equipo. No se cambió el consolidador."),
+        ];
+        tituloDetalle = "Hay que enlazar ese usuario";
+        if (texto(m.highlevelUserId)) filas.push({ k: "Id en HighLevel", v: String(m.highlevelUserId) });
+        if (texto(m.contactId)) filas.push({ k: "Contacto", v: String(m.contactId) });
+        break;
       case "registro_publico.recibido":
         tipo = "personas"; etiqueta = "REGISTRO"; tono = "azul";
         frase = [b("El formulario público"), t(" recibió un registro"), ...(sujeto ? [t(" de "), P()] : [])];
