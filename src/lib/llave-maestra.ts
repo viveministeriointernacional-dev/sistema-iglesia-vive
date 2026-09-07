@@ -17,9 +17,22 @@ export { LARGO_MINIMO_LLAVE };
 /// huella no se puede volver al valor, y probar a fuerza bruta cuesta caro por
 /// las iteraciones.
 
-/// Cuántas vueltas da el derivado. Sube el costo de probar llaves a ciegas sin
-/// que se note al ingresar (es una sola verificación por intento).
-const ITERACIONES = 210_000;
+/// ⚠️ **Cloudflare Workers no acepta más de 100 000 iteraciones de PBKDF2** en
+/// una sola llamada: por encima de ahí `crypto.subtle.deriveBits` lanza
+/// `NotSupportedError: Pbkdf2 failed: iteration counts above 100000 are not
+/// supported`. Es un tope duro del runtime, para que nadie use el Worker como
+/// quemador de CPU. Poner 210 000 (la recomendación de OWASP) tumbaba la acción
+/// de guardar con un error de servidor — pasó en producción el 7-sep-2026.
+///
+/// El rodeo es **encadenar rondas**: cada ronda deriva 100 000 iteraciones y su
+/// salida alimenta la siguiente, así el costo total sí sube por encima del tope
+/// sin pedirle a una sola llamada más de lo que admite.
+const ITERACIONES_POR_RONDA = 100_000;
+const RONDAS = 2;
+
+/// Lo que se guarda en la fila, para poder verificar una llave vieja aunque
+/// mañana cambien las rondas.
+const ITERACIONES = ITERACIONES_POR_RONDA * RONDAS;
 
 function aHex(datos: ArrayBuffer): string {
   return Array.from(new Uint8Array(datos))
@@ -27,22 +40,36 @@ function aHex(datos: ArrayBuffer): string {
     .join("");
 }
 
+/// Deriva la huella en tantas rondas de 100 000 como haga falta para sumar
+/// `iteraciones`. La primera ronda parte de la llave escrita; cada una de las
+/// siguientes parte del resultado de la anterior.
+///
+/// `iteraciones` viene de la fila, no de la constante: si mañana se suben las
+/// rondas, las llaves ya guardadas se siguen verificando con las suyas.
 async function derivar(valor: string, salHex: string, iteraciones: number) {
   const sal = Uint8Array.from(
     salHex.match(/.{2}/g)?.map((par) => Number.parseInt(par, 16)) ?? [],
   );
-  const material = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(valor),
-    "PBKDF2",
-    false,
-    ["deriveBits"],
-  );
-  const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt: sal, iterations: iteraciones, hash: "SHA-256" },
-    material,
-    256,
-  );
+
+  let semilla: BufferSource = new TextEncoder().encode(valor);
+  let bits: ArrayBuffer | null = null;
+
+  for (let restantes = iteraciones; restantes > 0; ) {
+    const vuelta = Math.min(ITERACIONES_POR_RONDA, restantes);
+    const material = await crypto.subtle.importKey("raw", semilla, "PBKDF2", false, [
+      "deriveBits",
+    ]);
+    bits = await crypto.subtle.deriveBits(
+      { name: "PBKDF2", salt: sal, iterations: vuelta, hash: "SHA-256" },
+      material,
+      256,
+    );
+    semilla = new Uint8Array(bits);
+    restantes -= vuelta;
+  }
+
+  // Solo pasa con `iteraciones` <= 0, que no se guarda nunca.
+  if (!bits) throw new Error("La llave maestra no se pudo derivar.");
   return aHex(bits);
 }
 

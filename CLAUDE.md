@@ -211,6 +211,46 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-07** — **⚠️ La llave maestra no se podía guardar: Cloudflare limita
+  PBKDF2 a 100 000 iteraciones.** Al pulsar «Guardar la llave maestra» salía la
+  pantalla negra «This page couldn't load · A server error occurred».
+  **Causa:** puse **210 000** iteraciones (la recomendación de OWASP) y el
+  runtime de Workers **no acepta más de 100 000 en una sola llamada**:
+  `crypto.subtle.deriveBits` lanza
+  `NotSupportedError: Pbkdf2 failed: iteration counts above 100000 are not
+  supported`. Es un tope duro de workerd para que nadie use el Worker como
+  quemador de CPU ([workerd#1346](https://github.com/cloudflare/workerd/issues/1346)).
+  **Arreglo: rondas encadenadas.** `derivar` da tantas vueltas de 100 000 como
+  haga falta, y la salida de cada una alimenta la siguiente. Hoy **2 rondas =
+  200 000 iteraciones** efectivas, sin que ninguna llamada pase del tope. El
+  total se guarda en `master_key.iterations` y la verificación usa **el de la
+  fila**, no la constante, así que subir las rondas mañana no invalida las
+  llaves ya guardadas.
+  **Probado**: misma llave → misma huella, otra llave → otra huella, 110 ms.
+  **No hubo que migrar nada**: la tabla estaba vacía (nunca se llegó a guardar
+  ninguna llave).
+  **REGLA para todo lo que use `crypto.subtle` en este proyecto: el tope de
+  PBKDF2 en Workers es 100 000 por llamada.** `tsc` y `cf:build` NO lo ven — es
+  un error de ejecución, no de compilación.
+
+- **2026-09-07** — **Generador de claves en los tres sitios que faltaban.**
+  `generarContrasena` (`src/lib/contrasena.ts`) ya existía pero **solo se usaba
+  en «Restablecer contraseña»**. Los demás campos eran texto pelado, así que la
+  clave salía o muy corta (el sistema la rechazaba) o adivinable.
+  - Componente compartido **`src/components/generador-de-clave.tsx`**: botón
+    «Generar una» + «Copiar», y **muestra el valor en claro** a propósito — hay
+    que poder leerlo para dictarlo antes de guardarlo.
+  - Puesto en: **Crear acceso** (administración), **`/nueva-clave`** (la persona
+    se pone la suya tras recuperar) y **Llave maestra**. En los dos últimos
+    llena **las dos casillas** de una vez: copiar a mano algo que ya generó el
+    sistema solo sirve para equivocarse.
+  - **`generarLlaveMaestra`** para la llave: mismo alfabeto legible (sin l/1/I
+    ni O/0) pero **tres bloques, 18 caracteres**, por encima del mínimo de 12.
+    Sigue siendo dictable por teléfono a propósito: de nada sirve una llave
+    invulnerable que haya que dejar escrita en un papel para no olvidarla.
+  - `/nueva-clave` pasó a tener las dos casillas **controladas** (conservan su
+    `name`, así que la Server Action sigue funcionando igual sin JS).
+
 - **2026-09-07** — **Llave maestra: entrar a cualquier perfil con su correo.**
   Pedido del usuario. Le ofrecí tres formas y **eligió «llave maestra propia,
   aparte de tu contraseña»** (las otras dos eran «Ingresar como» desde
@@ -246,6 +286,18 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
     `src/lib/llave-maestra-catalogo.ts`** por la regla del 6-sep: lo que usa el
     navegador va en el catálogo.
   - **Sin llave configurada, este camino no existe** — es el estado inicial.
+  - **SOLO EL ADMINISTRADOR PRINCIPAL LA CONFIGURA** (aclarado por el usuario el
+    mismo día): `CORREO_ADMIN_PRINCIPAL` + `esAdminPrincipal` en `auth.ts`, y
+    `conAdminPrincipal` en `administracion/acciones.ts`. **Hay CUATRO ADMIN**
+    (Administración Iglesia Vive, Alejandro Facundo, Juan Felipe Carvajal, Laura
+    Charry), así que `ROLES_ADMIN` no bastaba: los cuatro habrían podido poner o
+    quitar la llave. El botón tampoco se le muestra a los demás.
+    El correo va **en el código, no en la base**: si viviera en una tabla,
+    cualquier ADMIN podría ponerse a sí mismo como dueño desde Administración.
+  - **Lo que NO se puede hacer, y hay que decirlo así:** limitar *quién usa* la
+    llave. Se escribe en la pantalla de ingreso, **antes** de que exista sesión,
+    así que el sistema no sabe quién la teclea — solo a qué perfil entró. La
+    llave vale lo que valga el cuidado con que se guarde.
 
 - **2026-09-07** — **Autorización de bajas: nadie sale del sistema sin que un
   administrador lo apruebe** (mockup aprobado:

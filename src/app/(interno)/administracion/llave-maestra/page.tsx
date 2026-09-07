@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requerirRol, ROLES_ADMIN } from "@/lib/auth";
+import { esAdminPrincipal, requerirPermiso } from "@/lib/auth";
 import { ZONA_HORARIA } from "@/lib/dominio";
 import { estadoDeLlaveMaestra } from "@/lib/llave-maestra";
 import { getPrisma } from "@/lib/prisma";
@@ -18,7 +18,9 @@ const FECHA_Y_HORA = new Intl.DateTimeFormat("es-CO", {
 });
 
 export default async function PaginaLlaveMaestra() {
-  await requerirRol(ROLES_ADMIN);
+  // No basta ser ADMIN: la llave abre el perfil de cualquiera, así que
+  // configurarla es solo del administrador principal de la iglesia.
+  await requerirPermiso(esAdminPrincipal);
   const prisma = await getPrisma();
   const estado = await estadoDeLlaveMaestra(prisma);
 

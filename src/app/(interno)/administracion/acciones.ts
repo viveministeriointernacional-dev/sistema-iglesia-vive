@@ -16,6 +16,7 @@ import { resolverDeclaracion } from "@/lib/liderazgo";
 import {
   DONDE_PUEDE_MENTOREAR,
   ErrorDePermiso,
+  esAdminPrincipal,
   requerirRolEnAccion,
   ROLES_ADMIN,
   type UsuarioSesion,
@@ -60,6 +61,23 @@ async function conAdmin(
     throw error;
   }
   return ejecutar(usuario);
+}
+
+/// Como `conAdmin`, pero solo para el administrador principal de la iglesia.
+/// Se usa en lo que abre el sistema entero: hoy, la llave maestra.
+async function conAdminPrincipal(
+  ejecutar: (usuario: UsuarioSesion) => Promise<ResultadoAdmin>,
+): Promise<ResultadoAdmin> {
+  return conAdmin(async (usuario) => {
+    if (!esAdminPrincipal(usuario)) {
+      return {
+        ok: false,
+        mensaje:
+          "Solo el administrador principal de la iglesia puede tocar la llave maestra.",
+      };
+    }
+    return ejecutar(usuario);
+  });
 }
 
 const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -586,7 +604,7 @@ export async function darDeBaja(
 /// `src/lib/llave-maestra.ts`); ni siquiera esta pantalla lo puede volver a
 /// mostrar.
 export async function cambiarLlaveMaestra(valor: string): Promise<ResultadoAdmin> {
-  return conAdmin(async (usuario) => {
+  return conAdminPrincipal(async (usuario) => {
     const prisma = await getPrisma();
     const resultado = await guardarLlaveMaestra(prisma, {
       valor,
@@ -601,7 +619,7 @@ export async function cambiarLlaveMaestra(valor: string): Promise<ResultadoAdmin
 /// Deja el sistema sin llave maestra. A partir de ahí, a cada perfil solo se
 /// entra con su propia contraseña.
 export async function quitarLlaveMaestra(): Promise<ResultadoAdmin> {
-  return conAdmin(async (usuario) => {
+  return conAdminPrincipal(async (usuario) => {
     const prisma = await getPrisma();
     const resultado = await revocarLlaveMaestra(prisma, usuario.id);
     if (!resultado.ok) return resultado;

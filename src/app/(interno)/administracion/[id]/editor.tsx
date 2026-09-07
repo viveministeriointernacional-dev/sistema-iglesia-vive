@@ -6,6 +6,7 @@ import type { MilestoneKind, Phase, Role } from "@iglesia/prisma-client";
 import { FormularioDatosPersona } from "@/components/formulario-datos-persona";
 import type { DatosPersona } from "@/lib/persona";
 import { generarContrasena, LARGO_MINIMO_CONTRASENA } from "@/lib/contrasena";
+import { GeneradorDeClave } from "@/components/generador-de-clave";
 import {
   alternarHito,
   asignarMentor,
@@ -661,7 +662,18 @@ function SeccionCrearAcceso({ personId }: { personId: string }) {
           <input className="campo" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="correo@ejemplo.com" />
         </Campo>
         <Campo etiqueta="Contraseña inicial">
-          <input className="campo" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="mínimo 6 caracteres" />
+          <input
+            className="campo"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder={`mínimo ${LARGO_MINIMO_CONTRASENA} caracteres`}
+          />
+          <GeneradorDeClave
+            valor={password}
+            generar={generarContrasena}
+            alGenerar={setPassword}
+            nota="Se la puedes dictar así, o dejar que le llegue por correo."
+          />
         </Campo>
       </div>
       <div className="mt-3">
