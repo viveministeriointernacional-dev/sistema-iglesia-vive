@@ -181,6 +181,43 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 - Fusionado: **Carlos Andrés** (persona/expediente) ↔ **Carlos Zambrano** (cuenta
   consolidadora con 11 discípulos; `highlevel_user_id = 1ecXv5QNMEvAOnlb5nRC`).
   Sobrevive la cuenta de Zambrano con el expediente enganchado.
+- Fusionado (7-sep-2026): **Emelin Parra** (ficha del 26-ago, con su cuenta,
+  su contacto de HighLevel y 18 personas a cargo) ↔ **Emelin Parra Guerrón**
+  (ficha creada el 5-sep por el formulario de liderazgo). Sobrevive la primera,
+  con los datos que ella escribió (celular **+573116665492**, correo
+  `emelindparra@gmail.com`, dirección, apellidos), la etapa **ENTRENAR** y el
+  mentor **Juliana Facundo** que se decidieron el 7-sep, y los **9 hitos CON
+  FECHA** (los 8 de la ficha nueva venían sin fecha: gana el dato más preciso).
+  Su declaración de liderazgo, ya resuelta, quedó enganchada a la ficha real.
+  **Ojo:** esos renglones se habían confirmado sobre la ficha duplicada, que no
+  tenía cuenta, así que no habían aplicado ningún permiso; se comprobó que los
+  permisos de su cuenta ya coincidían con lo decidido. El celular viejo
+  **+573209724604 no quedó guardado** (0 llamadas en `call_log`; el nuevo tiene 7).
+- Fusionados (7-sep-2026) **otros tres duplicados creados por el formulario de
+  liderazgo el 5-sep**, con la regla del usuario: **mandan los datos de la
+  última actualización**. Sobrevive siempre la ficha vieja (es la que tiene la
+  CUENTA y el contacto de HighLevel):
+  **Jairo Esquivel → Jairo Esquibel Narvaez** (MENTOR), **Lucero Artunduaga →
+  Lucero Artunduaga Navia** (PASTOR) y **María José → María José Rojas Puentes**
+  (LÍDER DE ALPHA). En los tres se tomaron apellidos, nacimiento, celular y
+  dirección del 5-sep; las declaraciones quedaron enganchadas al expediente
+  real; y el mentor asignado sobre el duplicado pasó a la ficha buena con el
+  anterior cerrado (solo aplicaba a María José: Paola Viveros).
+  **Dos reglas que hay que repetir en cualquier fusión futura:**
+  1. **El hito REGISTRO NO se pisa con el del duplicado.** Su fecha sería la del
+     día en que se creó el duplicado. A María José le habría cambiado su
+     registro real de **2025-07-03** por el 5-sep-2026.
+  2. **Un campo en blanco no borra lo que ya estaba** (`coalesce(nullif(...))`).
+     Gracias a eso María José conservó su celular anterior como WhatsApp.
+  Error cometido y corregido en el acto: actualicé apellidos pero no el nombre,
+  y quedó «María Rojas Puentes» — le faltaba el «José», que vivía en
+  `first_name`. **Al fusionar, revisar nombre Y apellidos, no solo apellidos.**
+- **NO fusionar (decisión del usuario, 7-sep):** **Luna Sandoval / Lina Mercedes
+  Jovel** (`linitajovel@gmail.com`) y **Nini Guerrón / Dilan Cadena**
+  (`ninijguerrons@gmail.com`) **son personas distintas que comparten correo** —
+  se mantienen separadas. Igual **Miguel Ángel Linares / Anny Carolina Rivera**
+  (`annyrivera021@gmail.com`). Son los 3 correos repetidos que quedan en la base
+  y están bien así.
 - Revisados/fusionados duplicados en toda la base (agosto 2026).
 - Import masivo histórico de contactos hecho vía webhook (256 en ago-2026).
 
@@ -210,6 +247,58 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 - Validar deploy sin credenciales: `npx wrangler deploy --dry-run --outdir /tmp/x`
 
 ## 12. Bitácora (añadir lo nuevo arriba)
+
+- **2026-09-07** — **«Mi red» y «Árbol» pasan a ser UNA sola pantalla**
+  (mockup aprobado: claude.ai/code/artifact/9dd38781-3cd4-4006-aa34-d2406dcf7e64;
+  el usuario eligió que abra en **Lista**).
+  Eran dos entradas del menú que enseñaban **a la misma gente** con el mismo
+  buscador y unos indicadores parecidos pero distintos; lo único que cambiaba de
+  verdad era cómo se ordenaban las personas.
+  - **Un solo encabezado** —buscador, 5 indicadores y las barras de fase— y un
+    **interruptor Lista / Árbol** que cambia nada más el cuerpo. La vista viaja
+    por URL (`/mi-red?vista=arbol`), sin JS.
+  - **⚠️ Los indicadores salen SIEMPRE de `cargarRed`, en las dos vistas.**
+    Antes cada pantalla calculaba los suyos, así que las mismas cifras daban
+    números distintos según dónde estuvieras. Se añadieron `porFase` y
+    `operacion72Vencida` a `ResumenDeLaRed`, **calculados sobre las personas que
+    ya se cargaron** — cero consultas nuevas.
+  - **`cargarArbol` solo se ejecuta cuando se está mirando el árbol**, y
+    `cargarEquipo` solo en la lista: es la parte cara y no se paga si no se ve.
+  - **Las barras de fase ahora filtran las DOS vistas**: en lista recortan la
+    lista, en árbol lo aplanan (que es lo que ya hacían).
+  - **Arreglado un bache de permisos**: `/mi-red` pedía `tieneRed` y `/red`
+    pedía `ROLES_CON_RED`, así que **un consolidador con permiso de mentor veía
+    la lista pero no el árbol**. Ahora las dos piden `tieneRed`.
+  - **`/red` no se borró**: quedó como `permanentRedirect` a
+    `/mi-red?vista=arbol` (conservando `?fase=`), para los enlaces guardados.
+  - Se quitaron del encabezado los indicadores de **logros acumulados**
+    (Encuentros, Bautismos, Graduaciones, Multiplicadores): esas cifras ya viven
+    en el Informe y aquí competían con lo que hay que atender hoy.
+
+- **2026-09-07** — **El formulario de liderazgo reconoce a la persona también
+  por CORREO + FECHA DE NACIMIENTO** (decisión del usuario).
+  **El caso que lo destapó:** Emelin Parra llenó el formulario del QR y le creó
+  una **ficha nueva** en vez de actualizar la suya. No fue un fallo del código:
+  el formulario buscaba **solo por celular** y ella escribió un número distinto
+  al que tenía registrado. El correo que puso (`emelindparra@gmail.com`) era
+  justo el de su cuenta en el sistema — con eso se habría reconocido sola.
+  Las dos fichas se fusionaron a mano (ver §8).
+  **La regla nueva: primero el celular; si no aparece, correo Y nacimiento.**
+  **Los dos datos son obligatorios a propósito.** Se midió antes de decidir:
+  - **6 correos están repartidos en 2 o más fichas** de la base
+    (`ninijguerrons@gmail.com` lo tienen Nini Guerrón y Dilan Cadena, entre
+    otros), así que **buscar solo por correo habría escrito encima de la persona
+    equivocada**.
+  - **0 pares comparten correo Y fecha de nacimiento.** Con los dos datos, hoy
+    no existe un solo caso ambiguo en toda la base.
+  - Probado contra la base: por correo+nacimiento, Emelin da **exactamente 1**
+    candidata.
+  Se conserva la regla de siempre: **más de una candidata → el formulario para y
+  avisa**, en vez de adivinar (ahora el aviso distingue si fue por celular o por
+  correo). Cuando la reconoce por correo, **el celular que acaba de escribir
+  pisa al de la ficha** —es con el que pide que la llamen hoy— y queda anotado
+  en «lo que cambiaste». La auditoría registra `reconocidaPor`:
+  `celular` | `correo+nacimiento`.
 
 - **2026-09-07** — **Cada cosa declarada se confirma por separado** (mockup
   aprobado: claude.ai/code/artifact/4c4c3bf5-fce2-446e-9b4d-e7a3bec2e27a).

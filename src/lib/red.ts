@@ -30,10 +30,16 @@ export type ResumenDeLaRed = {
   acompanadas: number;
   conAlertas: number;
   operacion72: number;
+  /// De las de Operación 72, a cuántas se les pasó el plazo.
+  operacion72Vencida: number;
   sinContacto: number;
   paraRevision: number;
+  /// Cuántas hay en cada fase. Sale de `personas`, sin consultar de nuevo.
+  porFase: Record<Phase, number>;
   esVistaCompleta: boolean;
 };
+
+const ALERTA_OP72_VENCIDA = "Operación 72 vencida";
 
 function diasDesde(fecha: Date | null, ahora: Date) {
   if (!fecha) return null;
@@ -124,7 +130,7 @@ export async function cargarRed(
 
     const alertas: string[] = [];
     if (enOperacion72 && urgenciaDe(op72.deadlineAt, ahora) === "vencida") {
-      alertas.push("Operación 72 vencida");
+      alertas.push(ALERTA_OP72_VENCIDA);
     } else if (enOperacion72 && urgenciaDe(op72.deadlineAt, ahora) === "urgente") {
       alertas.push(`Operación 72 · ${Math.max(horasRestantes(op72.deadlineAt, ahora), 0)} h`);
     }
@@ -159,11 +165,23 @@ export async function cargarRed(
     };
   });
 
+  const porFase: Record<Phase, number> = {
+    [Phase.GANAR]: 0,
+    [Phase.FORTALECER]: 0,
+    [Phase.ENTRENAR]: 0,
+    [Phase.MULTIPLICAR]: 0,
+  };
+  for (const persona of personas) porFase[persona.fase] += 1;
+
   return {
     personas,
+    porFase,
     acompanadas: personas.length,
     conAlertas: personas.filter((p) => p.alertas.length > 0).length,
     operacion72: personas.filter((p) => p.avance.startsWith("Operación 72")).length,
+    operacion72Vencida: personas.filter((p) =>
+      p.alertas.includes(ALERTA_OP72_VENCIDA),
+    ).length,
     sinContacto: personas.filter(
       (p) => p.diasSinContacto !== null && p.diasSinContacto >= DIAS_SIN_CONTACTO,
     ).length,

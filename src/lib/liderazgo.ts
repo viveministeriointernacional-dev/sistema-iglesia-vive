@@ -98,33 +98,61 @@ export async function guardarActualizacionDeLiderazgo(
       achievedAt: fechaDeMesYAno(hito.mes, hito.ano),
     }));
 
-  const candidatas = await prisma.person.findMany({
+  const CAMPOS_FICHA = {
+    id: true,
+    firstName: true,
+    lastName: true,
+    gender: true,
+    birthDate: true,
+    whatsappPhone: true,
+    email: true,
+    address: true,
+    learnerProfile: { select: { id: true, phase: true } },
+  } as const;
+
+  // **Primero por el celular**, que es la llave de siempre.
+  let candidatas = await prisma.person.findMany({
     where: {
       OR: [
         { callPhone: { endsWith: cola } },
         { whatsappPhone: { endsWith: cola } },
       ],
     },
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      gender: true,
-      birthDate: true,
-      whatsappPhone: true,
-      email: true,
-      address: true,
-      learnerProfile: { select: { id: true, phase: true } },
-    },
+    select: CAMPOS_FICHA,
   });
+  let porCorreo = false;
 
-  // Dos fichas con el mismo número: no se adivina cuál es. Antes que escribir
-  // sobre la persona equivocada, se para y se avisa.
+  // **Si el celular no la encuentra, por CORREO + FECHA DE NACIMIENTO**
+  // (decisión del usuario, 7-sep-2026). Nació de un caso real: Emelin Parra
+  // escribió un celular distinto al que tenía registrado y el formulario le
+  // creó una ficha nueva en vez de actualizar la suya — el correo que puso era
+  // justo el de su cuenta.
+  //
+  // **Los DOS datos son obligatorios, y ese es el punto.** Solo por correo sería
+  // peligroso: hay fichas con el correo de otra persona (la de Cristina Ramírez
+  // tiene el de Nini Guerrón, ver CLAUDE.md §8), así que Nini llenando el
+  // formulario habría escrito encima de la ficha de Cristina. Que además
+  // coincida la fecha de nacimiento hace eso prácticamente imposible.
+  if (candidatas.length === 0 && correo && datos.birthDate) {
+    const nacimiento = new Date(datos.birthDate);
+    candidatas = await prisma.person.findMany({
+      where: {
+        email: { equals: correo, mode: "insensitive" },
+        birthDate: nacimiento,
+      },
+      select: CAMPOS_FICHA,
+    });
+    porCorreo = candidatas.length > 0;
+  }
+
+  // Dos fichas que casan: no se adivina cuál es. Antes que escribir sobre la
+  // persona equivocada, se para y se avisa.
   if (candidatas.length > 1) {
     return {
       ok: false,
-      mensaje:
-        "Encontramos más de una ficha con ese celular. Avísale al equipo de la iglesia para que lo revisen: no queremos escribir sobre los datos de otra persona.",
+      mensaje: porCorreo
+        ? "Encontramos más de una ficha con ese correo. Avísale al equipo de la iglesia para que lo revisen: no queremos escribir sobre los datos de otra persona."
+        : "Encontramos más de una ficha con ese celular. Avísale al equipo de la iglesia para que lo revisen: no queremos escribir sobre los datos de otra persona.",
     };
   }
 
@@ -165,6 +193,14 @@ export async function guardarActualizacionDeLiderazgo(
             apunta("NACIMIENTO", datos.birthDate);
           }
         }
+        // Si la encontramos por correo, el celular que escribió es distinto al
+        // que tenía la ficha. Manda el que acaba de escribir: es con el que
+        // pide que la llamen hoy.
+        if (porCorreo) {
+          datosNuevos.callPhone = datos.callPhone.trim();
+          apunta("CELULAR", datos.callPhone.trim());
+        }
+
         const whatsapp = datos.whatsappPhone.trim();
         if (whatsapp && whatsapp !== (existente.whatsappPhone ?? "")) {
           datosNuevos.whatsappPhone = whatsapp;
@@ -327,6 +363,7 @@ export async function guardarActualizacionDeLiderazgo(
         entityId: personId,
         metadata: {
           creada: !existente,
+          reconocidaPor: existente ? (porCorreo ? "correo+nacimiento" : "celular") : null,
           nombre,
           cambios: cambios.map((c) => c.rotulo),
           hitos: hitosGuardados.map((h) =>
