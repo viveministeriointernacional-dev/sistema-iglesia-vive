@@ -193,6 +193,31 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   tenía cuenta, así que no habían aplicado ningún permiso; se comprobó que los
   permisos de su cuenta ya coincidían con lo decidido. El celular viejo
   **+573209724604 no quedó guardado** (0 llamadas en `call_log`; el nuevo tiene 7).
+- Fusionados (7-sep-2026) **otros tres duplicados creados por el formulario de
+  liderazgo el 5-sep**, con la regla del usuario: **mandan los datos de la
+  última actualización**. Sobrevive siempre la ficha vieja (es la que tiene la
+  CUENTA y el contacto de HighLevel):
+  **Jairo Esquivel → Jairo Esquibel Narvaez** (MENTOR), **Lucero Artunduaga →
+  Lucero Artunduaga Navia** (PASTOR) y **María José → María José Rojas Puentes**
+  (LÍDER DE ALPHA). En los tres se tomaron apellidos, nacimiento, celular y
+  dirección del 5-sep; las declaraciones quedaron enganchadas al expediente
+  real; y el mentor asignado sobre el duplicado pasó a la ficha buena con el
+  anterior cerrado (solo aplicaba a María José: Paola Viveros).
+  **Dos reglas que hay que repetir en cualquier fusión futura:**
+  1. **El hito REGISTRO NO se pisa con el del duplicado.** Su fecha sería la del
+     día en que se creó el duplicado. A María José le habría cambiado su
+     registro real de **2025-07-03** por el 5-sep-2026.
+  2. **Un campo en blanco no borra lo que ya estaba** (`coalesce(nullif(...))`).
+     Gracias a eso María José conservó su celular anterior como WhatsApp.
+  Error cometido y corregido en el acto: actualicé apellidos pero no el nombre,
+  y quedó «María Rojas Puentes» — le faltaba el «José», que vivía en
+  `first_name`. **Al fusionar, revisar nombre Y apellidos, no solo apellidos.**
+- **NO fusionar (decisión del usuario, 7-sep):** **Luna Sandoval / Lina Mercedes
+  Jovel** (`linitajovel@gmail.com`) y **Nini Guerrón / Dilan Cadena**
+  (`ninijguerrons@gmail.com`) **son personas distintas que comparten correo** —
+  se mantienen separadas. Igual **Miguel Ángel Linares / Anny Carolina Rivera**
+  (`annyrivera021@gmail.com`). Son los 3 correos repetidos que quedan en la base
+  y están bien así.
 - Revisados/fusionados duplicados en toda la base (agosto 2026).
 - Import masivo histórico de contactos hecho vía webhook (256 en ago-2026).
 
