@@ -211,6 +211,32 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-07** — **El informe se quedó SIN «modos»: es un calendario y ya.**
+  El usuario dijo que no le gustó cómo se hacía el informe: «quisiera que lo
+  dejaras abierto para que yo mismo escogiera el periodo». Las pestañas Día ·
+  Semana · Mes obligaban a elegir **antes** una forma de contar, y el rango
+  libre había quedado como un cuarto modo dentro de ellas.
+  **Ahora hay una sola cosa: DESDE y HASTA.** Los cortes de antes son **atajos**
+  que solo rellenan esas dos casillas (Hoy · Ayer · Esta semana · Semana pasada ·
+  Este mes · Mes pasado · Este año), así que después de pulsar uno se pueden
+  correr las fechas a mano sin salir de ningún sitio.
+  - **Se borraron `PERIODOS`, `Periodo`, `ETIQUETA_PERIODO`, `DIAS_DEL_PERIODO`
+    y `periodoValido`**, y `Rango` ya no tiene campo `periodo`. `calcularRango`
+    pasó de `(periodo, dia, desde, hasta)` a **`(desde?, hasta?)`**. La URL es
+    siempre `?desde=…&hasta=…`. Menos código y una sola forma de decir lo mismo.
+  - **`atajosDelInforme(hoy)`** en `informe.ts` calcula los siete atajos en hora
+    Colombia. El chip se pinta como activo comparando **las dos fechas**, no una
+    clave: si mueves el rango a mano y coincide con un atajo, se enciende solo.
+  - **Sin parámetros el informe abre en la semana de VIERNES A JUEVES.** El
+    razonamiento del usuario (7-sep) sigue vivo y hay que conservarlo: la gente
+    entra en las reuniones del **sábado, domingo y miércoles**, así que un corte
+    de domingo a domingo los dejaría sin días hábiles para llamarlos antes del
+    cierre. Pero ahora es **el punto de partida, no una jaula**.
+  - **La comparación no cambió** (sigue la regla del PR #69): meses de calendario
+    completos se corren por meses, todo lo demás por su propio largo en días.
+    **Probado con los 7 atajos + agosto + año completo + fechas al revés + sin
+    parámetros + el viaje ← →**: todo correcto.
+
 - **2026-09-07** — **Informe: rango de fechas libre, y la comparación se
   calcula sola.** Pedido del usuario: «si coloco un periodo de 7 días, lo compare
   con los 7 días anteriores; si coloco un mes, con el mes anterior; si coloco 12
