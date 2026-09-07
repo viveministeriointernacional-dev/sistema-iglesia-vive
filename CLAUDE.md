@@ -211,6 +211,44 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-07** — **Informe de la plataforma** (`/administracion/informe`, solo
+  ADMIN; mockup aprobado:
+  claude.ai/code/artifact/5e99c331-253a-4ec1-b5f1-cf84c196f34f).
+  - **⚠️ LA SEMANA VA DE VIERNES A VIERNES** (decisión del usuario, y su
+    razonamiento hay que conservarlo): la gente entra en las reuniones del
+    **sábado (juvenil), domingo (familiar) y miércoles**, así que un corte de
+    domingo a domingo dejaría a los del fin de semana **sin días hábiles** para
+    llamarlos antes del cierre. Empezando el viernes quedan lunes, martes,
+    miércoles y jueves dentro del mismo periodo. **El «mes» son, por lo mismo,
+    4 semanas de viernes a viernes (28 días)**, no el mes del calendario.
+  - **Esto resolvió el problema de medir la efectividad.** No hace falta una
+    ventana rodante de 7 días: el periodo ya trae su propia ventana de cierre.
+    Los que entran sobre el cierre (los 2 últimos días) salen aparte como
+    **«aún en plazo»** y **no cuentan como perdidos**.
+  - **`src/lib/informe.ts`**: `calcularRango` (matemática de periodos en hora
+    Colombia, con `viernesDe`), `cargarInforme` y `cargarDetallePersonas`.
+    `informe-catalogo.ts` para lo que toca el navegador (regla del 6-sep).
+  - Bloques: tiles con **% contra el periodo anterior** (siempre con la cifra
+    base al lado: de 1 a 3 también es «+200 %»), **embudo de efectividad**,
+    **el recorrido** (personas por fase + neto del periodo + saltos y
+    retrocesos), actividad día por día, Operación 72, hitos, y **tabla por
+    consolidador con «sin tocar» y «efectividad»**.
+  - **`/administracion/informe/personas`**: qué se le hizo a cada persona, con
+    filtros (con movimiento · sin tocar · cambiaron de fase · dadas de baja).
+  - **El neto por fase sale de `phase_change`**, no de fotos históricas (no
+    existen): entradas menos salidas en el periodo. Es exacto.
+  - **Tres trampas de SQL que `tsc` y `cf:build` NO ven** y que hay que probar
+    contra la base (se probaron las tres):
+    1. Un `generate_series` de días debe devolver el día como **texto**
+       (`to_char`). Si vuelve como fecha, `pg` la construye en UTC y al
+       formatearla en hora Colombia **se corre un día hacia atrás**.
+    2. `CASE ${'$'}{parametro} WHEN …` falla con «could not determine data type»:
+       hay que castear (`${'$'}{filtro}::text`).
+    3. `IN (${'$'}{ids.join(...)})` en `$queryRaw` se parametriza como **un solo
+       valor** y no filtra nada. Usar el ORM o `Prisma.join`.
+  - La paleta de la gráfica de actividad (`#2f76c4` · `#c97b2c` · `#3f9f7a`)
+    **pasó el validador de contraste y daltonismo**. No cambiarla a ojo.
+
 - **2026-09-07** — **⚠️ La llave maestra no se podía guardar: Cloudflare limita
   PBKDF2 a 100 000 iteraciones.** Al pulsar «Guardar la llave maestra» salía la
   pantalla negra «This page couldn't load · A server error occurred».
