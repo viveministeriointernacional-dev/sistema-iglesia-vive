@@ -248,6 +248,33 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-07** — **«Mi red» y «Árbol» pasan a ser UNA sola pantalla**
+  (mockup aprobado: claude.ai/code/artifact/9dd38781-3cd4-4006-aa34-d2406dcf7e64;
+  el usuario eligió que abra en **Lista**).
+  Eran dos entradas del menú que enseñaban **a la misma gente** con el mismo
+  buscador y unos indicadores parecidos pero distintos; lo único que cambiaba de
+  verdad era cómo se ordenaban las personas.
+  - **Un solo encabezado** —buscador, 5 indicadores y las barras de fase— y un
+    **interruptor Lista / Árbol** que cambia nada más el cuerpo. La vista viaja
+    por URL (`/mi-red?vista=arbol`), sin JS.
+  - **⚠️ Los indicadores salen SIEMPRE de `cargarRed`, en las dos vistas.**
+    Antes cada pantalla calculaba los suyos, así que las mismas cifras daban
+    números distintos según dónde estuvieras. Se añadieron `porFase` y
+    `operacion72Vencida` a `ResumenDeLaRed`, **calculados sobre las personas que
+    ya se cargaron** — cero consultas nuevas.
+  - **`cargarArbol` solo se ejecuta cuando se está mirando el árbol**, y
+    `cargarEquipo` solo en la lista: es la parte cara y no se paga si no se ve.
+  - **Las barras de fase ahora filtran las DOS vistas**: en lista recortan la
+    lista, en árbol lo aplanan (que es lo que ya hacían).
+  - **Arreglado un bache de permisos**: `/mi-red` pedía `tieneRed` y `/red`
+    pedía `ROLES_CON_RED`, así que **un consolidador con permiso de mentor veía
+    la lista pero no el árbol**. Ahora las dos piden `tieneRed`.
+  - **`/red` no se borró**: quedó como `permanentRedirect` a
+    `/mi-red?vista=arbol` (conservando `?fase=`), para los enlaces guardados.
+  - Se quitaron del encabezado los indicadores de **logros acumulados**
+    (Encuentros, Bautismos, Graduaciones, Multiplicadores): esas cifras ya viven
+    en el Informe y aquí competían con lo que hay que atender hoy.
+
 - **2026-09-07** — **El formulario de liderazgo reconoce a la persona también
   por CORREO + FECHA DE NACIMIENTO** (decisión del usuario).
   **El caso que lo destapó:** Emelin Parra llenó el formulario del QR y le creó

@@ -459,7 +459,8 @@ export async function cambiarDeFase(
   }
 
   revalidatePath(`/expediente/${learnerId}`);
+  // El árbol vive dentro de «Mi red» desde el 7-sep-2026, así que una sola
+  // ruta cubre las dos vistas.
   revalidatePath("/mi-red");
-  revalidatePath("/red");
   return { ok: true, fase: hasta };
 }

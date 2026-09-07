@@ -33,8 +33,9 @@ export default async function LayoutInterno({
   const pestanas = [
     ...(tieneRed(usuario)
       ? [
+          // El árbol vive dentro de «Mi red» desde el 7-sep-2026: era la misma
+          // gente con el mismo buscador, solo ordenada de otra forma.
           { href: "/mi-red", etiqueta: "Mi red" },
-          { href: "/red", etiqueta: "Árbol" },
         ]
       : []),
     ...(ROLES_CONSOLIDACION.includes(usuario.role)
