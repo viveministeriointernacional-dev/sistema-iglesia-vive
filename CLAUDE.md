@@ -211,6 +211,32 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-07** — **La «hora de llamada» del CRM se estaba tirando a la basura.**
+  El campo existe en HighLevel como **`contact.hora_llamada`**, id
+  **`wWioQQ2mGFbj7d7hZw4R`**, nombre «Hora de llamada», tipo **LARGE_TEXT**
+  (texto libre, NO una lista de franjas). Dos fallos encadenados:
+  1. **La clave no coincidía.** El parser buscaba `callSchedules`,
+     `call_schedules` y `horarioLlamada`. `normalizarClave` quita todo lo que no
+     sea alfanumérico, así que `horarioLlamada` → `horariollamada` pero el campo
+     real es `hora_llamada` → `horallamada`. **Nunca casaban**: el dato llegaba
+     y se descartaba en silencio.
+  2. **`listaHorarios` comparaba la cadena ENTERA** contra mañana/tarde/noche,
+     así que «Tarde después de las 4 pm» no reconocía nada. Ahora busca las
+     palabras **dentro** del texto.
+  **Ahora un solo campo alimenta las dos cosas**: la franja que se reconozca
+  (`callSchedules`) y el texto tal cual (`callScheduleNote`). Lo que no nombra
+  franja («Después de las 2 pm», «Cualquier hora») se conserva íntegro en la
+  nota.
+  **También va de vuelta:** `exportarDatosPersona` ahora escribe el campo en el
+  CRM (`CAMPO.horaLlamada`), porque es lo que el equipo mira antes de marcar.
+  **Datos recuperados:** se leyeron los 220 contactos que tienen el campo en
+  HighLevel y se rellenaron los que estaban en blanco → **76 personas
+  recuperadas** (de 140 a 216 con hora) y 19 con franja reconocida. Solo se
+  tocó lo vacío; nada escrito a mano se pisó.
+  Ojo con el diagnóstico: **de 267 registros del CRM solo 9 tenían la hora**, y
+  esos 9 eran del reenvío manual del 3-sep (yo controlaba el mapeo). O sea:
+  **ningún registro real del workflow la traía**.
+
 - **2026-09-06** — **El id de HighLevel de Nora Bonilla estaba mal por DOS
   caracteres** y por eso María Eugenia Chávez se quedó «sin consolidador»
   aunque en el CRM sí se le había asignado a Nora.
