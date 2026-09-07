@@ -10,7 +10,7 @@ import {
 } from "@iglesia/prisma-client";
 import { HITOS_EDITABLES } from "@/lib/administracion";
 import { auditar } from "@/lib/audit";
-import { darDeBajaAprendiz } from "@/lib/baja";
+import { darDeBajaAprendiz, resolverSolicitudDeBaja } from "@/lib/baja";
 import { resolverDeclaracion } from "@/lib/liderazgo";
 import {
   DONDE_PUEDE_MENTOREAR,
@@ -571,7 +571,37 @@ export async function darDeBaja(
 
     revalidatePath(`/administracion/${resultado.personId}`);
     revalidatePath("/administracion");
-    revalidatePath("/administracion/dados-de-baja");
+    revalidatePath("/administracion/bajas");
+    revalidatePath("/operacion-72");
+    return { ok: true };
+  });
+}
+
+/// Responde una solicitud de baja del equipo de consolidación.
+///
+/// Autorizarla aplica la baja de verdad. No autorizarla deja a la persona
+/// donde estaba y manda la observación a la tarjeta de su consolidador, que es
+/// quien va a seguir trabajando con ella: por eso ahí la observación es
+/// obligatoria (lo valida `resolverSolicitudDeBaja`).
+export async function resolverBaja(
+  solicitudId: string,
+  autoriza: boolean,
+  observacion: string,
+): Promise<ResultadoAdmin> {
+  return conAdmin(async (usuario) => {
+    const prisma = await getPrisma();
+    const resultado = await resolverSolicitudDeBaja(prisma, {
+      solicitudId,
+      autoriza,
+      observacion,
+      actorId: usuario.id,
+    });
+    if (!resultado.ok) return resultado;
+
+    revalidatePath("/administracion/bajas");
+    revalidatePath(`/administracion/bajas/${solicitudId}`);
+    revalidatePath(`/administracion/${resultado.personId}`);
+    revalidatePath("/administracion");
     revalidatePath("/operacion-72");
     return { ok: true };
   });
@@ -581,7 +611,10 @@ export async function darDeBaja(
 /// deja registro de la reactivación y le devuelve el acceso al sistema si lo
 /// tenía. No restaura sola la mentoría ni la Operación 72: eso se reasigna a
 /// mano si la persona retoma su proceso.
-export async function reactivar(learnerId: string): Promise<ResultadoAdmin> {
+export async function reactivar(
+  learnerId: string,
+  observacion?: string,
+): Promise<ResultadoAdmin> {
   return conAdmin(async (usuario) => {
     const prisma = await getPrisma();
     const aprendiz = await prisma.learnerProfile.findUnique({
@@ -601,6 +634,10 @@ export async function reactivar(learnerId: string): Promise<ResultadoAdmin> {
     }
 
     const cuenta = aprendiz.person.user;
+    // Qué hacer con la persona que vuelve. La reactivación no le devuelve sola
+    // la Operación 72, así que esto no puede ir a una tarjeta del tablero: va
+    // al expediente, que es donde lo lee quien la retome.
+    const nota = observacion?.trim() || null;
 
     await prisma.$transaction(async (tx) => {
       await tx.learnerProfile.update({
@@ -613,7 +650,7 @@ export async function reactivar(learnerId: string): Promise<ResultadoAdmin> {
           learnerId,
           fromStatus: LearnerStatus.RETIRADO,
           toStatus: LearnerStatus.ACTIVO,
-          reason: "Reactivada",
+          reason: nota ? `Reactivada · ${nota}` : "Reactivada",
           decidedById: usuario.id,
         },
       });
@@ -630,12 +667,13 @@ export async function reactivar(learnerId: string): Promise<ResultadoAdmin> {
         action: "administracion.reactivado",
         entityType: "learner_profile",
         entityId: learnerId,
+        metadata: { observacion: nota },
       });
     });
 
     revalidatePath(`/administracion/${aprendiz.personId}`);
     revalidatePath("/administracion");
-    revalidatePath("/administracion/dados-de-baja");
+    revalidatePath("/administracion/bajas");
     return { ok: true };
   });
 }

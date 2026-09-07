@@ -106,6 +106,8 @@ model AppUser {
   auditoria             AuditLog[]
   llamadas              CallLog[]
   declaracionesRevisadas LeadershipDeclaration[] @relation("RevisoDeclaracion")
+  bajasPedidas           BajaRequest[]           @relation("PidioLaBaja")
+  bajasResueltas         BajaRequest[]           @relation("ResolvioLaBaja")
 
   @@index([role, active])
   @@map("app_user")
@@ -333,6 +335,7 @@ model LearnerProfile {
   serviceAssignments  ServiceAssignment[]
   phaseChanges        PhaseChange[]
   statusChanges       LearnerStatusChange[]
+  bajaRequests        BajaRequest[]
 
   @@index([phase, status])
   @@map("learner_profile")
@@ -1005,4 +1008,36 @@ model LeadershipDeclaration {
   @@index([status, createdAt])
   @@index([personId])
   @@map("leadership_declaration")
+}
+
+/// Solicitud de baja a la espera de que un administrador la autorice.
+///
+/// El equipo de consolidación no retira a nadie por su cuenta: pide la baja y
+/// la persona sigue en su lista hasta que haya respuesta. Si el administrador
+/// no la autoriza, `resolutionNote` es lo que el consolidador va a leer en la
+/// tarjeta para saber qué hacer con esa persona.
+model BajaRequest {
+  id            String    @id @default(uuid())
+  learnerId     String    @map("learner_id")
+  /// Motivo de la lista cerrada `MOTIVOS_DE_BAJA` (src/lib/op72.ts).
+  reason        String
+  /// Lo que el consolidador le cuenta al administrador.
+  note          String?
+  requestedById String    @map("requested_by_id")
+  /// PENDIENTE · AUTORIZADA · RECHAZADA · RETIRADA
+  status        String    @default("PENDIENTE")
+  resolvedById  String?   @map("resolved_by_id")
+  resolvedAt    DateTime? @map("resolved_at")
+  /// Obligatoria al no autorizar: qué hacer con la persona. Se muestra en la
+  /// tarjeta del tablero y queda en el expediente.
+  resolutionNote String?  @map("resolution_note")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  learner     LearnerProfile @relation(fields: [learnerId], references: [id])
+  requestedBy AppUser        @relation("PidioLaBaja", fields: [requestedById], references: [id])
+  resolvedBy  AppUser?       @relation("ResolvioLaBaja", fields: [resolvedById], references: [id])
+
+  @@index([status, createdAt])
+  @@index([learnerId, createdAt])
+  @@map("baja_request")
 }

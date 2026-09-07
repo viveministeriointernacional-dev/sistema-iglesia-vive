@@ -10,6 +10,7 @@ import {
   darDeBajaDesdeTablero,
   entregarAMentor,
   registrarLlamada,
+  retirarSolicitudDesdeTablero,
 } from "./acciones";
 
 export type MentorOpcion = { id: string; nombre: string; role: string };
@@ -39,6 +40,22 @@ export type TarjetaPersona = {
     cuando: string;
     observacion: string | null;
   };
+  /// Baja pedida y todavía sin respuesta. Mientras esté, la persona sigue en
+  /// el tablero y en la carga de su consolidador.
+  bajaEnEspera: {
+    solicitudId: string;
+    motivo: string;
+    nota: string | null;
+    quien: string;
+    cuando: string;
+  } | null;
+  /// Un administrador NO autorizó la baja y dejó dicho qué hacer con la
+  /// persona. Se queda a la vista hasta que se vuelva a pedir la baja.
+  devolucion: {
+    observacion: string;
+    quien: string | null;
+    cuando: string | null;
+  } | null;
   /// Solo en VISITA PENDIENTE: la visita que está acordada.
   visitaAcordada: {
     cuando: string;
@@ -83,9 +100,12 @@ type Panel = "accion" | "baja" | null;
 export function TarjetaDePersona({
   persona,
   mentores,
+  bajaRequiereAutorizacion,
 }: {
   persona: TarjetaPersona;
   mentores: MentorOpcion[];
+  /// Quien puede autorizar bajas las aplica directo; los demás las piden.
+  bajaRequiereAutorizacion: boolean;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [panel, setPanel] = useState<Panel>(null);
@@ -195,7 +215,68 @@ export function TarjetaDePersona({
         </div>
       )}
 
-      {panel === "accion" ? (
+      {persona.devolucion ? (
+        <div className="mt-3 rounded-[10px] border border-[rgba(27,74,122,.28)] bg-azul-050 p-3">
+          <p className="text-[9.5px] leading-none font-bold tracking-[.12em] text-azul-700">
+            QUÉ HACER CON ESTA PERSONA
+          </p>
+          <p className="mt-2 text-[11.5px] leading-[1.5] font-medium text-tinta">
+            «{persona.devolucion.observacion}»
+          </p>
+          <p className="mt-2 text-[10.5px] leading-[1.35] font-semibold text-[rgba(19,28,36,.5)]">
+            {[
+              persona.devolucion.quien
+                ? `${persona.devolucion.quien} no autorizó la baja`
+                : "No se autorizó la baja",
+              persona.devolucion.cuando,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+        </div>
+      ) : null}
+
+      {persona.bajaEnEspera ? (
+        <div className="mt-3 rounded-[10px] border border-[rgba(201,123,44,.3)] bg-ambar-fondo p-3">
+          <p className="text-[9.5px] leading-none font-bold tracking-[.12em] text-ambar-texto">
+            BAJA SOLICITADA · ESPERANDO AUTORIZACIÓN
+          </p>
+          <p className="mt-2 text-[12px] leading-[1.35] font-bold text-tinta">
+            {persona.bajaEnEspera.motivo}
+          </p>
+          <p className="mt-[3px] text-[10.5px] leading-[1.35] font-medium text-[rgba(19,28,36,.5)]">
+            La pidió {persona.bajaEnEspera.quien} · {persona.bajaEnEspera.cuando}
+          </p>
+          {persona.bajaEnEspera.nota ? (
+            <p className="mt-[6px] text-[11.5px] leading-[1.45] font-medium text-[rgba(19,28,36,.6)]">
+              «{persona.bajaEnEspera.nota}»
+            </p>
+          ) : null}
+          <p className="mt-[9px] text-[10.5px] leading-[1.4] font-semibold text-ambar-texto">
+            Sigue contando en tu carga hasta que un administrador responda.
+          </p>
+          <div className="mt-2 flex items-center justify-between">
+            <Link
+              href={`/expediente/${persona.learnerId}`}
+              className="text-[11px] leading-none font-semibold text-azul-700"
+            >
+              Ver expediente
+            </Link>
+            <button
+              type="button"
+              onClick={() =>
+                ejecutar(() =>
+                  retirarSolicitudDesdeTablero(persona.bajaEnEspera!.solicitudId),
+                )
+              }
+              disabled={enCurso}
+              className="cursor-pointer border-0 bg-transparent p-0 text-[11px] leading-none font-semibold text-[rgba(19,28,36,.5)] disabled:opacity-60"
+            >
+              {enCurso ? "Retirando…" : "Retirar solicitud"}
+            </button>
+          </div>
+        </div>
+      ) : panel === "accion" ? (
         <div className="mt-3 rounded-[10px] bg-papel p-3">
           {persona.estado === Operation72Status.INICIADA ||
           persona.estado === Operation72Status.SEGUIMIENTO ? (
@@ -238,6 +319,7 @@ export function TarjetaDePersona({
         <div className="mt-3 rounded-[10px] bg-papel p-3">
           <FormularioDeBaja
             nombre={persona.nombre}
+            requiereAutorizacion={bajaRequiereAutorizacion}
             enCurso={enCurso}
             alGuardar={(datos) =>
               ejecutar(() => darDeBajaDesdeTablero(persona.learnerId, datos))
@@ -268,7 +350,7 @@ export function TarjetaDePersona({
               disabled={enCurso}
               className="cursor-pointer border-0 bg-transparent p-0 text-[11px] leading-none font-semibold text-rojo disabled:opacity-60"
             >
-              Dar de baja
+              {bajaRequiereAutorizacion ? "Pedir la baja" : "Dar de baja"}
             </button>
           </div>
         </>
@@ -300,15 +382,22 @@ export function TarjetaDePersona({
   );
 }
 
-/// Dar de baja sin salir del tablero. El motivo es obligatorio: una persona
+/// Pedir la baja sin salir del tablero. El motivo es obligatorio: una persona
 /// que desaparece del tablero sin explicación es un dato perdido.
+///
+/// Para quien NO autoriza bajas esto es una solicitud, y entonces la nota
+/// también es obligatoria: es lo único que el administrador va a leer para
+/// decidir. Quien sí autoriza la aplica en el acto y la nota sigue siendo
+/// opcional, porque nadie más tiene que entenderla.
 function FormularioDeBaja({
   nombre,
+  requiereAutorizacion,
   enCurso,
   alGuardar,
   alCancelar,
 }: {
   nombre: string;
+  requiereAutorizacion: boolean;
   enCurso: boolean;
   alGuardar: (datos: { motivo: string; nota: string }) => void;
   alCancelar: () => void;
@@ -321,10 +410,23 @@ function FormularioDeBaja({
       <p className="text-[12px] leading-[1.4] font-semibold text-tinta">
         Dar de baja a {nombre}
       </p>
-      <p className="mt-1 text-[11px] leading-[1.45] font-medium text-[rgba(19,28,36,.55)]">
-        Sale del tablero y de consolidación. Su expediente e historial se conservan
-        y se puede reactivar desde Administración.
-      </p>
+      {requiereAutorizacion ? (
+        <div className="mt-2 rounded-[8px] border border-[rgba(201,123,44,.3)] bg-ambar-fondo p-[10px]">
+          <p className="text-[9.5px] leading-none font-bold tracking-[.12em] text-ambar-texto">
+            ESTO NO ES DEFINITIVO
+          </p>
+          <p className="mt-[7px] text-[11px] leading-[1.45] font-medium text-ambar-texto">
+            La solicitud va a un administrador para que la autorice. Mientras
+            tanto la persona <strong className="font-bold">sigue en tu lista</strong>{" "}
+            y no pierde su acceso.
+          </p>
+        </div>
+      ) : (
+        <p className="mt-1 text-[11px] leading-[1.45] font-medium text-[rgba(19,28,36,.55)]">
+          Sale del tablero y de consolidación. Su expediente e historial se
+          conservan y se puede reactivar desde Administración.
+        </p>
+      )}
 
       <div className="mt-3">
         <Etiqueta>¿Por qué se da de baja?</Etiqueta>
@@ -344,24 +446,40 @@ function FormularioDeBaja({
       </div>
 
       <label className="mt-3 block">
-        <Etiqueta>Nota para el expediente (opcional)</Etiqueta>
+        <Etiqueta>
+          {requiereAutorizacion
+            ? "Cuéntale al administrador qué pasó"
+            : "Nota para el expediente (opcional)"}
+        </Etiqueta>
         <textarea
           value={nota}
           onChange={(evento) => setNota(evento.target.value)}
-          rows={2}
-          className="campo campo-opcional"
-          placeholder="Qué pasó, para quien lea el expediente después."
+          rows={requiereAutorizacion ? 3 : 2}
+          className={requiereAutorizacion ? "campo" : "campo campo-opcional"}
+          placeholder={
+            requiereAutorizacion
+              ? "Qué intentaste, cuántas veces y qué te respondieron."
+              : "Qué pasó, para quien lea el expediente después."
+          }
         />
       </label>
 
       <div className="mt-3 flex gap-2">
         <button
           type="button"
-          disabled={enCurso || !motivo}
+          disabled={
+            enCurso || !motivo || (requiereAutorizacion && nota.trim().length < 10)
+          }
           onClick={() => motivo && alGuardar({ motivo, nota })}
-          className="flex-1 cursor-pointer rounded-[10px] border-0 bg-rojo px-4 py-[9px] text-[11.5px] leading-none font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
+          className={`flex-1 cursor-pointer rounded-[10px] border-0 px-4 py-[9px] text-[11.5px] leading-none font-bold text-white disabled:cursor-not-allowed disabled:opacity-60 ${
+            requiereAutorizacion ? "bg-azul-900" : "bg-rojo"
+          }`}
         >
-          {enCurso ? "Guardando…" : "Dar de baja"}
+          {enCurso
+            ? "Guardando…"
+            : requiereAutorizacion
+              ? "Enviar a autorización"
+              : "Dar de baja"}
         </button>
         <button
           type="button"

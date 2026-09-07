@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { Operation72Status, type Prisma, Role } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
-import { requerirRol, ROLES_CONSOLIDACION, veTodaLaConsolidacion } from "@/lib/auth";
+import {
+  puedeAutorizarBaja,
+  requerirRol,
+  ROLES_CONSOLIDACION,
+  veTodaLaConsolidacion,
+} from "@/lib/auth";
+import { ESTADO_SOLICITUD } from "@/lib/baja";
 import {
   momentoLegible,
   nombreCompleto,
@@ -109,6 +115,9 @@ export default async function TableroOperacion72({
   // Alcance por red: el consolidador ve solo sus personas asignadas; pastor,
   // administrador y coordinadoras de consolidación ven toda la iglesia.
   const soloSuRed = usuario.role === Role.CONSOLIDADOR && !veTodaLaConsolidacion(usuario);
+  // Quien puede autorizar bajas las aplica directo; a los demás la tarjeta les
+  // habla de pedirla, no de darla.
+  const bajaRequiereAutorizacion = !puedeAutorizarBaja(usuario);
   const alcance = soloSuRed ? { learner: { consolidatorId: usuario.id } } : {};
   // El mismo alcance, pero sobre el aprendiz: la búsqueda mira a personas que
   // ya NO tienen Operación 72 abierta, así que no puede filtrar por ella.
@@ -265,6 +274,35 @@ export default async function TableroOperacion72({
         },
       })
     : [];
+  // La última solicitud de baja de cada persona visible. Solo interesan dos:
+  // la que está esperando respuesta y la que un administrador devolvió con una
+  // observación. Las autorizadas ya sacaron a la persona del tablero y las
+  // retiradas las canceló el propio consolidador.
+  const solicitudes = operaciones.length
+    ? await prisma.bajaRequest.findMany({
+        where: { learnerId: { in: operaciones.map((o) => o.learner.id) } },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          learnerId: true,
+          status: true,
+          reason: true,
+          note: true,
+          resolutionNote: true,
+          resolvedAt: true,
+          createdAt: true,
+          requestedBy: { select: { fullName: true } },
+          resolvedBy: { select: { fullName: true } },
+        },
+      })
+    : [];
+  const solicitudPorAprendiz = new Map<string, (typeof solicitudes)[number]>();
+  for (const solicitud of solicitudes) {
+    if (!solicitudPorAprendiz.has(solicitud.learnerId)) {
+      solicitudPorAprendiz.set(solicitud.learnerId, solicitud);
+    }
+  }
+
   const ultimoPorOperacion = new Map<string, (typeof intentos)[number]>();
   const llamadasPorOperacion = new Map<string, number>();
   const visitaPorOperacion = new Map<string, (typeof intentos)[number]>();
@@ -334,6 +372,32 @@ export default async function TableroOperacion72({
           }
         : null;
 
+    // Una sola de las dos aparece, y nunca las dos: son el mismo hilo en dos
+    // momentos distintos (la pediste · te respondieron).
+    const solicitud = solicitudPorAprendiz.get(learner.id) ?? null;
+    const bajaEnEspera =
+      solicitud && solicitud.status === ESTADO_SOLICITUD.pendiente
+        ? {
+            solicitudId: solicitud.id,
+            motivo: solicitud.reason,
+            nota: solicitud.note?.trim() || null,
+            quien: solicitud.requestedBy.fullName,
+            cuando: momentoLegible(solicitud.createdAt, ahora),
+          }
+        : null;
+    const devolucion =
+      solicitud &&
+      solicitud.status === ESTADO_SOLICITUD.rechazada &&
+      solicitud.resolutionNote?.trim()
+        ? {
+            observacion: solicitud.resolutionNote.trim(),
+            quien: solicitud.resolvedBy?.fullName ?? null,
+            cuando: solicitud.resolvedAt
+              ? momentoLegible(solicitud.resolvedAt, ahora)
+              : null,
+          }
+        : null;
+
     const movimiento = ultimo
       ? {
           titulo: tituloDelMovimiento({
@@ -365,6 +429,8 @@ export default async function TableroOperacion72({
       registrada: momentoLegible(operacion.startedAt, ahora),
       datos,
       movimiento,
+      bajaEnEspera,
+      devolucion,
       visitaAcordada,
       chip: textoChip(operacion.deadlineAt, ahora),
       urgencia: urgenciaDe(operacion.deadlineAt, ahora),
@@ -701,6 +767,7 @@ export default async function TableroOperacion72({
                           key={persona.operacionId}
                           persona={persona}
                           mentores={mentores}
+                          bajaRequiereAutorizacion={bajaRequiereAutorizacion}
                         />
                       ))}
                       {personas.length === 0 ? (
@@ -739,6 +806,7 @@ export default async function TableroOperacion72({
                         key={persona.operacionId}
                         persona={persona}
                         mentores={mentores}
+                        bajaRequiereAutorizacion={bajaRequiereAutorizacion}
                       />
                     ))
                   : null}

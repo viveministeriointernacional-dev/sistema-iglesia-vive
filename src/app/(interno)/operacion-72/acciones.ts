@@ -16,6 +16,7 @@ import { ZONA_HORARIA } from "@/lib/dominio";
 import {
   DONDE_PUEDE_MENTOREAR,
   ErrorDePermiso,
+  puedeAutorizarBaja,
   puedeConfirmarEntrega,
   requerirRolEnAccion,
   ROLES_CONSOLIDACION,
@@ -23,7 +24,11 @@ import {
   type UsuarioSesion,
 } from "@/lib/auth";
 import { proponerMentor } from "@/lib/asignacion";
-import { darDeBajaAprendiz } from "@/lib/baja";
+import {
+  darDeBajaAprendiz,
+  retirarSolicitudDeBaja,
+  solicitarBaja,
+} from "@/lib/baja";
 import { exportarPrimeraLlamada, exportarVisita } from "@/lib/highlevel-salida";
 import {
   contactaDeVerdad,
@@ -505,10 +510,17 @@ export async function entregarAMentor(
   return { ok: true };
 }
 
-/// Da de baja desde el tablero, con la misma regla de alcance de las demás
-/// acciones: un consolidador solo sobre sus personas; coordinación, pastor y
-/// administrador sobre cualquiera. El motivo viene de una lista cerrada para
-/// que después se pueda contar por qué se pierden personas.
+/// Pide (o aplica) la baja desde el tablero.
+///
+/// **Quién puede autorizar la aplica directo; los demás la piden.** Nadie sale
+/// del sistema sin que un administrador haya visto el motivo, y pedirla no
+/// saca a la persona del tablero: sigue en la lista y en la carga de su
+/// consolidador hasta que haya respuesta.
+///
+/// Alcance: el mismo de las demás acciones del tablero — un consolidador solo
+/// sobre sus personas; coordinación, pastor y administrador sobre cualquiera.
+/// El motivo viene de una lista cerrada para poder contar después por qué se
+/// pierden personas.
 export async function darDeBajaDesdeTablero(
   learnerId: string,
   datos: { motivo: string; nota: string },
@@ -537,18 +549,62 @@ export async function darDeBajaDesdeTablero(
       aprendiz.consolidatorId === usuario.id);
   if (!esSuya) return { ok: false, mensaje: "Esta persona no está en tu lista." };
 
-  const resultado = await darDeBajaAprendiz(prisma, {
-    learnerId,
-    motivo: datos.motivo,
-    nota: datos.nota,
-    actorId: usuario.id,
-    accion: "operacion72.dado_de_baja",
-  });
+  const resultado = puedeAutorizarBaja(usuario)
+    ? await darDeBajaAprendiz(prisma, {
+        learnerId,
+        motivo: datos.motivo,
+        nota: datos.nota,
+        actorId: usuario.id,
+        accion: "operacion72.dado_de_baja",
+      })
+    : await solicitarBaja(prisma, {
+        learnerId,
+        motivo: datos.motivo,
+        nota: datos.nota,
+        actorId: usuario.id,
+      });
   if (!resultado.ok) return resultado;
 
   revalidatePath("/operacion-72");
   revalidatePath(`/expediente/${learnerId}`);
   revalidatePath("/administracion");
-  revalidatePath("/administracion/dados-de-baja");
+  revalidatePath("/administracion/bajas");
+  return { ok: true };
+}
+
+/// El consolidador se arrepiente antes de que le respondan. Mismo alcance que
+/// pedirla: solo sobre sus personas.
+export async function retirarSolicitudDesdeTablero(
+  solicitudId: string,
+): Promise<ResultadoAccion> {
+  let usuario: UsuarioSesion;
+  try {
+    usuario = await requerirRolEnAccion(ROLES_CONSOLIDACION);
+  } catch (error) {
+    if (error instanceof ErrorDePermiso) return { ok: false, mensaje: error.message };
+    throw error;
+  }
+
+  const prisma = await getPrisma();
+  const solicitud = await prisma.bajaRequest.findUnique({
+    where: { id: solicitudId },
+    select: { learnerId: true, learner: { select: { consolidatorId: true } } },
+  });
+  if (!solicitud) return { ok: false, mensaje: "No se encontró la solicitud." };
+
+  const esSuya =
+    usuario.role !== Role.CONSOLIDADOR ||
+    veTodaLaConsolidacion(usuario) ||
+    solicitud.learner.consolidatorId === usuario.id;
+  if (!esSuya) return { ok: false, mensaje: "Esta persona no está en tu lista." };
+
+  const resultado = await retirarSolicitudDeBaja(prisma, {
+    solicitudId,
+    actorId: usuario.id,
+  });
+  if (!resultado.ok) return resultado;
+
+  revalidatePath("/operacion-72");
+  revalidatePath("/administracion/bajas");
   return { ok: true };
 }

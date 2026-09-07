@@ -17,6 +17,12 @@ export type AccionAuditada =
   | "operacion72.estado_corregido"
   | "operacion72.entregada"
   | "operacion72.dado_de_baja"
+  // Autorización de bajas: el equipo de consolidación PIDE la baja y un
+  // administrador la resuelve. Nadie sale del sistema sin esa respuesta.
+  | "operacion72.baja_solicitada"
+  | "operacion72.baja_autorizada"
+  | "operacion72.baja_rechazada"
+  | "operacion72.baja_retirada"
   | "mentor.asignado"
   | "notas.reveladas"
   | "hito.registrado"
