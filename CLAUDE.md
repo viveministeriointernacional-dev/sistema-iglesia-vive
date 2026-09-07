@@ -181,6 +181,18 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 - Fusionado: **Carlos Andrés** (persona/expediente) ↔ **Carlos Zambrano** (cuenta
   consolidadora con 11 discípulos; `highlevel_user_id = 1ecXv5QNMEvAOnlb5nRC`).
   Sobrevive la cuenta de Zambrano con el expediente enganchado.
+- Fusionado (7-sep-2026): **Emelin Parra** (ficha del 26-ago, con su cuenta,
+  su contacto de HighLevel y 18 personas a cargo) ↔ **Emelin Parra Guerrón**
+  (ficha creada el 5-sep por el formulario de liderazgo). Sobrevive la primera,
+  con los datos que ella escribió (celular **+573116665492**, correo
+  `emelindparra@gmail.com`, dirección, apellidos), la etapa **ENTRENAR** y el
+  mentor **Juliana Facundo** que se decidieron el 7-sep, y los **9 hitos CON
+  FECHA** (los 8 de la ficha nueva venían sin fecha: gana el dato más preciso).
+  Su declaración de liderazgo, ya resuelta, quedó enganchada a la ficha real.
+  **Ojo:** esos renglones se habían confirmado sobre la ficha duplicada, que no
+  tenía cuenta, así que no habían aplicado ningún permiso; se comprobó que los
+  permisos de su cuenta ya coincidían con lo decidido. El celular viejo
+  **+573209724604 no quedó guardado** (0 llamadas en `call_log`; el nuevo tiene 7).
 - Revisados/fusionados duplicados en toda la base (agosto 2026).
 - Import masivo histórico de contactos hecho vía webhook (256 en ago-2026).
 
@@ -210,6 +222,31 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 - Validar deploy sin credenciales: `npx wrangler deploy --dry-run --outdir /tmp/x`
 
 ## 12. Bitácora (añadir lo nuevo arriba)
+
+- **2026-09-07** — **El formulario de liderazgo reconoce a la persona también
+  por CORREO + FECHA DE NACIMIENTO** (decisión del usuario).
+  **El caso que lo destapó:** Emelin Parra llenó el formulario del QR y le creó
+  una **ficha nueva** en vez de actualizar la suya. No fue un fallo del código:
+  el formulario buscaba **solo por celular** y ella escribió un número distinto
+  al que tenía registrado. El correo que puso (`emelindparra@gmail.com`) era
+  justo el de su cuenta en el sistema — con eso se habría reconocido sola.
+  Las dos fichas se fusionaron a mano (ver §8).
+  **La regla nueva: primero el celular; si no aparece, correo Y nacimiento.**
+  **Los dos datos son obligatorios a propósito.** Se midió antes de decidir:
+  - **6 correos están repartidos en 2 o más fichas** de la base
+    (`ninijguerrons@gmail.com` lo tienen Nini Guerrón y Dilan Cadena, entre
+    otros), así que **buscar solo por correo habría escrito encima de la persona
+    equivocada**.
+  - **0 pares comparten correo Y fecha de nacimiento.** Con los dos datos, hoy
+    no existe un solo caso ambiguo en toda la base.
+  - Probado contra la base: por correo+nacimiento, Emelin da **exactamente 1**
+    candidata.
+  Se conserva la regla de siempre: **más de una candidata → el formulario para y
+  avisa**, en vez de adivinar (ahora el aviso distingue si fue por celular o por
+  correo). Cuando la reconoce por correo, **el celular que acaba de escribir
+  pisa al de la ficha** —es con el que pide que la llamen hoy— y queda anotado
+  en «lo que cambiaste». La auditoría registra `reconocidaPor`:
+  `celular` | `correo+nacimiento`.
 
 - **2026-09-07** — **Cada cosa declarada se confirma por separado** (mockup
   aprobado: claude.ai/code/artifact/4c4c3bf5-fce2-446e-9b4d-e7a3bec2e27a).
