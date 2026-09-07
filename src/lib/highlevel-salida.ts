@@ -1,5 +1,5 @@
 import type { CallOutcome } from "@iglesia/prisma-client";
-import { nombreCompleto } from "@/lib/dominio";
+import { nombreCompleto, textoDeHorario } from "@/lib/dominio";
 import { variableDeEntorno } from "@/lib/entorno";
 import { ETIQUETA_LLAMADA } from "@/lib/op72";
 import { getPrisma } from "@/lib/prisma";
@@ -22,6 +22,8 @@ const CAMPO = {
   estadoLlamada: "U1VhdP5dRedFZ30ihJbJ",
   fechaLlamada: "mXbNh4wigwrtXUpfMSqD",
   observacionLlamada: "r0FlVnHCzP6tqnTMHqdJ",
+  /// «Hora de llamada» — texto libre en HighLevel (LARGE_TEXT).
+  horaLlamada: "wWioQQ2mGFbj7d7hZw4R",
 } as const;
 
 type Credenciales = { token: string; locationId: string };
@@ -79,6 +81,8 @@ async function enlaceExistente(learnerId: string) {
           whatsappPhone: true,
           email: true,
           address: true,
+          callSchedules: true,
+          callScheduleNote: true,
           highLevelContacts: {
             take: 1,
             orderBy: { createdAt: "asc" },
@@ -174,6 +178,13 @@ export async function exportarDatosPersona(learnerId: string): Promise<void> {
     }
 
     const telefono = persona.callPhone ?? persona.whatsappPhone ?? undefined;
+    // La hora de llamada también viaja de vuelta: es el dato que el equipo de
+    // consolidación mira en el CRM antes de marcar, así que si alguien lo
+    // corrige en el sistema tiene que reflejarse allá.
+    const horario = textoDeHorario(
+      persona.callSchedules,
+      persona.callScheduleNote,
+    );
     await pedir(
       `/contacts/${contactId}`,
       "PUT",
@@ -184,6 +195,13 @@ export async function exportarDatosPersona(learnerId: string): Promise<void> {
         email: persona.email ?? undefined,
         phone: telefono,
         address1: persona.address ?? undefined,
+        ...(horario
+          ? {
+              customFields: [
+                { id: CAMPO.horaLlamada, field_value: horario, value: horario },
+              ],
+            }
+          : {}),
       },
       cred.token,
     );

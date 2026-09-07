@@ -166,27 +166,38 @@ function enumPorEtiqueta<T extends string>(
   return equivalencias[normalizarClave(dato)] ?? null;
 }
 
+/// Las franjas que se puedan reconocer en lo que escribió la persona.
+///
+/// En HighLevel «Hora de llamada» es **texto libre** (LARGE_TEXT), así que
+/// llega «Tarde después de las 4 pm» o «Noche después de las 6», no una franja
+/// limpia. Por eso se buscan las palabras **dentro** del texto en vez de
+/// comparar la cadena entera, que era lo que hacía que no reconociera nada.
+/// Lo que no nombre una franja («Después de las 2 pm», «Cualquier hora») no
+/// devuelve nada y se conserva tal cual en `callScheduleNote`.
 function listaHorarios(valor: unknown): CallSchedule[] {
-  const valores = Array.isArray(valor)
-    ? valor
-    : texto(valor)?.split(/[,;|/]/) ?? [];
-  return Array.from(
-    new Set(
-      valores
-        .map((item) =>
-          enumPorEtiqueta(item, {
-            manana: CallSchedule.MANANA,
-            morning: CallSchedule.MANANA,
-            tarde: CallSchedule.TARDE,
-            afternoon: CallSchedule.TARDE,
-            noche: CallSchedule.NOCHE,
-            evening: CallSchedule.NOCHE,
-            night: CallSchedule.NOCHE,
-          }),
-        )
-        .filter((item): item is CallSchedule => Boolean(item)),
-    ),
-  );
+  const partes = Array.isArray(valor) ? valor : [valor];
+  const encontradas: CallSchedule[] = [];
+
+  for (const parte of partes) {
+    const dato = texto(parte);
+    if (!dato) continue;
+    const limpio = normalizarClave(dato);
+    if (limpio.includes("manana") || limpio.includes("morning")) {
+      encontradas.push(CallSchedule.MANANA);
+    }
+    if (limpio.includes("tarde") || limpio.includes("afternoon")) {
+      encontradas.push(CallSchedule.TARDE);
+    }
+    if (
+      limpio.includes("noche") ||
+      limpio.includes("evening") ||
+      limpio.includes("night")
+    ) {
+      encontradas.push(CallSchedule.NOCHE);
+    }
+  }
+
+  return Array.from(new Set(encontradas));
 }
 
 export function normalizarPayloadHighLevel(entrada: unknown) {
@@ -238,6 +249,20 @@ export function normalizarPayloadHighLevel(entrada: unknown) {
     ),
   });
 
+  const horaDeLlamada = obtener(
+    indice,
+    "Hora de llamada",
+    "contact.hora_llamada",
+    "hora_llamada",
+    "wWioQQ2mGFbj7d7hZw4R",
+    "callScheduleNote",
+    "call_schedule_note",
+    "detalleHorario",
+    "callSchedules",
+    "call_schedules",
+    "horarioLlamada",
+  );
+
   const datos = esquemaRegistro.parse({
     firstName,
     lastName: textoOpcional(
@@ -263,12 +288,14 @@ export function normalizarPayloadHighLevel(entrada: unknown) {
     // Solo se pasa el correo si tiene forma válida; uno mal formado se ignora
     // (opcional) en vez de tumbar todo el registro.
     email: correoOpcional(obtener(indice, "email", "correo")),
-    callSchedules: listaHorarios(
-      obtener(indice, "callSchedules", "call_schedules", "horarioLlamada"),
-    ),
-    callScheduleNote: textoOpcional(
-      obtener(indice, "callScheduleNote", "call_schedule_note", "detalleHorario"),
-    ),
+    // «Hora de llamada» es UN solo campo de texto libre en HighLevel
+    // (`contact.hora_llamada`, id `wWioQQ2mGFbj7d7hZw4R`), así que alimenta las
+    // dos cosas: la franja que se pueda reconocer y el texto tal cual.
+    // ⚠️ Antes solo se buscaban las claves `callSchedules`/`horarioLlamada`,
+    // que NO son las que manda el CRM, así que el dato llegaba y se descartaba
+    // en silencio (6-sep-2026: 267 registros sin hora de llamada).
+    callSchedules: listaHorarios(horaDeLlamada),
+    callScheduleNote: textoOpcional(horaDeLlamada),
     address:
       texto(obtener(indice, "address", "direccion")) ||
       direccionCompuesta ||

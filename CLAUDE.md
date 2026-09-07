@@ -211,6 +211,110 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-07** — **La «hora de llamada» del CRM se estaba tirando a la basura.**
+  El campo existe en HighLevel como **`contact.hora_llamada`**, id
+  **`wWioQQ2mGFbj7d7hZw4R`**, nombre «Hora de llamada», tipo **LARGE_TEXT**
+  (texto libre, NO una lista de franjas). Dos fallos encadenados:
+  1. **La clave no coincidía.** El parser buscaba `callSchedules`,
+     `call_schedules` y `horarioLlamada`. `normalizarClave` quita todo lo que no
+     sea alfanumérico, así que `horarioLlamada` → `horariollamada` pero el campo
+     real es `hora_llamada` → `horallamada`. **Nunca casaban**: el dato llegaba
+     y se descartaba en silencio.
+  2. **`listaHorarios` comparaba la cadena ENTERA** contra mañana/tarde/noche,
+     así que «Tarde después de las 4 pm» no reconocía nada. Ahora busca las
+     palabras **dentro** del texto.
+  **Ahora un solo campo alimenta las dos cosas**: la franja que se reconozca
+  (`callSchedules`) y el texto tal cual (`callScheduleNote`). Lo que no nombra
+  franja («Después de las 2 pm», «Cualquier hora») se conserva íntegro en la
+  nota.
+  **También va de vuelta:** `exportarDatosPersona` ahora escribe el campo en el
+  CRM (`CAMPO.horaLlamada`), porque es lo que el equipo mira antes de marcar.
+  **Datos recuperados:** se leyeron los 220 contactos que tienen el campo en
+  HighLevel y se rellenaron los que estaban en blanco → **76 personas
+  recuperadas** (de 140 a 216 con hora) y 19 con franja reconocida. Solo se
+  tocó lo vacío; nada escrito a mano se pisó.
+  Ojo con el diagnóstico: **de 267 registros del CRM solo 9 tenían la hora**, y
+  esos 9 eran del reenvío manual del 3-sep (yo controlaba el mapeo). O sea:
+  **ningún registro real del workflow la traía**.
+
+- **2026-09-06** — **El id de HighLevel de Nora Bonilla estaba mal por DOS
+  caracteres** y por eso María Eugenia Chávez se quedó «sin consolidador»
+  aunque en el CRM sí se le había asignado a Nora.
+  ```
+  HighLevel : t8HuZDPMHztakrzIFIJQ
+  Sistema   : t8HuZDPMHztakrzlFlJQ
+                             ^ ^   (I mayúscula vs l minúscula)
+  ```
+  Error de transcripción al copiar el código a ojo de la lista «Mi personal».
+  **Corregido en `app_user`** y reenviada la asignación: María Eugenia quedó con
+  Nora. **Se validaron los 15 ids contra `GET /users/<id>` de la API: los otros
+  14 están bien.** Solo había 1 contacto de Nora en el CRM, así que no hubo más
+  arrastre; y las 90 llamadas de `call_log` ya estaban bien atribuidas (el
+  webhook de llamadas la reconocía por correo).
+  **El sistema se comportó bien**: preguntó a la API, no encontró al usuario y
+  **se negó a tocar el consolidador** (422) en vez de adivinar.
+  **Mejora hecha:** ese rechazo era **invisible** —la respuesta se la queda
+  HighLevel— así que ahora se **audita** (`highlevel.usuario_sin_mapear`) y sale
+  en «Actividad del día» en rojo con el id, para poder corregirlo.
+  **Cómo validar todos los ids de un tirón:** `GET
+  services.leadconnectorhq.com/users/<id>` con el PIT — 200 = existe (devuelve
+  el nombre), 404 = mal copiado.
+
+- **2026-09-06** — **⚠️ SE ROMPIÓ `main` y se arregló (PR #64). Dos lecciones.**
+  1. **Squash sobre historia ya fusionada duplica código.** Los PR #62 y #63 se
+     fusionaron con squash sobre ramas que ya contenían el mismo bloque, y
+     `resolverDeclaracion` quedó **dos veces** en `liderazgo.ts`. Al reiniciar la
+     rama desde `main` (§5), **verificar que no quedó nada duplicado**.
+  2. **`tsc` NO basta antes de fusionar: hay que correr `npm run cf:build`.**
+     `liderazgo.ts` pasó a importar `highlevel-salida` (que arrastra `pg` y
+     `fs`/`net`/`tls`/`dns`) y el formulario, que es **componente de cliente**,
+     importaba de ahí → esos módulos acababan en el paquete del navegador y el
+     build se caía con «Module not found: Can't resolve 'dns'». `tsc` pasó
+     igual; solo el build lo vio.
+     **Arreglo estructural: `src/lib/liderazgo-catalogo.ts`** con las listas y
+     formatos que usan los dos lados. **REGLA: lo que use el navegador va en el
+     catálogo; lo que toque base de datos o red, en `liderazgo.ts`.** El mismo
+     cuidado vale para cualquier `lib` que importe un componente `"use client"`.
+
+- **2026-09-06** — **El id de HighLevel de Nora Bonilla estaba mal por DOS
+  caracteres** y por eso María Eugenia Chávez se quedó «sin consolidador»
+  aunque en el CRM sí se le había asignado a Nora.
+  ```
+  HighLevel : t8HuZDPMHztakrzIFIJQ
+  Sistema   : t8HuZDPMHztakrzlFlJQ
+                             ^ ^   (I mayúscula vs l minúscula)
+  ```
+  Error de transcripción al copiar el código a ojo de la lista «Mi personal».
+  **Corregido en `app_user`** y reenviada la asignación: María Eugenia quedó con
+  Nora. **Se validaron los 15 ids contra `GET /users/<id>` de la API: los otros
+  14 están bien.** Solo había 1 contacto de Nora en el CRM, así que no hubo más
+  arrastre; y las 90 llamadas de `call_log` ya estaban bien atribuidas (el
+  webhook de llamadas la reconocía por correo).
+  **El sistema se comportó bien**: preguntó a la API, no encontró al usuario y
+  **se negó a tocar el consolidador** (422) en vez de adivinar.
+  **Mejora hecha:** ese rechazo era **invisible** —la respuesta se la queda
+  HighLevel— así que ahora se **audita** (`highlevel.usuario_sin_mapear`) y sale
+  en «Actividad del día» en rojo con el id, para poder corregirlo.
+  **Cómo validar todos los ids de un tirón:** `GET
+  services.leadconnectorhq.com/users/<id>` con el PIT — 200 = existe (devuelve
+  el nombre), 404 = mal copiado.
+
+- **2026-09-06** — **⚠️ ROMPÍ `main` y lo arreglé (PR #64). Dos lecciones.**
+  1. **Squash sobre historia ya fusionada duplica código.** Los PR #62 y #63 se
+     fusionaron con squash sobre ramas que ya contenían el mismo bloque, y
+     `resolverDeclaracion` quedó **dos veces** en `liderazgo.ts`. Al reiniciar la
+     rama desde `main` (§5), **verificar que no quedó nada duplicado**.
+  2. **`tsc` NO basta antes de fusionar: hay que correr `npm run cf:build`.**
+     `liderazgo.ts` pasó a importar `highlevel-salida` (que arrastra `pg` y
+     `fs`/`net`/`tls`/`dns`) y el formulario, que es **componente de cliente**,
+     importaba de ahí → esos módulos acababan en el paquete del navegador y el
+     build se caía con «Module not found: Can't resolve 'dns'». `tsc` pasó
+     igual; solo el build lo vio.
+     **Arreglo estructural: `src/lib/liderazgo-catalogo.ts`** con las listas y
+     formatos que usan los dos lados. **REGLA: lo que use el navegador va en el
+     catálogo; lo que toque base de datos o red, en `liderazgo.ts`.** El mismo
+     cuidado vale para cualquier `lib` que importe un componente `"use client"`.
+
 - **2026-09-05** — **El formulario de liderazgo ahora SÍ escribe en HighLevel**
   (decisión del usuario: exportar todo, crear y actualizar).
   Se había quedado sin exportar nada, a diferencia de los otros tres caminos que
