@@ -480,7 +480,7 @@ function Confirmacion({
       {resultado.hitos.length ? (
         <div className="mt-[14px] rounded-[11px] bg-papel px-[15px] py-[14px]">
           <p className="text-[11px] leading-none font-bold tracking-[.1em] text-tinta-42">
-            TU RECORRIDO
+            TU RECORRIDO · POR CONFIRMAR
           </p>
           <ul className="mt-[10px] flex flex-col gap-[7px]">
             {resultado.hitos.map((hito) => (
@@ -496,7 +496,9 @@ function Confirmacion({
         </div>
       ) : null}
 
-      {resultado.rolesDeclarados.length || resultado.etapaPendiente ? (
+      {resultado.rolesDeclarados.length ||
+      resultado.etapaPendiente ||
+      resultado.hitos.length ? (
         <div className="aviso-ambar mt-4">
           <p className="text-[11.5px] leading-[1.5] font-medium text-ambar-texto">
             {resultado.rolesDeclarados.length ? (
@@ -513,6 +515,11 @@ function Confirmacion({
                 Y que estás en la etapa{" "}
                 <strong className="font-bold">{resultado.etapaPendiente}</strong>
                 .{" "}
+              </>
+            ) : null}
+            {resultado.hitos.length ? (
+              <>
+                Y anotamos tu recorrido.{" "}
               </>
             ) : null}
             Un administrador lo revisa y lo confirma.

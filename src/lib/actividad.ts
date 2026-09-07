@@ -728,13 +728,33 @@ export async function cargarActividad(
         break;
       }
       case "liderazgo.declaracion_confirmada":
-        tipo = "personas"; etiqueta = "LIDERAZGO"; tono = "verde";
-        frase = [A(), t(" confirmó lo que declaró "), P()];
+      case "liderazgo.declaracion_descartada": {
+        const confirmo = fila.action === "liderazgo.declaracion_confirmada";
+        tipo = "personas"; etiqueta = "LIDERAZGO"; tono = confirmo ? "verde" : "gris";
+        // Desde el 7-sep se resuelve renglón por renglón, así que la frase dice
+        // cuántas cosas y cuáles: «confirmó 1 de lo que declaró» sin más no
+        // servía para saber qué se aplicó.
+        const cuantos = typeof m.cuantos === "number" ? m.cuantos : 1;
+        frase = [
+          A(),
+          t(confirmo ? " confirmó " : " descartó "),
+          b(cuantos === 1 ? "una cosa" : `${cuantos} cosas`),
+          t(" de lo que declaró "),
+          P(),
+        ];
+        tituloDetalle = confirmo ? "Qué se confirmó" : "Qué se descartó";
+        const que = Array.isArray(m.que) ? m.que : [];
+        if (que.length) filas.push({ k: "Renglones", v: que.join(" · ") });
+        if (m.sinCuenta === true) {
+          filas.push({
+            k: "Ojo",
+            v: "No tiene cuenta: el permiso no tiene dónde aplicarse todavía.",
+          });
+        }
+        const quedan = typeof m.quedanPendientes === "number" ? m.quedanPendientes : 0;
+        if (quedan > 0) filas.push({ k: "Siguen esperando", v: `${quedan}` });
         break;
-      case "liderazgo.declaracion_descartada":
-        tipo = "personas"; etiqueta = "LIDERAZGO"; tono = "gris";
-        frase = [A(), t(" descartó lo que declaró "), P()];
-        break;
+      }
       case "highlevel.usuario_sin_mapear":
         tipo = "crm"; etiqueta = "CRM"; tono = "rojo";
         frase = [
