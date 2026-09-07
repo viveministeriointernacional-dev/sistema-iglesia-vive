@@ -510,6 +510,28 @@ export async function cargarActividad(
         tipo = "personas"; etiqueta = "BAJA PEDIDA"; tono = "ambar";
         frase = [A(), t(" retiró la solicitud de baja de "), P()];
         break;
+      case "acceso.llave_maestra_usada": {
+        tipo = "accesos"; etiqueta = "LLAVE MAESTRA"; tono = "rojo";
+        // Aquí NO se usa A(): quién escribió la llave no se sabe (es un secreto
+        // compartido). Lo que sí se sabe, y es lo que hay que poder revisar, es
+        // a qué perfil se entró.
+        const correo = texto(m.email);
+        frase = [
+          t("Alguien entró con la llave maestra al perfil de "),
+          b(nombreUsuario.get(fila.entityId ?? "") ?? correo ?? "un usuario"),
+        ];
+        if (correo) filas.push({ k: "Correo", v: correo });
+        tituloDetalle = "Entrada con llave maestra";
+        break;
+      }
+      case "acceso.llave_maestra_cambiada":
+        tipo = "accesos"; etiqueta = "LLAVE MAESTRA"; tono = "ambar";
+        frase = [A(), t(" cambió la llave maestra")];
+        break;
+      case "acceso.llave_maestra_revocada":
+        tipo = "accesos"; etiqueta = "LLAVE MAESTRA"; tono = "ambar";
+        frase = [A(), t(" quitó la llave maestra")];
+        break;
       case "administracion.reactivado": {
         tipo = "personas"; etiqueta = "PERSONAS"; tono = "verde";
         frase = [A(), t(" reactivó a "), P()];

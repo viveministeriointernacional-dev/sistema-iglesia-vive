@@ -11,6 +11,7 @@ import {
 import { HITOS_EDITABLES } from "@/lib/administracion";
 import { auditar } from "@/lib/audit";
 import { darDeBajaAprendiz, resolverSolicitudDeBaja } from "@/lib/baja";
+import { guardarLlaveMaestra, revocarLlaveMaestra } from "@/lib/llave-maestra";
 import { resolverDeclaracion } from "@/lib/liderazgo";
 import {
   DONDE_PUEDE_MENTOREAR,
@@ -573,6 +574,38 @@ export async function darDeBaja(
     revalidatePath("/administracion");
     revalidatePath("/administracion/bajas");
     revalidatePath("/operacion-72");
+    return { ok: true };
+  });
+}
+
+/// Pone o cambia la llave maestra: el secreto que abre cualquier perfil
+/// escribiendo el correo de esa persona en vez de su contraseña.
+///
+/// No es la contraseña de nadie, así que cambiarla no le quita el ingreso a
+/// ninguna persona. Del valor solo se guarda su huella (ver
+/// `src/lib/llave-maestra.ts`); ni siquiera esta pantalla lo puede volver a
+/// mostrar.
+export async function cambiarLlaveMaestra(valor: string): Promise<ResultadoAdmin> {
+  return conAdmin(async (usuario) => {
+    const prisma = await getPrisma();
+    const resultado = await guardarLlaveMaestra(prisma, {
+      valor,
+      actorId: usuario.id,
+    });
+    if (!resultado.ok) return resultado;
+    revalidatePath("/administracion/llave-maestra");
+    return { ok: true };
+  });
+}
+
+/// Deja el sistema sin llave maestra. A partir de ahí, a cada perfil solo se
+/// entra con su propia contraseña.
+export async function quitarLlaveMaestra(): Promise<ResultadoAdmin> {
+  return conAdmin(async (usuario) => {
+    const prisma = await getPrisma();
+    const resultado = await revocarLlaveMaestra(prisma, usuario.id);
+    if (!resultado.ok) return resultado;
+    revalidatePath("/administracion/llave-maestra");
     return { ok: true };
   });
 }

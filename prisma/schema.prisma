@@ -108,6 +108,7 @@ model AppUser {
   declaracionesRevisadas LeadershipDeclaration[] @relation("RevisoDeclaracion")
   bajasPedidas           BajaRequest[]           @relation("PidioLaBaja")
   bajasResueltas         BajaRequest[]           @relation("ResolvioLaBaja")
+  llavesMaestras         MasterKey[]             @relation("CreoLlaveMaestra")
 
   @@index([role, active])
   @@map("app_user")
@@ -1040,4 +1041,27 @@ model BajaRequest {
   @@index([status, createdAt])
   @@index([learnerId, createdAt])
   @@map("baja_request")
+}
+
+/// La llave maestra: un secreto propio del administrador que abre cualquier
+/// perfil escribiendo el correo de esa persona y esta llave en vez de su
+/// contraseña. Es distinta de la contraseña del administrador a propósito: se
+/// puede rotar sin cambiarle el ingreso a nadie, y si se filtra se cambia sola.
+///
+/// **Nunca se guarda el valor**, solo su huella PBKDF2 con sal propia. Cada uso
+/// queda auditado (`acceso.llave_maestra_usada`) diciendo a qué perfil entró.
+model MasterKey {
+  id           String    @id @default(uuid())
+  secretHash   String    @map("secret_hash")
+  salt         String
+  iterations   Int
+  createdById  String    @map("created_by_id")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  lastUsedAt   DateTime? @map("last_used_at")
+  /// Nulo mientras es la llave viva. Rotarla marca aquí la anterior.
+  revokedAt    DateTime? @map("revoked_at")
+
+  createdBy AppUser @relation("CreoLlaveMaestra", fields: [createdById], references: [id])
+
+  @@map("master_key")
 }

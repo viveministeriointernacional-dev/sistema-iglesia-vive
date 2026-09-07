@@ -211,6 +211,42 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-07** — **Llave maestra: entrar a cualquier perfil con su correo.**
+  Pedido del usuario. Le ofrecí tres formas y **eligió «llave maestra propia,
+  aparte de tu contraseña»** (las otras dos eran «Ingresar como» desde
+  Administración y usar literalmente la contraseña del administrador).
+  **Por qué no es la contraseña del administrador**: si lo fuera, no se podría
+  rotar sin cambiarle el ingreso a quien administra, y la contraseña del día a
+  día pasaría a ser la llave de todo el sistema, incluidas las notas pastorales.
+  - **Tabla `master_key`** (modelo `MasterKey`, migración
+    `20260907140000_llave_maestra`). **El valor NUNCA se guarda**: solo su huella
+    **PBKDF2-SHA256, 210 000 iteraciones, sal propia de 16 bytes**
+    (`crypto.subtle`, que sí existe en el Worker). Comparación en tiempo fijo.
+    Índice único parcial `((revoked_at IS NULL)) WHERE revoked_at IS NULL` para
+    que solo haya una llave viva; rotar revoca la anterior en la misma
+    transacción. Mínimo 12 caracteres.
+  - **Cómo entra**: en `/ingresar`, si `signInWithPassword` falla **y** el correo
+    es de un `app_user` activo, se comprueba la llave. Si acierta, se abre la
+    sesión de ese perfil con la llave de servicio en **dos pasos**: Supabase Auth
+    no tiene «entrar como», así que se genera un **magic link**
+    (`admin.generateLink`, que no se envía a ninguna parte) y se canjea su
+    `hashed_token` con `verifyOtp` en el cliente con cookies. Queda una sesión
+    normal de esa persona. **Requiere `SUPABASE_SERVICE_ROLE_KEY`** en el Worker.
+  - **La llave solo se comprueba tras un fallo y sobre un correo que existe y
+    está activo**, y la respuesta es siempre la misma frase: así no sirve para
+    averiguar qué correos hay.
+  - **Auditoría**: `acceso.llave_maestra_usada` (con el perfil al que entró),
+    `…_cambiada` y `…_revocada`, las tres con su `case` en `actividad.ts`.
+    Ojo: en la de uso **no se usa `A()`** — quién escribió la llave no se sabe,
+    es un secreto compartido; lo que se registra es **a qué perfil entró**.
+  - **Pantalla `/administracion/llave-maestra`** (solo ADMIN, botón nuevo en la
+    cabecera de Administración): ponerla, cambiarla o quitarla, con la fecha del
+    último cambio y del último uso. Se escribe dos veces porque después nadie la
+    puede volver a ver. **`LARGO_MINIMO_LLAVE` vive en
+    `src/lib/llave-maestra-catalogo.ts`** por la regla del 6-sep: lo que usa el
+    navegador va en el catálogo.
+  - **Sin llave configurada, este camino no existe** — es el estado inicial.
+
 - **2026-09-07** — **Autorización de bajas: nadie sale del sistema sin que un
   administrador lo apruebe** (mockup aprobado:
   claude.ai/code/artifact/c045bd7e-341f-43dd-9063-6502384acc42).

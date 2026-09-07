@@ -67,6 +67,11 @@ export type AccionAuditada =
   | "administracion.contrasena_restablecida"
   | "acceso.recuperacion_solicitada"
   | "acceso.contrasena_recuperada"
+  // Llave maestra: el secreto del administrador que abre cualquier perfil.
+  // Cada uso dice a qué perfil entró; sin esto la entrada sería invisible.
+  | "acceso.llave_maestra_cambiada"
+  | "acceso.llave_maestra_revocada"
+  | "acceso.llave_maestra_usada"
   | "administracion.hito_editado"
   | "administracion.mentor_asignado"
   | "administracion.dado_de_baja"
