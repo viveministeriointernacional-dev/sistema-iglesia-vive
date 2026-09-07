@@ -1,12 +1,6 @@
 import { LearnerStatus, Operation72Status, Phase, Prisma } from "@iglesia/prisma-client";
 import { ZONA_HORARIA } from "@/lib/dominio";
-import {
-  DIAS_DEL_PERIODO,
-  granoPara,
-  periodoValido,
-  type Grano,
-  type Periodo,
-} from "@/lib/informe-catalogo";
+import { granoPara, type Grano } from "@/lib/informe-catalogo";
 import type { ClientePrisma } from "@/lib/prisma";
 
 export * from "@/lib/informe-catalogo";
@@ -14,8 +8,16 @@ export * from "@/lib/informe-catalogo";
 /// El informe de la plataforma: qué pasó en un periodo, en cuánto creció, y
 /// qué tan efectivo fue el trabajo con la gente que entró.
 ///
-/// **Todo se mide en hora Colombia** (el servidor corre en UTC), y la semana
-/// arranca el VIERNES — ver `informe-catalogo.ts` para el porqué.
+/// **El periodo lo elige quien mira el informe**: dos fechas cualquiera. Con
+/// qué se compara sale de ellas (ver `correr`).
+///
+/// **Todo se mide en hora Colombia** (el servidor corre en UTC). La semana de
+/// referencia arranca el VIERNES: la gente entra en las reuniones del sábado,
+/// el domingo y el miércoles, así que un corte de domingo a domingo dejaría a
+/// los del fin de semana sin días hábiles para llamarlos antes del cierre.
+/// Empezando el viernes quedan lunes, martes, miércoles y jueves dentro del
+/// mismo periodo. Por eso el informe abre en la semana de viernes a jueves y
+/// hay un atajo para ella, pero es solo eso: un atajo.
 
 const FORMATO_DIA = new Intl.DateTimeFormat("en-CA", {
   year: "numeric",
@@ -70,7 +72,6 @@ function diaValido(valor: string | undefined) {
 }
 
 export type Rango = {
-  periodo: Periodo;
   /// Primer día del periodo, en formato aaaa-mm-dd.
   inicio: string;
   /// Último día del periodo (inclusive).
@@ -164,37 +165,23 @@ function nombreDelPrevio(inicio: string, fin: string) {
   return `los ${dias} días anteriores`;
 }
 
-/// Traduce «qué periodo y qué fechas» a las dos marcas de tiempo que usan todas
-/// las consultas, más las etiquetas y la navegación.
-export function calcularRango(
-  periodoCrudo: string | undefined,
-  diaCrudo: string | undefined,
-  desdeCrudo?: string,
-  hastaCrudo?: string,
-): Rango {
-  const periodo = periodoValido(periodoCrudo);
-
+/// Traduce las dos fechas elegidas a las marcas de tiempo que usan todas las
+/// consultas, más las etiquetas y la navegación.
+///
+/// Sin fechas abre en la **semana de viernes a jueves** en curso.
+export function calcularRango(desdeCrudo?: string, hastaCrudo?: string): Rango {
   let inicio: string;
   let fin: string;
 
-  if (periodo === "rango") {
-    // Dos fechas sueltas. Si vienen al revés se enderezan en vez de devolver un
-    // periodo vacío: es un error de dedo, no una intención.
-    const a = diaValido(desdeCrudo);
+  if (desdeCrudo || hastaCrudo) {
+    // Si vienen al revés se enderezan en vez de devolver un periodo vacío: es
+    // un error de dedo, no una intención.
+    const a = diaValido(desdeCrudo ?? hastaCrudo);
     const b = diaValido(hastaCrudo ?? desdeCrudo);
     [inicio, fin] = a <= b ? [a, b] : [b, a];
   } else {
-    const ancla = diaValido(diaCrudo);
-    const largo = DIAS_DEL_PERIODO[periodo];
-    // El día suelto empieza donde diga el ancla; los cortes semanales y de
-    // cuatro semanas siempre empiezan un viernes.
-    inicio =
-      periodo === "dia"
-        ? ancla
-        : periodo === "semana"
-          ? viernesDe(ancla)
-          : sumarDias(viernesDe(ancla), -21);
-    fin = sumarDias(inicio, largo - 1);
+    inicio = viernesDe(diaDeHoyColombia());
+    fin = sumarDias(inicio, 6);
   }
 
   const dias = diasEntre(inicio, fin);
@@ -206,7 +193,6 @@ export function calcularRango(
       : `${capitalizar(FECHA_LARGA.format(fechaDeDia(inicio)))} → ${FECHA_LARGA.format(fechaDeDia(fin))}`;
 
   return {
-    periodo,
     inicio,
     fin,
     desde: new Date(`${inicio}T00:00:00-05:00`),
@@ -223,6 +209,46 @@ export function calcularRango(
       hasta: new Date(`${previo.fin}T23:59:59.999-05:00`),
     },
   };
+}
+
+/// Los periodos de un clic. No son «modos»: cada uno solo rellena las dos
+/// fechas, así que después se pueden mover a mano sin cambiar de nada.
+export type Atajo = { clave: string; etiqueta: string; inicio: string; fin: string };
+
+export function atajosDelInforme(hoy = diaDeHoyColombia()): Atajo[] {
+  const { anio, mes } = partesDe(hoy);
+  const viernes = viernesDe(hoy);
+  const mesPasado = mes === 1 ? { anio: anio - 1, mes: 12 } : { anio, mes: mes - 1 };
+
+  return [
+    { clave: "hoy", etiqueta: "Hoy", inicio: hoy, fin: hoy },
+    { clave: "ayer", etiqueta: "Ayer", inicio: sumarDias(hoy, -1), fin: sumarDias(hoy, -1) },
+    {
+      clave: "semana",
+      etiqueta: "Esta semana",
+      inicio: viernes,
+      fin: sumarDias(viernes, 6),
+    },
+    {
+      clave: "semana-pasada",
+      etiqueta: "Semana pasada",
+      inicio: sumarDias(viernes, -7),
+      fin: sumarDias(viernes, -1),
+    },
+    {
+      clave: "mes",
+      etiqueta: "Este mes",
+      inicio: armarDia(anio, mes, 1),
+      fin: armarDia(anio, mes, diasDelMes(anio, mes)),
+    },
+    {
+      clave: "mes-pasado",
+      etiqueta: "Mes pasado",
+      inicio: armarDia(mesPasado.anio, mesPasado.mes, 1),
+      fin: armarDia(mesPasado.anio, mesPasado.mes, diasDelMes(mesPasado.anio, mesPasado.mes)),
+    },
+    { clave: "anio", etiqueta: "Este año", inicio: armarDia(anio, 1, 1), fin: armarDia(anio, 12, 31) },
+  ];
 }
 
 function capitalizar(texto: string) {
@@ -302,14 +328,9 @@ function posicion(fase: Phase) {
 
 export async function cargarInforme(
   prisma: ClientePrisma,
-  opciones: { periodo?: string; dia?: string; desde?: string; hasta?: string } = {},
+  opciones: { desde?: string; hasta?: string } = {},
 ): Promise<Informe> {
-  const rango = calcularRango(
-    opciones.periodo,
-    opciones.dia,
-    opciones.desde,
-    opciones.hasta,
-  );
+  const rango = calcularRango(opciones.desde, opciones.hasta);
   const { desde, hasta } = rango;
   const { desde: desdePrevio, hasta: hastaPrevio } = rango.previo;
 

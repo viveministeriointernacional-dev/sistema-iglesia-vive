@@ -3,9 +3,8 @@ import { Operation72Status, Phase } from "@iglesia/prisma-client";
 import { requerirRol, ROLES_ADMIN } from "@/lib/auth";
 import { ETIQUETA_HITO } from "@/lib/administracion";
 import {
+  atajosDelInforme,
   cargarInforme,
-  ETIQUETA_PERIODO,
-  PERIODOS,
   type Comparacion,
   type Efectividad,
   type Informe,
@@ -65,54 +64,26 @@ function anchoDe(parte: number, total: number) {
   return `${total <= 0 ? 0 : Math.max((parte / total) * 100, parte > 0 ? 1.5 : 0)}%`;
 }
 
-/// La URL que reproduce este mismo periodo. Los cortes fijos viajan con un solo
-/// día de ancla; el rango libre, con sus dos extremos.
+/// La URL que reproduce este mismo periodo. Siempre son las dos fechas: el
+/// informe no tiene «modos», solo un rango.
 function parametrosDelRango(rango: Rango) {
-  return rango.periodo === "rango"
-    ? `periodo=rango&desde=${rango.inicio}&hasta=${rango.fin}`
-    : `periodo=${rango.periodo}&dia=${rango.inicio}`;
+  return `desde=${rango.inicio}&hasta=${rango.fin}`;
 }
 
 export default async function PaginaInforme({
   searchParams,
 }: {
-  searchParams: Promise<{
-    periodo?: string;
-    dia?: string;
-    desde?: string;
-    hasta?: string;
-  }>;
+  searchParams: Promise<{ desde?: string; hasta?: string }>;
 }) {
   await requerirRol(ROLES_ADMIN);
-  const { periodo, dia, desde, hasta } = await searchParams;
+  const { desde, hasta } = await searchParams;
   const prisma = await getPrisma();
-  const informe = await cargarInforme(prisma, { periodo, dia, desde, hasta });
+  const informe = await cargarInforme(prisma, { desde, hasta });
   const { rango } = informe;
+  const atajos = atajosDelInforme();
 
-  const enlace = (cambios: {
-    periodo?: string;
-    dia?: string;
-    desde?: string;
-    hasta?: string;
-  }) => {
-    const elegido = cambios.periodo ?? rango.periodo;
-    const params = new URLSearchParams({ periodo: elegido });
-    if (elegido === "rango") {
-      // Al pasar a rango libre se conservan los extremos que ya se están viendo.
-      params.set("desde", cambios.desde ?? rango.inicio);
-      params.set("hasta", cambios.hasta ?? rango.fin);
-    } else {
-      params.set("dia", cambios.dia ?? rango.inicio);
-    }
-    return `/administracion/informe?${params.toString()}`;
-  };
-
-  /// ← y → mueven el periodo entero. Un tramo de meses completos se corre por
-  /// meses; cualquier otro, por su propio largo en días.
-  const enlaceA = (tramo: { inicio: string; fin: string }) =>
-    rango.periodo === "rango"
-      ? enlace({ desde: tramo.inicio, hasta: tramo.fin })
-      : enlace({ dia: tramo.inicio });
+  const enlace = (tramo: { inicio: string; fin: string }) =>
+    `/administracion/informe?desde=${tramo.inicio}&hasta=${tramo.fin}`;
 
   return (
     <main className="px-5 py-7 pb-16 sm:px-[26px]">
@@ -137,33 +108,28 @@ export default async function PaginaInforme({
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="flex overflow-hidden rounded-[10px] border border-borde-control bg-white">
-              {PERIODOS.map((opcion) => (
-                <Link
-                  key={opcion}
-                  href={enlace({ periodo: opcion })}
-                  className={`px-[15px] py-[11px] text-[12.5px] leading-none font-semibold ${
-                    opcion === rango.periodo
-                      ? "bg-azul-900 font-bold text-white"
-                      : "text-[rgba(19,28,36,.55)]"
-                  }`}
-                >
-                  {ETIQUETA_PERIODO[opcion]}
-                  {opcion === "semana" || opcion === "mes" ? (
-                    <span className="font-semibold opacity-70"> vie→jue</span>
-                  ) : null}
-                </Link>
-              ))}
-            </div>
             <Link
-              href={enlaceA(rango.anterior)}
+              href={enlace(rango.anterior)}
               aria-label="Periodo anterior"
               className="rounded-[9px] border border-borde-control bg-white px-[13px] py-[11px] text-[12.5px] leading-none font-bold text-tinta"
             >
               ←
             </Link>
+            {/* Formulario GET: funciona sin JavaScript, como el resto de la
+                pantalla. Las dos casillas SON el control del informe. */}
+            <form
+              method="get"
+              action="/administracion/informe"
+              className="flex items-end gap-2"
+            >
+              <CampoFecha rotulo="DESDE" nombre="desde" valor={rango.inicio} />
+              <CampoFecha rotulo="HASTA" nombre="hasta" valor={rango.fin} />
+              <button type="submit" className="boton-primario">
+                Ver
+              </button>
+            </form>
             <Link
-              href={enlaceA(rango.siguiente)}
+              href={enlace(rango.siguiente)}
               aria-label="Periodo siguiente"
               className="rounded-[9px] border border-borde-control bg-white px-[13px] py-[11px] text-[12.5px] leading-none font-bold text-tinta"
             >
@@ -172,47 +138,32 @@ export default async function PaginaInforme({
           </div>
         </header>
 
-        <div className="mt-[14px] flex flex-wrap items-end justify-between gap-[10px]">
-          <div>
-            <p className="text-[14px] leading-none font-bold text-tinta">
-              {rango.etiqueta}
-              <span className="ml-2 text-[12px] font-semibold text-[rgba(19,28,36,.5)]">
-                {rango.dias} {rango.dias === 1 ? "día" : "días"} · se compara con{" "}
-                {rango.etiquetaPrevio}
-              </span>
-            </p>
-            {rango.periodo === "semana" || rango.periodo === "mes" ? (
-              <p className="mt-[6px] text-[11.5px] leading-[1.4] font-semibold text-[rgba(19,28,36,.5)]">
-                {rango.periodo === "semana"
-                  ? "La semana corre de viernes a viernes: el fin de semana queda al principio y quedan lunes a jueves para llamar."
-                  : "Cuatro semanas de viernes a viernes, para que el corte coincida con el de la semana."}
-              </p>
-            ) : null}
-            {rango.periodo === "rango" ? (
-              <p className="mt-[6px] max-w-[560px] text-[11.5px] leading-[1.4] font-semibold text-[rgba(19,28,36,.5)]">
-                El periodo con el que se compara sale del que elijas: si el tramo
-                son meses completos, se compara contra los mismos meses de antes
-                (un mes contra el mes anterior, doce contra el año anterior); si
-                no, contra los mismos días justo antes.
-              </p>
-            ) : null}
-          </div>
-
-          {rango.periodo === "rango" ? (
-            <form
-              method="get"
-              action="/administracion/informe"
-              className="flex flex-wrap items-end gap-2"
-            >
-              <input type="hidden" name="periodo" value="rango" />
-              <CampoFecha rotulo="DESDE" nombre="desde" valor={rango.inicio} />
-              <CampoFecha rotulo="HASTA" nombre="hasta" valor={rango.fin} />
-              <button type="submit" className="boton-primario">
-                Ver
-              </button>
-            </form>
-          ) : null}
+        <div className="mt-[14px] flex flex-wrap items-center gap-2">
+          {atajos.map((atajo) => {
+            const puesto = atajo.inicio === rango.inicio && atajo.fin === rango.fin;
+            return (
+              <Link
+                key={atajo.clave}
+                href={enlace(atajo)}
+                className={`rounded-[20px] px-[13px] py-[8px] text-[11.5px] leading-none font-semibold ${
+                  puesto
+                    ? "bg-azul-900 font-bold text-white"
+                    : "border border-borde-control bg-white text-[rgba(19,28,36,.55)]"
+                }`}
+              >
+                {atajo.etiqueta}
+              </Link>
+            );
+          })}
         </div>
+
+        <p className="mt-[14px] text-[14px] leading-[1.4] font-bold text-tinta">
+          {rango.etiqueta}
+          <span className="ml-2 text-[12px] font-semibold text-[rgba(19,28,36,.5)]">
+            {rango.dias} {rango.dias === 1 ? "día" : "días"} · se compara con{" "}
+            {rango.etiquetaPrevio}
+          </span>
+        </p>
 
         <Tiles informe={informe} />
         <BloqueEfectividad informe={informe} />
@@ -551,11 +502,11 @@ function BloqueEfectividad({ informe }: { informe: Informe }) {
       )}
 
       <p className="mt-4 border-t border-borde-tarjeta pt-[13px] text-[11.5px] leading-[1.5] font-medium text-[rgba(19,28,36,.5)]">
-        Se mide <strong className="font-bold text-tinta">dentro del mismo periodo</strong>
-        {informe.rango.periodo === "semana" || informe.rango.periodo === "mes"
-          ? ": por eso el corte va de viernes a viernes — quien llegó el sábado o el domingo tiene lunes, martes, miércoles y jueves para que lo llamen"
-          : ""}
-        . Los que entraron sobre el cierre salen aparte como{" "}
+        Se mide{" "}
+        <strong className="font-bold text-tinta">dentro del mismo periodo</strong>,
+        así que conviene que el corte empiece un viernes: quien llegó el sábado o
+        el domingo tiene lunes, martes, miércoles y jueves para que lo llamen. Los
+        que entraron sobre el cierre salen aparte como{" "}
         <strong className="font-bold text-tinta">«aún en plazo»</strong> y no
         cuentan como perdidos.
       </p>
