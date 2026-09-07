@@ -211,6 +211,116 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-07** — **Menos viajes a la base en el tablero de Operación 72: de
+  ~15 a 6.** Es la palanca (1) del diagnóstico de lentitud de hoy, y la eligió
+  el usuario.
+  **El problema no era el plan de ejecución, era la FILA DE VIAJES.** Con
+  `PrismaPg max: 1` (necesario para no agotar el pooler de Supabase), **Prisma
+  serializa todas las consultas de una petición sobre la única conexión**, así
+  que un `Promise.all` de 10 consultas son 10 latencias, una detrás de otra.
+  El tablero hacía: 1 auth + 1 totales + 1 mentores + **2 por columna × 5
+  columnas** + 1 intentos + 1 solicitudes (+1 la búsqueda por teléfono).
+  **Nuevo `src/lib/tablero-op72.ts` → `seleccionarTarjetasDelTablero`**: una
+  sola consulta con `row_number() OVER (PARTITION BY status ORDER BY …)` que
+  devuelve **los ids de las cinco columnas y sus totales de un tirón**, con el
+  alcance por consolidador y la búsqueda (nombre y teléfono) dentro del mismo
+  SQL. La página hace después UNA `findMany` con esos ids y los reordena en
+  memoria (`findMany` no respeta el orden del `in`).
+  **La regla de orden `urgencia` cabe en un solo ORDER BY de tres claves:**
+  ```sql
+  (deadline_at >= now()) DESC,                                  -- dentro de plazo primero
+  CASE WHEN deadline_at >= now() THEN deadline_at END ASC,       -- menos margen primero
+  deadline_at DESC                                               -- vencidas: la más reciente
+  ```
+  **Comprobado fila por fila contra la base antes de cambiar nada: 60 de 60 en
+  el mismo id y el mismo puesto que las dos consultas viejas, 0 diferencias.**
+  También se probaron las tres ramas del filtro (sin filtro, por consolidador,
+  por nombre y por teléfono) con los parámetros tal como los manda Prisma
+  (arreglo de texto + nulos), porque **los casts son lo que se rompe**:
+  `${'$'}{estados}::text[]::"Operation72Status"[]` y `${'$'}{param}::text IS NULL`.
+  El `ORDER BY` se arma con `Prisma.raw` **desde un mapa cerrado**, nunca desde
+  algo que escriba el usuario.
+  **Pendiente de la misma palanca:** el informe todavía hace 9 viajes (4 de
+  ellos son `groupBy` chiquitos que se pueden juntar en uno).
+
+- **2026-09-07** — **Índices de consulta** (migración
+  `20260907170000_indices_de_consulta`, 9 índices) **y el diagnóstico honesto de
+  la lentitud**.
+  El usuario pidió índices para optimizar. **Se midió antes de crearlos, y el
+  resultado corrige la intuición:**
+  - **Las tablas son diminutas.** La más grande es `audit_log` con **1 528
+    filas / 952 kB**; `contact_attempt` tiene 398 filas / 248 kB. La consulta
+    más pesada del informe (la de consolidadores, con cinco `EXISTS`
+    correlacionados) tarda **20,4 ms de ejecución… y 19,6 ms de PLANIFICACIÓN**.
+    Todo resuelve por escaneo completo, y **Postgres hace bien**: la tabla
+    entera cabe en una docena de páginas.
+  - **⚠️ Conclusión: los índices NO son el cuello de botella hoy.** La lentitud
+    que se siente es **latencia de ida y vuelta al pooler de Supabase** (§9:
+    plan FREE, `ca-central-1`) multiplicada por el número de consultas por
+    página — y con `PrismaPg max:1` las consultas de un `Promise.all`
+    **se serializan** sobre la única conexión. El informe hace 9 viajes; el
+    tablero, otros tantos. Ahí está el segundo, no en el plan de ejecución.
+  - **Aun así los índices se crearon**, como trabajo preventivo: el costo del
+    escaneo crece en línea recta con la iglesia y `pg_stat_user_tables` ya
+    muestra el patrón — `person` lleva **771 933 filas leídas** a punta de
+    escaneo completo (2 044 escaneos), `learner_profile` 615 938. Cuando esas
+    tablas pasen de unos miles de filas, el planificador los empieza a usar
+    **solo**, sin tocar nada.
+  - **El que más se va a notar: `learner_profile(consolidator_id)`** — hoy no
+    existía ninguno por consolidador, y lo usan el alcance «solo mis personas»
+    del tablero y el cálculo de carga del reparto automático.
+  - Los otros ocho son por **rango de fechas**, que es lo que pide el informe y
+    que los índices existentes no cubren porque **empiezan por otra columna**
+    (`contact_attempt` tenía `(operation72_id, occurred_at)`, inútil cuando se
+    filtra solo por fecha; `learner_status_change` igual).
+  - **Van sin `CONCURRENTLY` a propósito**: `scripts/migrar.mjs` aplica cada
+    migración dentro de `BEGIN/COMMIT` y ahí no se permite. Con estos tamaños
+    el bloqueo de escritura dura milisegundos.
+  - **Verificados contra la base real** creándolos dentro de una transacción y
+    haciéndole `ROLLBACK`: los 9 se crean sin error y producción quedó intacta.
+  - **Palancas reales para la velocidad, en orden** (siguen pendientes, §9):
+    **(1) menos viajes por página** (juntar consultas), **(2) Hyperdrive**
+    (cachea el pool en el borde y mata la latencia por viaje), **(3) Supabase
+    Pro**. Un índice más no mueve la aguja hasta que la base crezca.
+
+- **2026-09-07** — **Informe de la plataforma** (`/administracion/informe`, solo
+  ADMIN; mockup aprobado:
+  claude.ai/code/artifact/5e99c331-253a-4ec1-b5f1-cf84c196f34f).
+  - **⚠️ LA SEMANA VA DE VIERNES A VIERNES** (decisión del usuario, y su
+    razonamiento hay que conservarlo): la gente entra en las reuniones del
+    **sábado (juvenil), domingo (familiar) y miércoles**, así que un corte de
+    domingo a domingo dejaría a los del fin de semana **sin días hábiles** para
+    llamarlos antes del cierre. Empezando el viernes quedan lunes, martes,
+    miércoles y jueves dentro del mismo periodo. **El «mes» son, por lo mismo,
+    4 semanas de viernes a viernes (28 días)**, no el mes del calendario.
+  - **Esto resolvió el problema de medir la efectividad.** No hace falta una
+    ventana rodante de 7 días: el periodo ya trae su propia ventana de cierre.
+    Los que entran sobre el cierre (los 2 últimos días) salen aparte como
+    **«aún en plazo»** y **no cuentan como perdidos**.
+  - **`src/lib/informe.ts`**: `calcularRango` (matemática de periodos en hora
+    Colombia, con `viernesDe`), `cargarInforme` y `cargarDetallePersonas`.
+    `informe-catalogo.ts` para lo que toca el navegador (regla del 6-sep).
+  - Bloques: tiles con **% contra el periodo anterior** (siempre con la cifra
+    base al lado: de 1 a 3 también es «+200 %»), **embudo de efectividad**,
+    **el recorrido** (personas por fase + neto del periodo + saltos y
+    retrocesos), actividad día por día, Operación 72, hitos, y **tabla por
+    consolidador con «sin tocar» y «efectividad»**.
+  - **`/administracion/informe/personas`**: qué se le hizo a cada persona, con
+    filtros (con movimiento · sin tocar · cambiaron de fase · dadas de baja).
+  - **El neto por fase sale de `phase_change`**, no de fotos históricas (no
+    existen): entradas menos salidas en el periodo. Es exacto.
+  - **Tres trampas de SQL que `tsc` y `cf:build` NO ven** y que hay que probar
+    contra la base (se probaron las tres):
+    1. Un `generate_series` de días debe devolver el día como **texto**
+       (`to_char`). Si vuelve como fecha, `pg` la construye en UTC y al
+       formatearla en hora Colombia **se corre un día hacia atrás**.
+    2. `CASE ${'$'}{parametro} WHEN …` falla con «could not determine data type»:
+       hay que castear (`${'$'}{filtro}::text`).
+    3. `IN (${'$'}{ids.join(...)})` en `$queryRaw` se parametriza como **un solo
+       valor** y no filtra nada. Usar el ORM o `Prisma.join`.
+  - La paleta de la gráfica de actividad (`#2f76c4` · `#c97b2c` · `#3f9f7a`)
+    **pasó el validador de contraste y daltonismo**. No cambiarla a ojo.
+
 - **2026-09-07** — **⚠️ La llave maestra no se podía guardar: Cloudflare limita
   PBKDF2 a 100 000 iteraciones.** Al pulsar «Guardar la llave maestra» salía la
   pantalla negra «This page couldn't load · A server error occurred».

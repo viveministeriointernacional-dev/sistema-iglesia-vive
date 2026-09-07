@@ -11,7 +11,6 @@ import { ESTADO_SOLICITUD } from "@/lib/baja";
 import {
   momentoLegible,
   nombreCompleto,
-  normalizarBusqueda,
   telefonoLegible,
   textoDeEntrada,
   textoDeHorario,
@@ -29,6 +28,7 @@ import {
 } from "@/lib/op72";
 import { mentoresElegibles } from "@/lib/equipo";
 import { TOPE_DE_BUSQUEDA, ubicarPersonas } from "@/lib/busqueda-op72";
+import { seleccionarTarjetasDelTablero } from "@/lib/tablero-op72";
 import { BuscadorPersonas } from "@/components/buscador-personas";
 import { TarjetaDePersona, type TarjetaPersona } from "./tarjeta";
 
@@ -118,38 +118,13 @@ export default async function TableroOperacion72({
   // Quien puede autorizar bajas las aplica directo; a los demás la tarjeta les
   // habla de pedirla, no de darla.
   const bajaRequiereAutorizacion = !puedeAutorizarBaja(usuario);
-  const alcance = soloSuRed ? { learner: { consolidatorId: usuario.id } } : {};
+  const consolidadorDelAlcance = soloSuRed ? usuario.id : null;
   // El mismo alcance, pero sobre el aprendiz: la búsqueda mira a personas que
   // ya NO tienen Operación 72 abierta, así que no puede filtrar por ella.
   const alcanceDelAprendiz: Prisma.LearnerProfileWhereInput = soloSuRed
     ? { consolidatorId: usuario.id }
     : {};
 
-  // Búsqueda por nombre o celular dentro del tablero. El nombre (y el correo)
-  // salen de `person.search_text`, que ya está sin tildes ni mayúsculas. El
-  // celular se compara solo por dígitos, porque el mismo número aparece como
-  // «323 7448212», «+573237448212» o «3237448212» según quién lo escribió.
-  const digitos = consulta.replace(/\D/g, "");
-  const condicionesDeBusqueda: Prisma.Operation72WhereInput[] = [];
-  if (consulta) {
-    condicionesDeBusqueda.push({
-      learner: { person: { searchText: { contains: normalizarBusqueda(consulta) } } },
-    });
-    if (digitos.length >= 4) {
-      const patron = `%${digitos}%`;
-      const porTelefono = await prisma.$queryRaw<{ id: string }[]>`
-        SELECT lp.id
-        FROM learner_profile lp
-        JOIN person p ON p.id = lp.person_id
-        WHERE regexp_replace(coalesce(p.call_phone, ''), '\\D', '', 'g') LIKE ${patron}
-           OR regexp_replace(coalesce(p.whatsapp_phone, ''), '\\D', '', 'g') LIKE ${patron}
-      `;
-      if (porTelefono.length) {
-        condicionesDeBusqueda.push({ learnerId: { in: porTelefono.map((f) => f.id) } });
-      }
-    }
-  }
-  const busqueda = condicionesDeBusqueda.length ? { OR: condicionesDeBusqueda } : {};
 
   // Cuántas tarjetas carga y renderiza cada columna. Con cientos de personas,
   // construirlas todas de golpe agota la memoria del Worker (error 1102), así
@@ -199,58 +174,50 @@ export default async function TableroOperacion72({
     },
   } as const;
 
-  const [conteos, mentores, ...gruposPorColumna] = await Promise.all([
-    prisma.operation72.groupBy({
-      by: ["status"],
-      where: { status: { in: [...ESTADOS_EN_TABLERO] }, ...alcance, ...busqueda },
-      _count: { _all: true },
+  // Los ids de todas las columnas y sus totales salen de UNA consulta
+  // (`seleccionarTarjetasDelTablero`), y los datos de esas tarjetas de otra.
+  // Antes eran hasta doce viajes a la base —uno por los totales y dos por
+  // columna—, y con una sola conexión por petición esos viajes se hacen en
+  // fila, sumando cada uno su latencia completa hasta Supabase.
+  const tope = Math.max(...columnasVisibles.map((columna) => limiteDe(columna.estado)));
+  const [seleccion, mentores] = await Promise.all([
+    seleccionarTarjetasDelTablero(prisma, {
+      estados: columnasVisibles.map((columna) => columna.estado),
+      consolidadorId: consolidadorDelAlcance,
+      consulta,
+      orden,
+      tope,
     }),
     mentoresElegibles(prisma),
-    ...columnasVisibles.map(async (columna) => {
-      const base = { status: columna.estado, ...alcance, ...busqueda };
-      const limite = limiteDe(columna.estado);
-
-      if (orden !== "urgencia") {
-        return prisma.operation72.findMany({
-          where: base,
-          orderBy: { startedAt: orden === "reciente" ? "desc" : "asc" },
-          take: limite,
-          select: seleccionDeTarjeta,
-        });
-      }
-
-      // Primero quienes SIGUEN dentro de sus 72 horas (los que todavía se
-      // pueden atender a tiempo), del que menos margen tiene al que más. Con
-      // cientos de tarjetas vencidas acumuladas, ordenar solo por plazo dejaba
-      // a los registros nuevos al final y el límite por columna los cortaba:
-      // justo las personas que hay que llamar hoy quedaban invisibles.
-      const dentroDePlazo = await prisma.operation72.findMany({
-        where: { ...base, deadlineAt: { gte: ahora } },
-        orderBy: { deadlineAt: "asc" },
-        take: limite,
-        select: seleccionDeTarjeta,
-      });
-
-      const resto = limite - dentroDePlazo.length;
-      if (resto <= 0) return dentroDePlazo;
-
-      // Y después las vencidas, de la más reciente a la más antigua: una deuda
-      // de esta semana se recupera; una de hace meses ya no es lo urgente.
-      const vencidas = await prisma.operation72.findMany({
-        where: { ...base, deadlineAt: { lt: ahora } },
-        orderBy: { deadlineAt: "desc" },
-        take: resto,
-        select: seleccionDeTarjeta,
-      });
-
-      return [...dentroDePlazo, ...vencidas];
-    }),
   ]);
 
-  const totalPorEstado = new Map(
-    conteos.map((fila) => [fila.status, fila._count._all]),
+  // Cada columna se recorta a SU límite: «Ver 60 más» alarga una sola columna,
+  // y la consulta trajo hasta el tope de la más larga.
+  const idsPorColumna = columnasVisibles.map((columna) => ({
+    estado: columna.estado,
+    ids: (seleccion.porEstado.get(columna.estado) ?? []).slice(0, limiteDe(columna.estado)),
+  }));
+  const idsVisibles = idsPorColumna.flatMap((columna) => columna.ids);
+
+  const filas = idsVisibles.length
+    ? await prisma.operation72.findMany({
+        where: { id: { in: idsVisibles } },
+        select: seleccionDeTarjeta,
+      })
+    : [];
+
+  // `findMany` no respeta el orden del `in`, así que se vuelve a armar en el
+  // orden que decidió la consulta: columna por columna, y dentro de cada una
+  // por urgencia (o por fecha, según lo que se haya elegido).
+  const filaPorId = new Map(filas.map((fila) => [fila.id, fila]));
+  const operaciones = idsPorColumna.flatMap((columna) =>
+    columna.ids.flatMap((id) => {
+      const fila = filaPorId.get(id);
+      return fila ? [fila] : [];
+    }),
   );
-  const operaciones = gruposPorColumna.flat();
+
+  const totalPorEstado = seleccion.totales;
 
   // El último movimiento de cada tarjeta (qué pasó, quién y cuándo) y cuántas
   // llamadas lleva. Una sola consulta para todas las tarjetas visibles: es lo
