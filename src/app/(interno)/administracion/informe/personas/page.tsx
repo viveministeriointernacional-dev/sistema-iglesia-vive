@@ -40,25 +40,38 @@ const FILTROS: { valor: FiltroDetalle; etiqueta: string }[] = [
 export default async function PaginaDetalle({
   searchParams,
 }: {
-  searchParams: Promise<{ periodo?: string; dia?: string; filtro?: string }>;
+  searchParams: Promise<{
+    periodo?: string;
+    dia?: string;
+    desde?: string;
+    hasta?: string;
+    filtro?: string;
+  }>;
 }) {
   await requerirRol(ROLES_ADMIN);
-  const { periodo, dia, filtro: filtroCrudo } = await searchParams;
-  const rango = calcularRango(periodo, dia);
+  const { periodo, dia, desde, hasta, filtro: filtroCrudo } = await searchParams;
+  const rango = calcularRango(periodo, dia, desde, hasta);
   const filtro = filtroValido(filtroCrudo);
 
   const prisma = await getPrisma();
   const { personas, total } = await cargarDetallePersonas(prisma, rango, filtro);
   const ahora = new Date();
 
+  // Los cortes fijos viajan con un solo día de ancla; el rango libre, con sus
+  // dos extremos. Si no, al volver al informe se perdería el periodo elegido.
+  const parametros =
+    rango.periodo === "rango"
+      ? `periodo=rango&desde=${rango.inicio}&hasta=${rango.fin}`
+      : `periodo=${rango.periodo}&dia=${rango.inicio}`;
+
   const enlaceFiltro = (valor: FiltroDetalle) =>
-    `/administracion/informe/personas?periodo=${rango.periodo}&dia=${rango.inicio}&filtro=${valor}`;
+    `/administracion/informe/personas?${parametros}&filtro=${valor}`;
 
   return (
     <main className="px-5 py-7 pb-16 sm:px-[26px]">
       <div className="mx-auto max-w-[1120px]">
         <Link
-          href={`/administracion/informe?periodo=${rango.periodo}&dia=${rango.inicio}`}
+          href={`/administracion/informe?${parametros}`}
           className="text-[12px] leading-none font-semibold text-azul-700"
         >
           ← Volver al informe

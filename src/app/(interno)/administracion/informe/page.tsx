@@ -9,6 +9,7 @@ import {
   type Comparacion,
   type Efectividad,
   type Informe,
+  type Rango,
 } from "@/lib/informe";
 import { getPrisma } from "@/lib/prisma";
 
@@ -64,24 +65,54 @@ function anchoDe(parte: number, total: number) {
   return `${total <= 0 ? 0 : Math.max((parte / total) * 100, parte > 0 ? 1.5 : 0)}%`;
 }
 
+/// La URL que reproduce este mismo periodo. Los cortes fijos viajan con un solo
+/// día de ancla; el rango libre, con sus dos extremos.
+function parametrosDelRango(rango: Rango) {
+  return rango.periodo === "rango"
+    ? `periodo=rango&desde=${rango.inicio}&hasta=${rango.fin}`
+    : `periodo=${rango.periodo}&dia=${rango.inicio}`;
+}
+
 export default async function PaginaInforme({
   searchParams,
 }: {
-  searchParams: Promise<{ periodo?: string; dia?: string }>;
+  searchParams: Promise<{
+    periodo?: string;
+    dia?: string;
+    desde?: string;
+    hasta?: string;
+  }>;
 }) {
   await requerirRol(ROLES_ADMIN);
-  const { periodo, dia } = await searchParams;
+  const { periodo, dia, desde, hasta } = await searchParams;
   const prisma = await getPrisma();
-  const informe = await cargarInforme(prisma, { periodo, dia });
+  const informe = await cargarInforme(prisma, { periodo, dia, desde, hasta });
   const { rango } = informe;
 
-  const enlace = (cambios: { periodo?: string; dia?: string }) => {
-    const params = new URLSearchParams({
-      periodo: cambios.periodo ?? rango.periodo,
-      dia: cambios.dia ?? rango.inicio,
-    });
+  const enlace = (cambios: {
+    periodo?: string;
+    dia?: string;
+    desde?: string;
+    hasta?: string;
+  }) => {
+    const elegido = cambios.periodo ?? rango.periodo;
+    const params = new URLSearchParams({ periodo: elegido });
+    if (elegido === "rango") {
+      // Al pasar a rango libre se conservan los extremos que ya se están viendo.
+      params.set("desde", cambios.desde ?? rango.inicio);
+      params.set("hasta", cambios.hasta ?? rango.fin);
+    } else {
+      params.set("dia", cambios.dia ?? rango.inicio);
+    }
     return `/administracion/informe?${params.toString()}`;
   };
+
+  /// ← y → mueven el periodo entero. Un tramo de meses completos se corre por
+  /// meses; cualquier otro, por su propio largo en días.
+  const enlaceA = (tramo: { inicio: string; fin: string }) =>
+    rango.periodo === "rango"
+      ? enlace({ desde: tramo.inicio, hasta: tramo.fin })
+      : enlace({ dia: tramo.inicio });
 
   return (
     <main className="px-5 py-7 pb-16 sm:px-[26px]">
@@ -118,21 +149,21 @@ export default async function PaginaInforme({
                   }`}
                 >
                   {ETIQUETA_PERIODO[opcion]}
-                  {opcion !== "dia" ? (
+                  {opcion === "semana" || opcion === "mes" ? (
                     <span className="font-semibold opacity-70"> vie→jue</span>
                   ) : null}
                 </Link>
               ))}
             </div>
             <Link
-              href={enlace({ dia: rango.anterior })}
+              href={enlaceA(rango.anterior)}
               aria-label="Periodo anterior"
               className="rounded-[9px] border border-borde-control bg-white px-[13px] py-[11px] text-[12.5px] leading-none font-bold text-tinta"
             >
               ←
             </Link>
             <Link
-              href={enlace({ dia: rango.siguiente })}
+              href={enlaceA(rango.siguiente)}
               aria-label="Periodo siguiente"
               className="rounded-[9px] border border-borde-control bg-white px-[13px] py-[11px] text-[12.5px] leading-none font-bold text-tinta"
             >
@@ -141,19 +172,46 @@ export default async function PaginaInforme({
           </div>
         </header>
 
-        <div className="mt-[14px] flex flex-wrap items-baseline justify-between gap-[10px]">
+        <div className="mt-[14px] flex flex-wrap items-end justify-between gap-[10px]">
           <div>
             <p className="text-[14px] leading-none font-bold text-tinta">
               {rango.etiqueta}
+              <span className="ml-2 text-[12px] font-semibold text-[rgba(19,28,36,.5)]">
+                {rango.dias} {rango.dias === 1 ? "día" : "días"} · se compara con{" "}
+                {rango.etiquetaPrevio}
+              </span>
             </p>
-            {rango.periodo !== "dia" ? (
+            {rango.periodo === "semana" || rango.periodo === "mes" ? (
               <p className="mt-[6px] text-[11.5px] leading-[1.4] font-semibold text-[rgba(19,28,36,.5)]">
                 {rango.periodo === "semana"
                   ? "La semana corre de viernes a viernes: el fin de semana queda al principio y quedan lunes a jueves para llamar."
                   : "Cuatro semanas de viernes a viernes, para que el corte coincida con el de la semana."}
               </p>
             ) : null}
+            {rango.periodo === "rango" ? (
+              <p className="mt-[6px] max-w-[560px] text-[11.5px] leading-[1.4] font-semibold text-[rgba(19,28,36,.5)]">
+                El periodo con el que se compara sale del que elijas: si el tramo
+                son meses completos, se compara contra los mismos meses de antes
+                (un mes contra el mes anterior, doce contra el año anterior); si
+                no, contra los mismos días justo antes.
+              </p>
+            ) : null}
           </div>
+
+          {rango.periodo === "rango" ? (
+            <form
+              method="get"
+              action="/administracion/informe"
+              className="flex flex-wrap items-end gap-2"
+            >
+              <input type="hidden" name="periodo" value="rango" />
+              <CampoFecha rotulo="DESDE" nombre="desde" valor={rango.inicio} />
+              <CampoFecha rotulo="HASTA" nombre="hasta" valor={rango.fin} />
+              <button type="submit" className="boton-primario">
+                Ver
+              </button>
+            </form>
+          ) : null}
         </div>
 
         <Tiles informe={informe} />
@@ -169,6 +227,30 @@ export default async function PaginaInforme({
         <BloqueConsolidadores informe={informe} />
       </div>
     </main>
+  );
+}
+
+function CampoFecha({
+  rotulo,
+  nombre,
+  valor,
+}: {
+  rotulo: string;
+  nombre: string;
+  valor: string;
+}) {
+  return (
+    <label className="flex flex-col gap-[5px]">
+      <span className="etiqueta-seccion" style={{ letterSpacing: ".14em" }}>
+        {rotulo}
+      </span>
+      <input
+        type="date"
+        name={nombre}
+        defaultValue={valor}
+        className="rounded-[9px] border border-borde-control bg-white px-[11px] py-[9px] text-[12.5px] leading-none font-semibold text-tinta"
+      />
+    </label>
   );
 }
 
@@ -424,7 +506,7 @@ function BloqueEfectividad({ informe }: { informe: Informe }) {
                   </p>
                 ) : null}
                 <Link
-                  href={`/administracion/informe/personas?periodo=${informe.rango.periodo}&dia=${informe.rango.inicio}&filtro=sin-tocar`}
+                  href={`/administracion/informe/personas?${parametrosDelRango(informe.rango)}&filtro=sin-tocar`}
                   className="mt-[10px] inline-block text-[11.5px] leading-none font-bold text-ambar-texto"
                 >
                   Ver a esas {sinLlamar} personas →
@@ -442,7 +524,7 @@ function BloqueEfectividad({ informe }: { informe: Informe }) {
             <div className="mt-3 flex flex-col gap-2">
               <div className="flex items-baseline justify-between rounded-[10px] bg-papel px-[13px] py-[11px]">
                 <span className="text-[12px] leading-[1.3] font-semibold text-[rgba(19,28,36,.6)]">
-                  Se les llamó, periodo anterior
+                  Se les llamó, {informe.rango.etiquetaPrevio}
                 </span>
                 <span className="text-[13px] leading-none font-bold text-tinta">
                   {tasaDeLlamada(previa)} %
@@ -470,9 +552,10 @@ function BloqueEfectividad({ informe }: { informe: Informe }) {
 
       <p className="mt-4 border-t border-borde-tarjeta pt-[13px] text-[11.5px] leading-[1.5] font-medium text-[rgba(19,28,36,.5)]">
         Se mide <strong className="font-bold text-tinta">dentro del mismo periodo</strong>
-        : por eso el corte va de viernes a viernes — quien llegó el sábado o el
-        domingo tiene lunes, martes, miércoles y jueves para que lo llamen. Los
-        que entraron sobre el cierre salen aparte como{" "}
+        {informe.rango.periodo === "semana" || informe.rango.periodo === "mes"
+          ? ": por eso el corte va de viernes a viernes — quien llegó el sábado o el domingo tiene lunes, martes, miércoles y jueves para que lo llamen"
+          : ""}
+        . Los que entraron sobre el cierre salen aparte como{" "}
         <strong className="font-bold text-tinta">«aún en plazo»</strong> y no
         cuentan como perdidos.
       </p>
@@ -601,7 +684,11 @@ function BloqueActividad({ informe }: { informe: Informe }) {
     <section className="tarjeta mt-3 p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h2 className="text-[15px] leading-[1.2] font-bold text-tinta">
-          Actividad, día por día
+          {informe.rango.grano === "dia"
+            ? "Actividad, día por día"
+            : informe.rango.grano === "semana"
+              ? "Actividad, semana por semana"
+              : "Actividad, mes por mes"}
         </h2>
         <div className="flex items-center gap-4">
           <Leyenda color={COLOR_LLAMADAS}>Llamadas</Leyenda>
@@ -817,7 +904,7 @@ function BloqueConsolidadores({ informe }: { informe: Informe }) {
       </p>
 
       <Link
-        href={`/administracion/informe/personas?periodo=${informe.rango.periodo}&dia=${informe.rango.inicio}`}
+        href={`/administracion/informe/personas?${parametrosDelRango(informe.rango)}`}
         className="boton-primario mt-[14px] inline-block"
       >
         Ver el detalle persona por persona
