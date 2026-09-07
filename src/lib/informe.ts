@@ -1,8 +1,10 @@
-import { LearnerStatus, Operation72Status, Phase } from "@iglesia/prisma-client";
+import { LearnerStatus, Operation72Status, Phase, Prisma } from "@iglesia/prisma-client";
 import { ZONA_HORARIA } from "@/lib/dominio";
 import {
   DIAS_DEL_PERIODO,
+  granoPara,
   periodoValido,
+  type Grano,
   type Periodo,
 } from "@/lib/informe-catalogo";
 import type { ClientePrisma } from "@/lib/prisma";
@@ -26,6 +28,12 @@ const FECHA_LARGA = new Intl.DateTimeFormat("es-CO", {
   weekday: "long",
   day: "numeric",
   month: "long",
+  timeZone: ZONA_HORARIA,
+});
+
+const FECHA_MES = new Intl.DateTimeFormat("es-CO", {
+  month: "short",
+  year: "2-digit",
   timeZone: ZONA_HORARIA,
 });
 
@@ -69,39 +77,131 @@ export type Rango = {
   fin: string;
   desde: Date;
   hasta: Date;
+  /// Cuántos días cubre, contando los dos extremos.
+  dias: number;
+  /// Cada cuánto agrupar la gráfica de actividad.
+  grano: Grano;
   etiqueta: string;
-  anterior: string;
-  siguiente: string;
-  /// El periodo inmediatamente anterior, para poder comparar.
-  previo: { desde: Date; hasta: Date };
+  /// Cómo se llama lo que hay al otro lado de la comparación.
+  etiquetaPrevio: string;
+  anterior: { inicio: string; fin: string };
+  siguiente: { inicio: string; fin: string };
+  /// El periodo con el que se compara.
+  previo: { desde: Date; hasta: Date; inicio: string; fin: string };
 };
 
-/// Traduce «qué periodo y qué día ancla» a las dos marcas de tiempo que usan
-/// todas las consultas, más las etiquetas y la navegación.
+function partesDe(dia: string) {
+  const [anio, mes, numero] = dia.split("-").map(Number);
+  return { anio, mes, numero };
+}
+
+function armarDia(anio: number, mes: number, numero: number) {
+  return `${anio}-${`${mes}`.padStart(2, "0")}-${`${numero}`.padStart(2, "0")}`;
+}
+
+/// Cuántos días tiene ese mes (mes va de 1 a 12).
+function diasDelMes(anio: number, mes: number) {
+  return new Date(Date.UTC(anio, mes, 0)).getUTCDate();
+}
+
+function diasEntre(inicio: string, fin: string) {
+  const ms = fechaDeDia(fin).getTime() - fechaDeDia(inicio).getTime();
+  return Math.round(ms / 86_400_000) + 1;
+}
+
+/// Si el tramo cubre meses de calendario COMPLETOS, cuántos. Si no, `null`.
+///
+/// Es lo que deja comparar «como manda la intuición»: un mes contra el mes
+/// anterior, y doce meses contra el año anterior. Restar días no sirve para eso
+/// —los meses no miden lo mismo y los años bisiestos corren la fecha—, pero
+/// esta sola regla cubre los dos casos.
+function mesesCompletos(inicio: string, fin: string): number | null {
+  const desde = partesDe(inicio);
+  const hasta = partesDe(fin);
+  if (desde.numero !== 1) return null;
+  if (hasta.numero !== diasDelMes(hasta.anio, hasta.mes)) return null;
+  const meses = (hasta.anio - desde.anio) * 12 + (hasta.mes - desde.mes) + 1;
+  return meses >= 1 ? meses : null;
+}
+
+/// Corre un tramo de meses completos `cuantos` meses hacia atrás (o adelante).
+function correrMeses(inicio: string, meses: number, saltos: number) {
+  const desde = partesDe(inicio);
+  const total = desde.anio * 12 + (desde.mes - 1) + saltos * meses;
+  const anioNuevo = Math.floor(total / 12);
+  const mesNuevo = (total % 12) + 1;
+  const anioFin = Math.floor((total + meses - 1) / 12);
+  const mesFin = ((total + meses - 1) % 12) + 1;
+  return {
+    inicio: armarDia(anioNuevo, mesNuevo, 1),
+    fin: armarDia(anioFin, mesFin, diasDelMes(anioFin, mesFin)),
+  };
+}
+
+/// El tramo con el que se compara, y el que sale al pulsar ← o →.
+///
+/// **Meses completos se corren por meses; todo lo demás, por días.** Así un
+/// rango del 1 al 31 de agosto compara contra julio entero (31 vs 31 días no
+/// habría dado eso), y uno de todo el año compara contra el año anterior.
+function correr(inicio: string, fin: string, saltos: number) {
+  const meses = mesesCompletos(inicio, fin);
+  if (meses !== null) return correrMeses(inicio, meses, saltos);
+  const largo = diasEntre(inicio, fin);
+  return {
+    inicio: sumarDias(inicio, saltos * largo),
+    fin: sumarDias(fin, saltos * largo),
+  };
+}
+
+function nombreDelPrevio(inicio: string, fin: string) {
+  const meses = mesesCompletos(inicio, fin);
+  if (meses === 12) return "el año anterior";
+  if (meses === 1) return "el mes anterior";
+  if (meses !== null) return `los ${meses} meses anteriores`;
+  const dias = diasEntre(inicio, fin);
+  if (dias === 1) return "el día anterior";
+  if (dias === 7) return "los 7 días anteriores";
+  return `los ${dias} días anteriores`;
+}
+
+/// Traduce «qué periodo y qué fechas» a las dos marcas de tiempo que usan todas
+/// las consultas, más las etiquetas y la navegación.
 export function calcularRango(
   periodoCrudo: string | undefined,
   diaCrudo: string | undefined,
+  desdeCrudo?: string,
+  hastaCrudo?: string,
 ): Rango {
   const periodo = periodoValido(periodoCrudo);
-  const ancla = diaValido(diaCrudo);
-  const largo = DIAS_DEL_PERIODO[periodo];
 
-  // El día suelto empieza donde diga el ancla; los cortes semanales y de cuatro
-  // semanas siempre empiezan un viernes.
-  const inicio =
-    periodo === "dia"
-      ? ancla
-      : periodo === "semana"
-        ? viernesDe(ancla)
-        : sumarDias(viernesDe(ancla), -21);
-  const fin = sumarDias(inicio, largo - 1);
+  let inicio: string;
+  let fin: string;
 
-  const desde = new Date(`${inicio}T00:00:00-05:00`);
-  const hasta = new Date(`${fin}T23:59:59.999-05:00`);
-  const inicioPrevio = sumarDias(inicio, -largo);
+  if (periodo === "rango") {
+    // Dos fechas sueltas. Si vienen al revés se enderezan en vez de devolver un
+    // periodo vacío: es un error de dedo, no una intención.
+    const a = diaValido(desdeCrudo);
+    const b = diaValido(hastaCrudo ?? desdeCrudo);
+    [inicio, fin] = a <= b ? [a, b] : [b, a];
+  } else {
+    const ancla = diaValido(diaCrudo);
+    const largo = DIAS_DEL_PERIODO[periodo];
+    // El día suelto empieza donde diga el ancla; los cortes semanales y de
+    // cuatro semanas siempre empiezan un viernes.
+    inicio =
+      periodo === "dia"
+        ? ancla
+        : periodo === "semana"
+          ? viernesDe(ancla)
+          : sumarDias(viernesDe(ancla), -21);
+    fin = sumarDias(inicio, largo - 1);
+  }
+
+  const dias = diasEntre(inicio, fin);
+  const previo = correr(inicio, fin, -1);
 
   const etiqueta =
-    periodo === "dia"
+    dias === 1
       ? capitalizar(FECHA_LARGA.format(fechaDeDia(inicio)))
       : `${capitalizar(FECHA_LARGA.format(fechaDeDia(inicio)))} → ${FECHA_LARGA.format(fechaDeDia(fin))}`;
 
@@ -109,14 +209,18 @@ export function calcularRango(
     periodo,
     inicio,
     fin,
-    desde,
-    hasta,
+    desde: new Date(`${inicio}T00:00:00-05:00`),
+    hasta: new Date(`${fin}T23:59:59.999-05:00`),
+    dias,
+    grano: granoPara(dias),
     etiqueta,
-    anterior: inicioPrevio,
-    siguiente: sumarDias(inicio, largo),
+    etiquetaPrevio: nombreDelPrevio(inicio, fin),
+    anterior: previo,
+    siguiente: correr(inicio, fin, 1),
     previo: {
-      desde: new Date(`${inicioPrevio}T00:00:00-05:00`),
-      hasta: new Date(`${sumarDias(inicio, -1)}T23:59:59.999-05:00`),
+      ...previo,
+      desde: new Date(`${previo.inicio}T00:00:00-05:00`),
+      hasta: new Date(`${previo.fin}T23:59:59.999-05:00`),
     },
   };
 }
@@ -198,16 +302,23 @@ function posicion(fase: Phase) {
 
 export async function cargarInforme(
   prisma: ClientePrisma,
-  opciones: { periodo?: string; dia?: string } = {},
+  opciones: { periodo?: string; dia?: string; desde?: string; hasta?: string } = {},
 ): Promise<Informe> {
-  const rango = calcularRango(opciones.periodo, opciones.dia);
+  const rango = calcularRango(
+    opciones.periodo,
+    opciones.dia,
+    opciones.desde,
+    opciones.hasta,
+  );
   const { desde, hasta } = rango;
   const { desde: desdePrevio, hasta: hastaPrevio } = rango.previo;
 
   // Los que entraron tan cerca del cierre que todavía tienen periodo por
   // delante. Con el corte de viernes, «los dos últimos días» son miércoles y
-  // jueves; en el corte de un solo día no aplica.
-  const margen = rango.periodo === "dia" ? 0 : 2;
+  // jueves. En un periodo de uno o dos días no aplica —no queda nada de plazo
+  // que reservar— y en los largos siguen siendo dos días: el plazo razonable
+  // para llamar a alguien no crece porque el informe abarque un año.
+  const margen = rango.dias <= 2 ? 0 : 2;
   const corteEnPlazo = new Date(hasta.getTime() - margen * 24 * 60 * 60 * 1000);
 
   const [
@@ -234,7 +345,7 @@ export async function cargarInforme(
       where: { decidedAt: { gte: desde, lte: hasta } },
       _count: { _all: true },
     }),
-    actividadPorDia(prisma, desde, hasta),
+    actividadPorPeriodo(prisma, desde, hasta, rango.grano),
     prisma.operation72.groupBy({
       by: ["status"],
       where: {
@@ -411,45 +522,62 @@ async function medirEfectividad(
   };
 }
 
-/// Llamadas, visitas y registros día por día (o hora por hora en el corte de un
-/// solo día). Los límites se corren cinco horas para agrupar por día colombiano.
-async function actividadPorDia(prisma: ClientePrisma, desde: Date, hasta: Date) {
+/// Llamadas, visitas y registros a lo largo del periodo. El grano lo decide el
+/// largo: por día hasta un mes, por semana hasta medio año, por mes de ahí en
+/// adelante. Un año en barras diarias son 365 barras que nadie lee.
+///
+/// Los límites se corren a hora Colombia para que cada cubo agrupe el día
+/// colombiano y no el UTC.
+async function actividadPorPeriodo(
+  prisma: ClientePrisma,
+  desde: Date,
+  hasta: Date,
+  grano: Grano,
+) {
+  const paso = grano === "dia" ? "1 day" : grano === "semana" ? "7 days" : "1 month";
   // El día se devuelve como TEXTO a propósito. Si volviera como fecha, `pg` la
   // construiría en UTC (el servidor corre en UTC) y al formatearla en hora
   // Colombia se correría un día hacia atrás.
   const filas = await prisma.$queryRaw<
     { dia: string; llamadas: bigint; visitas: bigint; registros: bigint }[]
   >`
-    WITH dias AS (
+    WITH cubos AS (
       SELECT generate_series(
-        date_trunc('day', ${desde}::timestamptz AT TIME ZONE 'America/Bogota'),
-        date_trunc('day', ${hasta}::timestamptz AT TIME ZONE 'America/Bogota'),
-        interval '1 day'
+        ${grano === "mes" ? Prisma.raw("date_trunc('month', inicio)") : Prisma.raw("inicio")},
+        fin,
+        ${Prisma.raw(`interval '${paso}'`)}
       ) AS dia
+      FROM (
+        SELECT date_trunc('day', ${desde}::timestamptz AT TIME ZONE 'America/Bogota') AS inicio,
+               date_trunc('day', ${hasta}::timestamptz AT TIME ZONE 'America/Bogota') AS fin
+      ) l
     )
-    SELECT to_char(d.dia, 'YYYY-MM-DD') AS dia,
+    SELECT to_char(c.dia, 'YYYY-MM-DD') AS dia,
       (SELECT count(*) FROM contact_attempt a
         WHERE a.type IN ('LLAMADA','INTENTO_LLAMADA')
-          AND (a.occurred_at AT TIME ZONE 'America/Bogota')::date = d.dia::date) AS llamadas,
+          AND (a.occurred_at AT TIME ZONE 'America/Bogota') >= c.dia
+          AND (a.occurred_at AT TIME ZONE 'America/Bogota') < c.dia + ${Prisma.raw(`interval '${paso}'`)}) AS llamadas,
       (SELECT count(*) FROM contact_attempt a
         WHERE a.type = 'VISITA'
-          AND (a.occurred_at AT TIME ZONE 'America/Bogota')::date = d.dia::date) AS visitas,
+          AND (a.occurred_at AT TIME ZONE 'America/Bogota') >= c.dia
+          AND (a.occurred_at AT TIME ZONE 'America/Bogota') < c.dia + ${Prisma.raw(`interval '${paso}'`)}) AS visitas,
       (SELECT count(*) FROM operation72 o
-        WHERE (o.started_at AT TIME ZONE 'America/Bogota')::date = d.dia::date) AS registros
-    FROM dias d
-    ORDER BY d.dia
+        WHERE (o.started_at AT TIME ZONE 'America/Bogota') >= c.dia
+          AND (o.started_at AT TIME ZONE 'America/Bogota') < c.dia + ${Prisma.raw(`interval '${paso}'`)}) AS registros
+    FROM cubos c
+    ORDER BY c.dia
   `;
 
-  return filas.map((fila) => {
-    const dia = fila.dia;
-    return {
-      dia,
-      etiqueta: FECHA_CORTA.format(fechaDeDia(dia)).replace(",", ""),
-      llamadas: Number(fila.llamadas),
-      visitas: Number(fila.visitas),
-      registros: Number(fila.registros),
-    };
-  });
+  return filas.map((fila) => ({
+    dia: fila.dia,
+    etiqueta:
+      grano === "mes"
+        ? capitalizar(FECHA_MES.format(fechaDeDia(fila.dia)))
+        : FECHA_CORTA.format(fechaDeDia(fila.dia)).replace(",", ""),
+    llamadas: Number(fila.llamadas),
+    visitas: Number(fila.visitas),
+    registros: Number(fila.registros),
+  }));
 }
 
 /// Qué hizo cada consolidador con SUS personas en el periodo. «Sin tocar» son

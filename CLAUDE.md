@@ -211,6 +211,42 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-07** — **Informe: rango de fechas libre, y la comparación se
+  calcula sola.** Pedido del usuario: «si coloco un periodo de 7 días, lo compare
+  con los 7 días anteriores; si coloco un mes, con el mes anterior; si coloco 12
+  meses, con el año anterior».
+  **Una sola regla cubre los tres casos, y es la clave de esta entrada:** si el
+  tramo elegido cubre **meses de calendario completos** (empieza el día 1 y
+  termina el último día de un mes), se corre hacia atrás **por meses**; si no, se
+  corre **por su propio largo en días**. Restar días no sirve para meses —los
+  meses no miden lo mismo y los bisiestos corren la fecha—, y restar meses no
+  sirve para tramos sueltos. `mesesCompletos` + `correr` en `informe.ts`.
+  Las flechas ← y → usan **la misma función**, así que el paso de navegación y el
+  de comparación siempre coinciden: ir atrás y volver adelante cae en el mismo
+  sitio.
+  - **Cuarto periodo `rango`** en `informe-catalogo.ts` (además de día, semana y
+    mes de viernes a viernes, que **no cambiaron**). Viaja por URL como
+    `?periodo=rango&desde=…&hasta=…`; los cortes fijos siguen viajando con un
+    solo día de ancla. Formulario GET con dos `input type="date"`, sin JS, como
+    el resto de la pantalla. Si las fechas vienen al revés se enderezan.
+  - **La gráfica cambia de grano sola** (`granoPara`): por día hasta 31 días, por
+    semana hasta 182, por mes de ahí en adelante. Un año en barras diarias son
+    365 barras que nadie lee. `actividadPorDia` pasó a `actividadPorPeriodo` y el
+    `interval` del `generate_series` se arma con `Prisma.raw` desde un mapa
+    cerrado. **Probado contra la base**: 12 cubos mensuales con datos reales
+    (agosto sale con los 267 registros del import masivo, que es la cifra
+    conocida).
+  - **La comparación se nombra en pantalla** (`etiquetaPrevio`): «se compara con
+    el mes anterior» / «con el año anterior» / «con los 7 días anteriores». Antes
+    decía «periodo anterior» a secas y no se sabía contra qué.
+  - **Matemática probada en los 9 casos**: 7 días, mes de 31, febrero de 28, año
+    completo, trimestre, año bisiesto 2028, y el viaje ← seguido de → vuelve al
+    mismo tramo.
+  - El margen de «aún en plazo» pasó a `dias <= 2 ? 0 : 2`: en un periodo de uno
+    o dos días no queda plazo que reservar, y en los largos siguen siendo dos
+    días (el plazo para llamar a alguien no crece porque el informe abarque un
+    año).
+
 - **2026-09-07** — **Menos viajes a la base en el tablero de Operación 72: de
   ~15 a 6.** Es la palanca (1) del diagnóstico de lentitud de hoy, y la eligió
   el usuario.
