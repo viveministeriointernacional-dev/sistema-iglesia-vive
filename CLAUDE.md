@@ -211,6 +211,46 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-07** — **Cada cosa declarada se confirma por separado** (mockup
+  aprobado: claude.ai/code/artifact/4c4c3bf5-fce2-446e-9b4d-e7a3bec2e27a).
+  El bloque «Pendiente de confirmar» del expediente tenía **un solo botón para
+  todo**: si alguien declaraba cuatro roles y solo uno era cierto, había que
+  aceptarlos los cuatro o rechazarlos los cuatro.
+  - **⚠️ CAMBIO DE COMPORTAMIENTO: los hitos ya NO se aplican solos.** Antes,
+    quien llenaba el formulario de liderazgo y marcaba «me gradué de la Escuela»
+    **escribía ese hito en su expediente al instante**, sin que nadie lo
+    revisara — lo único que esperaba confirmación eran los roles y la etapa.
+    Ahora los hitos también esperan, que es lo que dice la regla 3 del propio
+    formulario («el formulario no otorga nada»).
+  - **Tabla `leadership_declaration_item`** (modelo
+    `LeadershipDeclarationItem`, migración
+    `20260907190000_declaracion_por_partes`): un renglón por cosa — `kind` =
+    `ROL` · `ETAPA` · `HITO`, su `value` del catálogo, `achieved_at` para los
+    hitos, y **estado, responsable y fecha propios**. Antes solo se sabía «X
+    confirmó la declaración»; ahora se sabe qué confirmó y qué descartó.
+  - **`resolverDeclaracion` acepta `itemId`**: con él resuelve un renglón, sin
+    él resuelve **los que sigan pendientes** (los botones del pie). Lo ya
+    resuelto no se vuelve a tocar.
+  - **Cada renglón dice qué pasa si se confirma** («Le activa el permiso de
+    mentor» vs «Queda como información del expediente»), que es lo que no se
+    veía y es justo lo que hay que saber para decidir.
+  - **Hallazgo: una persona podía tener DOS declaraciones pendientes** (llenó el
+    formulario dos veces) y la pantalla solo mostraba la más reciente: la vieja
+    esperaba para siempre, invisible. Ahora una declaración nueva marca la
+    anterior como **`REEMPLAZADA`**, en el código y en la migración. Eran 28
+    declaraciones de 26 personas → quedan 26, con **64 renglones**, 0
+    duplicados.
+  - **⚠️ LECCIÓN DE MÉTODO, IMPORTANTE: `execute_sql` del MCP de Supabase NO
+    deshace nada por su cuenta.** Probando la migración escribí **sin querer en
+    producción**: la primera prueba llevaba `BEGIN;` y el conector la abortó al
+    terminar, pero la segunda —el mismo SQL, sin `BEGIN`— corrió en autocommit
+    y **quedó aplicada** (tabla creada, 2 declaraciones marcadas). Se revirtió
+    en el acto (`DROP TABLE` + devolver las 2 a `PENDIENTE`) y se verificó que
+    la base volvió exactamente a 28 pendientes / 0 reemplazadas / 30 en total.
+    **REGLA: toda prueba de SQL contra producción va envuelta en `BEGIN; … ;
+    ROLLBACK;` EN LA MISMA llamada** — nunca confiar en que el conector la
+    deshaga.
+
 - **2026-09-07** — **El informe se quedó SIN «modos»: es un calendario y ya.**
   El usuario dijo que no le gustó cómo se hacía el informe: «quisiera que lo
   dejaras abierto para que yo mismo escogiera el periodo». Las pestañas Día ·

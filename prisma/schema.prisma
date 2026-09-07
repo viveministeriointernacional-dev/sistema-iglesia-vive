@@ -106,6 +106,7 @@ model AppUser {
   auditoria             AuditLog[]
   llamadas              CallLog[]
   declaracionesRevisadas LeadershipDeclaration[] @relation("RevisoDeclaracion")
+  itemsDeclaracionResueltos LeadershipDeclarationItem[] @relation("ResolvioItemDeclaracion")
   bajasPedidas           BajaRequest[]           @relation("PidioLaBaja")
   bajasResueltas         BajaRequest[]           @relation("ResolvioLaBaja")
   llavesMaestras         MasterKey[]             @relation("CreoLlaveMaestra")
@@ -1022,10 +1023,39 @@ model LeadershipDeclaration {
 
   person     Person   @relation(fields: [personId], references: [id])
   reviewedBy AppUser? @relation("RevisoDeclaracion", fields: [reviewedById], references: [id])
+  items      LeadershipDeclarationItem[]
 
   @@index([status, createdAt])
   @@index([personId])
   @@map("leadership_declaration")
+}
+
+/// Una sola cosa de las que la persona declaró: un rol, la etapa, o un hito.
+/// Cada renglón se confirma o se descarta por su cuenta, con su propio
+/// responsable y su propia fecha — antes la declaración entera era un solo
+/// «sí» o «no», y los hitos ni pasaban por aquí.
+model LeadershipDeclarationItem {
+  id            String    @id @default(uuid())
+  declarationId String    @map("declaration_id")
+  /// ROL · ETAPA · HITO
+  kind          String
+  /// El valor del catálogo: el rol, la fase, o el tipo de hito.
+  value         String
+  /// Solo en los hitos, y puede faltar: mucha gente no recuerda la fecha.
+  achievedAt    DateTime? @map("achieved_at")
+  /// PENDIENTE · CONFIRMADO · DESCARTADO
+  status        String    @default("PENDIENTE")
+  resolvedById  String?   @map("resolved_by_id")
+  resolvedAt    DateTime? @map("resolved_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  declaration LeadershipDeclaration @relation(fields: [declarationId], references: [id], onDelete: Cascade)
+  resolvedBy  AppUser?              @relation("ResolvioItemDeclaracion", fields: [resolvedById], references: [id])
+
+  @@unique([declarationId, kind, value], map: "leadership_declaration_item_unico")
+  @@index([declarationId])
+  @@index([status])
+  @@map("leadership_declaration_item")
 }
 
 /// Solicitud de baja a la espera de que un administrador la autorice.

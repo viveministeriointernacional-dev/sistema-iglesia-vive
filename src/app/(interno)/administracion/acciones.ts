@@ -736,6 +736,7 @@ export async function resolverDeclaracionDeLiderazgo(
   declaracionId: string,
   confirmar: boolean,
   personId: string,
+  itemId?: string,
 ): Promise<ResultadoAdmin> {
   return conAdmin(async (usuario) => {
     const prisma = await getPrisma();
@@ -743,14 +744,15 @@ export async function resolverDeclaracionDeLiderazgo(
       declaracionId,
       actorId: usuario.id,
       confirmar,
+      itemId,
     });
     if (!resultado.ok) return { ok: false, mensaje: resultado.mensaje };
 
     revalidatePath(`/administracion/${personId}`);
     return {
       ok: true,
-      aviso: resultado.aplicado.includes("sin_cuenta")
-        ? "Confirmado, pero esta persona todavía no tiene acceso al sistema: créale la cuenta para que los permisos tengan dónde aplicarse."
+      aviso: resultado.sinCuenta
+        ? "Esta persona todavía no tiene acceso al sistema: créale la cuenta para que el permiso tenga dónde aplicarse."
         : undefined,
     };
   });
