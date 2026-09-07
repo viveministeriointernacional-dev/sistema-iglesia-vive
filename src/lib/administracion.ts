@@ -5,6 +5,7 @@ import {
   Phase,
   Role,
 } from "@iglesia/prisma-client";
+import { ESTADO_SOLICITUD } from "@/lib/baja";
 import { nombreCompleto, normalizarBusqueda } from "@/lib/dominio";
 import { getPrisma } from "@/lib/prisma";
 
@@ -141,7 +142,83 @@ export type FilaBaja = {
   motivo: string | null;
   fecha: Date | null;
   por: string | null;
+  /// Quién pidió la baja, cuando salió de una solicitud del equipo de
+  /// consolidación. Nulo si la dio directamente un administrador.
+  pedidaPor: string | null;
 };
+
+export type FilaSolicitudDeBaja = {
+  solicitudId: string;
+  learnerId: string;
+  personId: string;
+  nombre: string;
+  telefono: string | null;
+  motivo: string;
+  nota: string | null;
+  pedidaPor: string;
+  fecha: Date;
+  estadoOp72: string | null;
+  llamadas: number;
+};
+
+/// Las solicitudes de baja que están esperando respuesta, de la más antigua a
+/// la más nueva: la que lleva más tiempo esperando es la que más urge.
+export async function listarSolicitudesDeBaja(): Promise<FilaSolicitudDeBaja[]> {
+  const prisma = await getPrisma();
+  const solicitudes = await prisma.bajaRequest.findMany({
+    where: { status: ESTADO_SOLICITUD.pendiente },
+    orderBy: { createdAt: "asc" },
+    select: {
+      id: true,
+      learnerId: true,
+      reason: true,
+      note: true,
+      createdAt: true,
+      requestedBy: { select: { fullName: true } },
+      learner: {
+        select: {
+          operation72: { select: { id: true, status: true } },
+          person: {
+            select: { id: true, firstName: true, lastName: true, callPhone: true },
+          },
+        },
+      },
+    },
+  });
+
+  const operacionIds = solicitudes
+    .map((solicitud) => solicitud.learner.operation72?.id)
+    .filter((id): id is string => Boolean(id));
+  const llamadas = operacionIds.length
+    ? await prisma.contactAttempt.groupBy({
+        by: ["operation72Id"],
+        where: {
+          operation72Id: { in: operacionIds },
+          type: { in: ["LLAMADA", "INTENTO_LLAMADA"] },
+        },
+        _count: { _all: true },
+      })
+    : [];
+  const llamadasPorOperacion = new Map(
+    llamadas.map((fila) => [fila.operation72Id, fila._count._all]),
+  );
+
+  return solicitudes.map((solicitud) => ({
+    solicitudId: solicitud.id,
+    learnerId: solicitud.learnerId,
+    personId: solicitud.learner.person.id,
+    nombre: nombreCompleto(solicitud.learner.person),
+    telefono: solicitud.learner.person.callPhone,
+    motivo: solicitud.reason,
+    nota: solicitud.note,
+    pedidaPor: solicitud.requestedBy.fullName,
+    fecha: solicitud.createdAt,
+    estadoOp72: solicitud.learner.operation72?.status ?? null,
+    llamadas: solicitud.learner.operation72
+      ? (llamadasPorOperacion.get(solicitud.learner.operation72.id) ?? 0)
+      : 0,
+  }));
+}
 
 /// El listado aparte de personas dadas de baja (Retiradas), con el motivo, la
 /// fecha y quién la dio de baja. Es el «listado afuera» que pidió la iglesia.
@@ -165,6 +242,14 @@ export async function listarDadosDeBaja(): Promise<FilaBaja[]> {
           decidedBy: { select: { fullName: true } },
         },
       },
+      // Quién la pidió, cuando la baja vino de una solicitud autorizada. Así
+      // el listado dice las dos manos que intervinieron, no solo la última.
+      bajaRequests: {
+        where: { status: ESTADO_SOLICITUD.autorizada },
+        orderBy: { resolvedAt: "desc" },
+        take: 1,
+        select: { requestedBy: { select: { fullName: true } } },
+      },
     },
   });
 
@@ -178,8 +263,110 @@ export async function listarDadosDeBaja(): Promise<FilaBaja[]> {
       motivo: baja?.reason ?? null,
       fecha: baja?.createdAt ?? null,
       por: baja?.decidedBy.fullName ?? null,
+      pedidaPor: aprendiz.bajaRequests[0]?.requestedBy.fullName ?? null,
     };
   });
+}
+
+
+export type SolicitudDeBajaDetalle = NonNullable<
+  Awaited<ReturnType<typeof cargarSolicitudDeBaja>>
+>;
+
+/// Todo lo que un administrador necesita para responder una solicitud sin
+/// tener que salir a buscarlo: el motivo, lo que escribió el consolidador, y
+/// **lo que dice el sistema** — las llamadas registradas en el formulario, las
+/// marcaciones reales del discador y el horario en que la persona pidió que la
+/// llamaran. Ese cruce es lo que deja ver si de verdad se intentó.
+export async function cargarSolicitudDeBaja(solicitudId: string) {
+  const prisma = await getPrisma();
+  const solicitud = await prisma.bajaRequest.findUnique({
+    where: { id: solicitudId },
+    select: {
+      id: true,
+      status: true,
+      reason: true,
+      note: true,
+      createdAt: true,
+      resolutionNote: true,
+      resolvedAt: true,
+      requestedBy: { select: { fullName: true } },
+      resolvedBy: { select: { fullName: true } },
+      learner: {
+        select: {
+          id: true,
+          consolidator: { select: { fullName: true } },
+          operation72: { select: { id: true, status: true } },
+          person: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              callPhone: true,
+              whatsappPhone: true,
+              callSchedules: true,
+              callScheduleNote: true,
+              highLevelContacts: { select: { contactId: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+  if (!solicitud) return null;
+
+  const operacionId = solicitud.learner.operation72?.id ?? null;
+  const intentos = operacionId
+    ? await prisma.contactAttempt.findMany({
+        where: { operation72Id: operacionId },
+        orderBy: { occurredAt: "desc" },
+        take: 12,
+        select: {
+          type: true,
+          outcome: true,
+          note: true,
+          occurredAt: true,
+          byUser: { select: { fullName: true } },
+        },
+      })
+    : [];
+
+  // Las marcaciones del discador. No mueven Operación 72, pero son la prueba
+  // de que se llamó (o de que no) al margen de lo que se haya registrado.
+  const contactIds = solicitud.learner.person.highLevelContacts.map(
+    (contacto) => contacto.contactId,
+  );
+  const marcaciones = contactIds.length
+    ? await prisma.callLog.findMany({
+        where: { contactId: { in: contactIds } },
+        orderBy: { startedAt: "desc" },
+        take: 20,
+        select: { startedAt: true, answered: true, status: true, callerName: true },
+      })
+    : [];
+
+  return {
+    id: solicitud.id,
+    estado: solicitud.status,
+    motivo: solicitud.reason,
+    nota: solicitud.note,
+    pedidaPor: solicitud.requestedBy.fullName,
+    fecha: solicitud.createdAt,
+    resueltaPor: solicitud.resolvedBy?.fullName ?? null,
+    resueltaEn: solicitud.resolvedAt,
+    observacion: solicitud.resolutionNote,
+    learnerId: solicitud.learner.id,
+    personId: solicitud.learner.person.id,
+    nombre: nombreCompleto(solicitud.learner.person),
+    telefono:
+      solicitud.learner.person.callPhone ?? solicitud.learner.person.whatsappPhone,
+    horarios: solicitud.learner.person.callSchedules,
+    horarioNota: solicitud.learner.person.callScheduleNote,
+    consolidador: solicitud.learner.consolidator?.fullName ?? null,
+    estadoOp72: solicitud.learner.operation72?.status ?? null,
+    intentos,
+    marcaciones,
+  };
 }
 
 export type PersonaAdmin = NonNullable<

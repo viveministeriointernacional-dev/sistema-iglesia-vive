@@ -211,6 +211,84 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-07** — **Llave maestra: entrar a cualquier perfil con su correo.**
+  Pedido del usuario. Le ofrecí tres formas y **eligió «llave maestra propia,
+  aparte de tu contraseña»** (las otras dos eran «Ingresar como» desde
+  Administración y usar literalmente la contraseña del administrador).
+  **Por qué no es la contraseña del administrador**: si lo fuera, no se podría
+  rotar sin cambiarle el ingreso a quien administra, y la contraseña del día a
+  día pasaría a ser la llave de todo el sistema, incluidas las notas pastorales.
+  - **Tabla `master_key`** (modelo `MasterKey`, migración
+    `20260907140000_llave_maestra`). **El valor NUNCA se guarda**: solo su huella
+    **PBKDF2-SHA256, 210 000 iteraciones, sal propia de 16 bytes**
+    (`crypto.subtle`, que sí existe en el Worker). Comparación en tiempo fijo.
+    Índice único parcial `((revoked_at IS NULL)) WHERE revoked_at IS NULL` para
+    que solo haya una llave viva; rotar revoca la anterior en la misma
+    transacción. Mínimo 12 caracteres.
+  - **Cómo entra**: en `/ingresar`, si `signInWithPassword` falla **y** el correo
+    es de un `app_user` activo, se comprueba la llave. Si acierta, se abre la
+    sesión de ese perfil con la llave de servicio en **dos pasos**: Supabase Auth
+    no tiene «entrar como», así que se genera un **magic link**
+    (`admin.generateLink`, que no se envía a ninguna parte) y se canjea su
+    `hashed_token` con `verifyOtp` en el cliente con cookies. Queda una sesión
+    normal de esa persona. **Requiere `SUPABASE_SERVICE_ROLE_KEY`** en el Worker.
+  - **La llave solo se comprueba tras un fallo y sobre un correo que existe y
+    está activo**, y la respuesta es siempre la misma frase: así no sirve para
+    averiguar qué correos hay.
+  - **Auditoría**: `acceso.llave_maestra_usada` (con el perfil al que entró),
+    `…_cambiada` y `…_revocada`, las tres con su `case` en `actividad.ts`.
+    Ojo: en la de uso **no se usa `A()`** — quién escribió la llave no se sabe,
+    es un secreto compartido; lo que se registra es **a qué perfil entró**.
+  - **Pantalla `/administracion/llave-maestra`** (solo ADMIN, botón nuevo en la
+    cabecera de Administración): ponerla, cambiarla o quitarla, con la fecha del
+    último cambio y del último uso. Se escribe dos veces porque después nadie la
+    puede volver a ver. **`LARGO_MINIMO_LLAVE` vive en
+    `src/lib/llave-maestra-catalogo.ts`** por la regla del 6-sep: lo que usa el
+    navegador va en el catálogo.
+  - **Sin llave configurada, este camino no existe** — es el estado inicial.
+
+- **2026-09-07** — **Autorización de bajas: nadie sale del sistema sin que un
+  administrador lo apruebe** (mockup aprobado:
+  claude.ai/code/artifact/c045bd7e-341f-43dd-9063-6502384acc42).
+  Antes, cualquiera del equipo de consolidación retiraba a una persona de un
+  clic y eso era definitivo. Ahora hay dos manos.
+  - **Tabla `baja_request`** (modelo `BajaRequest`, migración
+    `20260907120000_solicitud_de_baja`): motivo, nota del consolidador, quién la
+    pidió, estado (`PENDIENTE` · `AUTORIZADA` · `RECHAZADA` · `RETIRADA`), quién
+    la resolvió y `resolution_note`. **Índice único parcial** para que solo haya
+    UNA solicitud pendiente por persona.
+  - **Núcleo en `src/lib/baja.ts`**: `solicitarBaja`, `resolverSolicitudDeBaja`,
+    `retirarSolicitudDeBaja`, junto al ya existente `darDeBajaAprendiz` (que no
+    cambió: sigue siendo lo que aplica la baja de verdad).
+  - **Quién decide qué**: `puedeAutorizarBaja` (`auth.ts`, hoy = `ROLES_ADMIN`).
+    **La regla va por el ACTOR, no por la pantalla**: quien puede autorizar la
+    aplica directo desde donde sea; los demás la piden. Un PASTOR pide, no
+    autoriza — corrige lo que dije al presentar el mockup.
+  - **Pedir la baja NO saca a la persona del tablero.** Sigue en la columna y en
+    la carga de su consolidador hasta que haya respuesta; si desapareciera, dar
+    de baja sería una forma de aliviar carga sin que nadie revise el motivo.
+  - **La nota es obligatoria al pedirla** (mín. 10 caracteres): es lo único que
+    el administrador va a leer. Al dar de baja directo sigue siendo opcional.
+  - **`/administracion/dados-de-baja` pasó a `/administracion/bajas`** («Bajas»
+    en el menú), con la sección **PENDIENTES DE AUTORIZAR** arriba y el listado
+    de siempre abajo, que ahora dice quién pidió y quién autorizó.
+  - **`/administracion/bajas/<id>`**: la pantalla de revisión. Muestra el motivo,
+    lo que escribió el consolidador y **lo que dice el sistema** — registros de
+    `contact_attempt`, marcaciones reales de `call_log` (por `contactId` de
+    HighLevel) y la hora en que la persona pidió que la llamaran. Ese cruce es
+    lo que deja ver si de verdad se intentó.
+  - **Devolver exige observación** (mín. 10 caracteres) y esa observación
+    aparece en la tarjeta del tablero en el bloque azul **QUÉ HACER CON ESTA
+    PERSONA**, con quién la escribió. Se queda a la vista hasta que se vuelva a
+    pedir la baja (la solicitud más nueva reemplaza a la anterior).
+  - **Reactivar también acepta observación** («¿Qué proceso se sigue con esta
+    persona?»). Va al `learner_status_change` y a la auditoría, **no** a una
+    tarjeta: reactivar no devuelve sola la Operación 72, así que la persona no
+    vuelve al tablero.
+  - Auditoría nueva: `operacion72.baja_solicitada` · `baja_autorizada` ·
+    `baja_rechazada` · `baja_retirada`, las cuatro con su `case` en
+    `actividad.ts`.
+
 - **2026-09-07** — **La «hora de llamada» del CRM se estaba tirando a la basura.**
   El campo existe en HighLevel como **`contact.hora_llamada`**, id
   **`wWioQQ2mGFbj7d7hZw4R`**, nombre «Hora de llamada», tipo **LARGE_TEXT**

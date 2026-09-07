@@ -26,6 +26,18 @@ export type UsuarioSesion = {
 /// Quién administra el sistema: personas, roles, permisos y procesos.
 export const ROLES_ADMIN: Role[] = [Role.ADMIN];
 
+/// Quién autoriza que una persona salga del sistema.
+///
+/// El equipo de consolidación **pide** la baja y espera respuesta; quien está
+/// en esta lista la aplica directo, porque es quien la autorizaría de todos
+/// modos. Es la misma lista que entra a Administración: si mañana entrara
+/// alguien más, autorizaría bajas por el mismo camino.
+export const ROLES_AUTORIZAN_BAJA: Role[] = ROLES_ADMIN;
+
+export function puedeAutorizarBaja(usuario: UsuarioSesion): boolean {
+  return ROLES_AUTORIZAN_BAJA.includes(usuario.role);
+}
+
 export const ETIQUETA_ROL: Record<Role, string> = {
   APRENDIZ: "Aprendiz",
   CONSOLIDADOR: "Consolidador",

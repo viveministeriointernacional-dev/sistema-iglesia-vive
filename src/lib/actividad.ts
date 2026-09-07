@@ -478,10 +478,68 @@ export async function cargarActividad(
         if (observacion) filas.push({ k: "Nota", v: observacion });
         break;
       }
-      case "administracion.reactivado":
+      case "operacion72.baja_solicitada": {
+        tipo = "personas"; etiqueta = "BAJA PEDIDA"; tono = "ambar";
+        const motivo = texto(m.motivo);
+        frase = [A(), t(" pidió dar de baja a "), P(), t(motivo ? ` · «${motivo}»` : "")];
+        observacion = texto(m.nota);
+        tituloDetalle = "Lo que contó quien la pidió";
+        if (motivo) filas.push({ k: "Motivo", v: motivo });
+        if (observacion) filas.push({ k: "Nota", v: observacion });
+        break;
+      }
+      case "operacion72.baja_autorizada": {
+        tipo = "personas"; etiqueta = "BAJA"; tono = "rojo";
+        const motivo = texto(m.motivo);
+        frase = [A(), t(" autorizó la baja de "), P(), t(motivo ? ` · «${motivo}»` : "")];
+        observacion = texto(m.observacion);
+        tituloDetalle = "La autorización";
+        if (motivo) filas.push({ k: "Motivo", v: motivo });
+        if (observacion) filas.push({ k: "Nota", v: observacion });
+        break;
+      }
+      case "operacion72.baja_rechazada": {
+        tipo = "personas"; etiqueta = "DEVUELTA"; tono = "verde";
+        frase = [A(), t(" NO autorizó la baja de "), P(), t(" · vuelve a consolidación")];
+        observacion = texto(m.observacion);
+        tituloDetalle = "Qué hacer con esta persona";
+        if (observacion) filas.push({ k: "Observación", v: observacion });
+        break;
+      }
+      case "operacion72.baja_retirada":
+        tipo = "personas"; etiqueta = "BAJA PEDIDA"; tono = "ambar";
+        frase = [A(), t(" retiró la solicitud de baja de "), P()];
+        break;
+      case "acceso.llave_maestra_usada": {
+        tipo = "accesos"; etiqueta = "LLAVE MAESTRA"; tono = "rojo";
+        // Aquí NO se usa A(): quién escribió la llave no se sabe (es un secreto
+        // compartido). Lo que sí se sabe, y es lo que hay que poder revisar, es
+        // a qué perfil se entró.
+        const correo = texto(m.email);
+        frase = [
+          t("Alguien entró con la llave maestra al perfil de "),
+          b(nombreUsuario.get(fila.entityId ?? "") ?? correo ?? "un usuario"),
+        ];
+        if (correo) filas.push({ k: "Correo", v: correo });
+        tituloDetalle = "Entrada con llave maestra";
+        break;
+      }
+      case "acceso.llave_maestra_cambiada":
+        tipo = "accesos"; etiqueta = "LLAVE MAESTRA"; tono = "ambar";
+        frase = [A(), t(" cambió la llave maestra")];
+        break;
+      case "acceso.llave_maestra_revocada":
+        tipo = "accesos"; etiqueta = "LLAVE MAESTRA"; tono = "ambar";
+        frase = [A(), t(" quitó la llave maestra")];
+        break;
+      case "administracion.reactivado": {
         tipo = "personas"; etiqueta = "PERSONAS"; tono = "verde";
         frase = [A(), t(" reactivó a "), P()];
+        observacion = texto(m.observacion);
+        tituloDetalle = "Qué proceso se sigue";
+        if (observacion) filas.push({ k: "Observación", v: observacion });
         break;
+      }
       case "persona.registrada": {
         tipo = "personas"; etiqueta = "REGISTRO"; tono = "azul";
         const soloFicha = m.sinOperacion72 === true;

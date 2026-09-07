@@ -106,6 +106,9 @@ model AppUser {
   auditoria             AuditLog[]
   llamadas              CallLog[]
   declaracionesRevisadas LeadershipDeclaration[] @relation("RevisoDeclaracion")
+  bajasPedidas           BajaRequest[]           @relation("PidioLaBaja")
+  bajasResueltas         BajaRequest[]           @relation("ResolvioLaBaja")
+  llavesMaestras         MasterKey[]             @relation("CreoLlaveMaestra")
 
   @@index([role, active])
   @@map("app_user")
@@ -333,6 +336,7 @@ model LearnerProfile {
   serviceAssignments  ServiceAssignment[]
   phaseChanges        PhaseChange[]
   statusChanges       LearnerStatusChange[]
+  bajaRequests        BajaRequest[]
 
   @@index([phase, status])
   @@map("learner_profile")
@@ -1005,4 +1009,59 @@ model LeadershipDeclaration {
   @@index([status, createdAt])
   @@index([personId])
   @@map("leadership_declaration")
+}
+
+/// Solicitud de baja a la espera de que un administrador la autorice.
+///
+/// El equipo de consolidación no retira a nadie por su cuenta: pide la baja y
+/// la persona sigue en su lista hasta que haya respuesta. Si el administrador
+/// no la autoriza, `resolutionNote` es lo que el consolidador va a leer en la
+/// tarjeta para saber qué hacer con esa persona.
+model BajaRequest {
+  id            String    @id @default(uuid())
+  learnerId     String    @map("learner_id")
+  /// Motivo de la lista cerrada `MOTIVOS_DE_BAJA` (src/lib/op72.ts).
+  reason        String
+  /// Lo que el consolidador le cuenta al administrador.
+  note          String?
+  requestedById String    @map("requested_by_id")
+  /// PENDIENTE · AUTORIZADA · RECHAZADA · RETIRADA
+  status        String    @default("PENDIENTE")
+  resolvedById  String?   @map("resolved_by_id")
+  resolvedAt    DateTime? @map("resolved_at")
+  /// Obligatoria al no autorizar: qué hacer con la persona. Se muestra en la
+  /// tarjeta del tablero y queda en el expediente.
+  resolutionNote String?  @map("resolution_note")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  learner     LearnerProfile @relation(fields: [learnerId], references: [id])
+  requestedBy AppUser        @relation("PidioLaBaja", fields: [requestedById], references: [id])
+  resolvedBy  AppUser?       @relation("ResolvioLaBaja", fields: [resolvedById], references: [id])
+
+  @@index([status, createdAt])
+  @@index([learnerId, createdAt])
+  @@map("baja_request")
+}
+
+/// La llave maestra: un secreto propio del administrador que abre cualquier
+/// perfil escribiendo el correo de esa persona y esta llave en vez de su
+/// contraseña. Es distinta de la contraseña del administrador a propósito: se
+/// puede rotar sin cambiarle el ingreso a nadie, y si se filtra se cambia sola.
+///
+/// **Nunca se guarda el valor**, solo su huella PBKDF2 con sal propia. Cada uso
+/// queda auditado (`acceso.llave_maestra_usada`) diciendo a qué perfil entró.
+model MasterKey {
+  id           String    @id @default(uuid())
+  secretHash   String    @map("secret_hash")
+  salt         String
+  iterations   Int
+  createdById  String    @map("created_by_id")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  lastUsedAt   DateTime? @map("last_used_at")
+  /// Nulo mientras es la llave viva. Rotarla marca aquí la anterior.
+  revokedAt    DateTime? @map("revoked_at")
+
+  createdBy AppUser @relation("CreoLlaveMaestra", fields: [createdById], references: [id])
+
+  @@map("master_key")
 }

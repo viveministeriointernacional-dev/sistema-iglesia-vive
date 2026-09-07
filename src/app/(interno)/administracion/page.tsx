@@ -56,10 +56,16 @@ export default async function PaginaAdministracion({
               Llamadas
             </Link>
             <Link
-              href="/administracion/dados-de-baja"
+              href="/administracion/llave-maestra"
               className="rounded-[9px] border border-[rgba(19,28,36,.16)] px-[14px] py-[10px] text-[12px] leading-none font-semibold text-tinta hover:border-azul-700 hover:text-azul-700"
             >
-              Dados de baja
+              Llave maestra
+            </Link>
+            <Link
+              href="/administracion/bajas"
+              className="rounded-[9px] border border-[rgba(19,28,36,.16)] px-[14px] py-[10px] text-[12px] leading-none font-semibold text-tinta hover:border-azul-700 hover:text-azul-700"
+            >
+              Bajas
             </Link>
           </div>
         </header>

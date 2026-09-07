@@ -142,6 +142,7 @@ function SeccionBaja({
 }) {
   const router = useRouter();
   const [motivo, setMotivo] = useState("");
+  const [observacion, setObservacion] = useState("");
   const [estado, setEstado] = useState<null | EstadoAviso>(null);
   const [ocupado, iniciar] = useTransition();
 
@@ -162,9 +163,13 @@ function SeccionBaja({
 
   function ejecutarReactivar() {
     iniciar(async () => {
-      const r = await reactivar(learnerId);
-      if (r.ok) router.refresh();
-      else setEstado({ ok: false, texto: r.mensaje });
+      const r = await reactivar(learnerId, observacion);
+      if (r.ok) {
+        setObservacion("");
+        router.refresh();
+      } else {
+        setEstado({ ok: false, texto: r.mensaje });
+      }
     });
   }
 
@@ -186,6 +191,21 @@ function SeccionBaja({
             </p>
           </div>
         ) : null}
+        <label className="mt-4 block">
+          <span className="etiqueta-campo">
+            ¿Qué proceso se sigue con esta persona? (opcional)
+          </span>
+          <textarea
+            className="campo campo-opcional"
+            rows={2}
+            value={observacion}
+            onChange={(e) => setObservacion(e.target.value)}
+            placeholder="Por dónde retomar, con quién, qué quedó pendiente."
+          />
+          <span className="mt-[7px] block text-[11px] leading-[1.45] font-medium text-[rgba(19,28,36,.5)]">
+            Queda en el expediente, junto al registro de la reactivación.
+          </span>
+        </label>
         <Aviso estado={estado} />
         <button
           type="button"
