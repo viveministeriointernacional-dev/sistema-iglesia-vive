@@ -211,6 +211,38 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-07** — **Menos viajes a la base en el tablero de Operación 72: de
+  ~15 a 6.** Es la palanca (1) del diagnóstico de lentitud de hoy, y la eligió
+  el usuario.
+  **El problema no era el plan de ejecución, era la FILA DE VIAJES.** Con
+  `PrismaPg max: 1` (necesario para no agotar el pooler de Supabase), **Prisma
+  serializa todas las consultas de una petición sobre la única conexión**, así
+  que un `Promise.all` de 10 consultas son 10 latencias, una detrás de otra.
+  El tablero hacía: 1 auth + 1 totales + 1 mentores + **2 por columna × 5
+  columnas** + 1 intentos + 1 solicitudes (+1 la búsqueda por teléfono).
+  **Nuevo `src/lib/tablero-op72.ts` → `seleccionarTarjetasDelTablero`**: una
+  sola consulta con `row_number() OVER (PARTITION BY status ORDER BY …)` que
+  devuelve **los ids de las cinco columnas y sus totales de un tirón**, con el
+  alcance por consolidador y la búsqueda (nombre y teléfono) dentro del mismo
+  SQL. La página hace después UNA `findMany` con esos ids y los reordena en
+  memoria (`findMany` no respeta el orden del `in`).
+  **La regla de orden `urgencia` cabe en un solo ORDER BY de tres claves:**
+  ```sql
+  (deadline_at >= now()) DESC,                                  -- dentro de plazo primero
+  CASE WHEN deadline_at >= now() THEN deadline_at END ASC,       -- menos margen primero
+  deadline_at DESC                                               -- vencidas: la más reciente
+  ```
+  **Comprobado fila por fila contra la base antes de cambiar nada: 60 de 60 en
+  el mismo id y el mismo puesto que las dos consultas viejas, 0 diferencias.**
+  También se probaron las tres ramas del filtro (sin filtro, por consolidador,
+  por nombre y por teléfono) con los parámetros tal como los manda Prisma
+  (arreglo de texto + nulos), porque **los casts son lo que se rompe**:
+  `${'$'}{estados}::text[]::"Operation72Status"[]` y `${'$'}{param}::text IS NULL`.
+  El `ORDER BY` se arma con `Prisma.raw` **desde un mapa cerrado**, nunca desde
+  algo que escriba el usuario.
+  **Pendiente de la misma palanca:** el informe todavía hace 9 viajes (4 de
+  ellos son `groupBy` chiquitos que se pueden juntar en uno).
+
 - **2026-09-07** — **Índices de consulta** (migración
   `20260907170000_indices_de_consulta`, 9 índices) **y el diagnóstico honesto de
   la lentitud**.
