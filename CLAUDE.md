@@ -246,6 +246,18 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
     `src/lib/llave-maestra-catalogo.ts`** por la regla del 6-sep: lo que usa el
     navegador va en el catálogo.
   - **Sin llave configurada, este camino no existe** — es el estado inicial.
+  - **SOLO EL ADMINISTRADOR PRINCIPAL LA CONFIGURA** (aclarado por el usuario el
+    mismo día): `CORREO_ADMIN_PRINCIPAL` + `esAdminPrincipal` en `auth.ts`, y
+    `conAdminPrincipal` en `administracion/acciones.ts`. **Hay CUATRO ADMIN**
+    (Administración Iglesia Vive, Alejandro Facundo, Juan Felipe Carvajal, Laura
+    Charry), así que `ROLES_ADMIN` no bastaba: los cuatro habrían podido poner o
+    quitar la llave. El botón tampoco se le muestra a los demás.
+    El correo va **en el código, no en la base**: si viviera en una tabla,
+    cualquier ADMIN podría ponerse a sí mismo como dueño desde Administración.
+  - **Lo que NO se puede hacer, y hay que decirlo así:** limitar *quién usa* la
+    llave. Se escribe en la pantalla de ingreso, **antes** de que exista sesión,
+    así que el sistema no sabe quién la teclea — solo a qué perfil entró. La
+    llave vale lo que valga el cuidado con que se guarde.
 
 - **2026-09-07** — **Autorización de bajas: nadie sale del sistema sin que un
   administrador lo apruebe** (mockup aprobado:

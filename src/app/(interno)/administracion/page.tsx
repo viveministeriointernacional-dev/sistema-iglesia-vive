@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ETIQUETA_ROL, requerirRol, ROLES_ADMIN } from "@/lib/auth";
+import { esAdminPrincipal, ETIQUETA_ROL, requerirRol, ROLES_ADMIN } from "@/lib/auth";
 import { buscarPersonasAdmin, TAMANOS_PAGINA } from "@/lib/administracion";
 
 export const metadata = { title: "Administración · Iglesia Vive" };
@@ -19,7 +19,7 @@ export default async function PaginaAdministracion({
 }: {
   searchParams: Promise<{ q?: string; page?: string; size?: string }>;
 }) {
-  await requerirRol(ROLES_ADMIN);
+  const usuario = await requerirRol(ROLES_ADMIN);
   const { q, page, size } = await searchParams;
   const consulta = (q ?? "").trim();
   const tam = Number(size) || 20;
@@ -55,12 +55,14 @@ export default async function PaginaAdministracion({
             >
               Llamadas
             </Link>
-            <Link
-              href="/administracion/llave-maestra"
-              className="rounded-[9px] border border-[rgba(19,28,36,.16)] px-[14px] py-[10px] text-[12px] leading-none font-semibold text-tinta hover:border-azul-700 hover:text-azul-700"
-            >
-              Llave maestra
-            </Link>
+            {esAdminPrincipal(usuario) ? (
+              <Link
+                href="/administracion/llave-maestra"
+                className="rounded-[9px] border border-[rgba(19,28,36,.16)] px-[14px] py-[10px] text-[12px] leading-none font-semibold text-tinta hover:border-azul-700 hover:text-azul-700"
+              >
+                Llave maestra
+              </Link>
+            ) : null}
             <Link
               href="/administracion/bajas"
               className="rounded-[9px] border border-[rgba(19,28,36,.16)] px-[14px] py-[10px] text-[12px] leading-none font-semibold text-tinta hover:border-azul-700 hover:text-azul-700"

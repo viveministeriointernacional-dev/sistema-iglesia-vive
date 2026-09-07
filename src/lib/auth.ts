@@ -26,6 +26,22 @@ export type UsuarioSesion = {
 /// Quién administra el sistema: personas, roles, permisos y procesos.
 export const ROLES_ADMIN: Role[] = [Role.ADMIN];
 
+/// El administrador principal de la iglesia: la cuenta dueña del sistema.
+///
+/// Hay varios ADMIN (coordinación, liderazgo), y para casi todo eso está bien.
+/// Pero **la llave maestra abre el perfil de cualquiera**, incluidas las notas
+/// pastorales, así que ponerla, cambiarla o quitarla es solo de esta cuenta.
+///
+/// Va en el código y no en la base de datos a propósito: si viviera en una
+/// tabla, cualquier ADMIN podría cambiarse a sí mismo por dueño desde la
+/// pantalla de administración y quedarse con la llave. No es un secreto —es un
+/// correo—, así que no rompe la regla de no commitear secretos.
+export const CORREO_ADMIN_PRINCIPAL = "viveministeriointernacional@gmail.com";
+
+export function esAdminPrincipal(usuario: UsuarioSesion): boolean {
+  return usuario.email.toLowerCase() === CORREO_ADMIN_PRINCIPAL;
+}
+
 /// Quién autoriza que una persona salga del sistema.
 ///
 /// El equipo de consolidación **pide** la baja y espera respuesta; quien está
