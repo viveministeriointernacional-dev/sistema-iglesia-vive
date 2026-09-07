@@ -211,6 +211,46 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-07** — **Índices de consulta** (migración
+  `20260907170000_indices_de_consulta`, 9 índices) **y el diagnóstico honesto de
+  la lentitud**.
+  El usuario pidió índices para optimizar. **Se midió antes de crearlos, y el
+  resultado corrige la intuición:**
+  - **Las tablas son diminutas.** La más grande es `audit_log` con **1 528
+    filas / 952 kB**; `contact_attempt` tiene 398 filas / 248 kB. La consulta
+    más pesada del informe (la de consolidadores, con cinco `EXISTS`
+    correlacionados) tarda **20,4 ms de ejecución… y 19,6 ms de PLANIFICACIÓN**.
+    Todo resuelve por escaneo completo, y **Postgres hace bien**: la tabla
+    entera cabe en una docena de páginas.
+  - **⚠️ Conclusión: los índices NO son el cuello de botella hoy.** La lentitud
+    que se siente es **latencia de ida y vuelta al pooler de Supabase** (§9:
+    plan FREE, `ca-central-1`) multiplicada por el número de consultas por
+    página — y con `PrismaPg max:1` las consultas de un `Promise.all`
+    **se serializan** sobre la única conexión. El informe hace 9 viajes; el
+    tablero, otros tantos. Ahí está el segundo, no en el plan de ejecución.
+  - **Aun así los índices se crearon**, como trabajo preventivo: el costo del
+    escaneo crece en línea recta con la iglesia y `pg_stat_user_tables` ya
+    muestra el patrón — `person` lleva **771 933 filas leídas** a punta de
+    escaneo completo (2 044 escaneos), `learner_profile` 615 938. Cuando esas
+    tablas pasen de unos miles de filas, el planificador los empieza a usar
+    **solo**, sin tocar nada.
+  - **El que más se va a notar: `learner_profile(consolidator_id)`** — hoy no
+    existía ninguno por consolidador, y lo usan el alcance «solo mis personas»
+    del tablero y el cálculo de carga del reparto automático.
+  - Los otros ocho son por **rango de fechas**, que es lo que pide el informe y
+    que los índices existentes no cubren porque **empiezan por otra columna**
+    (`contact_attempt` tenía `(operation72_id, occurred_at)`, inútil cuando se
+    filtra solo por fecha; `learner_status_change` igual).
+  - **Van sin `CONCURRENTLY` a propósito**: `scripts/migrar.mjs` aplica cada
+    migración dentro de `BEGIN/COMMIT` y ahí no se permite. Con estos tamaños
+    el bloqueo de escritura dura milisegundos.
+  - **Verificados contra la base real** creándolos dentro de una transacción y
+    haciéndole `ROLLBACK`: los 9 se crean sin error y producción quedó intacta.
+  - **Palancas reales para la velocidad, en orden** (siguen pendientes, §9):
+    **(1) menos viajes por página** (juntar consultas), **(2) Hyperdrive**
+    (cachea el pool en el borde y mata la latencia por viaje), **(3) Supabase
+    Pro**. Un índice más no mueve la aguja hasta que la base crezca.
+
 - **2026-09-07** — **Informe de la plataforma** (`/administracion/informe`, solo
   ADMIN; mockup aprobado:
   claude.ai/code/artifact/5e99c331-253a-4ec1-b5f1-cf84c196f34f).
