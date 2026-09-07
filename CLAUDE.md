@@ -211,6 +211,28 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-07** — **⚠️ La llave maestra no se podía guardar: Cloudflare limita
+  PBKDF2 a 100 000 iteraciones.** Al pulsar «Guardar la llave maestra» salía la
+  pantalla negra «This page couldn't load · A server error occurred».
+  **Causa:** puse **210 000** iteraciones (la recomendación de OWASP) y el
+  runtime de Workers **no acepta más de 100 000 en una sola llamada**:
+  `crypto.subtle.deriveBits` lanza
+  `NotSupportedError: Pbkdf2 failed: iteration counts above 100000 are not
+  supported`. Es un tope duro de workerd para que nadie use el Worker como
+  quemador de CPU ([workerd#1346](https://github.com/cloudflare/workerd/issues/1346)).
+  **Arreglo: rondas encadenadas.** `derivar` da tantas vueltas de 100 000 como
+  haga falta, y la salida de cada una alimenta la siguiente. Hoy **2 rondas =
+  200 000 iteraciones** efectivas, sin que ninguna llamada pase del tope. El
+  total se guarda en `master_key.iterations` y la verificación usa **el de la
+  fila**, no la constante, así que subir las rondas mañana no invalida las
+  llaves ya guardadas.
+  **Probado**: misma llave → misma huella, otra llave → otra huella, 110 ms.
+  **No hubo que migrar nada**: la tabla estaba vacía (nunca se llegó a guardar
+  ninguna llave).
+  **REGLA para todo lo que use `crypto.subtle` en este proyecto: el tope de
+  PBKDF2 en Workers es 100 000 por llamada.** `tsc` y `cf:build` NO lo ven — es
+  un error de ejecución, no de compilación.
+
 - **2026-09-07** — **Generador de claves en los tres sitios que faltaban.**
   `generarContrasena` (`src/lib/contrasena.ts`) ya existía pero **solo se usaba
   en «Restablecer contraseña»**. Los demás campos eran texto pelado, así que la
