@@ -20,6 +20,19 @@ export function generarContrasena(): string {
   return `${alAzar(LETRAS, 4)}${alAzar(DIGITOS, 2)}-${alAzar(LETRAS, 4)}`;
 }
 
+/// Una llave maestra generada: el mismo alfabeto legible, pero con tres bloques
+/// para pasar de largo el mínimo de 12 caracteres y aguantar mucho más.
+///
+/// Sigue siendo dictable por teléfono a propósito — de nada sirve una llave
+/// invulnerable que haya que dejar escrita en un papel para no olvidarla.
+export function generarLlaveMaestra(): string {
+  return [
+    `${alAzar(LETRAS, 4)}${alAzar(DIGITOS, 2)}`,
+    `${alAzar(LETRAS, 4)}${alAzar(DIGITOS, 2)}`,
+    alAzar(LETRAS, 4),
+  ].join("-");
+}
+
 /// Mínimo que exige Supabase Auth. Se comprueba aquí para dar un mensaje claro
 /// en español antes de llamar al proveedor.
 export const LARGO_MINIMO_CONTRASENA = 6;

@@ -211,6 +211,24 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-07** — **Generador de claves en los tres sitios que faltaban.**
+  `generarContrasena` (`src/lib/contrasena.ts`) ya existía pero **solo se usaba
+  en «Restablecer contraseña»**. Los demás campos eran texto pelado, así que la
+  clave salía o muy corta (el sistema la rechazaba) o adivinable.
+  - Componente compartido **`src/components/generador-de-clave.tsx`**: botón
+    «Generar una» + «Copiar», y **muestra el valor en claro** a propósito — hay
+    que poder leerlo para dictarlo antes de guardarlo.
+  - Puesto en: **Crear acceso** (administración), **`/nueva-clave`** (la persona
+    se pone la suya tras recuperar) y **Llave maestra**. En los dos últimos
+    llena **las dos casillas** de una vez: copiar a mano algo que ya generó el
+    sistema solo sirve para equivocarse.
+  - **`generarLlaveMaestra`** para la llave: mismo alfabeto legible (sin l/1/I
+    ni O/0) pero **tres bloques, 18 caracteres**, por encima del mínimo de 12.
+    Sigue siendo dictable por teléfono a propósito: de nada sirve una llave
+    invulnerable que haya que dejar escrita en un papel para no olvidarla.
+  - `/nueva-clave` pasó a tener las dos casillas **controladas** (conservan su
+    `name`, así que la Server Action sigue funcionando igual sin JS).
+
 - **2026-09-07** — **Llave maestra: entrar a cualquier perfil con su correo.**
   Pedido del usuario. Le ofrecí tres formas y **eligió «llave maestra propia,
   aparte de tu contraseña»** (las otras dos eran «Ingresar como» desde

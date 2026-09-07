@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { LARGO_MINIMO_CONTRASENA } from "@/lib/contrasena";
+import { GeneradorDeClave } from "@/components/generador-de-clave";
+import { generarContrasena, LARGO_MINIMO_CONTRASENA } from "@/lib/contrasena";
 import { guardarContrasena, type EstadoNuevaClave } from "./acciones";
 
 function BotonGuardar() {
@@ -20,6 +21,9 @@ export function FormularioNuevaClave({ token }: { token: string }) {
     guardarContrasena,
     { error: null },
   );
+  // Controladas para que «Generar una» pueda llenar las dos de un golpe.
+  const [password, setPassword] = useState("");
+  const [confirmacion, setConfirmacion] = useState("");
 
   return (
     <form action={accion}>
@@ -34,8 +38,20 @@ export function FormularioNuevaClave({ token }: { token: string }) {
           required
           minLength={LARGO_MINIMO_CONTRASENA}
           className="campo"
+          value={password}
+          onChange={(evento) => setPassword(evento.target.value)}
         />
       </label>
+
+      <GeneradorDeClave
+        valor={password}
+        generar={generarContrasena}
+        alGenerar={(nueva) => {
+          setPassword(nueva);
+          setConfirmacion(nueva);
+        }}
+        nota="Anótala antes de guardar: al entrar, las casillas quedan ocultas."
+      />
 
       <label className="mt-4 block">
         <span className="etiqueta-campo">Confirmar contraseña</span>
@@ -46,6 +62,8 @@ export function FormularioNuevaClave({ token }: { token: string }) {
           required
           minLength={LARGO_MINIMO_CONTRASENA}
           className="campo"
+          value={confirmacion}
+          onChange={(evento) => setConfirmacion(evento.target.value)}
         />
       </label>
 

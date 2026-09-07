@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { GeneradorDeClave } from "@/components/generador-de-clave";
+import { generarLlaveMaestra } from "@/lib/contrasena";
 import { LARGO_MINIMO_LLAVE } from "@/lib/llave-maestra-catalogo";
 import { cambiarLlaveMaestra, quitarLlaveMaestra } from "../acciones";
 
@@ -74,6 +76,20 @@ export function FormularioLlaveMaestra({ configurada }: { configurada: boolean }
           placeholder={`Al menos ${LARGO_MINIMO_LLAVE} caracteres`}
         />
       </label>
+
+      <GeneradorDeClave
+        valor={valor}
+        generar={generarLlaveMaestra}
+        alGenerar={(nueva) => {
+          // Llena las dos casillas: pedirle que copie a mano algo que ya generó
+          // el sistema solo sirve para equivocarse.
+          setValor(nueva);
+          setRepetida(nueva);
+          setError(null);
+          setListo(null);
+        }}
+        nota="Cópiala y guárdala ahora en un lugar seguro: al guardarla no se vuelve a mostrar."
+      />
 
       <label className="mt-3 block">
         <span className="etiqueta-campo">Escríbela otra vez</span>
