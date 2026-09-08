@@ -248,6 +248,39 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-08** — **⚠️ CUARTA TRAMPA DE SQL: `AT TIME ZONE 'America/Bogota'`
+  sobre una columna `timestamp without time zone` SUMA 5 h en vez de restarlas.**
+  El usuario preguntó por qué el informe mostraba menos llamadas que el
+  historial. **Los tiles estaban bien** (usan `BETWEEN ${'$'}{desde} AND
+  ${'$'}{hasta}` con `Date` de JS, que Prisma manda como `timestamptz`), pero la
+  **gráfica «Actividad, día por día» estaba mal**: en la misma pantalla, el tile
+  decía **18** y la barra del 7-sep decía **7**.
+  **La causa.** Todas las marcas de tiempo del proyecto son `timestamp without
+  time zone` **con la hora en UTC**. En Postgres:
+  - `timestamp AT TIME ZONE 'z'` → **interpreta** el valor como si ya estuviera
+    en `z` y devuelve `timestamptz`. Sobre una hora UTC eso **suma** 5 h.
+  - Lo correcto es anclarla primero: **`x AT TIME ZONE 'UTC' AT TIME ZONE
+    'America/Bogota'`** → `timestamp` en hora Colombia de verdad.
+  Con el desfase de los cubos, el error efectivo era de **10 horas**: una llamada
+  de las **18:04 del 7-sep** aparecía como **04:04 del 8-sep**, así que **toda
+  llamada después de las 2 de la tarde caía en el día siguiente** — y como el
+  equipo llama por la tarde, la barra de hoy siempre salía corta.
+  **Medido antes y después** (4 y 7 de sep): 14 → **27** y 7 → **18**, y el 18
+  cuadra exactamente con el tile. Arreglado en las 3 subconsultas de
+  `actividadPorPeriodo` (llamadas, visitas y registros).
+  **Ojo: `src/lib/llamadas.ts` NUNCA tuvo el bug** — construye los límites con
+  `new Date("…T00:00:00-05:00")` y compara como `timestamptz`, que es la otra
+  forma correcta de hacerlo.
+  **REGLA: nunca escribir `AT TIME ZONE 'America/Bogota'` a secas sobre una
+  columna del modelo.** O se anclan en UTC primero, o se comparan contra `Date`
+  de JS con el offset puesto.
+  **Y la respuesta a la pregunta del usuario, que NO era un bug:** el historial
+  cuenta **marcaciones del discador** (`call_log`) y el informe cuenta
+  **registros de formulario** (`contact_attempt`). El 7-sep hubo **52
+  marcaciones a 33 personas** pero solo **18 registros de 16 personas**: **17
+  personas marcadas sin registrar**. Esa diferencia es justo lo que el sistema
+  está hecho para revelar (§6), no un fallo.
+
 - **2026-09-07** — **«Mi red» y «Árbol» pasan a ser UNA sola pantalla**
   (mockup aprobado: claude.ai/code/artifact/9dd38781-3cd4-4006-aa34-d2406dcf7e64;
   el usuario eligió que abra en **Lista**).

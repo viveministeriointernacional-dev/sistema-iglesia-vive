@@ -549,6 +549,14 @@ async function medirEfectividad(
 ///
 /// Los límites se corren a hora Colombia para que cada cubo agrupe el día
 /// colombiano y no el UTC.
+///
+/// ⚠️ **`occurred_at` y `started_at` son `timestamp without time zone` con la
+/// hora en UTC**, así que hay que anclarlas en UTC ANTES de pasarlas a hora
+/// Colombia: `x AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota'`. Escribir
+/// solo `x AT TIME ZONE 'America/Bogota'` hace lo contrario —la interpreta como
+/// si ya fuera hora Colombia y devuelve UTC— y **suma 5 h en vez de restarlas**.
+/// Con el desfase de los cubos eso corría las barras 10 h: toda llamada después
+/// de las 2 de la tarde caía en el día siguiente (bug del 8-sep-2026).
 async function actividadPorPeriodo(
   prisma: ClientePrisma,
   desde: Date,
@@ -576,15 +584,15 @@ async function actividadPorPeriodo(
     SELECT to_char(c.dia, 'YYYY-MM-DD') AS dia,
       (SELECT count(*) FROM contact_attempt a
         WHERE a.type IN ('LLAMADA','INTENTO_LLAMADA')
-          AND (a.occurred_at AT TIME ZONE 'America/Bogota') >= c.dia
-          AND (a.occurred_at AT TIME ZONE 'America/Bogota') < c.dia + ${Prisma.raw(`interval '${paso}'`)}) AS llamadas,
+          AND (a.occurred_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota') >= c.dia
+          AND (a.occurred_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota') < c.dia + ${Prisma.raw(`interval '${paso}'`)}) AS llamadas,
       (SELECT count(*) FROM contact_attempt a
         WHERE a.type = 'VISITA'
-          AND (a.occurred_at AT TIME ZONE 'America/Bogota') >= c.dia
-          AND (a.occurred_at AT TIME ZONE 'America/Bogota') < c.dia + ${Prisma.raw(`interval '${paso}'`)}) AS visitas,
+          AND (a.occurred_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota') >= c.dia
+          AND (a.occurred_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota') < c.dia + ${Prisma.raw(`interval '${paso}'`)}) AS visitas,
       (SELECT count(*) FROM operation72 o
-        WHERE (o.started_at AT TIME ZONE 'America/Bogota') >= c.dia
-          AND (o.started_at AT TIME ZONE 'America/Bogota') < c.dia + ${Prisma.raw(`interval '${paso}'`)}) AS registros
+        WHERE (o.started_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota') >= c.dia
+          AND (o.started_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota') < c.dia + ${Prisma.raw(`interval '${paso}'`)}) AS registros
     FROM cubos c
     ORDER BY c.dia
   `;
