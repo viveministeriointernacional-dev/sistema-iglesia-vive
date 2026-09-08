@@ -296,7 +296,17 @@ export type FilaConsolidador = {
 export type Informe = {
   rango: Rango;
   registros: Comparacion;
+  /// **Llamadas = marcaciones del discador** (`call_log`), la MISMA fuente que
+  /// el historial de `/administracion/llamadas`. Antes esta cifra contaba los
+  /// registros de formulario, así que el informe y el historial nunca cuadraban
+  /// (decisión del usuario, 8-sep-2026: «que sean los mismos datos en cada
+  /// vista»).
   llamadas: Comparacion;
+  /// De esas llamadas, cuántas quedaron registradas en el formulario. Es lo
+  /// único que mueve la tarjeta (§6 de CLAUDE.md), así que la diferencia entre
+  /// las dos cifras es justo lo que hay que vigilar: quien marca pero no
+  /// registra.
+  llamadasRegistradas: Comparacion;
   visitas: Comparacion;
   entregas: Comparacion;
   hitos: Comparacion;
@@ -447,6 +457,8 @@ async function contarMovimientos(
       registros_previo: bigint;
       llamadas: bigint;
       llamadas_previo: bigint;
+      registradas: bigint;
+      registradas_previo: bigint;
       visitas: bigint;
       visitas_previo: bigint;
       entregas: bigint;
@@ -461,8 +473,10 @@ async function contarMovimientos(
     SELECT
       (SELECT count(*) FROM operation72 WHERE started_at BETWEEN ${desde} AND ${hasta}) AS registros,
       (SELECT count(*) FROM operation72 WHERE started_at BETWEEN ${desdePrevio} AND ${hastaPrevio}) AS registros_previo,
-      (SELECT count(*) FROM contact_attempt WHERE type IN ('LLAMADA','INTENTO_LLAMADA') AND occurred_at BETWEEN ${desde} AND ${hasta}) AS llamadas,
-      (SELECT count(*) FROM contact_attempt WHERE type IN ('LLAMADA','INTENTO_LLAMADA') AND occurred_at BETWEEN ${desdePrevio} AND ${hastaPrevio}) AS llamadas_previo,
+      (SELECT count(*) FROM call_log WHERE started_at BETWEEN ${desde} AND ${hasta}) AS llamadas,
+      (SELECT count(*) FROM call_log WHERE started_at BETWEEN ${desdePrevio} AND ${hastaPrevio}) AS llamadas_previo,
+      (SELECT count(*) FROM contact_attempt WHERE type IN ('LLAMADA','INTENTO_LLAMADA') AND occurred_at BETWEEN ${desde} AND ${hasta}) AS registradas,
+      (SELECT count(*) FROM contact_attempt WHERE type IN ('LLAMADA','INTENTO_LLAMADA') AND occurred_at BETWEEN ${desdePrevio} AND ${hastaPrevio}) AS registradas_previo,
       (SELECT count(*) FROM contact_attempt WHERE type = 'VISITA' AND occurred_at BETWEEN ${desde} AND ${hasta}) AS visitas,
       (SELECT count(*) FROM contact_attempt WHERE type = 'VISITA' AND occurred_at BETWEEN ${desdePrevio} AND ${hastaPrevio}) AS visitas_previo,
       (SELECT count(*) FROM mentor_relationship WHERE started_at BETWEEN ${desde} AND ${hasta}) AS entregas,
@@ -478,6 +492,7 @@ async function contarMovimientos(
   return {
     registros: comparar(n(fila?.registros), n(fila?.registros_previo)),
     llamadas: comparar(n(fila?.llamadas), n(fila?.llamadas_previo)),
+    llamadasRegistradas: comparar(n(fila?.registradas), n(fila?.registradas_previo)),
     visitas: comparar(n(fila?.visitas), n(fila?.visitas_previo)),
     entregas: comparar(n(fila?.entregas), n(fila?.entregas_previo)),
     hitos: comparar(n(fila?.hitos), n(fila?.hitos_previo)),
@@ -582,10 +597,9 @@ async function actividadPorPeriodo(
       ) l
     )
     SELECT to_char(c.dia, 'YYYY-MM-DD') AS dia,
-      (SELECT count(*) FROM contact_attempt a
-        WHERE a.type IN ('LLAMADA','INTENTO_LLAMADA')
-          AND (a.occurred_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota') >= c.dia
-          AND (a.occurred_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota') < c.dia + ${Prisma.raw(`interval '${paso}'`)}) AS llamadas,
+      (SELECT count(*) FROM call_log l
+        WHERE (l.started_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota') >= c.dia
+          AND (l.started_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota') < c.dia + ${Prisma.raw(`interval '${paso}'`)}) AS llamadas,
       (SELECT count(*) FROM contact_attempt a
         WHERE a.type = 'VISITA'
           AND (a.occurred_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota') >= c.dia

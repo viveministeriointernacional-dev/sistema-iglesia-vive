@@ -248,6 +248,43 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-08** — **«LLAMADAS» en el informe pasa a contar MARCACIONES, la
+  misma fuente que el historial** (decisión del usuario, dicha dos veces: «que
+  sean los mismos datos en cada vista» y «no se ve la misma cantidad de
+  llamadas»).
+  Le expliqué que eran cosas distintas a propósito (§6: marcaciones ≠ registros)
+  y **aun así pidió que cuadraran**. Es su llamada y se hizo.
+  - El tile **LLAMADAS** y la barra de la gráfica salen ahora de **`call_log`**,
+    con los mismos límites que `/administracion/llamadas`. Para el 7-sep: **52 y
+    52**, idénticos.
+  - **No se perdió la otra cifra**: debajo del tile va **«N con formulario»**
+    (`llamadasRegistradas`, de `contact_attempt`), y la leyenda de la gráfica
+    dice **«Llamadas marcadas»**. La diferencia entre las dos es justo lo que
+    hay que vigilar —quien marca pero no registra—, así que sigue a la vista.
+  - Comprobado contra la base en 5 días: tile, barra e historial dan lo mismo
+    (4-sep 59·59, 7-sep 52·52), y «con formulario» 27 y 20.
+  - **Ojo con el bloque de efectividad**: sigue midiendo sobre `contact_attempt`
+    («se les registró una llamada»), que es lo correcto ahí — el embudo mide el
+    proceso, no el esfuerzo del discador.
+
+- **2026-09-08** — **⚠️ EL DESPLIEGUE SE QUEDÓ ATASCADO: los PR #73 y #74 están
+  fusionados en `main` pero NO están vivos.** Verificado a las 05:13 UTC, más de
+  40 min después del merge (lo normal son 5).
+  **Cómo se comprueba cuando el CSS no sirve de huella** (estos dos PR no
+  tocaron ni una clase de Tailwind, así que la hoja de estilos salió idéntica y
+  no distingue versiones):
+  1. Sacar de la página viva los paquetes que pide:
+     `curl -s <URL>/ingresar | grep -o '/_next/static/chunks/[a-z0-9._-]*\.js'`.
+  2. Compilar el commit sospechoso (`npm run cf:build`) y ver si produce ese
+     mismo nombre. Los nombres llevan hash del contenido.
+  Resultado: el sitio pide **`35yis8a6jlmce.js`**, que **NO** lo produce ni el
+  build del PR #73 ni el del #74 → **está corriendo todavía el PR #72**.
+  El sitio está **sano** (`/ingresar` 200, `/actualizar-datos` 200, webhook 401):
+  no es una caída, es que el build nuevo no entra.
+  **Pendiente del usuario:** mirar Cloudflare → Workers & Pages →
+  `sistema-iglesia-vive` → **Deployments**, y decir si el build está en curso o
+  falló. Desde aquí no hay credenciales para verlo.
+
 - **2026-09-08** — **Un día significa lo mismo en TODAS las pantallas**
   (pedido del usuario: «que sean los mismos datos en cada vista, no puede haber
   un desfase; estamos en Colombia»). Barrido completo tras el bug de la gráfica.
