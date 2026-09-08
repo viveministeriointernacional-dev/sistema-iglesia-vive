@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { diaLargo } from "@/lib/dominio";
 import { requerirPermiso } from "@/lib/auth";
 import {
   cargarCasaDeFe,
@@ -10,11 +11,6 @@ import { CasaDeFe, type MiembroVista } from "./grupo";
 
 export const dynamic = "force-dynamic";
 
-const FECHA = new Intl.DateTimeFormat("es-CO", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-});
 
 export async function generateMetadata({
   params,
@@ -59,7 +55,7 @@ export default async function PaginaCasaDeFe({
             {grupo.name}
           </h1>
           <p className="mt-2 text-[13px] leading-none font-medium text-[rgba(19,28,36,.55)]">
-            {grupo.leader.fullName} · desde {FECHA.format(grupo.startDate)} ·{" "}
+            {grupo.leader.fullName} · desde {diaLargo(grupo.startDate)} ·{" "}
             {miembros.length} {miembros.length === 1 ? "persona" : "personas"}
             {grupo.closedAt ? " · cerrada" : ""}
           </p>

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { diaLargo, momentoLargo } from "@/lib/dominio";
 import { requerirPermiso } from "@/lib/auth";
 import {
   ASISTENCIA_MINIMA,
@@ -12,11 +13,6 @@ import { Grupo, type ParticipanteVista, type SesionVista } from "./grupo";
 
 export const dynamic = "force-dynamic";
 
-const FECHA = new Intl.DateTimeFormat("es-CO", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-});
 
 export async function generateMetadata({
   params,
@@ -49,7 +45,7 @@ export default async function PaginaGrupoDeAlpha({
   const sesiones: SesionVista[] = grupo.sessions.map((sesion) => ({
     id: sesion.id,
     numero: sesion.number,
-    fecha: FECHA.format(sesion.date),
+    fecha: diaLargo(sesion.date),
     tema: sesion.topic,
     realizada: sesion.date.getTime() <= ahora.getTime(),
   }));
@@ -76,7 +72,7 @@ export default async function PaginaGrupoDeAlpha({
     cumpleAsistencia: persona.cumpleAsistencia,
     tieneFocusDay: persona.focusDay !== null,
     validado: persona.validadoEl
-      ? `${FECHA.format(persona.validadoEl)}${persona.validadoPor ? ` · ${persona.validadoPor}` : ""}`
+      ? `${momentoLargo(persona.validadoEl)}${persona.validadoPor ? ` · ${persona.validadoPor}` : ""}`
       : null,
     faltaParaValidar: persona.faltaParaValidar,
     asistencia: asistenciaPorInscripcion.get(persona.enrollmentId) ?? {},
@@ -92,7 +88,7 @@ export default async function PaginaGrupoDeAlpha({
             {grupo.name}
           </h1>
           <p className="mt-2 text-[13px] leading-none font-medium text-[rgba(19,28,36,.55)]">
-            {grupo.leader.fullName} · desde {FECHA.format(grupo.startDate)} ·{" "}
+            {grupo.leader.fullName} · desde {diaLargo(grupo.startDate)} ·{" "}
             {grupo.sessions.length} de {SESIONES_DE_ALPHA} sesiones ·{" "}
             {vistas.length} {vistas.length === 1 ? "persona" : "personas"} ·{" "}
             {validados} {validados === 1 ? "validada" : "validadas"}

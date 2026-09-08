@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { momentoCorto } from "@/lib/dominio";
 import { Phase } from "@iglesia/prisma-client";
 import { requerirPermiso, tieneRed } from "@/lib/auth";
 import { cargarArbol } from "@/lib/arbol";
@@ -33,10 +34,6 @@ const FASES: Phase[] = [
   Phase.MULTIPLICAR,
 ];
 
-const FECHA_CORTA = new Intl.DateTimeFormat("es-CO", {
-  day: "numeric",
-  month: "short",
-});
 
 const COLOR_FASE: Record<Phase, string> = {
   GANAR: "bg-azul-050 text-azul-700",
@@ -298,7 +295,7 @@ function FilaDePersona({ persona }: { persona: PersonaDeLaRed }) {
         </Link>
         <p className="mt-1 text-[11.5px] leading-[1.3] font-medium text-[rgba(19,28,36,.5)]">
           {persona.ultimoContacto
-            ? `Último registro: ${FECHA_CORTA.format(persona.ultimoContacto)}`
+            ? `Último registro: ${momentoCorto(persona.ultimoContacto)}`
             : "Sin registros todavía"}
         </p>
       </div>

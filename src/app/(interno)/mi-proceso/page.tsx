@@ -12,7 +12,7 @@ import {
   FASES,
   HITOS_DEL_RECORRIDO,
 } from "@/lib/expediente";
-import { ZONA_HORARIA } from "@/lib/dominio";
+import { ZONA_HORARIA, diaCorto, momentoCorto } from "@/lib/dominio";
 import { cargarMiEscuela } from "@/lib/entrenar";
 import { ETIQUETA_EVENTO, proximoEventoDe } from "@/lib/eventos";
 import { cargarMiAlpha, miHistoria, miProximoPaso } from "@/lib/mi-proceso";
@@ -20,10 +20,6 @@ import { cargarMiAlpha, miHistoria, miProximoPaso } from "@/lib/mi-proceso";
 export const metadata = { title: "Mi proceso · Iglesia Vive" };
 export const dynamic = "force-dynamic";
 
-const FECHA_CORTA = new Intl.DateTimeFormat("es-CO", {
-  day: "numeric",
-  month: "short",
-});
 
 const FECHA_LARGA = new Intl.DateTimeFormat("es-CO", {
   weekday: "long",
@@ -178,7 +174,7 @@ export default async function MiProceso() {
                       {esCasaDeFe
                         ? `${temasCompletados} / 12`
                         : hito?.achievedAt
-                          ? FECHA_CORTA.format(hito.achievedAt)
+                          ? momentoCorto(hito.achievedAt)
                           : enCurso
                             ? "En curso"
                             : "Aún no"}
@@ -228,7 +224,7 @@ export default async function MiProceso() {
                   <div className="mt-3 rounded-[10px] bg-papel p-3">
                     <p className="text-[12.5px] leading-[1.45] font-semibold text-tinta">
                       Próxima · sesión {escuela.proxima.numero} el{" "}
-                      {FECHA_CORTA.format(escuela.proxima.fecha)} ·{" "}
+                      {diaCorto(escuela.proxima.fecha)} ·{" "}
                       {escuela.proxima.tema}
                     </p>
                     {escuela.proxima.tarea ? (
@@ -251,7 +247,7 @@ export default async function MiProceso() {
 
                 {escuela.completado ? (
                   <p className="mt-3 rounded-[8px] bg-verde-100 px-2 py-1 text-[10px] leading-[1.4] font-bold text-verde-700">
-                    ✓ ESCUELA COMPLETADA · {FECHA_CORTA.format(escuela.completado)}
+                    ✓ ESCUELA COMPLETADA · {momentoCorto(escuela.completado)}
                   </p>
                 ) : null}
               </section>
@@ -272,18 +268,18 @@ export default async function MiProceso() {
                 {alpha.proxima ? (
                   <p className="mt-3 rounded-[10px] bg-papel p-3 text-[12.5px] leading-[1.45] font-semibold text-tinta">
                     Próxima · sesión {alpha.proxima.numero} el{" "}
-                    {FECHA_CORTA.format(alpha.proxima.fecha)}
+                    {diaCorto(alpha.proxima.fecha)}
                     {alpha.proxima.tema ? ` · ${alpha.proxima.tema}` : ""}
                   </p>
                 ) : null}
 
                 {alpha.validado ? (
                   <p className="mt-3 rounded-[8px] bg-verde-100 px-2 py-1 text-[10px] leading-[1.4] font-bold text-verde-700">
-                    ✓ ALPHA COMPLETADO · {FECHA_CORTA.format(alpha.validado)}
+                    ✓ ALPHA COMPLETADO · {momentoCorto(alpha.validado)}
                   </p>
                 ) : alpha.focusDay ? (
                   <p className="mt-3 text-[11.5px] leading-[1.4] font-semibold text-verde-700">
-                    ✓ Focus Day · {FECHA_CORTA.format(alpha.focusDay)}
+                    ✓ Focus Day · {momentoCorto(alpha.focusDay)}
                   </p>
                 ) : null}
               </section>
@@ -384,7 +380,7 @@ export default async function MiProceso() {
                   <span
                     className={`text-[11.5px] leading-[1.6] font-semibold text-[rgba(19,28,36,.45)] ${ultimo ? "" : "pb-[18px]"}`}
                   >
-                    {FECHA_CORTA.format(evento.fecha)}
+                    {momentoCorto(evento.fecha)}
                   </span>
                   <span className="relative grid place-items-start justify-center">
                     {!ultimo ? (

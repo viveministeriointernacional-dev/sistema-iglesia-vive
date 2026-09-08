@@ -11,6 +11,8 @@ import {
   textoDeAsistenciaIglesia,
   textoDeEntrada,
   textoDeHorario,
+  diaCorto,
+  momentoCorto,
 } from "@/lib/dominio";
 import { edadDesde } from "@/lib/op72";
 import {
@@ -38,10 +40,6 @@ import { DatosPersona } from "./datos-persona";
 
 export const dynamic = "force-dynamic";
 
-const FECHA_CORTA = new Intl.DateTimeFormat("es-CO", {
-  day: "numeric",
-  month: "short",
-});
 
 export async function generateMetadata({
   params,
@@ -87,8 +85,8 @@ export default async function PaginaExpediente({
         id: servicio.id,
         ministerio: servicio.ministry,
         status: servicio.status,
-        desde: FECHA_CORTA.format(servicio.startedAt),
-        hasta: servicio.endedAt ? FECHA_CORTA.format(servicio.endedAt) : null,
+        desde: diaCorto(servicio.startedAt),
+        hasta: servicio.endedAt ? diaCorto(servicio.endedAt) : null,
         responsable: servicio.responsible?.fullName ?? null,
         observaciones: servicio.notes,
         evidencia: servicio.evidence,
@@ -106,7 +104,7 @@ export default async function PaginaExpediente({
         id: paso.id,
         desde: paso.fromPhase,
         hasta: paso.toPhase,
-        fecha: FECHA_CORTA.format(paso.decidedAt),
+        fecha: momentoCorto(paso.decidedAt),
         decidio: paso.decidedBy.fullName,
         nota: paso.note,
       }))
@@ -266,7 +264,7 @@ export default async function PaginaExpediente({
                       {esCasaDeFe
                         ? `${temasCompletados} / 12`
                         : hito?.achievedAt
-                          ? FECHA_CORTA.format(hito.achievedAt)
+                          ? momentoCorto(hito.achievedAt)
                           : enCurso
                             ? "En curso"
                             : "Pendiente"}
@@ -308,7 +306,7 @@ export default async function PaginaExpediente({
                       <span
                         className={`text-[11.5px] leading-[1.6] font-semibold text-[rgba(19,28,36,.45)] ${ultimo ? "" : "pb-[18px]"}`}
                       >
-                        {FECHA_CORTA.format(evento.fecha)}
+                        {momentoCorto(evento.fecha)}
                       </span>
                       <span className="relative grid place-items-start justify-center">
                         {!ultimo ? (
