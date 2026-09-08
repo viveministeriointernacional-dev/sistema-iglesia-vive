@@ -248,6 +248,41 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-08** — **Un día significa lo mismo en TODAS las pantallas**
+  (pedido del usuario: «que sean los mismos datos en cada vista, no puede haber
+  un desfase; estamos en Colombia»). Barrido completo tras el bug de la gráfica.
+  **Había DOS clases de fecha mezcladas y nadie las distinguía**, así que la
+  misma cosa salía con días distintos según la pantalla:
+  1. **Marca de tiempo real** (`occurred_at`, `created_at`, `decided_at`,
+     `achieved_at`, `validated_at`, `completed_at`, `MentorRelationship.started_at`,
+     `Event.starts_at`): se guarda en UTC. **Sin `timeZone` se pintaba en UTC**, o
+     sea que **todo lo de después de las 7 de la noche salía con la fecha del día
+     siguiente**.
+  2. **Fecha suelta**, columna **`@db.Date`** (`birth_date`, `start_date`,
+     `end_date`, la fecha de una sesión de Alpha o Escuela, y **`ServiceAssignment`
+     start/ended**): Prisma la trae a **medianoche UTC**, así que **aplicarle hora
+     Colombia la corre un día ATRÁS**.
+  **La regla, y cómo se decide sin pensarlo:** mirar el esquema — **si el campo
+  lleva `@db.Date`, va con `dia…`; si no, con `momento…`**.
+  **Cuatro helpers en `dominio.ts`**, para que no haya que acordarse:
+  `momentoCorto` · `momentoLargo` (hora Colombia) y `diaCorto` · `diaLargo`
+  (sin zona). **Se borraron los 9 formateadores sueltos** que había en
+  escuela, alpha, casa de fe, expediente (×2), mi-red y mi-proceso.
+  **Dos archivos usaban UN SOLO formateador para las dos clases** —
+  `expediente/[id]/page.tsx` y `mi-proceso/page.tsx`—, que es justo por donde se
+  colaba el error: la próxima sesión de Alpha (fecha suelta) y el hito
+  conseguido (marca real) se pintaban igual.
+  **Impacto medido en la base**: se veían un día adelante **113 de 428**
+  `contact_attempt`, **106 de 705** hitos y **12 de 34** cambios de fase.
+  El más visible era «Mi red», que decía *«Último registro: 8 sep»* de una
+  llamada que el informe y el expediente fechaban el 7.
+  **Comprobado**: a las 18:59 hora Colombia antes y ahora dan lo mismo; a las
+  19:00 antes decía el día siguiente y ahora no. Y a una fecha suelta ponerle
+  zona la deja en el día anterior — por eso `diaCorto` no la lleva.
+  **Los límites de día ya estaban bien en todas partes** (`informe.ts`,
+  `llamadas.ts`, `actividad.ts` construyen `T00:00:00-05:00` /
+  `T23:59:59.999-05:00`): el desfase estaba solo al PINTAR.
+
 - **2026-09-08** — **⚠️ CUARTA TRAMPA DE SQL: `AT TIME ZONE 'America/Bogota'`
   sobre una columna `timestamp without time zone` SUMA 5 h en vez de restarlas.**
   El usuario preguntó por qué el informe mostraba menos llamadas que el

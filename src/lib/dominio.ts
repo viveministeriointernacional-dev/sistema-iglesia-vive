@@ -15,6 +15,67 @@ export const ZONA_HORARIA = "America/Bogota";
 /// El día de hoy en Colombia, como `AAAA-MM-DD`. Sirve para poner por defecto
 /// (y como tope) los campos de fecha: el servidor corre en UTC, así que después
 /// de las 7 p. m. su «hoy» ya es el día siguiente para nosotros.
+/// **Las dos maneras de escribir una fecha, y por qué son dos.**
+///
+/// El servidor corre en UTC, así que hay que decidir en cada caso si el valor
+/// es un instante o un día del calendario. Mezclarlas es lo que hacía que
+/// «Mi red» dijera *8 sep* y el expediente *7 sep* de lo mismo (8-sep-2026).
+///
+/// - **`momento…`** para una MARCA DE TIEMPO real —`occurredAt`, `createdAt`,
+///   `decidedAt`, `achievedAt`, `validatedAt`…—: se muestra en hora Colombia.
+///   Sin la zona saldría en UTC y **todo lo de después de las 7 de la tarde
+///   aparecería con la fecha del día siguiente**.
+/// - **`dia…`** para una FECHA SUELTA, o sea una columna **`@db.Date`**
+///   (`birthDate`, `startDate`, la fecha de una sesión, `ServiceAssignment`):
+///   Prisma la trae a medianoche UTC, y aplicarle hora Colombia **la correría
+///   un día hacia atrás**.
+///
+/// La duda se resuelve mirando el esquema: **si el campo tiene `@db.Date`, va
+/// con `dia…`; si no, con `momento…`**.
+const MOMENTO_CORTO = new Intl.DateTimeFormat("es-CO", {
+  day: "numeric",
+  month: "short",
+  timeZone: ZONA_HORARIA,
+});
+
+const MOMENTO_LARGO = new Intl.DateTimeFormat("es-CO", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  timeZone: ZONA_HORARIA,
+});
+
+const DIA_CORTO = new Intl.DateTimeFormat("es-CO", {
+  day: "numeric",
+  month: "short",
+});
+
+const DIA_LARGO = new Intl.DateTimeFormat("es-CO", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
+
+/// «5 sep», en hora Colombia. Para marcas de tiempo reales.
+export function momentoCorto(fecha: Date): string {
+  return MOMENTO_CORTO.format(fecha);
+}
+
+/// «5 sep 2026», en hora Colombia. Para marcas de tiempo reales.
+export function momentoLargo(fecha: Date): string {
+  return MOMENTO_LARGO.format(fecha);
+}
+
+/// «5 sep». Para columnas `@db.Date`, que no tienen hora que convertir.
+export function diaCorto(fecha: Date): string {
+  return DIA_CORTO.format(fecha);
+}
+
+/// «5 sep 2026». Para columnas `@db.Date`.
+export function diaLargo(fecha: Date): string {
+  return DIA_LARGO.format(fecha);
+}
+
 export function hoyEnColombia(ahora: Date = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: ZONA_HORARIA,

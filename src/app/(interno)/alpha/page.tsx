@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { diaLargo } from "@/lib/dominio";
 import { requerirPermiso } from "@/lib/auth";
 import {
   cargarGrupos,
@@ -21,11 +22,6 @@ import { NuevaCasaDeFe } from "../casa-de-fe/nuevo-grupo";
 export const metadata = { title: "Alpha y Casa de Fe · Iglesia Vive" };
 export const dynamic = "force-dynamic";
 
-const FECHA = new Intl.DateTimeFormat("es-CO", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-});
 
 export default async function PaginaAlpha() {
   const usuario = await requerirPermiso(
@@ -96,7 +92,7 @@ export default async function PaginaAlpha() {
                           {grupo.name}
                         </Link>
                         <p className="mt-1 text-[11.5px] leading-[1.3] font-medium text-[rgba(19,28,36,.5)]">
-                          Desde {FECHA.format(grupo.startDate)} ·{" "}
+                          Desde {diaLargo(grupo.startDate)} ·{" "}
                           {grupo.leader.fullName}
                         </p>
                       </div>
@@ -161,7 +157,7 @@ export default async function PaginaAlpha() {
                           {casa.name}
                         </Link>
                         <p className="mt-1 text-[11.5px] leading-[1.3] font-medium text-[rgba(19,28,36,.5)]">
-                          Desde {FECHA.format(casa.startDate)} ·{" "}
+                          Desde {diaLargo(casa.startDate)} ·{" "}
                           {casa.leader.fullName}
                         </p>
                       </div>

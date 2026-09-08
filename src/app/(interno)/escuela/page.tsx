@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { diaLargo } from "@/lib/dominio";
 import { requerirRol, ROLES_BUSCADOR } from "@/lib/auth";
 import {
   cargarEscuelas,
@@ -11,11 +12,6 @@ import { NuevaEscuela } from "./nueva-escuela";
 export const metadata = { title: "Escuela Ser Líder · Iglesia Vive" };
 export const dynamic = "force-dynamic";
 
-const FECHA = new Intl.DateTimeFormat("es-CO", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-});
 
 export default async function PaginaEscuela() {
   const usuario = await requerirRol(ROLES_ENTRENAR);
@@ -64,7 +60,7 @@ export default async function PaginaEscuela() {
                       {escuela.name}
                     </Link>
                     <p className="mt-1 text-[11.5px] leading-[1.3] font-medium text-[rgba(19,28,36,.5)]">
-                      Desde {FECHA.format(escuela.startDate)} ·{" "}
+                      Desde {diaLargo(escuela.startDate)} ·{" "}
                       {escuela.leader.fullName}
                     </p>
                   </div>

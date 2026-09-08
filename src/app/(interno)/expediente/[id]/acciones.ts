@@ -10,7 +10,7 @@ import {
   Phase,
 } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
-import { fechaDeDia, hoyEnColombia } from "@/lib/dominio";
+import { fechaDeDia, hoyEnColombia, momentoCorto } from "@/lib/dominio";
 import { auditar, encolarEventoIntegracion } from "@/lib/audit";
 import { ErrorDePermiso, obtenerUsuarioActual } from "@/lib/auth";
 import {
@@ -42,10 +42,6 @@ export type ResultadoNotas =
   | { ok: true; notas: NotaPastoral[] }
   | { ok: false; mensaje: string };
 
-const FORMATO_FECHA = new Intl.DateTimeFormat("es-CO", {
-  day: "numeric",
-  month: "short",
-});
 
 async function usuarioConAcceso(learnerId: string) {
   const usuario = await obtenerUsuarioActual();
@@ -133,7 +129,7 @@ export async function revelarNotas(learnerId: string): Promise<ResultadoNotas> {
     ok: true,
     notas: notas.map((nota) => ({
       id: nota.id,
-      fecha: FORMATO_FECHA.format(nota.createdAt),
+      fecha: momentoCorto(nota.createdAt),
       autor: nota.author.fullName,
       tipo: nota.kind,
       cuerpo: nota.body,

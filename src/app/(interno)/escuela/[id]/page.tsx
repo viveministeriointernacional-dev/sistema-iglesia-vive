@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { diaLargo, momentoLargo } from "@/lib/dominio";
 import { getPrisma } from "@/lib/prisma";
 import { requerirRol } from "@/lib/auth";
 import {
@@ -13,11 +14,6 @@ import { Escuela, type ParticipanteVista, type SesionVista } from "./escuela";
 
 export const dynamic = "force-dynamic";
 
-const FECHA = new Intl.DateTimeFormat("es-CO", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-});
 
 export async function generateMetadata({
   params,
@@ -55,7 +51,7 @@ export default async function PaginaDeEscuela({
   const sesiones: SesionVista[] = escuela.sessions.map((sesion) => ({
     id: sesion.id,
     numero: sesion.number,
-    fecha: FECHA.format(sesion.date),
+    fecha: diaLargo(sesion.date),
     tema: sesion.topic,
     kind: sesion.kind,
     recurso: sesion.resource,
@@ -88,7 +84,7 @@ export default async function PaginaDeEscuela({
     tareasEntregadas: persona.tareasEntregadas,
     tareasPedidas: persona.tareasPedidas,
     completado: persona.completadoEl
-      ? `${FECHA.format(persona.completadoEl)}${persona.completadoPor ? ` · ${persona.completadoPor}` : ""}`
+      ? `${momentoLargo(persona.completadoEl)}${persona.completadoPor ? ` · ${persona.completadoPor}` : ""}`
       : null,
     faltaParaCerrar: persona.faltaParaCerrar,
     registro: registroPorInscripcion.get(persona.enrollmentId) ?? {},
@@ -104,7 +100,7 @@ export default async function PaginaDeEscuela({
             {escuela.name}
           </h1>
           <p className="mt-2 text-[13px] leading-none font-medium text-[rgba(19,28,36,.55)]">
-            {escuela.leader.fullName} · desde {FECHA.format(escuela.startDate)} ·{" "}
+            {escuela.leader.fullName} · desde {diaLargo(escuela.startDate)} ·{" "}
             {escuela.sessions.length}{" "}
             {escuela.sessions.length === 1 ? "sesión" : "sesiones"} ·{" "}
             {vistas.length} {vistas.length === 1 ? "persona" : "personas"} ·{" "}
