@@ -277,7 +277,15 @@ function Tiles({ informe }: { informe: Informe }) {
   return (
     <section className="mt-4 grid grid-cols-2 gap-[10px] sm:grid-cols-3 lg:grid-cols-6">
       <Tile rotulo="PERSONAS NUEVAS" valor={informe.registros.ahora} dato={informe.registros} />
-      <Tile rotulo="LLAMADAS" valor={informe.llamadas.ahora} dato={informe.llamadas} />
+      <Tile
+        rotulo="LLAMADAS"
+        valor={informe.llamadas.ahora}
+        dato={informe.llamadas}
+        // Las marcaciones son la cifra grande porque es la misma del historial
+        // de llamadas; debajo, cuántas de ellas quedaron registradas, que es lo
+        // único que mueve la tarjeta.
+        pie={`${informe.llamadasRegistradas.ahora} con formulario`}
+      />
       <Tile rotulo="VISITAS" valor={informe.visitas.ahora} dato={informe.visitas} />
       <Tile rotulo="ENTREGADAS" valor={informe.entregas.ahora} dato={informe.entregas} />
       <Tile rotulo="HITOS" valor={informe.hitos.ahora} dato={informe.hitos} />
@@ -642,11 +650,18 @@ function BloqueActividad({ informe }: { informe: Informe }) {
               : "Actividad, mes por mes"}
         </h2>
         <div className="flex items-center gap-4">
-          <Leyenda color={COLOR_LLAMADAS}>Llamadas</Leyenda>
+          <Leyenda color={COLOR_LLAMADAS}>Llamadas marcadas</Leyenda>
           <Leyenda color={COLOR_VISITAS}>Visitas</Leyenda>
           <Leyenda color={COLOR_REGISTROS}>Registros</Leyenda>
         </div>
       </div>
+
+      <p className="mt-2 text-[11.5px] leading-[1.5] font-medium text-[rgba(19,28,36,.5)]">
+        <strong className="font-bold text-tinta">Llamadas</strong> son las
+        marcaciones del discador, las mismas que salen en el historial de
+        llamadas. Debajo del indicador va cuántas de ellas quedaron con
+        formulario: esas son las que mueven la tarjeta.
+      </p>
 
       <div className="mt-[18px] overflow-x-auto">
         <div style={{ minWidth: `${informe.porDia.length * 54}px` }}>
