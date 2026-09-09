@@ -23,6 +23,8 @@ export type AccionAuditada =
   | "operacion72.baja_autorizada"
   | "operacion72.baja_rechazada"
   | "operacion72.baja_retirada"
+  | "operacion72.marcado_asistente"
+  | "operacion72.vuelve_a_proceso"
   | "mentor.asignado"
   | "notas.reveladas"
   | "hito.registrado"

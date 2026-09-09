@@ -123,6 +123,19 @@ export const MOTIVOS_DE_BAJA = [
   "Otro motivo",
 ] as const;
 
+/// Motivos por los que alguien asiste pero no quiere entrar a un proceso.
+///
+/// Lista cerrada como la de bajas, y por lo mismo: dentro de un año hay que
+/// poder responder si la gente no entra por falta de tiempo o porque ya hizo
+/// su proceso en otra parte. Son dos problemas distintos.
+export const MOTIVOS_DE_ASISTENTE = [
+  "No le queda tiempo por trabajo o estudio",
+  "Ya hizo el proceso en otra iglesia",
+  "Prefiere solo asistir a las reuniones",
+  "Por salud o por su familia",
+  "Otro motivo",
+] as const;
+
 export function tituloLinea(lineKnown: boolean) {
   return lineKnown
     ? "LÍNEA CONOCIDA · SE CONSERVA"

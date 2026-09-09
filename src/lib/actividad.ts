@@ -478,6 +478,34 @@ export async function cargarActividad(
         if (observacion) filas.push({ k: "Nota", v: observacion });
         break;
       }
+      case "operacion72.marcado_asistente": {
+        tipo = "personas"; etiqueta = "ASISTENTE"; tono = "verde";
+        const motivo = texto(m.motivo);
+        frase = [
+          A(),
+          t(" marcó a "),
+          P(),
+          t(" como asistente de la iglesia"),
+          t(motivo ? ` · «${motivo}»` : ""),
+        ];
+        observacion = texto(m.nota);
+        tituloDetalle = "Por qué no quiere proceso";
+        if (motivo) filas.push({ k: "Motivo", v: motivo });
+        if (observacion) filas.push({ k: "Nota", v: observacion });
+        break;
+      }
+      case "operacion72.vuelve_a_proceso": {
+        tipo = "personas"; etiqueta = "VUELVE AL PROCESO"; tono = "verde";
+        frase = [A(), t(" devolvió al proceso a "), P()];
+        observacion = texto(m.nota);
+        tituloDetalle = "Qué cambió";
+        filas.push({
+          k: "Vuelve al tablero",
+          v: m.vuelveAlTablero ? "Sí, con 72 horas nuevas" : "No, la acompaña su mentor",
+        });
+        if (observacion) filas.push({ k: "Nota", v: observacion });
+        break;
+      }
       case "operacion72.baja_solicitada": {
         tipo = "personas"; etiqueta = "BAJA PEDIDA"; tono = "ambar";
         const motivo = texto(m.motivo);

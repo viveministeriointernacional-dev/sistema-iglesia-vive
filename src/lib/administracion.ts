@@ -7,6 +7,7 @@ import {
 } from "@iglesia/prisma-client";
 import { ESTADO_SOLICITUD } from "@/lib/baja";
 import { nombreCompleto, normalizarBusqueda } from "@/lib/dominio";
+import { edadDesde } from "@/lib/op72";
 import { getPrisma } from "@/lib/prisma";
 
 /// Hitos que un administrador puede marcar o quitar a mano desde el panel.
@@ -60,6 +61,7 @@ export type FilaAdmin = {
   tieneAcceso: boolean;
   /// Dada de baja (Retirada). Solo aparece en el listado al buscarla.
   retirado: boolean;
+  asistente: boolean;
 };
 
 /// Tamaños de página que ofrece el listado de personas.
@@ -130,6 +132,7 @@ export async function buscarPersonasAdmin(
       fase: persona.learnerProfile?.phase ?? null,
       tieneAcceso: Boolean(persona.user),
       retirado: persona.learnerProfile?.status === LearnerStatus.RETIRADO,
+      asistente: persona.learnerProfile?.status === LearnerStatus.ASISTENTE,
     })),
   };
 }
@@ -264,6 +267,127 @@ export async function listarDadosDeBaja(): Promise<FilaBaja[]> {
       fecha: baja?.createdAt ?? null,
       por: baja?.decidedBy.fullName ?? null,
       pedidaPor: aprendiz.bajaRequests[0]?.requestedBy.fullName ?? null,
+    };
+  });
+}
+
+
+/// Los hitos que resumen «hasta dónde llegó» una persona, en el orden del
+/// recorrido. Es un subconjunto a propósito: la tira tiene que leerse de un
+/// vistazo, así que quedan fuera los hitos internos (validación pastoral,
+/// evaluación de cierre) que no significan nada para quien mira la lista.
+export const HITOS_DEL_RECORRIDO: { kind: MilestoneKind; etiqueta: string }[] = [
+  { kind: MilestoneKind.REGISTRO, etiqueta: "Registro" },
+  { kind: MilestoneKind.OPERACION_72, etiqueta: "Operación 72" },
+  { kind: MilestoneKind.ALPHA, etiqueta: "Alpha" },
+  { kind: MilestoneKind.CASA_DE_FE, etiqueta: "Casa de Fe" },
+  { kind: MilestoneKind.BAUTISMO, etiqueta: "Bautismo" },
+  { kind: MilestoneKind.ENCUENTRO, etiqueta: "Encuentro" },
+  { kind: MilestoneKind.ENTRADA_ESCUELA, etiqueta: "Escuela" },
+];
+
+/// Cuánto silencio se considera demasiado. Tres meses es el plazo que fijó el
+/// usuario: es lo que separa «no quiere proceso» de «nadie volvió a saber de
+/// esta persona», que son dos cosas muy distintas.
+export const DIAS_SIN_CONTACTO = 90;
+
+export type FilaAsistente = {
+  learnerId: string;
+  personId: string;
+  nombre: string;
+  telefono: string | null;
+  edad: number | null;
+  consolidador: string | null;
+  desde: Date | null;
+  motivo: string | null;
+  nota: string | null;
+  anotadaPor: string | null;
+  ultimoContacto: Date | null;
+  hitos: { etiqueta: string; conseguido: boolean; fecha: Date | null }[];
+  conseguidos: number;
+  sinContacto: boolean;
+};
+
+/// Los asistentes de la iglesia, con lo que llevan hecho hasta el momento.
+///
+/// Todo sale de UNA consulta con sus relaciones: son pocas personas y el
+/// pooler de Supabase cobra por viaje, no por tamaño (§9 del CLAUDE.md).
+export async function listarAsistentes(): Promise<FilaAsistente[]> {
+  const prisma = await getPrisma();
+  const ahora = new Date();
+  const aprendices = await prisma.learnerProfile.findMany({
+    where: { status: LearnerStatus.ASISTENTE },
+    orderBy: { attendeeSince: "desc" },
+    select: {
+      id: true,
+      attendeeSince: true,
+      attendeeReason: true,
+      attendeeNote: true,
+      person: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          callPhone: true,
+          birthDate: true,
+        },
+      },
+      consolidator: { select: { fullName: true } },
+      milestones: {
+        where: { status: MilestoneStatus.COMPLETADO },
+        select: { kind: true, achievedAt: true },
+      },
+      // Quién la marcó como asistente: es el que sabe contar el caso.
+      statusChanges: {
+        where: { toStatus: LearnerStatus.ASISTENTE },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { decidedBy: { select: { fullName: true } } },
+      },
+      // El último movimiento real que alguien registró sobre esta persona.
+      operation72: {
+        select: {
+          attempts: {
+            orderBy: { occurredAt: "desc" },
+            take: 1,
+            select: { occurredAt: true },
+          },
+        },
+      },
+    },
+  });
+
+  return aprendices.map((aprendiz) => {
+    const logrados = new Map(
+      aprendiz.milestones.map((hito) => [hito.kind, hito.achievedAt]),
+    );
+    const hitos = HITOS_DEL_RECORRIDO.map((hito) => ({
+      etiqueta: hito.etiqueta,
+      conseguido: logrados.has(hito.kind),
+      fecha: logrados.get(hito.kind) ?? null,
+    }));
+    const ultimoContacto = aprendiz.operation72?.attempts[0]?.occurredAt ?? null;
+    // Sin ningún registro también cuenta como silencio: no es que se le haya
+    // hablado hace mucho, es que no consta que se le haya hablado nunca.
+    const dias = ultimoContacto
+      ? (ahora.getTime() - ultimoContacto.getTime()) / 86_400_000
+      : Infinity;
+
+    return {
+      learnerId: aprendiz.id,
+      personId: aprendiz.person.id,
+      nombre: nombreCompleto(aprendiz.person),
+      telefono: aprendiz.person.callPhone,
+      edad: edadDesde(aprendiz.person.birthDate, ahora),
+      consolidador: aprendiz.consolidator?.fullName ?? null,
+      desde: aprendiz.attendeeSince,
+      motivo: aprendiz.attendeeReason,
+      nota: aprendiz.attendeeNote,
+      anotadaPor: aprendiz.statusChanges[0]?.decidedBy.fullName ?? null,
+      ultimoContacto,
+      hitos,
+      conseguidos: hitos.filter((h) => h.conseguido).length,
+      sinContacto: dias > DIAS_SIN_CONTACTO,
     };
   });
 }

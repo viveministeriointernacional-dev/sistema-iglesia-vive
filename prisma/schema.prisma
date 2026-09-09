@@ -287,6 +287,9 @@ enum Phase {
 
 enum LearnerStatus {
   ACTIVO
+  /// Asiste a la iglesia pero hoy no quiere ningún proceso. No es una baja:
+  /// conserva expediente, acceso y lo que ya alcanzó; solo sale del tablero.
+  ASISTENTE
   PAUSADO
   RETIRADO
   GRADUADO
@@ -299,6 +302,12 @@ model LearnerProfile {
   phase          Phase         @default(GANAR)
   status         LearnerStatus @default(ACTIVO)
   phaseStartedAt DateTime      @default(now()) @map("phase_started_at")
+
+  // Solo tienen valor mientras el estado es ASISTENTE. Viven aquí, y no en
+  // learner_status_change, porque el listado los pinta en cada renglón.
+  attendeeSince  DateTime? @map("attendee_since")
+  attendeeReason String?   @map("attendee_reason")
+  attendeeNote   String?   @map("attendee_note")
 
   // Origen. Todo opcional: en la puerta de un domingo no siempre se alcanza a
   // preguntar, y un dato en blanco es mejor que un dato inventado.
