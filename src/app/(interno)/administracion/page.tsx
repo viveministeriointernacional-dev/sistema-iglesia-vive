@@ -70,6 +70,12 @@ export default async function PaginaAdministracion({
               </Link>
             ) : null}
             <Link
+              href="/administracion/asistentes"
+              className="rounded-[9px] border border-[rgba(19,28,36,.16)] px-[14px] py-[10px] text-[12px] leading-none font-semibold text-tinta hover:border-azul-700 hover:text-azul-700"
+            >
+              Asistentes
+            </Link>
+            <Link
               href="/administracion/bajas"
               className="rounded-[9px] border border-[rgba(19,28,36,.16)] px-[14px] py-[10px] text-[12px] leading-none font-semibold text-tinta hover:border-azul-700 hover:text-azul-700"
             >
@@ -155,6 +161,12 @@ export default async function PaginaAdministracion({
               {persona.fase ? (
                 <span className="text-[11.5px] leading-none font-semibold text-[rgba(19,28,36,.55)]">
                   {persona.fase}
+                </span>
+              ) : null}
+
+              {persona.asistente ? (
+                <span className="rounded-[20px] bg-verde-100 px-2 py-1 text-[10px] leading-none font-bold text-verde-700">
+                  Asistente
                 </span>
               ) : null}
 

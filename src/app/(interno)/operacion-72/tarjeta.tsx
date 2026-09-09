@@ -3,12 +3,17 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { CallOutcome, Operation72Status } from "@iglesia/prisma-client";
-import { MOTIVOS_DE_BAJA, RESULTADOS_DE_LLAMADA } from "@/lib/op72";
+import {
+  MOTIVOS_DE_ASISTENTE,
+  MOTIVOS_DE_BAJA,
+  RESULTADOS_DE_LLAMADA,
+} from "@/lib/op72";
 import {
   agendarVisita,
   cerrarVisita,
   darDeBajaDesdeTablero,
   entregarAMentor,
+  marcarAsistenteDesdeTablero,
   registrarLlamada,
   retirarSolicitudDesdeTablero,
 } from "./acciones";
@@ -95,7 +100,7 @@ const ESTILO_BARRA: Record<TarjetaPersona["urgencia"], string> = {
   normal: "bg-verde-500",
 };
 
-type Panel = "accion" | "baja" | null;
+type Panel = "accion" | "baja" | "asistente" | null;
 
 export function TarjetaDePersona({
   persona,
@@ -315,6 +320,17 @@ export function TarjetaDePersona({
             />
           )}
         </div>
+      ) : panel === "asistente" ? (
+        <div className="mt-3 rounded-[10px] bg-papel p-3">
+          <FormularioDeAsistente
+            nombre={persona.nombre}
+            enCurso={enCurso}
+            alGuardar={(datos) =>
+              ejecutar(() => marcarAsistenteDesdeTablero(persona.learnerId, datos))
+            }
+            alCancelar={() => setPanel(null)}
+          />
+        </div>
       ) : panel === "baja" ? (
         <div className="mt-3 rounded-[10px] bg-papel p-3">
           <FormularioDeBaja
@@ -351,6 +367,16 @@ export function TarjetaDePersona({
               className="cursor-pointer border-0 bg-transparent p-0 text-[11px] leading-none font-semibold text-rojo disabled:opacity-60"
             >
               {bajaRequiereAutorizacion ? "Pedir la baja" : "Dar de baja"}
+            </button>
+          </div>
+          <div className="mt-[9px] border-t border-[rgba(19,28,36,.09)] pt-[9px] text-center">
+            <button
+              type="button"
+              onClick={() => setPanel("asistente")}
+              disabled={enCurso}
+              className="cursor-pointer border-0 bg-transparent p-0 text-[11px] leading-none font-bold text-verde-700 disabled:opacity-60"
+            >
+              Asiste, no quiere proceso
             </button>
           </div>
         </>
@@ -480,6 +506,89 @@ function FormularioDeBaja({
             : requiereAutorizacion
               ? "Enviar a autorización"
               : "Dar de baja"}
+        </button>
+        <button
+          type="button"
+          onClick={alCancelar}
+          className="boton-secundario py-[9px] text-[11.5px]"
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/// El tercer desenlace de la Operación 72: la persona asiste, pero hoy no
+/// quiere proceso.
+///
+/// La nota es obligatoria (mínimo 10 caracteres) a propósito. El motivo de la
+/// lista sirve para contar; la nota es lo único que le explica el caso a quien
+/// abra el listado dentro de un año.
+function FormularioDeAsistente({
+  nombre,
+  enCurso,
+  alGuardar,
+  alCancelar,
+}: {
+  nombre: string;
+  enCurso: boolean;
+  alGuardar: (datos: { motivo: string; nota: string }) => void;
+  alCancelar: () => void;
+}) {
+  const [motivo, setMotivo] = useState<string | null>(null);
+  const [nota, setNota] = useState("");
+
+  return (
+    <div>
+      <p className="text-[12px] leading-[1.4] font-semibold text-tinta">
+        {nombre} asiste, pero no quiere proceso
+      </p>
+      <p className="mt-1 text-[11px] leading-[1.45] font-medium text-[rgba(19,28,36,.55)]">
+        Sale del tablero y deja de contarte carga.{" "}
+        <strong className="font-bold">No se le da de baja</strong>: conserva su
+        expediente, su acceso y lo que ya alcanzó.
+      </p>
+
+      <div className="mt-3">
+        <Etiqueta>¿Por qué no quiere?</Etiqueta>
+        <div className="mt-[7px] flex flex-col gap-[6px]">
+          {MOTIVOS_DE_ASISTENTE.map((opcion) => (
+            <button
+              key={opcion}
+              type="button"
+              aria-pressed={motivo === opcion}
+              onClick={() => setMotivo(opcion)}
+              className="opcion px-3 py-[9px] text-left text-[11.5px] leading-[1.25]"
+            >
+              {opcion}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <label className="mt-3 block">
+        <Etiqueta>Cuéntalo con tus palabras</Etiqueta>
+        <textarea
+          value={nota}
+          onChange={(evento) => setNota(evento.target.value)}
+          rows={3}
+          className="campo"
+          placeholder="Qué te dijo y en qué quedaron."
+        />
+        <span className="mt-[6px] block text-[10.5px] leading-[1.35] font-semibold text-[rgba(19,28,36,.45)]">
+          Es lo que va a leer quien lo busque dentro de un año.
+        </span>
+      </label>
+
+      <div className="mt-3 flex gap-2">
+        <button
+          type="button"
+          disabled={enCurso || !motivo || nota.trim().length < 10}
+          onClick={() => motivo && alGuardar({ motivo, nota })}
+          className="flex-1 cursor-pointer rounded-[10px] border-0 bg-azul-900 px-4 py-[9px] text-[11.5px] leading-none font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {enCurso ? "Guardando…" : "Guardar"}
         </button>
         <button
           type="button"

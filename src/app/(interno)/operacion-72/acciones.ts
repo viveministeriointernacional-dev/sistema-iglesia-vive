@@ -29,10 +29,12 @@ import {
   retirarSolicitudDeBaja,
   solicitarBaja,
 } from "@/lib/baja";
+import { marcarComoAsistente } from "@/lib/asistente";
 import { exportarPrimeraLlamada, exportarVisita } from "@/lib/highlevel-salida";
 import {
   contactaDeVerdad,
   ETIQUETA_LLAMADA,
+  MOTIVOS_DE_ASISTENTE,
   MOTIVOS_DE_BAJA,
   RESULTADOS_DE_LLAMADA,
 } from "@/lib/op72";
@@ -569,6 +571,58 @@ export async function darDeBajaDesdeTablero(
   revalidatePath(`/expediente/${learnerId}`);
   revalidatePath("/administracion");
   revalidatePath("/administracion/bajas");
+  return { ok: true };
+}
+
+/// Marca a la persona como asistente de la iglesia desde el tablero.
+///
+/// **No pide autorización, a diferencia de la baja**, y la razón es la que
+/// distingue las dos cosas: dar de baja saca a alguien del sistema y le apaga
+/// el acceso, así que hacen falta dos manos; esto solo reconoce que hoy no
+/// quiere proceso. Sigue en la casa, con su expediente y su acceso intactos, y
+/// se le puede devolver al proceso con un clic desde Administración.
+export async function marcarAsistenteDesdeTablero(
+  learnerId: string,
+  datos: { motivo: string; nota: string },
+): Promise<ResultadoAccion> {
+  let usuario: UsuarioSesion;
+  try {
+    usuario = await requerirRolEnAccion(ROLES_CONSOLIDACION);
+  } catch (error) {
+    if (error instanceof ErrorDePermiso) return { ok: false, mensaje: error.message };
+    throw error;
+  }
+
+  if (!(MOTIVOS_DE_ASISTENTE as readonly string[]).includes(datos.motivo)) {
+    return { ok: false, mensaje: "Elige un motivo de la lista." };
+  }
+
+  const prisma = await getPrisma();
+  const aprendiz = await prisma.learnerProfile.findUnique({
+    where: { id: learnerId },
+    select: { consolidatorId: true },
+  });
+  // El mismo alcance que las demás acciones del tablero: un consolidador solo
+  // toca a los suyos.
+  const esSuya =
+    aprendiz &&
+    (usuario.role !== Role.CONSOLIDADOR ||
+      veTodaLaConsolidacion(usuario) ||
+      aprendiz.consolidatorId === usuario.id);
+  if (!esSuya) return { ok: false, mensaje: "Esta persona no está en tu lista." };
+
+  const resultado = await marcarComoAsistente(prisma, {
+    learnerId,
+    motivo: datos.motivo,
+    nota: datos.nota,
+    actorId: usuario.id,
+  });
+  if (!resultado.ok) return resultado;
+
+  revalidatePath("/operacion-72");
+  revalidatePath(`/expediente/${learnerId}`);
+  revalidatePath("/administracion");
+  revalidatePath("/administracion/asistentes");
   return { ok: true };
 }
 

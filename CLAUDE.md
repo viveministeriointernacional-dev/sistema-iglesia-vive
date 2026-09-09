@@ -248,6 +248,66 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-09** — **«Asistentes de la iglesia»: el TERCER desenlace de la
+  Operación 72** (pedido del usuario; mockup aprobado:
+  claude.ai/code/artifact/c79aa611-60b0-4531-9503-add93940b317).
+  Había gente que **no se puede dar de baja porque sí asiste**, pero que no
+  quiere Alpha, ni Casa de Fe, ni discipulado. Hasta hoy el tablero solo tenía
+  dos salidas —entregar a mentor o dar de baja— así que esas personas se
+  quedaban atascadas en una columna, llamándolas para siempre.
+  - **Estado nuevo `LearnerStatus.ASISTENTE`** (migración
+    `20260909120000_asistentes`) + columnas `attendee_since`,
+    `attendee_reason`, `attendee_note` en `learner_profile`.
+    **NO se reutilizó `PAUSADO`** (existe, 0 personas, pero significa otra
+    cosa) ni `RETIRADO` (apaga el acceso).
+  - **La diferencia con la baja, que es lo que hay que conservar:** la baja
+    **apaga el acceso** y **necesita autorización de un administrador**, porque
+    saca a alguien del sistema. Marcar asistente **no hace ninguna de las dos**:
+    solo reconoce que hoy no quiere proceso. Conserva expediente, acceso y lo
+    alcanzado. Lo único que cambia: **sale del tablero y deja de contarle carga
+    a su consolidador** (si siguiera contando, el equipo cargaría para siempre
+    con gente a la que ya no hay que llamar).
+  - **La mentoría NO se cierra** al marcar asistente (la baja sí la cierra): si
+    alguien ya la acompañaba, ese vínculo es lo único que la mantiene cerca.
+  - **Pantalla `/administracion/asistentes`** (solo ADMIN, botón «Asistentes» en
+    la cabecera): 4 indicadores, buscador por nombre/celular y 4 cortes por URL
+    sin JS. Cada renglón trae **la tira de hitos** (`HITOS_DEL_RECORRIDO`:
+    Registro · Operación 72 · Alpha · Casa de Fe · Bautismo · Encuentro ·
+    Escuela) con lo conseguido en verde y con fecha, y lo que falta en punteado.
+    **Todo sale de UNA consulta con relaciones** — el pooler cobra por viaje.
+  - **⚠️ El indicador que manda es el ámbar: «nadie les habla hace 90 días»**
+    (`DIAS_SIN_CONTACTO`, plazo fijado por el usuario). Sin él la pantalla sería
+    un cajón donde la gente se archiva y se olvida, que es justo el riesgo.
+    **Sin ningún registro también cuenta como silencio**: no es que se le haya
+    hablado hace mucho, es que no consta que se le haya hablado nunca.
+  - **«Volver a proceso»** la devuelve a ACTIVO y, **solo si está en GANAR**, al
+    tablero con **72 horas nuevas contadas desde hoy** (no desde su registro
+    original: lo que se mide es la respuesta del equipo desde que la persona
+    dijo que sí, no un plazo vencido hace meses). De FORTALECER en adelante la
+    acompaña su mentor y no vuelve al tablero.
+  - **`MOTIVOS_DE_ASISTENTE`** (5, lista cerrada como los de baja) en `op72.ts`.
+    **La nota es obligatoria** (mín. 10 caracteres) en los dos sitios: el motivo
+    sirve para contar, la nota es lo que le explica el caso a quien abra el
+    listado dentro de un año.
+  - **Ojo con la tira de hitos:** `OPERACION_72` solo pasa a COMPLETADO **al
+    entregar a mentor**, así que a un asistente casi siempre le sale en
+    punteado. **Es correcto** (no la terminó), aunque en el mockup salía verde.
+  - **Efectos secundarios revisados uno por uno**: Alpha y Casa de Fe filtran
+    candidatos por `ACTIVO`, así que **un asistente no se puede inscribir sin
+    volver antes al proceso** (correcto); `expediente/acciones` exige `ACTIVO`
+    para cambiar de fase (correcto); `informe.ts:371` cuenta por fase solo
+    `ACTIVO`, así que los asistentes salen del recorrido (correcto: no están en
+    proceso); `arbol`, `red` y `equipo` filtran `not RETIRADO`, así que siguen
+    apareciendo. Badge verde **«Asistente»** en el listado de Administración.
+  - Auditoría: `operacion72.marcado_asistente` y `operacion72.vuelve_a_proceso`,
+    las dos con su `case` en `actividad.ts`.
+  - **Migración probada contra la base con `BEGIN … ROLLBACK` en la misma
+    llamada** (regla del 7-sep): las 3 columnas, el valor del enum y el índice
+    se crean sin error, y se verificó después que producción quedó en 0/0.
+    Confirmado de paso que **`ALTER TYPE … ADD VALUE` sí corre dentro de la
+    transacción de `migrar.mjs`** en PG 17.6, mientras el valor no se USE en la
+    misma transacción.
+
 - **2026-09-08** — **«LLAMADAS» en el informe pasa a contar MARCACIONES, la
   misma fuente que el historial** (decisión del usuario, dicha dos veces: «que
   sean los mismos datos en cada vista» y «no se ve la misma cantidad de
