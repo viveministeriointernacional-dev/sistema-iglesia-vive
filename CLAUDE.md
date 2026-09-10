@@ -280,6 +280,34 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-10** — **Reprogramar una visita que no se pudo cumplir** (pedido del
+  usuario, el mismo día que lo de la hora).
+  - **Botón «No se pudo · mover la visita»** en la tarjeta, y **solo aparece si
+    hay visita acordada**. Abre **el mismo `FormularioDeVisita`** de siempre,
+    ya lleno con lo pactado (fecha, hora, lugar, virtual): mover una visita casi
+    siempre es correr la hora, no rehacerla desde cero.
+  - **⚠️ LO PACTADO NO SE PISA: SE APILA.** Cada reprogramación crea **su propio
+    `contact_attempt`**, con `result` = «Visita reprogramada · antes era el X».
+    Si se sobrescribiera la visita anterior, nadie podría ver después **cuántas
+    veces se corrió** una visita — y eso es justo la señal de que algo no está
+    funcionando con esa persona. La tarjeta y el orden de la columna toman
+    siempre **la más reciente**, así que la vista no se ensucia.
+  - **La tarjeta se queda en VISITA PENDIENTE**: mover una cita no es avanzar ni
+    retroceder. `reprogramarVisita` exige ese estado y refleja a HighLevel igual
+    que `agendarVisita`.
+  - Auditoría `operacion72.visita_reprogramada` con `antes` y `cuando`, y su
+    `case` en `actividad.ts` («movió la visita de X · ahora …», con las dos
+    fechas en el detalle). También entra en el contador de **visitas** del día.
+  - **`momentoParaCampo(fecha)` en `dominio.ts`**: da `AAAA-MM-DDTHH:mm` **en
+    hora de Colombia**, que es lo que pide un `<input type="datetime-local">`.
+    **Ojo, esto es fácil de equivocar**: el navegador interpreta ese valor en la
+    zona de quien mira, así que hay que entregarlo ya convertido — mandar la
+    hora UTC pondría una visita de las 4 de la tarde a las 9 de la noche.
+    **Probado con el caso de borde**: 02:00 UTC del día 16 → `2026-09-15T21:00`,
+    o sea el día anterior, que es lo correcto en Colombia.
+  - El formulario quedó reutilizable con `texto`, `inicial` y `notaPlaceholder`
+    opcionales; agendar por primera vez no cambió en nada.
+
 - **2026-09-10** — **Hora de la visita, y «Visita pendiente» ordenada por fecha
   de visita** (pedido del usuario).
   **Ojo con el diagnóstico, que es lo que ahorra tiempo la próxima:** el

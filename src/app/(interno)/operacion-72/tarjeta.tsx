@@ -15,6 +15,7 @@ import {
   entregarAMentor,
   marcarAsistenteDesdeTablero,
   registrarLlamada,
+  reprogramarVisita,
   retirarSolicitudDesdeTablero,
 } from "./acciones";
 
@@ -68,6 +69,11 @@ export type TarjetaPersona = {
     quien: string | null;
     desdeCrm: boolean;
     nota: string | null;
+    /// Lo pactado, tal como lo pide el campo del formulario, para poder
+    /// reprogramar sin volver a escribirlo todo.
+    valorFecha: string | null;
+    lugar: string | null;
+    virtual: boolean;
   } | null;
   chip: string;
   urgencia: "vencida" | "urgente" | "normal";
@@ -100,7 +106,7 @@ const ESTILO_BARRA: Record<TarjetaPersona["urgencia"], string> = {
   normal: "bg-verde-500",
 };
 
-type Panel = "accion" | "baja" | "asistente" | null;
+type Panel = "accion" | "baja" | "asistente" | "reprogramar" | null;
 
 export function TarjetaDePersona({
   persona,
@@ -320,6 +326,33 @@ export function TarjetaDePersona({
             />
           )}
         </div>
+      ) : panel === "reprogramar" && persona.visitaAcordada ? (
+        <div className="mt-3 rounded-[10px] bg-papel p-3">
+          <p className="text-[12px] leading-[1.4] font-semibold text-tinta">
+            Mover la visita de {persona.nombre}
+          </p>
+          <p className="mt-1 text-[11px] leading-[1.45] font-medium text-[rgba(19,28,36,.55)]">
+            Estaba para{" "}
+            <strong className="font-bold">{persona.visitaAcordada.cuando}</strong>. La
+            anterior no se borra: queda en el expediente que se movió.
+          </p>
+          <div className="mt-3">
+            <FormularioDeVisita
+              enCurso={enCurso}
+              texto="Mover la visita"
+              inicial={{
+                cuando: persona.visitaAcordada.valorFecha ?? "",
+                lugar: persona.visitaAcordada.lugar ?? "",
+                virtual: persona.visitaAcordada.virtual,
+              }}
+              notaPlaceholder="No pudo · pidió que fuera otro día"
+              alGuardar={(datos) =>
+                ejecutar(() => reprogramarVisita(persona.operacionId, datos))
+              }
+              alCancelar={() => setPanel(null)}
+            />
+          </div>
+        </div>
       ) : panel === "asistente" ? (
         <div className="mt-3 rounded-[10px] bg-papel p-3">
           <FormularioDeAsistente
@@ -369,6 +402,18 @@ export function TarjetaDePersona({
               {bajaRequiereAutorizacion ? "Pedir la baja" : "Dar de baja"}
             </button>
           </div>
+          {persona.visitaAcordada ? (
+            <div className="mt-2 text-center">
+              <button
+                type="button"
+                onClick={() => setPanel("reprogramar")}
+                disabled={enCurso}
+                className="cursor-pointer border-0 bg-transparent p-0 text-[11px] leading-none font-semibold text-azul-700 disabled:opacity-60"
+              >
+                No se pudo · mover la visita
+              </button>
+            </div>
+          ) : null}
           <div className="mt-[9px] border-t border-[rgba(19,28,36,.09)] pt-[9px] text-center">
             <button
               type="button"
@@ -738,10 +783,15 @@ function FormularioDeLlamada({
   );
 }
 
+/// El mismo formulario sirve para agendar y para mover una visita: lo que
+/// cambia es con qué llega lleno y qué dice el botón.
 function FormularioDeVisita({
   enCurso,
   alGuardar,
   alCancelar,
+  texto = "Agendar visita",
+  inicial,
+  notaPlaceholder = "Va acompañada · pidió que fuéramos dos",
 }: {
   enCurso: boolean;
   alGuardar: (datos: {
@@ -751,10 +801,13 @@ function FormularioDeVisita({
     nota: string;
   }) => void;
   alCancelar: () => void;
+  texto?: string;
+  inicial?: { cuando: string; lugar: string; virtual: boolean };
+  notaPlaceholder?: string;
 }) {
-  const [cuando, setCuando] = useState("");
-  const [lugar, setLugar] = useState("");
-  const [virtual, setVirtual] = useState(false);
+  const [cuando, setCuando] = useState(inicial?.cuando ?? "");
+  const [lugar, setLugar] = useState(inicial?.lugar ?? "");
+  const [virtual, setVirtual] = useState(inicial?.virtual ?? false);
   const [nota, setNota] = useState("");
 
   return (
@@ -794,14 +847,14 @@ function FormularioDeVisita({
           value={nota}
           onChange={(evento) => setNota(evento.target.value)}
           rows={2}
-          placeholder="Va acompañada · pidió que fuéramos dos"
+          placeholder={notaPlaceholder}
           className="campo font-medium"
         />
       </label>
 
       <Botones
         enCurso={enCurso}
-        texto="Agendar visita"
+        texto={texto}
         alCancelar={alCancelar}
         alGuardar={() => alGuardar({ cuando, lugar, virtual, nota })}
       />

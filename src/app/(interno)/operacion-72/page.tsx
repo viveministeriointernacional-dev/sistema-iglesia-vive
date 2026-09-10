@@ -10,6 +10,7 @@ import {
 import { ESTADO_SOLICITUD } from "@/lib/baja";
 import {
   momentoLegible,
+  momentoParaCampo,
   nombreCompleto,
   telefonoLegible,
   textoDeEntrada,
@@ -331,6 +332,11 @@ export default async function TableroOperacion72({
       operacion.status === "VISITA_PENDIENTE" && visita
         ? {
             cuando: visita.scheduledAt ? momentoLegible(visita.scheduledAt, ahora) : "fecha por confirmar",
+            // Para dejar el formulario de reprogramar ya lleno con lo pactado:
+            // mover una visita casi siempre es correr la hora, no rehacerla.
+            valorFecha: visita.scheduledAt ? momentoParaCampo(visita.scheduledAt) : null,
+            lugar: visita.place?.trim() || null,
+            virtual: visita.isVirtual,
             donde: visita.isVirtual ? "virtual" : visita.place?.trim() || null,
             // Las visitas que llegan del CRM no traen usuario: las agendó la línea.
             quien: visita.byUser?.fullName ?? null,
