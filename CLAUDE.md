@@ -280,6 +280,51 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-10** — **Hora de la visita, y «Visita pendiente» ordenada por fecha
+  de visita** (pedido del usuario).
+  **Ojo con el diagnóstico, que es lo que ahorra tiempo la próxima:** el
+  formulario del **tablero** ya pedía fecha Y hora (`datetime-local`) desde
+  siempre. El que solo capturaba el día era el del **CRM**
+  (`/registro/primera-llamada/linea`), y por eso toda visita que agendaba la
+  línea quedaba **a mediodía** — se ve en la base: montones de visitas a las
+  12:00 clavadas.
+  - **`extraerVisita` lee ahora `horaVisita`** en campo aparte («Hora visita»,
+    «Hora de la visita», `contact.hora_visita`), porque el formulario de
+    HighLevel pregunta día y hora por separado.
+  - **`fechaDesdeCrm(valor, hora?)`** las junta, y **solo cuando el día viene
+    sin hora propia**: si el valor ya trae hora, esa manda. Sin hora
+    reconocible se conserva el mediodía de siempre — mejor una hora aproximada
+    que una inventada.
+  - **`horaDesdeCrm`** aguanta lo que escriba la gente: `16:30`, `4:30 pm`,
+    `4 p. m.`, `8am`, `09:05`. **Las dos excepciones del reloj de 12 h están
+    cubiertas y probadas**: `12 am` = medianoche, `12 pm` = mediodía. Lo que no
+    nombra una hora (`en la tarde`) devuelve `null`. **13 casos en
+    `fecha-crm.test.ts`.**
+  - **⚠️ ACCIÓN DEL USUARIO: falta crear el campo «Hora visita» en HighLevel** y
+    ponerlo en el formulario. Mientras no exista, todo sigue igual (mediodía);
+    el sistema ya está listo para recibirlo.
+  - **La columna VISITA PENDIENTE se ordena SIEMPRE por la fecha de la visita**,
+    ascendente, **pase lo que pase con el filtro de orden** (`ORDEN_VISITA` en
+    `tablero-op72.ts`). Ahí la pregunta no es «a quién registramos primero» sino
+    «a quién le toca visita antes». **Las vencidas quedan arriba** (su fecha ya
+    pasó) y las que no tienen fecha, al final (`NULLS LAST`).
+    Se le ofrecieron al usuario las dos direcciones y **eligió la más próxima
+    primero**, no la literal «más reciente a más antigua» que había dicho.
+  - **Truco del `CASE` que vale la pena recordar:** como `row_number()` reparte
+    por estado, `CASE WHEN f.status = 'VISITA_PENDIENTE' THEN f.visita_at END`
+    es NULL en todas las filas de las demás columnas, así que ahí **no altera
+    nada** y cae al orden de siempre. Una sola consulta, sin ramas.
+  - La visita sale de un `LEFT JOIN LATERAL` sobre `contact_attempt` (tipo
+    VISITA, `scheduled_at` no nulo, la más reciente por `occurred_at`), que es
+    **exactamente la misma que pinta la tarjeta**.
+  - **Probado contra la base antes de subir**: la columna quedó 28-ago → 2-sep →
+    5-sep → 9-sep… y **de las otras cuatro columnas no se movió ni una tarjeta**
+    (278 de 278 en el mismo puesto; en VISITA PENDIENTE se movieron 23 de 26).
+  - **Tropiezo del día:** un backtick dentro de un comentario `--` del SQL
+    **cierra el template literal** de TypeScript. `tsc` lo cazó como «`,`
+    expected» en una línea que se veía bien. **En un `$queryRaw`, ni backticks
+    ni `${'$'}{}` dentro de los comentarios SQL.**
+
 - **2026-09-09** — **«Asistentes de la iglesia»: el TERCER desenlace de la
   Operación 72** (pedido del usuario; mockup aprobado:
   claude.ai/code/artifact/c79aa611-60b0-4531-9503-add93940b317).

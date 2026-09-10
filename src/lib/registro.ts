@@ -124,7 +124,7 @@ export async function programarVisitaDesdeCrm(
   if (!visitaConfirmada) return llamadaRegistrada ? "llamada" : null;
 
   const esVirtual = visita.confirmacion === "virtual";
-  const fecha = fechaValida(visita.fechaVisita);
+  const fecha = fechaValida(visita.fechaVisita, visita.horaVisita);
 
   await db.contactAttempt.create({
     data: {
@@ -170,7 +170,10 @@ export async function programarVisitaDesdeCrm(
 /// (`2026-08-29`, o `29/08/2026` si alguien lo escribió a mano): interpretados
 /// en UTC caerían a las 7 p. m. del día ANTERIOR en Colombia. Una fecha sin
 /// hora se ancla al mediodía en hora de Colombia; una con hora se respeta.
-export function fechaDesdeCrm(valor: string | null): Date | null {
+export function fechaDesdeCrm(
+  valor: string | null,
+  hora?: string | null,
+): Date | null {
   if (!valor) return null;
   const dato = valor.trim();
   const co = dato.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
@@ -178,8 +181,39 @@ export function fechaDesdeCrm(valor: string | null): Date | null {
     ? `${co[3]}-${co[2].padStart(2, "0")}-${co[1].padStart(2, "0")}`
     : dato;
   const soloDia = /^\d{4}-\d{2}-\d{2}$/.test(iso);
-  const fecha = new Date(soloDia ? `${iso}T12:00:00-05:00` : iso);
+  // El formulario de HighLevel pregunta el día y la hora en campos separados.
+  // Solo se juntan cuando el día viene sin hora propia: si el valor ya trae
+  // hora, esa manda.
+  const enPunto = soloDia ? horaDesdeCrm(hora) : null;
+  const fecha = new Date(
+    soloDia ? `${iso}T${enPunto ?? "12:00:00"}-05:00` : iso,
+  );
   return Number.isNaN(fecha.getTime()) ? null : fecha;
+}
+
+/// La hora suelta que escribe la línea, en lo que Postgres entiende.
+///
+/// Se acepta como salga del formulario: «16:30», «4:30 pm», «4 p. m.», «8am».
+/// Devuelve `null` si no se reconoce, y entonces la visita queda a mediodía —
+/// es mejor una hora aproximada que una inventada.
+export function horaDesdeCrm(valor: string | null | undefined): string | null {
+  if (!valor) return null;
+  const dato = valor.trim().toLowerCase();
+  if (!dato || dato.startsWith("{{")) return null;
+  const partes = dato.match(/^(\d{1,2})(?::(\d{2}))?\s*(a\.?\s?m\.?|p\.?\s?m\.?)?/);
+  if (!partes) return null;
+
+  let horas = Number(partes[1]);
+  const minutos = Number(partes[2] ?? "0");
+  if (!Number.isFinite(horas) || horas > 23 || minutos > 59) return null;
+
+  const meridiano = partes[3]?.replace(/[.\s]/g, "");
+  // «12 am» es medianoche y «12 pm» es mediodía: las dos son excepciones.
+  if (meridiano === "pm" && horas < 12) horas += 12;
+  if (meridiano === "am" && horas === 12) horas = 0;
+  if (horas > 23) return null;
+
+  return `${String(horas).padStart(2, "0")}:${String(minutos).padStart(2, "0")}:00`;
 }
 
 const fechaValida = fechaDesdeCrm;

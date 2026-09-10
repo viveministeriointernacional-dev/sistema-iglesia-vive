@@ -14,6 +14,10 @@ export type VisitaDesdeCrm = {
   confirmacion: "confirmada" | "virtual" | "no" | null;
   /// Fecha de la visita, si la línea la fijó.
   fechaVisita: string | null;
+  /// Hora de la visita, en campo aparte. El formulario de HighLevel pregunta el
+  /// día y la hora por separado, así que llegan como dos valores; se juntan al
+  /// guardar. Sin hora, la visita queda a mediodía (ver `fechaDesdeCrm`).
+  horaVisita: string | null;
   /// Cómo salió la llamada de la línea.
   estadoLinea: CallOutcome | null;
   fechaLinea: string | null;
@@ -410,6 +414,15 @@ function extraerVisita(indice: Map<string, unknown>): VisitaDesdeCrm {
         "Fecha de la visita",
         "contact.fecha_visita",
         "RoA76CCpoBd2DvraoQEF",
+      ),
+    ),
+    horaVisita: texto(
+      obtener(
+        indice,
+        "Hora visita",
+        "Hora de la visita",
+        "contact.hora_visita",
+        "contact.hora_de_la_visita",
       ),
     ),
     // Dos formularios distintos preguntan lo mismo y cada uno tiene su propio
