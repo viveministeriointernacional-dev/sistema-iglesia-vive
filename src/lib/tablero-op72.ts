@@ -35,6 +35,19 @@ const ORDEN: Record<OrdenTablero, string> = {
   antiguo: "o.started_at ASC",
 };
 
+/// **La columna VISITA PENDIENTE se ordena SIEMPRE por la fecha de la visita**,
+/// pase lo que pase con el orden elegido arriba (decisión del usuario, 10-sep).
+///
+/// Ahí la pregunta no es «a quién registramos primero» sino «a quién le toca
+/// visita antes», así que la lista se lee de arriba abajo en el orden en que se
+/// van a hacer. Las **vencidas quedan primero** —su fecha ya pasó— que es justo
+/// lo que hay que atender. Sin fecha acordada, al final (`NULLS LAST`).
+///
+/// Como `row_number()` reparte por estado, el `CASE` es NULL en todas las filas
+/// de las demás columnas y ahí no altera nada: cae al orden de siempre.
+const ORDEN_VISITA = `CASE WHEN f.status = 'VISITA_PENDIENTE'::"Operation72Status"
+                             THEN f.visita_at END ASC NULLS LAST`;
+
 export type SeleccionDelTablero = {
   /// Los ids de cada columna, ya en el orden en que se van a pintar.
   porEstado: Map<Operation72Status, string[]>;
@@ -73,10 +86,21 @@ export async function seleccionarTarjetasDelTablero(
     { id: string; status: Operation72Status; total: bigint; puesto: bigint }[]
   >`
     WITH filtradas AS (
-      SELECT o.id, o.status, o.deadline_at, o.started_at
+      SELECT o.id, o.status, o.deadline_at, o.started_at, v.scheduled_at AS visita_at
       FROM operation72 o
       JOIN learner_profile lp ON lp.id = o.learner_id
       JOIN person p ON p.id = lp.person_id
+      -- La visita acordada más reciente. Es la misma que pinta la tarjeta, que
+      -- toma el primer intento de tipo VISITA ordenando por occurred_at desc.
+      LEFT JOIN LATERAL (
+        SELECT ca.scheduled_at
+        FROM contact_attempt ca
+        WHERE ca.operation72_id = o.id
+          AND ca.type = 'VISITA'
+          AND ca.scheduled_at IS NOT NULL
+        ORDER BY ca.occurred_at DESC, ca.created_at DESC
+        LIMIT 1
+      ) v ON true
       WHERE o.status = ANY(${estados as Operation72Status[]}::text[]::"Operation72Status"[])
         AND (${consolidadorId}::text IS NULL OR lp.consolidator_id = ${consolidadorId}::text)
         AND (
@@ -93,7 +117,8 @@ export async function seleccionarTarjetasDelTablero(
     ), numeradas AS (
       SELECT f.id, f.status,
         count(*) OVER (PARTITION BY f.status) AS total,
-        row_number() OVER (PARTITION BY f.status ORDER BY ${Prisma.raw(ORDEN[orden])}) AS puesto
+        row_number() OVER (PARTITION BY f.status
+          ORDER BY ${Prisma.raw(`${ORDEN_VISITA}, ${ORDEN[orden]}`)}) AS puesto
       FROM filtradas f
       JOIN operation72 o ON o.id = f.id
     )

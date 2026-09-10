@@ -212,6 +212,38 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   Error cometido y corregido en el acto: actualicé apellidos pero no el nombre,
   y quedó «María Rojas Puentes» — le faltaba el «José», que vivía en
   `first_name`. **Al fusionar, revisar nombre Y apellidos, no solo apellidos.**
+- Fusionado (10-sep-2026): **Yuli Perdomo** (ficha del 3-sep, con su CUENTA de
+  MENTOR, su mentoría con Jairo Esquivel, su discípula Sandra Barón y sus 2
+  cambios de fase hasta MULTIPLICAR) ↔ **Yuli Katherine Hernandez Perdomo**
+  (ficha del 8-sep, creada por el formulario de liderazgo). Sobrevive la
+  primera; quedó con el nombre completo, el correo `yhernandez17@udi.edu.co`,
+  nacimiento 1993-03-10 y dirección que ella escribió el 8-sep.
+  **⚠️ ESTE CASO INVIERTE DOS COSAS QUE PARECÍAN FIJAS:**
+  1. **El contacto de HighLevel estaba en la ficha NUEVA, no en la vieja**
+     (`vJzy5tRukmAn7gSq1rVF`, con 4 llamadas en `call_log`). En las 4 fusiones
+     anteriores siempre venía con la ficha vieja. **Hay que mirarlo cada vez**,
+     no darlo por sentado, o el CRM se queda apuntando a una ficha borrada.
+  2. **Las fechas buenas de los hitos estaban en la ficha NUEVA.** La vieja
+     tenía **los 12 hitos con fecha 2026-09-03**, que es el día en que se creó
+     la ficha — o sea, la fecha de nada. La nueva traía las que ella misma
+     declaró: escuela 2022-08, encuentro y bautismo 2022-10, servicio 2023-04,
+     Casa de Fe 2023-08, Alpha 2026-06. **Se tomaron esas 6.**
+     Se respetaron las dos reglas de siempre: **REGISTRO no se pisa** (queda
+     3-sep, el real) y **FOCUS_DAY tampoco** (en la nueva venía sin fecha, y un
+     blanco no borra).
+  **⚠️ PENDIENTE DEL USUARIO — conflicto real, NO lo resolví yo:** el 10-sep
+  «Administración Iglesia Vive» resolvió la declaración sobre la ficha
+  duplicada y **DESCARTÓ el hito GRADUACIÓN**, pero la ficha vieja lo tiene
+  marcado como conseguido (con la fecha falsa del 3-sep). Se **conservó** el
+  hito: borrar un logro es destructivo y las dos decisiones son humanas. Hay
+  que preguntarle si Yuli se graduó de la Escuela o no.
+  **Y el mismo tropiezo de Emelin, otra vez:** esas 9 confirmaciones se
+  aplicaron sobre la ficha duplicada, **que no tenía cuenta**, así que
+  **ningún permiso llegó a aplicarse**. Su cuenta real quedó como estaba
+  (MENTOR, activa, líder de Alpha y de Casa de Fe).
+  Método: todo en **una sola transacción**, probada antes con `BEGIN … ROLLBACK`
+  en la misma llamada. Verificado después: **1 sola ficha** con ese correo y ese
+  celular, 12 hitos, 2 declaraciones, 1 contacto de CRM, 1 discípula.
 - **NO fusionar (decisión del usuario, 7-sep):** **Luna Sandoval / Lina Mercedes
   Jovel** (`linitajovel@gmail.com`) y **Nini Guerrón / Dilan Cadena**
   (`ninijguerrons@gmail.com`) **son personas distintas que comparten correo** —
@@ -247,6 +279,51 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 - Validar deploy sin credenciales: `npx wrangler deploy --dry-run --outdir /tmp/x`
 
 ## 12. Bitácora (añadir lo nuevo arriba)
+
+- **2026-09-10** — **Hora de la visita, y «Visita pendiente» ordenada por fecha
+  de visita** (pedido del usuario).
+  **Ojo con el diagnóstico, que es lo que ahorra tiempo la próxima:** el
+  formulario del **tablero** ya pedía fecha Y hora (`datetime-local`) desde
+  siempre. El que solo capturaba el día era el del **CRM**
+  (`/registro/primera-llamada/linea`), y por eso toda visita que agendaba la
+  línea quedaba **a mediodía** — se ve en la base: montones de visitas a las
+  12:00 clavadas.
+  - **`extraerVisita` lee ahora `horaVisita`** en campo aparte («Hora visita»,
+    «Hora de la visita», `contact.hora_visita`), porque el formulario de
+    HighLevel pregunta día y hora por separado.
+  - **`fechaDesdeCrm(valor, hora?)`** las junta, y **solo cuando el día viene
+    sin hora propia**: si el valor ya trae hora, esa manda. Sin hora
+    reconocible se conserva el mediodía de siempre — mejor una hora aproximada
+    que una inventada.
+  - **`horaDesdeCrm`** aguanta lo que escriba la gente: `16:30`, `4:30 pm`,
+    `4 p. m.`, `8am`, `09:05`. **Las dos excepciones del reloj de 12 h están
+    cubiertas y probadas**: `12 am` = medianoche, `12 pm` = mediodía. Lo que no
+    nombra una hora (`en la tarde`) devuelve `null`. **13 casos en
+    `fecha-crm.test.ts`.**
+  - **⚠️ ACCIÓN DEL USUARIO: falta crear el campo «Hora visita» en HighLevel** y
+    ponerlo en el formulario. Mientras no exista, todo sigue igual (mediodía);
+    el sistema ya está listo para recibirlo.
+  - **La columna VISITA PENDIENTE se ordena SIEMPRE por la fecha de la visita**,
+    ascendente, **pase lo que pase con el filtro de orden** (`ORDEN_VISITA` en
+    `tablero-op72.ts`). Ahí la pregunta no es «a quién registramos primero» sino
+    «a quién le toca visita antes». **Las vencidas quedan arriba** (su fecha ya
+    pasó) y las que no tienen fecha, al final (`NULLS LAST`).
+    Se le ofrecieron al usuario las dos direcciones y **eligió la más próxima
+    primero**, no la literal «más reciente a más antigua» que había dicho.
+  - **Truco del `CASE` que vale la pena recordar:** como `row_number()` reparte
+    por estado, `CASE WHEN f.status = 'VISITA_PENDIENTE' THEN f.visita_at END`
+    es NULL en todas las filas de las demás columnas, así que ahí **no altera
+    nada** y cae al orden de siempre. Una sola consulta, sin ramas.
+  - La visita sale de un `LEFT JOIN LATERAL` sobre `contact_attempt` (tipo
+    VISITA, `scheduled_at` no nulo, la más reciente por `occurred_at`), que es
+    **exactamente la misma que pinta la tarjeta**.
+  - **Probado contra la base antes de subir**: la columna quedó 28-ago → 2-sep →
+    5-sep → 9-sep… y **de las otras cuatro columnas no se movió ni una tarjeta**
+    (278 de 278 en el mismo puesto; en VISITA PENDIENTE se movieron 23 de 26).
+  - **Tropiezo del día:** un backtick dentro de un comentario `--` del SQL
+    **cierra el template literal** de TypeScript. `tsc` lo cazó como «`,`
+    expected» en una línea que se veía bien. **En un `$queryRaw`, ni backticks
+    ni `${'$'}{}` dentro de los comentarios SQL.**
 
 - **2026-09-09** — **«Asistentes de la iglesia»: el TERCER desenlace de la
   Operación 72** (pedido del usuario; mockup aprobado:
