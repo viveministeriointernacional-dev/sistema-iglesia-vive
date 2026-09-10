@@ -212,6 +212,38 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   Error cometido y corregido en el acto: actualicé apellidos pero no el nombre,
   y quedó «María Rojas Puentes» — le faltaba el «José», que vivía en
   `first_name`. **Al fusionar, revisar nombre Y apellidos, no solo apellidos.**
+- Fusionado (10-sep-2026): **Yuli Perdomo** (ficha del 3-sep, con su CUENTA de
+  MENTOR, su mentoría con Jairo Esquivel, su discípula Sandra Barón y sus 2
+  cambios de fase hasta MULTIPLICAR) ↔ **Yuli Katherine Hernandez Perdomo**
+  (ficha del 8-sep, creada por el formulario de liderazgo). Sobrevive la
+  primera; quedó con el nombre completo, el correo `yhernandez17@udi.edu.co`,
+  nacimiento 1993-03-10 y dirección que ella escribió el 8-sep.
+  **⚠️ ESTE CASO INVIERTE DOS COSAS QUE PARECÍAN FIJAS:**
+  1. **El contacto de HighLevel estaba en la ficha NUEVA, no en la vieja**
+     (`vJzy5tRukmAn7gSq1rVF`, con 4 llamadas en `call_log`). En las 4 fusiones
+     anteriores siempre venía con la ficha vieja. **Hay que mirarlo cada vez**,
+     no darlo por sentado, o el CRM se queda apuntando a una ficha borrada.
+  2. **Las fechas buenas de los hitos estaban en la ficha NUEVA.** La vieja
+     tenía **los 12 hitos con fecha 2026-09-03**, que es el día en que se creó
+     la ficha — o sea, la fecha de nada. La nueva traía las que ella misma
+     declaró: escuela 2022-08, encuentro y bautismo 2022-10, servicio 2023-04,
+     Casa de Fe 2023-08, Alpha 2026-06. **Se tomaron esas 6.**
+     Se respetaron las dos reglas de siempre: **REGISTRO no se pisa** (queda
+     3-sep, el real) y **FOCUS_DAY tampoco** (en la nueva venía sin fecha, y un
+     blanco no borra).
+  **⚠️ PENDIENTE DEL USUARIO — conflicto real, NO lo resolví yo:** el 10-sep
+  «Administración Iglesia Vive» resolvió la declaración sobre la ficha
+  duplicada y **DESCARTÓ el hito GRADUACIÓN**, pero la ficha vieja lo tiene
+  marcado como conseguido (con la fecha falsa del 3-sep). Se **conservó** el
+  hito: borrar un logro es destructivo y las dos decisiones son humanas. Hay
+  que preguntarle si Yuli se graduó de la Escuela o no.
+  **Y el mismo tropiezo de Emelin, otra vez:** esas 9 confirmaciones se
+  aplicaron sobre la ficha duplicada, **que no tenía cuenta**, así que
+  **ningún permiso llegó a aplicarse**. Su cuenta real quedó como estaba
+  (MENTOR, activa, líder de Alpha y de Casa de Fe).
+  Método: todo en **una sola transacción**, probada antes con `BEGIN … ROLLBACK`
+  en la misma llamada. Verificado después: **1 sola ficha** con ese correo y ese
+  celular, 12 hitos, 2 declaraciones, 1 contacto de CRM, 1 discípula.
 - **NO fusionar (decisión del usuario, 7-sep):** **Luna Sandoval / Lina Mercedes
   Jovel** (`linitajovel@gmail.com`) y **Nini Guerrón / Dilan Cadena**
   (`ninijguerrons@gmail.com`) **son personas distintas que comparten correo** —
