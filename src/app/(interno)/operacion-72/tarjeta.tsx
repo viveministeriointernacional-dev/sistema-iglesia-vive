@@ -328,30 +328,15 @@ export function TarjetaDePersona({
         </div>
       ) : panel === "reprogramar" && persona.visitaAcordada ? (
         <div className="mt-3 rounded-[10px] bg-papel p-3">
-          <p className="text-[12px] leading-[1.4] font-semibold text-tinta">
-            Mover la visita de {persona.nombre}
-          </p>
-          <p className="mt-1 text-[11px] leading-[1.45] font-medium text-[rgba(19,28,36,.55)]">
-            Estaba para{" "}
-            <strong className="font-bold">{persona.visitaAcordada.cuando}</strong>. La
-            anterior no se borra: queda en el expediente que se movió.
-          </p>
-          <div className="mt-3">
-            <FormularioDeVisita
-              enCurso={enCurso}
-              texto="Mover la visita"
-              inicial={{
-                cuando: persona.visitaAcordada.valorFecha ?? "",
-                lugar: persona.visitaAcordada.lugar ?? "",
-                virtual: persona.visitaAcordada.virtual,
-              }}
-              notaPlaceholder="No pudo · pidió que fuera otro día"
-              alGuardar={(datos) =>
-                ejecutar(() => reprogramarVisita(persona.operacionId, datos))
-              }
-              alCancelar={() => setPanel(null)}
-            />
-          </div>
+          <FormularioDeCambioDeVisita
+            nombre={persona.nombre}
+            acordada={persona.visitaAcordada}
+            enCurso={enCurso}
+            alGuardar={(datos) =>
+              ejecutar(() => reprogramarVisita(persona.operacionId, datos))
+            }
+            alCancelar={() => setPanel(null)}
+          />
         </div>
       ) : panel === "asistente" ? (
         <div className="mt-3 rounded-[10px] bg-papel p-3">
@@ -410,7 +395,7 @@ export function TarjetaDePersona({
                 disabled={enCurso}
                 className="cursor-pointer border-0 bg-transparent p-0 text-[11px] leading-none font-semibold text-azul-700 disabled:opacity-60"
               >
-                No se pudo · mover la visita
+                Cambiar la fecha de la visita
               </button>
             </div>
           ) : null}
@@ -779,6 +764,96 @@ function FormularioDeLlamada({
           Elige cómo salió la llamada para guardar.
         </p>
       ) : null}
+    </div>
+  );
+}
+
+/// Cambiar la fecha u hora de una visita ya acordada, por las **dos razones
+/// por las que pasa de verdad** (dichas por el usuario, 11-sep): la visita se
+/// movió, o la fecha se digitó mal.
+///
+/// **La diferencia no es cosmética, decide qué se guarda:**
+/// - **Se movió** → sí hubo una visita pactada para ese día y se corrió, así
+///   que se apila un registro nuevo y el historial muestra el movimiento.
+/// - **Estaba mal escrita** → **nunca hubo** visita a esa hora. Apilar un «se
+///   reprogramó» inventaría un movimiento que no pasó, así que se corrige el
+///   registro en su sitio y el cambio queda en la auditoría.
+function FormularioDeCambioDeVisita({
+  nombre,
+  acordada,
+  enCurso,
+  alGuardar,
+  alCancelar,
+}: {
+  nombre: string;
+  acordada: NonNullable<TarjetaPersona["visitaAcordada"]>;
+  enCurso: boolean;
+  alGuardar: (datos: {
+    cuando: string;
+    lugar: string;
+    virtual: boolean;
+    nota: string;
+    motivo: "movida" | "correccion";
+  }) => void;
+  alCancelar: () => void;
+}) {
+  const [motivo, setMotivo] = useState<"movida" | "correccion">("movida");
+  const corrige = motivo === "correccion";
+
+  return (
+    <div>
+      <p className="text-[12px] leading-[1.4] font-semibold text-tinta">
+        La visita de {nombre}
+      </p>
+      <p className="mt-1 text-[11px] leading-[1.45] font-medium text-[rgba(19,28,36,.55)]">
+        Ahora dice <strong className="font-bold">{acordada.cuando}</strong>.
+      </p>
+
+      <div className="mt-3">
+        <Etiqueta>¿Qué pasó?</Etiqueta>
+        <div className="mt-[7px] flex flex-col gap-[6px]">
+          <button
+            type="button"
+            aria-pressed={!corrige}
+            onClick={() => setMotivo("movida")}
+            className="opcion px-3 py-[9px] text-left text-[11.5px] leading-[1.25]"
+          >
+            Se movió la visita
+          </button>
+          <button
+            type="button"
+            aria-pressed={corrige}
+            onClick={() => setMotivo("correccion")}
+            className="opcion px-3 py-[9px] text-left text-[11.5px] leading-[1.25]"
+          >
+            La fecha estaba mal escrita
+          </button>
+        </div>
+        <p className="mt-2 text-[10.5px] leading-[1.4] font-medium text-[rgba(19,28,36,.5)]">
+          {corrige
+            ? "Se arregla la que hay: nunca hubo visita a esa hora, así que no queda como si se hubiera movido."
+            : "La anterior no se borra: queda en el expediente que la visita se corrió."}
+        </p>
+      </div>
+
+      <div className="mt-3">
+        <FormularioDeVisita
+          enCurso={enCurso}
+          texto={corrige ? "Corregir la fecha" : "Mover la visita"}
+          inicial={{
+            cuando: acordada.valorFecha ?? "",
+            lugar: acordada.lugar ?? "",
+            virtual: acordada.virtual,
+          }}
+          notaPlaceholder={
+            corrige
+              ? "Lo que de verdad se acordó"
+              : "No pudo · pidió que fuera otro día"
+          }
+          alGuardar={(datos) => alGuardar({ ...datos, motivo })}
+          alCancelar={alCancelar}
+        />
+      </div>
     </div>
   );
 }

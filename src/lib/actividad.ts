@@ -376,6 +376,26 @@ export async function cargarActividad(
         filas.push({ k: "Quedó en", v: contactada ? "CONTACTADA" : "SEGUIMIENTO" });
         break;
       }
+      case "operacion72.visita_corregida": {
+        tipo = "op72"; etiqueta = "OP 72"; tono = "azul";
+        const cuando = texto(m.cuando);
+        const fecha = cuando ? new Date(cuando) : null;
+        const antesTexto = texto(m.antes);
+        const antes = antesTexto ? new Date(antesTexto) : null;
+        const legible = fecha && !Number.isNaN(fecha.getTime()) ? momentoLegible(fecha, ahora) : null;
+        frase = [
+          A(),
+          t(" corrigió la fecha de la visita de "),
+          P(),
+          t(legible ? ` · queda ${legible}` : ""),
+        ];
+        tituloDetalle = "La fecha estaba mal escrita";
+        if (antes && !Number.isNaN(antes.getTime())) {
+          filas.push({ k: "Decía", v: momentoLegible(antes, ahora) });
+        }
+        if (legible) filas.push({ k: "Es", v: legible });
+        break;
+      }
       case "operacion72.visita_reprogramada": {
         tipo = "op72"; etiqueta = "OP 72"; tono = "ambar";
         const cuando = texto(m.cuando);
@@ -893,7 +913,7 @@ export async function cargarActividad(
     registros: auditoria.filter((f) => f.action === "persona.registrada").length,
     llamadas: auditoria.filter((f) => f.action === "operacion72.contacto_registrado").length,
     contactadas: auditoria.filter((f) => f.action === "operacion72.contacto_registrado" && meta(f.metadata).contactada === true).length,
-    visitas: auditoria.filter((f) => f.action === "operacion72.visita_agendada" || f.action === "operacion72.visita_reprogramada" || f.action === "operacion72.visita_cerrada").length,
+    visitas: auditoria.filter((f) => f.action === "operacion72.visita_agendada" || f.action === "operacion72.visita_reprogramada" || f.action === "operacion72.visita_corregida" || f.action === "operacion72.visita_cerrada").length,
     entregas: auditoria.filter((f) => f.action === "operacion72.entregada" || f.action === "administracion.mentor_asignado").length,
     fases: auditoria.filter((f) => f.action === "fase.cambiada").length,
   };

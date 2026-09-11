@@ -585,7 +585,15 @@ export async function darDeBajaDesdeTablero(
 /// La tarjeta se queda en VISITA PENDIENTE: no es un paso adelante ni atrás.
 export async function reprogramarVisita(
   operacionId: string,
-  datos: { cuando: string; lugar: string; virtual: boolean; nota: string },
+  datos: {
+    cuando: string;
+    lugar: string;
+    virtual: boolean;
+    nota: string;
+    /// `movida` = la visita estaba pactada y se corrió · `correccion` = la
+    /// fecha estaba mal escrita y nunca hubo visita a esa hora.
+    motivo: "movida" | "correccion";
+  },
 ): Promise<ResultadoAccion> {
   let usuario: UsuarioSesion;
   try {
@@ -612,7 +620,7 @@ export async function reprogramarVisita(
   const nota = datos.nota.trim() || null;
   const prisma = await getPrisma();
 
-  // La visita que estaba acordada, para dejar dicho de dónde se movió.
+  // La visita que estaba acordada: de dónde se movió, o qué quedó mal escrito.
   const anterior = await prisma.contactAttempt.findFirst({
     where: {
       operation72Id: operacion.id,
@@ -620,24 +628,40 @@ export async function reprogramarVisita(
       scheduledAt: { not: null },
     },
     orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }],
-    select: { scheduledAt: true },
+    select: { id: true, scheduledAt: true },
   });
+  const corregir = datos.motivo === "correccion";
 
   await prisma.$transaction(async (tx) => {
-    await tx.contactAttempt.create({
-      data: {
-        operation72Id: operacion.id,
-        type: ContactType.VISITA,
-        result: anterior?.scheduledAt
-          ? `Visita reprogramada · antes era el ${FORMATO_VISITA.format(anterior.scheduledAt)}`
-          : "Visita reprogramada",
-        note: nota,
-        scheduledAt: cuando,
-        place: lugar,
-        isVirtual: datos.virtual,
-        byUserId: usuario.id,
-      },
-    });
+    if (corregir && anterior) {
+      // Un error de digitación se ARREGLA, no se apila: nunca hubo una visita
+      // a esa hora, así que dejar un «se reprogramó» inventaría un movimiento
+      // que no pasó. La corrección queda en la auditoría, que es su sitio.
+      await tx.contactAttempt.update({
+        where: { id: anterior.id },
+        data: {
+          scheduledAt: cuando,
+          place: lugar,
+          isVirtual: datos.virtual,
+          ...(nota ? { note: nota } : {}),
+        },
+      });
+    } else {
+      await tx.contactAttempt.create({
+        data: {
+          operation72Id: operacion.id,
+          type: ContactType.VISITA,
+          result: anterior?.scheduledAt
+            ? `Visita reprogramada · antes era el ${FORMATO_VISITA.format(anterior.scheduledAt)}`
+            : "Visita reprogramada",
+          note: nota,
+          scheduledAt: cuando,
+          place: lugar,
+          isVirtual: datos.virtual,
+          byUserId: usuario.id,
+        },
+      });
+    }
 
     await tx.operation72.update({
       where: { id: operacion.id },
@@ -653,7 +677,9 @@ export async function reprogramarVisita(
 
     await auditar(tx, {
       actorId: usuario.id,
-      action: "operacion72.visita_reprogramada",
+      action: corregir
+        ? "operacion72.visita_corregida"
+        : "operacion72.visita_reprogramada",
       entityType: "operation72",
       entityId: operacion.id,
       metadata: {

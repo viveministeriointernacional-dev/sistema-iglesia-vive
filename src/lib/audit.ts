@@ -12,6 +12,7 @@ export type AccionAuditada =
   | "operacion72.contacto_registrado"
   | "operacion72.visita_agendada"
   | "operacion72.visita_reprogramada"
+  | "operacion72.visita_corregida"
   | "operacion72.visita_cerrada"
   // Corrección de datos: una tarjeta que quedó en la columna equivocada por
   // reglas anteriores del sistema y se movió a la que le corresponde hoy.
