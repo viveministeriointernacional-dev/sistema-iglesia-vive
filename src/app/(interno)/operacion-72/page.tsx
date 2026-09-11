@@ -3,8 +3,8 @@ import { Operation72Status, type Prisma, Role } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
 import {
   puedeAutorizarBaja,
-  requerirRol,
-  ROLES_CONSOLIDACION,
+  requerirPermiso,
+  puedeOperarOperacion72,
   veTodaLaConsolidacion,
 } from "@/lib/auth";
 import { ESTADO_SOLICITUD } from "@/lib/baja";
@@ -92,7 +92,7 @@ export default async function TableroOperacion72({
     n?: string;
   }>;
 }) {
-  const usuario = await requerirRol(ROLES_CONSOLIDACION);
+  const usuario = await requerirPermiso(puedeOperarOperacion72);
   const {
     q: consultaCruda,
     orden: ordenCrudo,

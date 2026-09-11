@@ -70,6 +70,28 @@ export const ROLES_CONSOLIDACION: Role[] = [
   Role.ADMIN,
 ];
 
+/// Quién trabaja el tablero de Operación 72 (decisión del usuario, 11-sep:
+/// «que solo le aparezca a los perfiles administradores y consolidadores»).
+///
+/// **PASTOR queda FUERA a propósito, y ahí está el cambio.** Antes se usaba
+/// `ROLES_CONSOLIDACION`, que lo incluye, así que a los pastores les salía el
+/// tablero en el menú sin tener nada que hacer en él. La consolidación es el
+/// oficio de un equipo concreto; el pastor acompaña por otro lado (su red, los
+/// expedientes, el informe).
+export const ROLES_OPERACION_72: Role[] = [Role.ADMIN, Role.CONSOLIDADOR];
+
+/// **Pero el permiso «coordina la consolidación» sigue abriendo el tablero**,
+/// sea cual sea el rol. Ese permiso existe justo para eso —ver y operar el
+/// trabajo de todos los consolidadores— así que quitárselo a quien lo tiene
+/// concedido sería vaciarlo de sentido. Hoy lo tienen dos pastoras a las que se
+/// les dio a propósito; si se les quiere cerrar el tablero, se les quita la
+/// casilla en Administración, no se cambia esta regla.
+export function puedeOperarOperacion72(usuario: UsuarioSesion): boolean {
+  return (
+    ROLES_OPERACION_72.includes(usuario.role) || usuario.coordinaConsolidacion
+  );
+}
+
 /// Quiénes pueden registrar «solo la ficha» (sin Operación 72): quien luego
 /// le va a dar rol y permisos a esa persona.
 export const ROLES_REGISTRO_SOLO_FICHA: Role[] = [Role.ADMIN, Role.PASTOR];
@@ -231,5 +253,18 @@ export async function requerirRolEnAccion(roles: Role[]): Promise<UsuarioSesion>
   const usuario = await obtenerUsuarioActual();
   if (!usuario) throw new ErrorDePermiso("Tu sesión expiró. Vuelve a entrar.");
   if (!roles.includes(usuario.role)) throw new ErrorDePermiso();
+  return usuario;
+}
+
+/// La misma variante, pero para lo que se autoriza **por permiso y no por
+/// rol** — como el tablero de Operación 72, que también abre con «coordina la
+/// consolidación». Es a `requerirPermiso` lo que `requerirRolEnAccion` es a
+/// `requerirRol`.
+export async function requerirPermisoEnAccion(
+  tienePermiso: (usuario: UsuarioSesion) => boolean,
+): Promise<UsuarioSesion> {
+  const usuario = await obtenerUsuarioActual();
+  if (!usuario) throw new ErrorDePermiso("Tu sesión expiró. Vuelve a entrar.");
+  if (!tienePermiso(usuario)) throw new ErrorDePermiso();
   return usuario;
 }
