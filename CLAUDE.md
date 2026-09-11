@@ -318,13 +318,25 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
     asignarles discípulos** (o darles «coordina la consolidación»); no se arregla
     en el código. Laura Charry también tiene rama 0, pero es ADMIN y sigue
     viendo todo.
-  - **⚠️ LO QUE NO SE TOCÓ, y es una decisión, no un olvido:
-    `accesoAExpediente` y el buscador siguen abriéndole CUALQUIER expediente al
-    PASTOR.** Ver la ficha de alguien por quien te preguntan es acceso pastoral,
-    y es otra cosa que el tablero de «a quién le toca atención hoy» — el usuario
-    habló de los totales. Pero queda dicho: **un pastor sigue encontrando a las
-    361 en el buscador**, así que si eso también debe cerrarse, es una decisión
-    aparte (y se haría en `accesoAExpediente` + `ROLES_BUSCADOR`).
+  - **⚠️ EL BUSCADOR NO SE CIERRA — DECISIÓN CERRADA DEL USUARIO (11-sep):
+    «no se debe cerrar el buscador, pero no debe mostrarle toda la gente que
+    pide atención, solo lo de su línea o personas a su cargo y las personas que
+    tienen a su vez a cargo sus personas».** O sea: `accesoAExpediente` y el
+    buscador **siguen abriéndole CUALQUIER expediente al PASTOR** (sigue
+    encontrando a las 361), y lo que se recorta es **la gente que pide
+    atención**. Ver la ficha de alguien por quien te preguntan es acceso
+    pastoral; el tablero de «a quién le toca atención hoy» es otra cosa.
+    **No volver a proponer cerrar el buscador.**
+  - **Comprobado que «Mi red» era el ÚNICO sitio que había que recortar**:
+    `cargarRed` / `cargarArbol` / `cargarEquipo` solo los consume
+    `mi-red/page.tsx`, y de las otras cuatro entradas del menú que ve un pastor
+    (Registrar persona, Alpha y Casa de Fe, Escuela, Eventos) ninguna es una
+    lista de quién pide atención — son de gestión de grupos y programas.
+    Administración es solo de ADMIN.
+  - **Lo que le va a salir a Jesús Polanía**, calculado sobre su rama con la
+    lógica de `cargarRed`: **10 personas · 1 con alertas · 0 sin contacto · 1
+    Op72 vencida · 0 para revisión**, y por fase **Ganar 4 · Fortalecer 2 ·
+    Entrenar 3 · Multiplicar 1**. Antes: 361 · 287 · 71 · 277 · 0.
 
 - **2026-09-11** — **«Mi red» pasa a mostrar la rama EN CASCADA, no solo los
   discípulos directos** (pedido del usuario: «solamente puedan ver la red que
