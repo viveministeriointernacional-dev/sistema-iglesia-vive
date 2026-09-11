@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { CallOutcome, Operation72Status } from "@iglesia/prisma-client";
 import {
@@ -121,13 +122,28 @@ export function TarjetaDePersona({
   const [error, setError] = useState<string | null>(null);
   const [panel, setPanel] = useState<Panel>(null);
   const [enCurso, iniciar] = useTransition();
+  const router = useRouter();
 
+  /// ⚠️ **`router.refresh()` no es opcional.** La acción del servidor invalida
+  /// su caché con `revalidatePath`, pero la página que el navegador ya pintó se
+  /// queda igual: el panel se cierra, el dato quedó guardado, y en pantalla
+  /// sigue el valor viejo.
+  ///
+  /// Se veía poco porque casi todas las acciones **mueven la tarjeta de
+  /// columna**, y eso tapaba el problema. Lo destapó reprogramar una visita,
+  /// donde la tarjeta se queda en su sitio y lo único que cambia es la hora:
+  /// el usuario cambió la hora de Ana López, no vio el cambio, y lo volvió a
+  /// hacer — quedaron dos reprogramaciones con un minuto de diferencia.
   function ejecutar(accion: () => Promise<{ ok: boolean; mensaje?: string }>) {
     setError(null);
     iniciar(async () => {
       const resultado = await accion();
-      if (!resultado.ok) setError(resultado.mensaje ?? "No se pudo guardar.");
-      else setPanel(null);
+      if (!resultado.ok) {
+        setError(resultado.mensaje ?? "No se pudo guardar.");
+        return;
+      }
+      setPanel(null);
+      router.refresh();
     });
   }
 

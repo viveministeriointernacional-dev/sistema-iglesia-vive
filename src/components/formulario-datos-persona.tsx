@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { DatosPersona, ResultadoGuardado } from "@/lib/persona";
 
 /// Formulario de los datos básicos de una persona. Lo usan administración y el
@@ -18,6 +19,7 @@ export function FormularioDatosPersona({
   const [form, setForm] = useState<DatosPersona>(inicial);
   const [estado, setEstado] = useState<null | { ok: boolean; texto: string }>(null);
   const [guardando, iniciar] = useTransition();
+  const router = useRouter();
   const set = (campo: keyof DatosPersona, valor: string) =>
     setForm((previo) => ({ ...previo, [campo]: valor }));
 
@@ -25,6 +27,10 @@ export function FormularioDatosPersona({
     iniciar(async () => {
       const r = await guardar(form);
       setEstado(r.ok ? { ok: true, texto: textoExito } : { ok: false, texto: r.mensaje });
+      // El formulario conserva lo que se escribió, pero el resto de la pantalla
+      // (el nombre de la cabecera, por ejemplo) se queda con lo viejo hasta que
+      // se vuelvan a pedir los datos al servidor.
+      if (r.ok) router.refresh();
     });
   }
 

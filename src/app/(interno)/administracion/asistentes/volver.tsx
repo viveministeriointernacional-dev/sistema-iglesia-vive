@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { devolverAProcesoDesdeAdministracion } from "./acciones";
 
 /// «Volver a proceso»: la devuelve al tablero con 72 horas nuevas.
@@ -18,6 +19,7 @@ export function VolverAProceso({
   const [nota, setNota] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [enCurso, empezar] = useTransition();
+  const router = useRouter();
 
   if (!abierto) {
     return (
@@ -70,8 +72,12 @@ export function VolverAProceso({
                 learnerId,
                 { nota },
               );
-              if (resultado.ok) setAbierto(false);
-              else setError(resultado.mensaje);
+              if (resultado.ok) {
+                setAbierto(false);
+                // Sin esto el renglón sigue en la lista aunque ya volvió al
+                // proceso: `revalidatePath` limpia el servidor, no la pantalla.
+                router.refresh();
+              } else setError(resultado.mensaje);
             })
           }
           className="boton-primario"

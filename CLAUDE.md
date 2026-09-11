@@ -280,6 +280,37 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-11** — **⚠️ BUG REAL Y VIEJO: las acciones guardaban bien pero la
+  PANTALLA no se repintaba.** Lo reportó el usuario: «a Ana López le acabo de
+  cambiar la hora de visita pero no realizó el cambio». **Sí la realizó** — y
+  dos veces, porque al no ver el cambio lo volvió a hacer: quedaron dos
+  reprogramaciones con **un minuto de diferencia** (4:30 p. m. → 11:30 a. m. →
+  11:29 a. m.).
+  **La causa.** Las acciones del servidor llaman `revalidatePath`, que **limpia
+  la caché del servidor pero NO repinta la página que el navegador ya tiene**.
+  `ejecutar` en `tarjeta.tsx` cerraba el panel y no pedía nada más, así que el
+  dato quedaba guardado y en pantalla seguía el valor viejo.
+  **Arreglo: `router.refresh()` después de cada acción exitosa.**
+  **⚠️ POR QUÉ NADIE LO HABÍA NOTADO EN MESES, que es la parte útil:** casi
+  todas las acciones del tablero **mueven la tarjeta de columna**, y ese salto
+  tapaba el problema. Reprogramar una visita fue la primera acción en la que
+  **la tarjeta se queda en su sitio y lo único que cambia es un dato** — ahí
+  quedó a la vista.
+  **REGLA: toda acción de servidor que muta y deja al usuario en la misma
+  pantalla necesita `router.refresh()`. `revalidatePath` NO basta.**
+  **Barrido hecho**: de 22 componentes con `useTransition`, **12 ya lo tenían**,
+  **1 no lo necesita** (`buscador-personas.tsx` solo lee) y **9 no lo tenían**.
+  Arreglados los 3 donde el efecto es claro y no hay estado local que pelear:
+  `operacion-72/tarjeta.tsx`, `administracion/asistentes/volver.tsx` y
+  `components/formulario-datos-persona.tsx`.
+  **Quedan 3 por revisar con cuidado** — `administracion/[id]/declaracion.tsx`,
+  `expediente/[id]/casa-de-fe.tsx` y `expediente/[id]/panel-lateral.tsx`:
+  **los tres llevan su propio estado local y se actualizan solos**, así que
+  meterles un refresh a ciegas puede pelear con lo que ya pintan. Hay que
+  mirarlos uno por uno. (`registro-interno/asistente.tsx` redirige al terminar,
+  así que no aplica.)
+
+
 - **2026-09-11** — **⚠️ EL DESPLIEGUE SÍ ESTABA ENTRANDO, y mi prueba para
   detectarlo daba FALSO NEGATIVO.** Lo destapó un pantallazo del usuario: en el
   tablero vivo se ven **«Asiste, no quiere proceso»** (PR #76) y la columna
