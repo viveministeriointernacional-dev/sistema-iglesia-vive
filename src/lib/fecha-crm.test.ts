@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fechaDesdeCrm, horaDesdeCrm } from "./registro";
+import { fechaDesdeCrm, horaConocidaDelCrm, horaDesdeCrm } from "./registro";
 
 test("una fecha sin hora del CRM no se corre un día atrás en Colombia", () => {
   const fecha = fechaDesdeCrm("2026-08-29");
@@ -44,4 +44,17 @@ test("la hora de la visita llega en un campo aparte y se junta con el día", () 
     fechaDesdeCrm("2026-09-15T08:00:00-05:00", "4:30 pm")?.toISOString(),
     "2026-09-15T13:00:00.000Z",
   );
+});
+
+test("se distingue la hora que alguien dijo del mediodía de relleno", () => {
+  // Lo que llegó de verdad el 11-sep: día en un campo, hora en otro.
+  assert.equal(horaConocidaDelCrm("2026-09-14", "5 p.m"), true);
+  assert.equal(horaConocidaDelCrm("14/09/2026", "4:00 pm"), true);
+  // Sin hora, o con un texto que no nombra ninguna: es el mediodía de relleno.
+  assert.equal(horaConocidaDelCrm("2026-09-14", null), false);
+  assert.equal(horaConocidaDelCrm("2026-09-14", "está por confirmar"), false);
+  assert.equal(horaConocidaDelCrm("2026-09-14", "{{contact.hora_visita}}"), false);
+  // Un valor que ya trae la hora dentro no necesita el campo aparte.
+  assert.equal(horaConocidaDelCrm("2026-09-14T16:00:00-05:00", null), true);
+  assert.equal(horaConocidaDelCrm(null, "5 p.m"), false);
 });

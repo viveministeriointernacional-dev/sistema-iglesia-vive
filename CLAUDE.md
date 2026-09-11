@@ -280,6 +280,30 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-11** — **El campo «Hora visita» de HighLevel quedó VIVO y probado
+  con envíos reales.** El usuario lo puso en el formulario **Registro Llamada
+  Línea** y llegó de inmediato: id **`YncLUTwKQ7eNkYLPhF3G`**, en `others` del
+  envío. Dos envíos el 11-sep: «4:00 pm» (prueba) y **«5 p.m» → Lourdes Cruz
+  González quedó con la visita el 14 de sept a las 17:00 hora Colombia**, o sea
+  que `horaDesdeCrm` y `fechaDesdeCrm` hacen lo suyo en producción.
+  **Cómo se comprueba sin entrar al panel** (receta): `GET
+  /forms/submissions?locationId=…&formId=07rGKuRchJO15bxL2Unj` con el PIT y
+  mirar si el id del campo aparece en `others`. ⚠️ **`GET /forms/` NO sirve para
+  esto**: devuelve los formularios con `fields: []`, así que no dice qué campos
+  tiene ninguno. **El envío real es la única evidencia.**
+  **Fallo encontrado al revisar, y arreglado: el resumen no imprimía la hora.**
+  El detalle del CRM se formateaba con día y mes a secas («Visita 14 de sept»)
+  aunque la hora ya estuviera guardada bien. Era correcto cuando la hora no
+  existía —imprimir el mediodía de relleno habría **afirmado una hora que nadie
+  pactó**— pero ahora hay que distinguir los dos casos.
+  **`horaConocidaDelCrm(valor, hora)`** dice si la hora la dijo alguien o es el
+  mediodía de relleno, y el detalle usa un formateador con hora solo en el
+  primer caso. **Esta distinción es la razón de ser del helper**: varias
+  observaciones dicen literalmente «está por confirmar la hora», así que ahí el
+  mediodía significa «falta confirmar» y mentir sobre eso es peor que no decirlo.
+  Corregido a mano el resumen de Lourdes (la única ya guardada con hora conocida
+  y resumen sin ella). **7 casos nuevos en `fecha-crm.test.ts`.**
+
 - **2026-09-11** — **⚠️ QUINTA TRAMPA DE FECHAS, y la más caliente: un
   `<input type="datetime-local">` manda la hora SIN ZONA, y el servidor corre
   en UTC.** Lo reportó el usuario después de que el arreglo del repintado no
