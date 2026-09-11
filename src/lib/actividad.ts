@@ -396,6 +396,27 @@ export async function cargarActividad(
         if (legible) filas.push({ k: "Es", v: legible });
         break;
       }
+      case "operacion72.visita_anulada": {
+        // Rojo, no azul: no es un ajuste de agenda, es un registro que se
+        // retira porque se le hizo a la persona equivocada. Quien revisa el
+        // día tiene que poder verlo de un golpe.
+        tipo = "op72"; etiqueta = "OP 72"; tono = "rojo";
+        const eraTexto = texto(m.visitaEra);
+        const era = eraTexto ? new Date(eraTexto) : null;
+        const legible = era && !Number.isNaN(era.getTime()) ? momentoLegible(era, ahora) : null;
+        frase = [
+          A(),
+          t(" deshizo la visita de "),
+          P(),
+          t(" · no era esta persona"),
+        ];
+        tituloDetalle = "La visita se había agendado por error";
+        if (legible) filas.push({ k: "Decía", v: legible });
+        const motivo = texto(m.motivo);
+        if (motivo) filas.push({ k: "Qué pasó", v: motivo });
+        filas.push({ k: "Vuelve a", v: "CONTACTADA" });
+        break;
+      }
       case "operacion72.visita_reprogramada": {
         tipo = "op72"; etiqueta = "OP 72"; tono = "ambar";
         const cuando = texto(m.cuando);

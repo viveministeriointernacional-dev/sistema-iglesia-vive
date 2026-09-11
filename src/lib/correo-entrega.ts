@@ -62,6 +62,10 @@ export async function enviarCorreoDeEntrega(
             startedAt: true,
             deliveredAt: true,
             attempts: {
+              // Sin las anuladas: el correo le cuenta al mentor lo que pasó de
+              // verdad con esta persona, y una visita retirada por haberse
+              // apuntado a quien no era le haría perder el tiempo buscándola.
+              where: { annulledAt: null },
               orderBy: [{ occurredAt: "asc" }, { createdAt: "asc" }],
               select: {
                 type: true,

@@ -16,6 +16,7 @@ import {
   entregarAMentor,
   marcarAsistenteDesdeTablero,
   registrarLlamada,
+  deshacerVisitaAgendada,
   reprogramarVisita,
   retirarSolicitudDesdeTablero,
 } from "./acciones";
@@ -107,7 +108,7 @@ const ESTILO_BARRA: Record<TarjetaPersona["urgencia"], string> = {
   normal: "bg-verde-500",
 };
 
-type Panel = "accion" | "baja" | "asistente" | "reprogramar" | null;
+type Panel = "accion" | "baja" | "asistente" | "reprogramar" | "deshacer" | null;
 
 export function TarjetaDePersona({
   persona,
@@ -354,6 +355,18 @@ export function TarjetaDePersona({
             alCancelar={() => setPanel(null)}
           />
         </div>
+      ) : panel === "deshacer" && persona.visitaAcordada ? (
+        <div className="mt-3 rounded-[10px] bg-papel p-3">
+          <FormularioDeVisitaPorError
+            nombre={persona.nombre}
+            acordada={persona.visitaAcordada}
+            enCurso={enCurso}
+            alGuardar={(datos) =>
+              ejecutar(() => deshacerVisitaAgendada(persona.operacionId, datos))
+            }
+            alCancelar={() => setPanel(null)}
+          />
+        </div>
       ) : panel === "asistente" ? (
         <div className="mt-3 rounded-[10px] bg-papel p-3">
           <FormularioDeAsistente
@@ -404,7 +417,7 @@ export function TarjetaDePersona({
             </button>
           </div>
           {persona.visitaAcordada ? (
-            <div className="mt-2 text-center">
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center">
               <button
                 type="button"
                 onClick={() => setPanel("reprogramar")}
@@ -412,6 +425,14 @@ export function TarjetaDePersona({
                 className="cursor-pointer border-0 bg-transparent p-0 text-[11px] leading-none font-semibold text-azul-700 disabled:opacity-60"
               >
                 Cambiar la fecha de la visita
+              </button>
+              <button
+                type="button"
+                onClick={() => setPanel("deshacer")}
+                disabled={enCurso}
+                className="cursor-pointer border-0 bg-transparent p-0 text-[11px] leading-none font-semibold text-[rgba(19,28,36,.5)] disabled:opacity-60"
+              >
+                No era esta persona
               </button>
             </div>
           ) : null}
@@ -571,6 +592,81 @@ function FormularioDeBaja({
 /// La nota es obligatoria (mínimo 10 caracteres) a propósito. El motivo de la
 /// lista sirve para contar; la nota es lo único que le explica el caso a quien
 /// abra el listado dentro de un año.
+/// Deshacer una visita que se le agendó a la persona equivocada.
+///
+/// Es el único panel del tablero que **retira** algo en vez de añadirlo, y por
+/// eso dice con letra clara qué va a pasar: a dónde vuelve la tarjeta y qué
+/// queda en el expediente. Quien deshace tiene que poder ver que no está
+/// borrando el historial de nadie.
+function FormularioDeVisitaPorError({
+  nombre,
+  acordada,
+  enCurso,
+  alGuardar,
+  alCancelar,
+}: {
+  nombre: string;
+  acordada: { cuando: string; donde: string | null };
+  enCurso: boolean;
+  alGuardar: (datos: { motivo: string }) => void;
+  alCancelar: () => void;
+}) {
+  const [motivo, setMotivo] = useState("");
+
+  return (
+    <div>
+      <p className="text-[12px] leading-[1.4] font-semibold text-tinta">
+        Esta visita no era de {nombre}
+      </p>
+      <p className="mt-1 text-[11px] leading-[1.45] font-medium text-[rgba(19,28,36,.55)]">
+        Se retira la visita del <strong className="font-bold">{acordada.cuando}</strong>
+        {acordada.donde ? ` · ${acordada.donde}` : ""} y la tarjeta vuelve a{" "}
+        <strong className="font-bold">CONTACTADA</strong>, lista para agendarle
+        la suya cuando la haya.
+      </p>
+      <p className="mt-[6px] text-[11px] leading-[1.45] font-medium text-[rgba(19,28,36,.55)]">
+        La llamada que recibió <strong className="font-bold">se conserva</strong>,
+        y en su expediente la visita queda tachada con lo que escribas aquí. No
+        se borra nada.
+      </p>
+
+      <label className="mt-3 block">
+        <Etiqueta>¿Qué pasó?</Etiqueta>
+        <textarea
+          value={motivo}
+          onChange={(evento) => setMotivo(evento.target.value)}
+          rows={2}
+          className="campo"
+          placeholder="Era la visita de otra persona con el mismo nombre."
+        />
+        <span className="mt-[6px] block text-[10.5px] leading-[1.35] font-semibold text-[rgba(19,28,36,.45)]">
+          Es lo que va a leer quien abra el expediente y vea que la tarjeta se
+          movió y volvió.
+        </span>
+      </label>
+
+      <div className="mt-3 flex gap-2">
+        <button
+          type="button"
+          disabled={enCurso || motivo.trim().length < 10}
+          onClick={() => alGuardar({ motivo })}
+          className="flex-1 cursor-pointer rounded-[8px] border-0 bg-azul-900 p-[10px] text-[11.5px] leading-none font-semibold text-white disabled:opacity-60"
+        >
+          {enCurso ? "Guardando…" : "Deshacer la visita"}
+        </button>
+        <button
+          type="button"
+          disabled={enCurso}
+          onClick={alCancelar}
+          className="cursor-pointer rounded-[8px] border border-[rgba(19,28,36,.18)] bg-white px-3 py-[10px] text-[11.5px] leading-none font-semibold text-tinta disabled:opacity-60"
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function FormularioDeAsistente({
   nombre,
   enCurso,

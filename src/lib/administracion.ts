@@ -348,6 +348,11 @@ export async function listarAsistentes(): Promise<FilaAsistente[]> {
       operation72: {
         select: {
           attempts: {
+            // Una visita anulada no cuenta como contacto: se retiró porque se
+            // le había apuntado a quien no era. Si contara, el indicador ámbar
+            // de «nadie le habla hace 90 días» daría por atendida a alguien a
+            // quien nadie atendió.
+            where: { annulledAt: null },
             orderBy: { occurredAt: "desc" },
             take: 1,
             select: { occurredAt: true },

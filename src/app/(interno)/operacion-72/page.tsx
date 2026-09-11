@@ -226,7 +226,14 @@ export default async function TableroOperacion72({
   // observación y no decía quién ni cuándo.
   const intentos = operaciones.length
     ? await prisma.contactAttempt.findMany({
-        where: { operation72Id: { in: operaciones.map((o) => o.id) } },
+        where: {
+          operation72Id: { in: operaciones.map((o) => o.id) },
+          // Las anuladas quedan fuera del tablero: se retiraron porque se
+          // habían hecho sobre la persona equivocada, así que no son ni la
+          // visita acordada ni el último movimiento. Siguen en el expediente,
+          // tachadas, que es donde explican lo que pasó.
+          annulledAt: null,
+        },
         orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }],
         select: {
           operation72Id: true,

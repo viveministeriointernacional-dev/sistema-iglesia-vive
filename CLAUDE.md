@@ -280,6 +280,64 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-11** — **Deshacer una visita agendada a la persona EQUIVOCADA: el
+  tercer caso, y el primero en que el tablero RETROCEDE** (pedido del usuario:
+  «se le asigna una visita por error… nos equivocamos de persona»).
+  **Por qué no servía nada de lo que había, que es lo que hay que entender
+  antes de tocar esto:** el tablero **solo avanzaba**. Las dos herramientas de
+  visita daban por hecho que la visita EXISTÍA — «se movió» (se corrió) y «la
+  fecha estaba mal escrita» (existía a otra hora). Aquí **la visita nunca
+  existió para esa persona**, y la única salida era dejarla esperando una
+  visita que nadie iba a hacer.
+  - **Botón «No era esta persona»** en la tarjeta, junto a «Cambiar la fecha»,
+    y solo si hay visita acordada. `deshacerVisitaAgendada` en
+    `operacion-72/acciones.ts`.
+  - **⚠️ EL REGISTRO SE ANULA, NO SE BORRA** (decisión del usuario). Migración
+    `20260911200000_visita_anulada`: `annulled_at`, `annulled_by_id`,
+    `annulled_reason` en `contact_attempt`. Anulado **deja de pintar en la
+    tarjeta y de ordenar la columna** —que es lo que había que arreglar— pero
+    **sigue visible, TACHADO, en el expediente**, con quién lo deshizo y por
+    qué. Borrarlo dejaría la ficha sin ninguna explicación de por qué la
+    tarjeta se movió y volvió, que es justo lo que alguien va a querer entender
+    dentro de seis meses.
+  - **⚠️ VUELVE A CONTACTADA, no a INICIADA ni a SEGUIMIENTO** (decisión del
+    usuario). La llamada a esa persona **sí ocurrió** y ya se habló con ella;
+    devolverla al principio la pondría otra vez en la fila de «hay que
+    llamarla», que es falso.
+  - **⚠️ LA LLAMADA DEL MISMO ENVÍO SE CONSERVA** (decisión del usuario).
+    Alguien marcó y alguien habló — lo que se equivocó fue **a qué ficha se le
+    apuntó la visita**. Anularla le quitaría a esa persona un contacto que de
+    verdad recibió y la dejaría pareciendo desatendida.
+  - **⚠️ LOS CINCO SITIOS QUE HAY QUE FILTRAR, y ninguno es opcional** (anular
+    sin tocarlos habría dejado la tarjeta exactamente igual):
+    1. `operacion-72/page.tsx` — la consulta de intentos (`annulledAt: null`):
+       pinta la visita acordada **y el último movimiento**.
+    2. `tablero-op72.ts` — el `LEFT JOIN LATERAL` de `ORDEN_VISITA`: sin el
+       filtro, la columna seguiría **ordenándose por una visita que ya no
+       existe**.
+    3. `correo-entrega.ts` — el mentor buscaría a alguien en una visita
+       retirada.
+    4. `administracion.ts` (asistentes) — una visita anulada **no cuenta como
+       contacto**: si contara, el indicador ámbar de «nadie le habla hace 90
+       días» daría por atendido a quien nadie atendió.
+    5. `expediente.ts` — **aquí SÍ entran**, es el único sitio donde deben
+       constar. Tono nuevo `anulado` en `HitoLineaDeTiempo` → tachado y gris.
+    `mi-proceso` **no** hizo falta tocarlo: `miHistoria` nunca incluyó los
+    contactos, así que la persona no ve esto.
+  - **`anularVisitaEnHighLevel`** limpia «Confirmación de visita» y «Fecha
+    visita» del contacto. **Sin esto el arreglo sería inútil**: el equipo de
+    consolidación trabaja **solo con el CRM** (§6), así que el CRM seguiría
+    diciendo «visita confirmada» y alguien iría a visitar a quien no era.
+  - Auditoría `operacion72.visita_anulada` (catálogo en `audit.ts` + `case` en
+    `actividad.ts`, en **rojo**: no es un ajuste de agenda, es un registro que
+    se retira). **NO entra en el contador de visitas del día**: se retiró, no
+    se hizo.
+  - Migración probada con `BEGIN … ROLLBACK` en la misma llamada, **incluida la
+    repetición entera para comprobar que es idempotente** (§5), y verificado
+    después que producción quedó en 0 columnas. La consulta de orden con el
+    filtro nuevo devuelve **28**, las mismas 28 tarjetas de VISITA PENDIENTE
+    con visita: ninguna pierde la suya.
+
 - **2026-09-11** — **El campo «Hora visita» de HighLevel quedó VIVO y probado
   con envíos reales.** El usuario lo puso en el formulario **Registro Llamada
   Línea** y llegó de inmediato: id **`YncLUTwKQ7eNkYLPhF3G`**, en `others` del
