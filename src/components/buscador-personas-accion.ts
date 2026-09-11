@@ -1,14 +1,14 @@
 "use server";
 
 import { Prisma, Role } from "@iglesia/prisma-client";
-import { obtenerUsuarioActual } from "@/lib/auth";
+import { obtenerUsuarioActual, tieneRed } from "@/lib/auth";
 import { nombreCompleto, normalizarBusqueda } from "@/lib/dominio";
 import { getPrisma } from "@/lib/prisma";
+import { ramaDeLaRed } from "@/lib/red";
 
 export type PersonaEncontrada = {
   learnerId: string;
   nombre: string;
-  /// Enmascarado: solo los últimos dígitos, para no exponer el número entero.
   telefono: string | null;
   fase: string;
   estado: string;
@@ -16,10 +16,11 @@ export type PersonaEncontrada = {
 
 /// Busca aprendices por nombre o teléfono, limitado a lo que el rol puede ver.
 ///
-/// El alcance refleja `accesoAExpediente`: admin y pastor ven a todos; el mentor
-/// solo a quien acompaña; el consolidador solo a sus asignados. Los demás roles
-/// no reciben resultados. Así el buscador nunca abre una puerta que el
-/// expediente después cerraría.
+/// El alcance refleja `accesoAExpediente`: admin y pastor ven a todos; el
+/// mentor ve **su rama en cascada** —a quien acompaña y a quien acompañan
+/// ellos—; el consolidador, sus asignados. Los demás roles no reciben
+/// resultados. Así el buscador nunca abre una puerta que el expediente después
+/// cerraría, ni esconde a alguien que la lista de «Mi red» sí muestra.
 export async function buscarPersonas(
   consulta: string,
 ): Promise<PersonaEncontrada[]> {
@@ -34,19 +35,20 @@ export async function buscarPersonas(
     usuario.role === Role.PASTOR ||
     usuario.coordinaConsolidacion;
   const acompana =
-    usuario.role === Role.MENTOR || usuario.role === Role.CONSOLIDADOR;
+    tieneRed(usuario) || usuario.role === Role.CONSOLIDADOR;
   if (!puedeVerTodo && !acompana) return [];
+
+  // La rama en cascada sale de una sola consulta recursiva; sin ella el
+  // buscador se quedaría en los discípulos directos y no encontraría a la
+  // gente que los propios discípulos ya están liderando.
+  const rama = puedeVerTodo ? null : await ramaDeLaRed(usuario.id);
 
   const alcance: Prisma.LearnerProfileWhereInput = puedeVerTodo
     ? {}
     : {
         OR: [
           { consolidatorId: usuario.id },
-          {
-            mentorRelationships: {
-              some: { endedAt: null, mentorId: usuario.id },
-            },
-          },
+          { id: { in: rama ? [...rama.keys()] : [] } },
         ],
       };
 

@@ -120,6 +120,27 @@ export function tieneRed(usuario: UsuarioSesion): boolean {
   return ROLES_CON_RED.includes(usuario.role) || usuario.canMentor;
 }
 
+/// **Quién ve la red de TODA la iglesia**, y no solo la rama que cuelga de él.
+///
+/// Regla del usuario (11-sep-2026): «una persona que es mentor o pastor, si no
+/// tiene privilegios o asignación de consolidación general o perfil de
+/// administrador, **no debería ver el total de personas que hay en el
+/// sistema**». Así que es el **perfil de administrador** o el permiso
+/// **«coordina la consolidación»** — no el rol de pastor.
+///
+/// ⚠️ **El rol PASTOR abría la vista completa y por eso el tablero decía «Toda
+/// la iglesia» con 361 personas a un pastor con 10 a cargo.** Y el daño no era
+/// solo el título: los cinco indicadores (con alertas, sin contacto, Op72
+/// vencida, para revisión) y las cuatro barras de fase salen de la MISMA
+/// función, así que le contaban el trabajo de toda la iglesia como si fuera
+/// suyo — 287 alertas que no le tocan tapan las de su propia gente.
+///
+/// Quien coordina la consolidación sí la conserva: ese permiso existe justo
+/// para mirar el trabajo de todos.
+export function veTodaLaRed(usuario: UsuarioSesion): boolean {
+  return ROLES_ADMIN.includes(usuario.role) || usuario.coordinaConsolidacion;
+}
+
 /// Quién puede buscar personas y abrir expedientes desde el buscador. Coincide
 /// con quienes `accesoAExpediente` deja ver algún expediente: los aprendices y
 /// líderes Alpha no buscan (no abren expedientes ajenos).
