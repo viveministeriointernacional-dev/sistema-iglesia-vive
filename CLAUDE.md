@@ -280,6 +280,52 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-11** — **Las 7 «visitas» del 9-sep no eran visitas: eran gente que
+  YA lleva proceso. Corregidas (6 por mí, 1 por el usuario).**
+  **Cómo se descubrió, que es la parte que vale:** buscando a quién preguntarle
+  por la hora inverosímil, se leyeron **las observaciones** de cada registro:
+  «miembro activo de Casa Vive», «ha vivido su proceso con Pas. Felipe y Aleja»,
+  «está recibiendo mentoría de parejas (Pas. Cristina)». Las siete las registró
+  **Nini Guerrón** una tras otra entre 11:01 y 11:15. **No estaba agendando
+  visitas: no tenía dónde decir eso**, así que usó «Agendar visita» y puso la
+  hora en la que estaba llenando el formulario.
+  ⚠️ **Mi hipótesis anterior —«se abrió el selector del celular y quedó en
+  ahora»— era FALSA.** La evidencia estaba en las observaciones y no las había
+  leído. **LECCIÓN: antes de teorizar sobre un dato raro, leer la observación
+  que lo acompaña.** El equipo casi siempre escribió la verdad en alguna parte.
+  **Lo aplicado a las 6** (Francisco Sandoval, Saidy Aragón, Jenny Ruiz,
+  Valentina Cubillos, Nicolás y Óscar Tabares), replicando lo que hace
+  `pasarAEntregaPorProcesoPrevio`: a **LISTA PARA ENTREGA**, `detail` y
+  `prior_process_note` con **la nota que Nini ya había escrito** (verbatim, sin
+  reescribirla), mentor propuesto, y la **visita falsa ANULADA** con
+  `annulled_reason` explicando que nunca fue una visita.
+  **⚠️ CÓMO SE VALIDÓ LA PROPUESTA DE MENTOR SIN PODER EJECUTAR EL CÓDIGO** (no
+  hay `DATABASE_URL` en el entorno, así que solo se puede SQL por el MCP): se
+  reprodujo la regla de `proponerMentor` en SQL —sin línea de origen y sin
+  género registrado en ninguna de las 6, así que cae a `elegirPorCarga`: menor
+  carga, a igual carga mayor capacidad libre, a igual todo el primero por
+  nombre— y dio **Laura Charry**. **El sistema real había propuesto
+  exactamente Laura Charry** para Mateo Tabares minutos antes, lo que confirma
+  que la réplica es fiel. **Esa es la forma de comprobar una réplica en SQL:
+  buscar un caso que el código ya resolvió y ver si coincide.**
+  **⚠️ Mateo Tabares lo movió el usuario ANTES, por el camino viejo**
+  («Cerrar visita y preparar entrega», 11-sep 3:13 p. m.), y eso **le dejó en
+  el expediente un `contact_attempt` «Visita realizada»** con nota «Ya esta se
+  encuentra en un proceso.» — **una visita que nunca se hizo**. Es justo lo que
+  el botón nuevo evita. **NO se tocó**: fue una decisión suya, consciente y de
+  hace minutos; se le preguntó si quiere limpiarlo.
+  Todo probado con `BEGIN … ROLLBACK` en la misma llamada antes de aplicar, y
+  verificado después: las 6 en LISTA PARA ENTREGA, con su nota, su mentor y su
+  visita anulada.
+
+- **2026-09-11** — **El PR #81 entró COMPLETO y las dos migraciones corrieron**
+  (`20260911200000_visita_anulada` · `20260911213000_proceso_previo`),
+  verificado en `app_migration` y en las columnas: 3 `annulled%` en
+  `contact_attempt` y `prior_process_note` en `operation72`.
+  `git log --oneline origin/main..origin/<rama>` quedó **vacío**: esta vez no se
+  quedó nada fuera. **Y la mejor prueba de que el despliegue está vivo no la
+  puse yo**: el usuario usó el tablero minutos después del merge.
+
 - **2026-09-11** — **⚠️ SEGUNDA VEZ QUE UN MERGE SE LLEVA SOLO PARTE DEL
   TRABAJO. Regla nueva para que no haya una tercera.**
   El **PR #80 se fusionó a los DOS MINUTOS de abrirlo** (abierto 19:20:34,
