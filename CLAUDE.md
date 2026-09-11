@@ -280,6 +280,30 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-11** — **⚠️ SEGUNDA VEZ QUE UN MERGE SE LLEVA SOLO PARTE DEL
+  TRABAJO. Regla nueva para que no haya una tercera.**
+  El **PR #80 se fusionó a los DOS MINUTOS de abrirlo** (abierto 19:20:34,
+  fusionado 19:22:23), cuando la rama solo tenía sus **dos primeros commits**.
+  Los **tres siguientes quedaron huérfanos** y **sus dos migraciones nunca
+  corrieron**: se comprobó en la base —0 columnas `annulled%`, 0
+  `prior_process_note`, 0 migraciones `202609112%` registradas— mientras `main`
+  sí tenía el arreglo de las cinco horas. Pasó igual con el PR #77 el mismo día.
+  **REGLA: NO abrir el PR hasta que TODO el trabajo esté empujado.** El usuario
+  fusiona en minutos, no en horas, así que un PR abierto es un PR que ya se
+  está fusionando. Si hace falta seguir trabajando después de abrirlo, avisarle
+  explícitamente de que no lo fusione todavía.
+  **Y la comprobación que lo destapa en un segundo**, que hay que hacer
+  siempre después de un merge:
+  `git log --oneline origin/main..origin/<rama>` — si devuelve algo, **eso se
+  quedó fuera**. Mirar el `commits` y el `head.sha` del PR también lo dice.
+  Arreglado con §5: rama rehecha desde `main`, los tres commits por encima
+  (`cherry-pick`), **cero duplicados verificados función por función** (la
+  lección del 6-sep), build y pruebas en verde, PR #81 nuevo.
+  ⚠️ **Ojo con la trampa de creer que ya está**: `main` contenía los commits del
+  PR y el sitio estaba desplegado, así que «el merge entró» era cierto **y aun
+  así faltaba la mitad del trabajo**. Que `main` avance no significa que
+  avanzara con todo.
+
 - **2026-09-11** — **Atajo para quien YA lleva proceso en la iglesia: pasa
   directo a LISTA PARA ENTREGA** (pedido del usuario: «hay personas que ya
   hacen parte de la iglesia, ya llevan un proceso, pero están en alguna fase de
