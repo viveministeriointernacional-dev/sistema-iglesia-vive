@@ -368,6 +368,107 @@ export async function cerrarVisita(
   return { ok: true };
 }
 
+/// Atajo para quien YA lleva proceso en la iglesia: pasa directo a LISTA PARA
+/// ENTREGA, pendiente de que le asignen mentor.
+///
+/// **El problema que resuelve.** El tablero da por hecho que la persona es
+/// nueva: hay que llamarla, acordar una visita y hacerla. Pero entra gente que
+/// **ya se congrega y ya lleva un proceso** —hizo Alpha, está en una Casa de
+/// Fe, se bautizó— y con ella esos tres pasos no tienen sentido: no hay nada
+/// que averiguar por teléfono ni ninguna casa que visitar. Lo único que le
+/// falta es **un mentor que la acompañe**. Sin este atajo había que fingir una
+/// llamada y una visita que nunca ocurrieron para poder entregarla.
+///
+/// **Sirve desde CUALQUIER columna del tablero** (iniciada, seguimiento,
+/// contactada o visita pendiente): que la persona ya esté en la iglesia no
+/// depende de en qué casilla haya caído su tarjeta.
+///
+/// **⚠️ NO se inventa ninguna visita.** `cerrarVisita` deja un
+/// `contact_attempt` de tipo VISITA con «Visita realizada», porque ahí sí se
+/// hizo. Aquí no se hizo nada, así que **no se crea ningún intento**: lo que
+/// pasó queda en `detail` (que es lo que lee el correo al mentor) y en la
+/// auditoría. Escribir «visita realizada» aquí sería meter en el expediente
+/// una visita que nadie hizo — el mismo error que evitan las otras acciones.
+///
+/// **Sí propone mentor**, igual que `cerrarVisita`, para que la tarjeta llegue
+/// a la última columna con su candidato y solo haya que confirmarlo.
+export async function pasarAEntregaPorProcesoPrevio(
+  operacionId: string,
+  datos: { nota: string },
+): Promise<ResultadoAccion> {
+  let usuario: UsuarioSesion;
+  try {
+    usuario = await requerirRolEnAccion(ROLES_CONSOLIDACION);
+  } catch (error) {
+    if (error instanceof ErrorDePermiso) return { ok: false, mensaje: error.message };
+    throw error;
+  }
+
+  const operacion = await cargarOperacion(operacionId, usuario);
+  if (!operacion) return { ok: false, mensaje: "Esta persona no está en tu lista." };
+  if (operacion.status === Operation72Status.LISTA_PARA_ENTREGA) {
+    return { ok: false, mensaje: "Ya está lista para entrega: solo falta asignarle mentor." };
+  }
+  // Las cuatro columnas desde las que aplica, escritas una por una a
+  // propósito: una tarjeta ENTREGADA o CERRADA ya salió del tablero.
+  const enElTablero: Operation72Status[] = [
+    Operation72Status.INICIADA,
+    Operation72Status.SEGUIMIENTO,
+    Operation72Status.CONTACTADA,
+    Operation72Status.VISITA_PENDIENTE,
+  ];
+  if (!enElTablero.includes(operacion.status)) {
+    return { ok: false, mensaje: "Alguien más ya movió esta tarjeta. Actualiza el tablero." };
+  }
+
+  // Es lo que va a leer el mentor en el correo de entrega, y lo único que le
+  // explica por qué esta persona llegó sin llamada ni visita.
+  const nota = datos.nota.trim();
+  if (nota.length < 10) {
+    return {
+      ok: false,
+      mensaje: "Cuenta qué proceso lleva ya: es lo que va a leer el mentor que la reciba.",
+    };
+  }
+
+  const prisma = await getPrisma();
+  const estadoAnterior = operacion.status;
+
+  await prisma.$transaction(async (tx) => {
+    const propuesta = await proponerMentor(tx, operacion.learnerId);
+
+    await tx.operation72.update({
+      where: { id: operacion.id },
+      data: {
+        status: Operation72Status.LISTA_PARA_ENTREGA,
+        detail: `Ya lleva proceso en la iglesia · ${nota}`,
+        // Además de `detail`, en su propia columna: `detail` lo reescribe la
+        // siguiente acción, y esto tiene que llegarle al mentor.
+        priorProcessNote: nota,
+        ...(propuesta
+          ? {
+              proposedMentorId: propuesta.mentorId,
+              proposedMentorNote: propuesta.detalle,
+              lineKnown: propuesta.conservaLinea,
+            }
+          : {}),
+      },
+    });
+
+    await auditar(tx, {
+      actorId: usuario.id,
+      action: "operacion72.pasa_a_entrega_por_proceso_previo",
+      entityType: "operation72",
+      entityId: operacion.id,
+      metadata: { nota, desde: estadoAnterior },
+    });
+  });
+
+  revalidatePath("/operacion-72");
+  revalidatePath(`/expediente/${operacion.learnerId}`);
+  return { ok: true };
+}
+
 /// Entrega a mentor: cierra Operación 72 y abre la relación de discipulado.
 ///
 /// La relación queda con fecha de inicio y responsable que la autorizó; el

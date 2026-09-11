@@ -396,6 +396,22 @@ export async function cargarActividad(
         if (legible) filas.push({ k: "Es", v: legible });
         break;
       }
+      case "operacion72.pasa_a_entrega_por_proceso_previo": {
+        tipo = "op72"; etiqueta = "OP 72"; tono = "verde";
+        frase = [
+          A(),
+          t(" pasó a "),
+          P(),
+          t(" a entrega · ya lleva proceso en la iglesia"),
+        ];
+        tituloDetalle = "Ya está en la iglesia · pendiente de mentor";
+        const nota = texto(m.nota);
+        if (nota) filas.push({ k: "Qué proceso lleva", v: nota });
+        const desde = texto(m.desde);
+        if (desde) filas.push({ k: "Venía de", v: desde.replace(/_/g, " ") });
+        filas.push({ k: "Queda en", v: "LISTA PARA ENTREGA" });
+        break;
+      }
       case "operacion72.visita_anulada": {
         // Rojo, no azul: no es un ajuste de agenda, es un registro que se
         // retira porque se le hizo a la persona equivocada. Quien revisa el

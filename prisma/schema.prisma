@@ -410,6 +410,11 @@ model Operation72 {
   lineKnown          Boolean           @default(false) @map("line_known")
   proposedMentorId   String?           @map("proposed_mentor_id")
   proposedMentorNote String?           @map("proposed_mentor_note")
+  /// Qué proceso lleva ya en la iglesia quien pasó directo a entrega sin
+  /// llamada ni visita. **No vive en `detail`** a propósito: `detail` es un
+  /// resumen libre que cada acción reescribe, y esto tiene que sobrevivir para
+  /// que el mentor sepa por qué le llega así.
+  priorProcessNote   String?           @map("prior_process_note")
   createdAt          DateTime          @default(now()) @map("created_at")
   updatedAt          DateTime          @updatedAt @map("updated_at")
 

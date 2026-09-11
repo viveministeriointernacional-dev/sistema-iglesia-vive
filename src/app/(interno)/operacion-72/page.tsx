@@ -149,6 +149,7 @@ export default async function TableroOperacion72({
     lineKnown: true,
     proposedMentorId: true,
     proposedMentorNote: true,
+    priorProcessNote: true,
     proposedMentor: {
       select: { fullName: true, team: { select: { name: true } } },
     },
@@ -430,6 +431,10 @@ export default async function TableroOperacion72({
               ]
                 .filter(Boolean)
                 .join(" · "),
+              // Por qué esta tarjeta llegó a la última columna sin llamada ni
+              // visita. Sin esto quedaría en «Lista para entrega» sin ninguna
+              // explicación: la tarjeta no pinta `detail`.
+              procesoPrevio: operacion.priorProcessNote?.trim() || null,
             }
           : null,
     };

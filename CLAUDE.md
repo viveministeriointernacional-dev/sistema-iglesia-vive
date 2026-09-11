@@ -280,6 +280,60 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-11** — **Atajo para quien YA lleva proceso en la iglesia: pasa
+  directo a LISTA PARA ENTREGA** (pedido del usuario: «hay personas que ya
+  hacen parte de la iglesia, ya llevan un proceso, pero están en alguna fase de
+  Operación 72… pendiente por asignar mentor»).
+  **El problema, que es el de fondo del tablero:** Operación 72 da por hecho
+  que la persona es **nueva** —llamarla, acordar visita, hacerla—. Pero entra
+  gente que **ya se congrega y ya lleva proceso** (hizo Alpha, está en una Casa
+  de Fe, se bautizó), y con ella esos tres pasos no tienen sentido: no hay nada
+  que averiguar por teléfono ni ninguna casa que visitar. Lo único que le falta
+  es **mentor**. Sin el atajo había que **fingir una llamada y una visita que
+  nunca ocurrieron** para poder entregarla.
+  - **Enlace «Ya lleva proceso · pasar a entrega»** en el pie de la tarjeta,
+    **desde las CUATRO columnas** (iniciada, seguimiento, contactada, visita
+    pendiente): que alguien ya esté en la iglesia no depende de en qué casilla
+    cayó su tarjeta. `pasarAEntregaPorProcesoPrevio` en
+    `operacion-72/acciones.ts`. Las cuatro se escriben una por una en la acción
+    (no `ESTADOS_EN_TABLERO`, que incluye la quinta).
+  - **⚠️ NO se inventa ninguna visita.** `cerrarVisita` deja un
+    `contact_attempt` VISITA con «Visita realizada» porque ahí sí se hizo; aquí
+    **no se crea ningún intento**. Escribir «visita realizada» metería en el
+    expediente una visita que nadie hizo — el mismo error que evitan las otras
+    acciones del día.
+  - **Sí propone mentor** (`proponerMentor`, igual que `cerrarVisita`), así que
+    la tarjeta llega a la última columna con su candidato y solo hay que
+    confirmarlo. Queda **pendiente de mentor, NO entregada**.
+  - **⚠️ COLUMNA NUEVA `prior_process_note`** (migración
+    `20260911213000_proceso_previo`) **y no `detail`**, que fue el hallazgo
+    importante: `detail` es un resumen libre que **la siguiente acción
+    reescribe**, así que la nota se habría perdido justo antes de que el mentor
+    la necesitara.
+  - **⚠️ LO QUE CASI QUEDÓ MAL, y hay que recordarlo: el correo al mentor NO
+    lee `operation72.detail`.** Yo había escrito en el panel «es lo que va a
+    leer el mentor» y **era falso** — se comprobó con `grep detail` sobre
+    `correo-entrega.ts` y `correo.ts`: **cero coincidencias**. Arreglado de
+    verdad: la nota entra en el bloque **«quién es»** del correo como «Ya lleva
+    proceso». Va ahí y **no en el historial** porque no es algo que pasó en una
+    fecha, es quién es la persona — y sin ella el mentor recibiría **un
+    historial casi vacío** (solo el registro) sin saber por qué.
+  - **La tarjeta también lo dice.** Ojo: desde el 3-sep **la tarjeta no pinta
+    `detail`**, así que sin esto la persona aparecería en «Lista para entrega»
+    **sin ninguna explicación**. Se añadió al bloque verde de entrega: «Ya
+    lleva proceso · …».
+  - Auditoría `operacion72.pasa_a_entrega_por_proceso_previo` (catálogo en
+    `audit.ts` + `case` en `actividad.ts`, en verde, con `desde` = la columna de
+    la que venía).
+  - **La nota es obligatoria** (mín. 10 caracteres), como en los demás paneles:
+    es lo único que le explica al mentor por qué le llega alguien sin llamada
+    ni visita.
+  - Migración probada con `BEGIN … ROLLBACK` en la misma llamada, repetida
+    entera para comprobar que es idempotente, y verificado después que
+    producción quedó en 0 columnas.
+  - **Dato de contexto medido de paso: hay 47 personas en LISTA PARA ENTREGA**,
+    todas con mentor propuesto, esperando que alguien confirme la entrega.
+
 - **2026-09-11** — **Deshacer una visita agendada a la persona EQUIVOCADA: el
   tercer caso, y el primero en que el tablero RETROCEDE** (pedido del usuario:
   «se le asigna una visita por error… nos equivocamos de persona»).

@@ -61,6 +61,7 @@ export async function enviarCorreoDeEntrega(
           select: {
             startedAt: true,
             deliveredAt: true,
+            priorProcessNote: true,
             attempts: {
               // Sin las anuladas: el correo le cuenta al mentor lo que pasó de
               // verdad con esta persona, y una visita retirada por haberse
@@ -131,6 +132,11 @@ export async function enviarCorreoDeEntrega(
         : null,
     },
     { rotulo: "Iglesia", valor: iglesia },
+    // Va aquí, y no en el historial, porque no es algo que haya pasado en una
+    // fecha: es quién es esta persona. Y es lo que explica por qué llega sin
+    // llamada ni visita — sin esto, el mentor recibiría un historial casi
+    // vacío y no sabría por qué.
+    { rotulo: "Ya lleva proceso", valor: op?.priorProcessNote?.trim() ?? "" },
   ].filter((fila): fila is { rotulo: string; valor: string } => Boolean(fila.valor));
 
   // El historial de Operación 72, del registro a la entrega, tal cual quedó.

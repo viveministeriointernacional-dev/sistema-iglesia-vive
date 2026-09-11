@@ -17,6 +17,7 @@ import {
   marcarAsistenteDesdeTablero,
   registrarLlamada,
   deshacerVisitaAgendada,
+  pasarAEntregaPorProcesoPrevio,
   reprogramarVisita,
   retirarSolicitudDesdeTablero,
 } from "./acciones";
@@ -87,6 +88,9 @@ export type TarjetaPersona = {
     titulo: string;
     mentor: string;
     detalle: string;
+    /// Por qué llegó aquí sin llamada ni visita: ya lleva proceso en la
+    /// iglesia. Nulo en las que recorrieron el tablero normalmente.
+    procesoPrevio: string | null;
   } | null;
 };
 
@@ -108,7 +112,14 @@ const ESTILO_BARRA: Record<TarjetaPersona["urgencia"], string> = {
   normal: "bg-verde-500",
 };
 
-type Panel = "accion" | "baja" | "asistente" | "reprogramar" | "deshacer" | null;
+type Panel =
+  | "accion"
+  | "baja"
+  | "asistente"
+  | "reprogramar"
+  | "deshacer"
+  | "yaEnIglesia"
+  | null;
 
 export function TarjetaDePersona({
   persona,
@@ -367,6 +378,17 @@ export function TarjetaDePersona({
             alCancelar={() => setPanel(null)}
           />
         </div>
+      ) : panel === "yaEnIglesia" ? (
+        <div className="mt-3 rounded-[10px] bg-papel p-3">
+          <FormularioDeProcesoPrevio
+            nombre={persona.nombre}
+            enCurso={enCurso}
+            alGuardar={(datos) =>
+              ejecutar(() => pasarAEntregaPorProcesoPrevio(persona.operacionId, datos))
+            }
+            alCancelar={() => setPanel(null)}
+          />
+        </div>
       ) : panel === "asistente" ? (
         <div className="mt-3 rounded-[10px] bg-papel p-3">
           <FormularioDeAsistente
@@ -436,7 +458,17 @@ export function TarjetaDePersona({
               </button>
             </div>
           ) : null}
-          <div className="mt-[9px] border-t border-[rgba(19,28,36,.09)] pt-[9px] text-center">
+          <div className="mt-[9px] flex flex-col items-center gap-[7px] border-t border-[rgba(19,28,36,.09)] pt-[9px] text-center">
+            {persona.estado !== Operation72Status.LISTA_PARA_ENTREGA ? (
+              <button
+                type="button"
+                onClick={() => setPanel("yaEnIglesia")}
+                disabled={enCurso}
+                className="cursor-pointer border-0 bg-transparent p-0 text-[11px] leading-none font-bold text-azul-700 disabled:opacity-60"
+              >
+                Ya lleva proceso · pasar a entrega
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => setPanel("asistente")}
@@ -469,6 +501,12 @@ export function TarjetaDePersona({
           <p className="mt-1 text-[11.5px] leading-[1.35] font-medium text-[rgba(19,28,36,.5)]">
             {persona.entrega.detalle}
           </p>
+          {persona.entrega.procesoPrevio ? (
+            <p className="mt-2 border-t border-[rgba(110,154,85,.35)] pt-2 text-[11.5px] leading-[1.4] font-medium text-[rgba(19,28,36,.6)]">
+              <span className="font-bold text-verde-700">Ya lleva proceso · </span>
+              {persona.entrega.procesoPrevio}
+            </p>
+          ) : null}
         </div>
       ) : null}
     </article>
@@ -653,6 +691,78 @@ function FormularioDeVisitaPorError({
           className="flex-1 cursor-pointer rounded-[8px] border-0 bg-azul-900 p-[10px] text-[11.5px] leading-none font-semibold text-white disabled:opacity-60"
         >
           {enCurso ? "Guardando…" : "Deshacer la visita"}
+        </button>
+        <button
+          type="button"
+          disabled={enCurso}
+          onClick={alCancelar}
+          className="cursor-pointer rounded-[8px] border border-[rgba(19,28,36,.18)] bg-white px-3 py-[10px] text-[11.5px] leading-none font-semibold text-tinta disabled:opacity-60"
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/// «Ya lleva proceso en la iglesia»: pasa directo a la última columna.
+///
+/// Dice con letra clara **qué se salta y qué no**, porque es el único atajo del
+/// tablero que brinca tres pasos: quien lo usa tiene que ver que no se está
+/// inventando ninguna visita y que la persona no queda entregada todavía —
+/// queda esperando mentor.
+function FormularioDeProcesoPrevio({
+  nombre,
+  enCurso,
+  alGuardar,
+  alCancelar,
+}: {
+  nombre: string;
+  enCurso: boolean;
+  alGuardar: (datos: { nota: string }) => void;
+  alCancelar: () => void;
+}) {
+  const [nota, setNota] = useState("");
+
+  return (
+    <div>
+      <p className="text-[12px] leading-[1.4] font-semibold text-tinta">
+        {nombre} ya lleva proceso en la iglesia
+      </p>
+      <p className="mt-1 text-[11px] leading-[1.45] font-medium text-[rgba(19,28,36,.55)]">
+        Pasa directo a <strong className="font-bold">LISTA PARA ENTREGA</strong>,
+        pendiente de que le asignen mentor. Se salta la llamada y la visita
+        porque con ella no aplican: ya se congrega.
+      </p>
+      <p className="mt-[6px] text-[11px] leading-[1.45] font-medium text-[rgba(19,28,36,.55)]">
+        <strong className="font-bold">No se registra ninguna visita</strong> que
+        no se haya hecho, y <strong className="font-bold">todavía no queda
+        entregada</strong>: el sistema propone un mentor y alguien lo confirma.
+      </p>
+
+      <label className="mt-3 block">
+        <Etiqueta>¿Qué proceso lleva ya?</Etiqueta>
+        <textarea
+          value={nota}
+          onChange={(evento) => setNota(evento.target.value)}
+          rows={3}
+          className="campo"
+          placeholder="Se congrega desde hace dos años, hizo Alpha y está en la Casa de Fe de Jairo."
+        />
+        <span className="mt-[6px] block text-[10.5px] leading-[1.35] font-semibold text-[rgba(19,28,36,.45)]">
+          Es lo que va a leer el mentor que la reciba, y lo único que le explica
+          por qué llega sin llamada ni visita.
+        </span>
+      </label>
+
+      <div className="mt-3 flex gap-2">
+        <button
+          type="button"
+          disabled={enCurso || nota.trim().length < 10}
+          onClick={() => alGuardar({ nota })}
+          className="flex-1 cursor-pointer rounded-[8px] border-0 bg-azul-900 p-[10px] text-[11.5px] leading-none font-semibold text-white disabled:opacity-60"
+        >
+          {enCurso ? "Guardando…" : "Pasar a entrega"}
         </button>
         <button
           type="button"
