@@ -258,12 +258,30 @@ const FORMATO_HORA = new Intl.DateTimeFormat("es-CO", {
   hour12: true,
   timeZone: ZONA_HORARIA,
 });
+const FORMATO_HORA_24 = new Intl.DateTimeFormat("en-GB", {
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+  timeZone: ZONA_HORARIA,
+});
 const FORMATO_DIA_CLAVE = new Intl.DateTimeFormat("en-CA", {
   year: "numeric",
   month: "2-digit",
   day: "2-digit",
   timeZone: ZONA_HORARIA,
 });
+
+/// Un momento en el formato que pide un `<input type="datetime-local">`:
+/// `AAAA-MM-DDTHH:mm`, **en hora de Colombia**.
+///
+/// El navegador interpreta ese valor en la zona de quien mira, así que hay que
+/// entregarlo ya convertido: si se mandara la hora UTC, una visita de las 4 de
+/// la tarde aparecería en el campo a las 9 de la noche.
+export function momentoParaCampo(fecha: Date): string {
+  const dia = FORMATO_DIA_CLAVE.format(fecha);
+  const hora = FORMATO_HORA_24.format(fecha);
+  return `${dia}T${hora}`;
+}
 
 /// Un momento como se dice en voz alta: «hoy, 9:14 a. m.», «ayer, 4:32 p. m.»,
 /// «1 sep, 7:40 p. m.». Siempre en hora de Colombia.

@@ -574,6 +574,131 @@ export async function darDeBajaDesdeTablero(
   return { ok: true };
 }
 
+/// Mueve una visita ya acordada a otra fecha y hora.
+///
+/// **Lo que se pactó no se borra: se apila.** Cada reprogramación crea su
+/// propio intento, así que en el expediente queda «se acordó para el 12, no se
+/// pudo, se movió al 15». Si se sobrescribiera la visita anterior, nadie podría
+/// ver después cuántas veces se corrió una visita — que es justo la señal de
+/// que algo no está funcionando con esa persona.
+///
+/// La tarjeta se queda en VISITA PENDIENTE: no es un paso adelante ni atrás.
+export async function reprogramarVisita(
+  operacionId: string,
+  datos: {
+    cuando: string;
+    lugar: string;
+    virtual: boolean;
+    nota: string;
+    /// `movida` = la visita estaba pactada y se corrió · `correccion` = la
+    /// fecha estaba mal escrita y nunca hubo visita a esa hora.
+    motivo: "movida" | "correccion";
+  },
+): Promise<ResultadoAccion> {
+  let usuario: UsuarioSesion;
+  try {
+    usuario = await requerirRolEnAccion(ROLES_CONSOLIDACION);
+  } catch (error) {
+    if (error instanceof ErrorDePermiso) return { ok: false, mensaje: error.message };
+    throw error;
+  }
+
+  const operacion = await cargarOperacion(operacionId, usuario);
+  if (!operacion) return { ok: false, mensaje: "Esta persona no está en tu lista." };
+  if (operacion.status !== Operation72Status.VISITA_PENDIENTE) {
+    return { ok: false, mensaje: "Alguien más ya movió esta tarjeta. Actualiza el tablero." };
+  }
+  if (Number.isNaN(Date.parse(datos.cuando))) {
+    return { ok: false, mensaje: "La fecha y hora de la visita no son válidas." };
+  }
+  if (!datos.virtual && !datos.lugar.trim()) {
+    return { ok: false, mensaje: "Escribe el lugar, o marca que la visita es virtual." };
+  }
+
+  const cuando = new Date(datos.cuando);
+  const lugar = datos.virtual ? null : datos.lugar.trim();
+  const nota = datos.nota.trim() || null;
+  const prisma = await getPrisma();
+
+  // La visita que estaba acordada: de dónde se movió, o qué quedó mal escrito.
+  const anterior = await prisma.contactAttempt.findFirst({
+    where: {
+      operation72Id: operacion.id,
+      type: ContactType.VISITA,
+      scheduledAt: { not: null },
+    },
+    orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }],
+    select: { id: true, scheduledAt: true },
+  });
+  const corregir = datos.motivo === "correccion";
+
+  await prisma.$transaction(async (tx) => {
+    if (corregir && anterior) {
+      // Un error de digitación se ARREGLA, no se apila: nunca hubo una visita
+      // a esa hora, así que dejar un «se reprogramó» inventaría un movimiento
+      // que no pasó. La corrección queda en la auditoría, que es su sitio.
+      await tx.contactAttempt.update({
+        where: { id: anterior.id },
+        data: {
+          scheduledAt: cuando,
+          place: lugar,
+          isVirtual: datos.virtual,
+          ...(nota ? { note: nota } : {}),
+        },
+      });
+    } else {
+      await tx.contactAttempt.create({
+        data: {
+          operation72Id: operacion.id,
+          type: ContactType.VISITA,
+          result: anterior?.scheduledAt
+            ? `Visita reprogramada · antes era el ${FORMATO_VISITA.format(anterior.scheduledAt)}`
+            : "Visita reprogramada",
+          note: nota,
+          scheduledAt: cuando,
+          place: lugar,
+          isVirtual: datos.virtual,
+          byUserId: usuario.id,
+        },
+      });
+    }
+
+    await tx.operation72.update({
+      where: { id: operacion.id },
+      data: {
+        detail: [
+          `Visita ${FORMATO_VISITA.format(cuando)}`,
+          datos.virtual ? "virtual" : lugar,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      },
+    });
+
+    await auditar(tx, {
+      actorId: usuario.id,
+      action: corregir
+        ? "operacion72.visita_corregida"
+        : "operacion72.visita_reprogramada",
+      entityType: "operation72",
+      entityId: operacion.id,
+      metadata: {
+        cuando: cuando.toISOString(),
+        antes: anterior?.scheduledAt?.toISOString() ?? null,
+        virtual: datos.virtual,
+        lugar,
+      },
+    });
+  });
+
+  // Reflejo hacia HighLevel (best-effort, fuera de la transacción).
+  await exportarVisita(operacion.learnerId, { cuando, virtual: datos.virtual });
+
+  revalidatePath("/operacion-72");
+  revalidatePath(`/expediente/${operacion.learnerId}`);
+  return { ok: true };
+}
+
 /// Marca a la persona como asistente de la iglesia desde el tablero.
 ///
 /// **No pide autorización, a diferencia de la baja**, y la razón es la que

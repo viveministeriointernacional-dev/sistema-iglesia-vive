@@ -280,6 +280,95 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-11** — **⚠️ EL DESPLIEGUE SÍ ESTABA ENTRANDO, y mi prueba para
+  detectarlo daba FALSO NEGATIVO.** Lo destapó un pantallazo del usuario: en el
+  tablero vivo se ven **«Asiste, no quiere proceso»** (PR #76) y la columna
+  **ordenada por fecha de visita** (PR #77). O sea que los despliegues llegaron.
+  **La prueba del 8-sep —«el sitio pide `35yis8a6jlmce.js`, luego corre la
+  versión vieja»— NO SIRVE**: ese paquete se sigue sirviendo en versiones
+  nuevas, así que da falso negativo. **No volver a usarla como única evidencia.**
+  Lo que sí sirve: **mirar en pantalla una función que solo exista en el PR
+  fusionado**, o comprobar un dato que solo el código nuevo produce.
+
+- **2026-09-11** — **Cambiar la fecha u hora de una visita: DOS razones, y cada
+  una guarda distinto** (el usuario lo precisó: «en su momento se digitó mal o
+  se reprogramó»).
+  **La distinción no es cosmética, decide qué queda en el expediente:**
+  - **«Se movió la visita»** → sí hubo una visita pactada para ese día y se
+    corrió. **Se apila un registro nuevo** («antes era el X») y el historial
+    muestra el movimiento. **Cuántas veces se corrió una visita es la señal de
+    que algo no va bien con esa persona**, y por eso no se puede perder.
+  - **«La fecha estaba mal escrita»** → **NUNCA hubo** visita a esa hora.
+    **Se corrige el registro en su sitio**, sin apilar nada: dejar un «se
+    reprogramó» ahí **inventaría un movimiento que no ocurrió**. El cambio queda
+    en la auditoría (`operacion72.visita_corregida`), que es su lugar.
+  - Botón **«Cambiar la fecha de la visita»** en la tarjeta, solo si hay visita
+    acordada. Abre `FormularioDeVisita` **ya lleno con lo pactado** y el texto
+    del botón cambia según la razón elegida.
+  - **`momentoParaCampo(fecha)` en `dominio.ts`**: `AAAA-MM-DDTHH:mm` **en hora
+    de Colombia**, que es lo que pide `<input type="datetime-local">`. **Fácil
+    de equivocar**: el navegador lo interpreta en la zona de quien mira, así que
+    mandar la hora UTC pondría una visita de las 4 de la tarde a las 9 de la
+    noche. **Probado con el borde**: 02:00 UTC del día 16 → `2026-09-15T21:00`.
+  - La tarjeta **se queda en VISITA PENDIENTE**: cambiar una cita no es avanzar
+    ni retroceder.
+  - **⚠️ Lección de git:** este trabajo **se quedó fuera del PR #77**. El usuario
+    lo fusionó cuando la rama solo tenía el primer commit, y el de reprogramar
+    se subió después, quedando huérfano en la rama. Se rehízo desde `main`
+    (§5) y se comprobó que no quedó nada duplicado. **Tras un merge, verificar
+    qué commits quedaron fuera antes de seguir empujando a la misma rama.**
+
+- **2026-09-11** — **Las 9 visitas que quedaron a mediodía, corregidas a mano**
+  (autorizado por el usuario tras revisar la lista).
+  El equipo **ya escribía la hora**, pero dentro del texto de la observación,
+  porque el formulario del CRM no tenía dónde ponerla. De **30 visitas del CRM,
+  26 quedaron a las 12:00** y **13 traían la hora escrita**.
+  Corregidas: Yesid González 8:00 a. m. · Ana López 4:30 p. m. · Amanda Suárez
+  8:30 p. m. · Sergio Bermúdez 10:00 a. m. · Laura Camila Méndez 10:00 a. m. ·
+  Rubianid Moreno 3:30 p. m. · Sofía Muñoz 6:00 p. m. · Evelyn Rojas 3:00 p. m.
+  · Dayver Tafur 1:00 p. m.
+  - **⚠️ POR QUÉ ESTO NO SE PUEDE AUTOMATIZAR:** la hora en prosa trae **rangos**
+    («de 3 a 4 p.m», «en el transcurso de 1 a 3 p.m») y un buscador se queda con
+    **la hora del final**. En 2 de 9 habría puesto la hora equivocada. Se tomó
+    **la de inicio**, decidido a mano.
+  - **⚠️ NO BASTA CON CAMBIAR `contact_attempt.scheduled_at`:** la tarjeta pinta
+    un resumen guardado aparte en **`operation72.detail`**. Si solo se cambia la
+    fecha, **la tarjeta sigue diciendo mediodía** aunque el dato ya esté bien.
+    Hay que actualizar los dos.
+  - **NO se tocaron las observaciones** (son la evidencia de que la corrección
+    es fiel) ni **las 6 visitas a mediodía sin hora escrita** — varias dicen
+    literalmente «está por confirmar la hora», así que ahí el mediodía significa
+    «falta confirmar» y es honesto.
+  - Probado con `BEGIN … ROLLBACK` antes de aplicar, y verificado después.
+
+- **2026-09-10** — **Reprogramar una visita que no se pudo cumplir** (pedido del
+  usuario, el mismo día que lo de la hora). **Refinado el 11-sep: ver arriba.**
+  - **Botón «No se pudo · mover la visita»** en la tarjeta, y **solo aparece si
+    hay visita acordada**. Abre **el mismo `FormularioDeVisita`** de siempre,
+    ya lleno con lo pactado (fecha, hora, lugar, virtual): mover una visita casi
+    siempre es correr la hora, no rehacerla desde cero.
+  - **⚠️ LO PACTADO NO SE PISA: SE APILA.** Cada reprogramación crea **su propio
+    `contact_attempt`**, con `result` = «Visita reprogramada · antes era el X».
+    Si se sobrescribiera la visita anterior, nadie podría ver después **cuántas
+    veces se corrió** una visita — y eso es justo la señal de que algo no está
+    funcionando con esa persona. La tarjeta y el orden de la columna toman
+    siempre **la más reciente**, así que la vista no se ensucia.
+  - **La tarjeta se queda en VISITA PENDIENTE**: mover una cita no es avanzar ni
+    retroceder. `reprogramarVisita` exige ese estado y refleja a HighLevel igual
+    que `agendarVisita`.
+  - Auditoría `operacion72.visita_reprogramada` con `antes` y `cuando`, y su
+    `case` en `actividad.ts` («movió la visita de X · ahora …», con las dos
+    fechas en el detalle). También entra en el contador de **visitas** del día.
+  - **`momentoParaCampo(fecha)` en `dominio.ts`**: da `AAAA-MM-DDTHH:mm` **en
+    hora de Colombia**, que es lo que pide un `<input type="datetime-local">`.
+    **Ojo, esto es fácil de equivocar**: el navegador interpreta ese valor en la
+    zona de quien mira, así que hay que entregarlo ya convertido — mandar la
+    hora UTC pondría una visita de las 4 de la tarde a las 9 de la noche.
+    **Probado con el caso de borde**: 02:00 UTC del día 16 → `2026-09-15T21:00`,
+    o sea el día anterior, que es lo correcto en Colombia.
+  - El formulario quedó reutilizable con `texto`, `inicial` y `notaPlaceholder`
+    opcionales; agendar por primera vez no cambió en nada.
+
 - **2026-09-10** — **Hora de la visita, y «Visita pendiente» ordenada por fecha
   de visita** (pedido del usuario).
   **Ojo con el diagnóstico, que es lo que ahorra tiempo la próxima:** el

@@ -15,6 +15,7 @@ import {
   entregarAMentor,
   marcarAsistenteDesdeTablero,
   registrarLlamada,
+  reprogramarVisita,
   retirarSolicitudDesdeTablero,
 } from "./acciones";
 
@@ -68,6 +69,11 @@ export type TarjetaPersona = {
     quien: string | null;
     desdeCrm: boolean;
     nota: string | null;
+    /// Lo pactado, tal como lo pide el campo del formulario, para poder
+    /// reprogramar sin volver a escribirlo todo.
+    valorFecha: string | null;
+    lugar: string | null;
+    virtual: boolean;
   } | null;
   chip: string;
   urgencia: "vencida" | "urgente" | "normal";
@@ -100,7 +106,7 @@ const ESTILO_BARRA: Record<TarjetaPersona["urgencia"], string> = {
   normal: "bg-verde-500",
 };
 
-type Panel = "accion" | "baja" | "asistente" | null;
+type Panel = "accion" | "baja" | "asistente" | "reprogramar" | null;
 
 export function TarjetaDePersona({
   persona,
@@ -320,6 +326,18 @@ export function TarjetaDePersona({
             />
           )}
         </div>
+      ) : panel === "reprogramar" && persona.visitaAcordada ? (
+        <div className="mt-3 rounded-[10px] bg-papel p-3">
+          <FormularioDeCambioDeVisita
+            nombre={persona.nombre}
+            acordada={persona.visitaAcordada}
+            enCurso={enCurso}
+            alGuardar={(datos) =>
+              ejecutar(() => reprogramarVisita(persona.operacionId, datos))
+            }
+            alCancelar={() => setPanel(null)}
+          />
+        </div>
       ) : panel === "asistente" ? (
         <div className="mt-3 rounded-[10px] bg-papel p-3">
           <FormularioDeAsistente
@@ -369,6 +387,18 @@ export function TarjetaDePersona({
               {bajaRequiereAutorizacion ? "Pedir la baja" : "Dar de baja"}
             </button>
           </div>
+          {persona.visitaAcordada ? (
+            <div className="mt-2 text-center">
+              <button
+                type="button"
+                onClick={() => setPanel("reprogramar")}
+                disabled={enCurso}
+                className="cursor-pointer border-0 bg-transparent p-0 text-[11px] leading-none font-semibold text-azul-700 disabled:opacity-60"
+              >
+                Cambiar la fecha de la visita
+              </button>
+            </div>
+          ) : null}
           <div className="mt-[9px] border-t border-[rgba(19,28,36,.09)] pt-[9px] text-center">
             <button
               type="button"
@@ -738,10 +768,105 @@ function FormularioDeLlamada({
   );
 }
 
+/// Cambiar la fecha u hora de una visita ya acordada, por las **dos razones
+/// por las que pasa de verdad** (dichas por el usuario, 11-sep): la visita se
+/// movió, o la fecha se digitó mal.
+///
+/// **La diferencia no es cosmética, decide qué se guarda:**
+/// - **Se movió** → sí hubo una visita pactada para ese día y se corrió, así
+///   que se apila un registro nuevo y el historial muestra el movimiento.
+/// - **Estaba mal escrita** → **nunca hubo** visita a esa hora. Apilar un «se
+///   reprogramó» inventaría un movimiento que no pasó, así que se corrige el
+///   registro en su sitio y el cambio queda en la auditoría.
+function FormularioDeCambioDeVisita({
+  nombre,
+  acordada,
+  enCurso,
+  alGuardar,
+  alCancelar,
+}: {
+  nombre: string;
+  acordada: NonNullable<TarjetaPersona["visitaAcordada"]>;
+  enCurso: boolean;
+  alGuardar: (datos: {
+    cuando: string;
+    lugar: string;
+    virtual: boolean;
+    nota: string;
+    motivo: "movida" | "correccion";
+  }) => void;
+  alCancelar: () => void;
+}) {
+  const [motivo, setMotivo] = useState<"movida" | "correccion">("movida");
+  const corrige = motivo === "correccion";
+
+  return (
+    <div>
+      <p className="text-[12px] leading-[1.4] font-semibold text-tinta">
+        La visita de {nombre}
+      </p>
+      <p className="mt-1 text-[11px] leading-[1.45] font-medium text-[rgba(19,28,36,.55)]">
+        Ahora dice <strong className="font-bold">{acordada.cuando}</strong>.
+      </p>
+
+      <div className="mt-3">
+        <Etiqueta>¿Qué pasó?</Etiqueta>
+        <div className="mt-[7px] flex flex-col gap-[6px]">
+          <button
+            type="button"
+            aria-pressed={!corrige}
+            onClick={() => setMotivo("movida")}
+            className="opcion px-3 py-[9px] text-left text-[11.5px] leading-[1.25]"
+          >
+            Se movió la visita
+          </button>
+          <button
+            type="button"
+            aria-pressed={corrige}
+            onClick={() => setMotivo("correccion")}
+            className="opcion px-3 py-[9px] text-left text-[11.5px] leading-[1.25]"
+          >
+            La fecha estaba mal escrita
+          </button>
+        </div>
+        <p className="mt-2 text-[10.5px] leading-[1.4] font-medium text-[rgba(19,28,36,.5)]">
+          {corrige
+            ? "Se arregla la que hay: nunca hubo visita a esa hora, así que no queda como si se hubiera movido."
+            : "La anterior no se borra: queda en el expediente que la visita se corrió."}
+        </p>
+      </div>
+
+      <div className="mt-3">
+        <FormularioDeVisita
+          enCurso={enCurso}
+          texto={corrige ? "Corregir la fecha" : "Mover la visita"}
+          inicial={{
+            cuando: acordada.valorFecha ?? "",
+            lugar: acordada.lugar ?? "",
+            virtual: acordada.virtual,
+          }}
+          notaPlaceholder={
+            corrige
+              ? "Lo que de verdad se acordó"
+              : "No pudo · pidió que fuera otro día"
+          }
+          alGuardar={(datos) => alGuardar({ ...datos, motivo })}
+          alCancelar={alCancelar}
+        />
+      </div>
+    </div>
+  );
+}
+
+/// El mismo formulario sirve para agendar y para mover una visita: lo que
+/// cambia es con qué llega lleno y qué dice el botón.
 function FormularioDeVisita({
   enCurso,
   alGuardar,
   alCancelar,
+  texto = "Agendar visita",
+  inicial,
+  notaPlaceholder = "Va acompañada · pidió que fuéramos dos",
 }: {
   enCurso: boolean;
   alGuardar: (datos: {
@@ -751,10 +876,13 @@ function FormularioDeVisita({
     nota: string;
   }) => void;
   alCancelar: () => void;
+  texto?: string;
+  inicial?: { cuando: string; lugar: string; virtual: boolean };
+  notaPlaceholder?: string;
 }) {
-  const [cuando, setCuando] = useState("");
-  const [lugar, setLugar] = useState("");
-  const [virtual, setVirtual] = useState(false);
+  const [cuando, setCuando] = useState(inicial?.cuando ?? "");
+  const [lugar, setLugar] = useState(inicial?.lugar ?? "");
+  const [virtual, setVirtual] = useState(inicial?.virtual ?? false);
   const [nota, setNota] = useState("");
 
   return (
@@ -794,14 +922,14 @@ function FormularioDeVisita({
           value={nota}
           onChange={(evento) => setNota(evento.target.value)}
           rows={2}
-          placeholder="Va acompañada · pidió que fuéramos dos"
+          placeholder={notaPlaceholder}
           className="campo font-medium"
         />
       </label>
 
       <Botones
         enCurso={enCurso}
-        texto="Agendar visita"
+        texto={texto}
         alCancelar={alCancelar}
         alGuardar={() => alGuardar({ cuando, lugar, virtual, nota })}
       />
