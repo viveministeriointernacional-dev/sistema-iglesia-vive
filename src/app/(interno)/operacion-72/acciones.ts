@@ -18,8 +18,8 @@ import {
   ErrorDePermiso,
   puedeAutorizarBaja,
   puedeConfirmarEntrega,
-  requerirRolEnAccion,
-  ROLES_CONSOLIDACION,
+  requerirPermisoEnAccion,
+  puedeOperarOperacion72,
   veTodaLaConsolidacion,
   type UsuarioSesion,
 } from "@/lib/auth";
@@ -106,7 +106,7 @@ export async function registrarLlamada(
 ): Promise<ResultadoAccion> {
   let usuario: UsuarioSesion;
   try {
-    usuario = await requerirRolEnAccion(ROLES_CONSOLIDACION);
+    usuario = await requerirPermisoEnAccion(puedeOperarOperacion72);
   } catch (error) {
     if (error instanceof ErrorDePermiso) return { ok: false, mensaje: error.message };
     throw error;
@@ -228,7 +228,7 @@ export async function agendarVisita(
 ): Promise<ResultadoAccion> {
   let usuario: UsuarioSesion;
   try {
-    usuario = await requerirRolEnAccion(ROLES_CONSOLIDACION);
+    usuario = await requerirPermisoEnAccion(puedeOperarOperacion72);
   } catch (error) {
     if (error instanceof ErrorDePermiso) return { ok: false, mensaje: error.message };
     throw error;
@@ -308,7 +308,7 @@ export async function cerrarVisita(
 ): Promise<ResultadoAccion> {
   let usuario: UsuarioSesion;
   try {
-    usuario = await requerirRolEnAccion(ROLES_CONSOLIDACION);
+    usuario = await requerirPermisoEnAccion(puedeOperarOperacion72);
   } catch (error) {
     if (error instanceof ErrorDePermiso) return { ok: false, mensaje: error.message };
     throw error;
@@ -398,7 +398,7 @@ export async function pasarAEntregaPorProcesoPrevio(
 ): Promise<ResultadoAccion> {
   let usuario: UsuarioSesion;
   try {
-    usuario = await requerirRolEnAccion(ROLES_CONSOLIDACION);
+    usuario = await requerirPermisoEnAccion(puedeOperarOperacion72);
   } catch (error) {
     if (error instanceof ErrorDePermiso) return { ok: false, mensaje: error.message };
     throw error;
@@ -479,7 +479,7 @@ export async function entregarAMentor(
 ): Promise<ResultadoAccion> {
   let usuario: UsuarioSesion;
   try {
-    usuario = await requerirRolEnAccion(ROLES_CONSOLIDACION);
+    usuario = await requerirPermisoEnAccion(puedeOperarOperacion72);
   } catch (error) {
     if (error instanceof ErrorDePermiso) return { ok: false, mensaje: error.message };
     throw error;
@@ -637,7 +637,7 @@ export async function darDeBajaDesdeTablero(
 ): Promise<ResultadoAccion> {
   let usuario: UsuarioSesion;
   try {
-    usuario = await requerirRolEnAccion(ROLES_CONSOLIDACION);
+    usuario = await requerirPermisoEnAccion(puedeOperarOperacion72);
   } catch (error) {
     if (error instanceof ErrorDePermiso) return { ok: false, mensaje: error.message };
     throw error;
@@ -705,7 +705,7 @@ export async function reprogramarVisita(
 ): Promise<ResultadoAccion> {
   let usuario: UsuarioSesion;
   try {
-    usuario = await requerirRolEnAccion(ROLES_CONSOLIDACION);
+    usuario = await requerirPermisoEnAccion(puedeOperarOperacion72);
   } catch (error) {
     if (error instanceof ErrorDePermiso) return { ok: false, mensaje: error.message };
     throw error;
@@ -839,7 +839,7 @@ export async function deshacerVisitaAgendada(
 ): Promise<ResultadoAccion> {
   let usuario: UsuarioSesion;
   try {
-    usuario = await requerirRolEnAccion(ROLES_CONSOLIDACION);
+    usuario = await requerirPermisoEnAccion(puedeOperarOperacion72);
   } catch (error) {
     if (error instanceof ErrorDePermiso) return { ok: false, mensaje: error.message };
     throw error;
@@ -933,7 +933,7 @@ export async function marcarAsistenteDesdeTablero(
 ): Promise<ResultadoAccion> {
   let usuario: UsuarioSesion;
   try {
-    usuario = await requerirRolEnAccion(ROLES_CONSOLIDACION);
+    usuario = await requerirPermisoEnAccion(puedeOperarOperacion72);
   } catch (error) {
     if (error instanceof ErrorDePermiso) return { ok: false, mensaje: error.message };
     throw error;
@@ -979,7 +979,7 @@ export async function retirarSolicitudDesdeTablero(
 ): Promise<ResultadoAccion> {
   let usuario: UsuarioSesion;
   try {
-    usuario = await requerirRolEnAccion(ROLES_CONSOLIDACION);
+    usuario = await requerirPermisoEnAccion(puedeOperarOperacion72);
   } catch (error) {
     if (error instanceof ErrorDePermiso) return { ok: false, mensaje: error.message };
     throw error;

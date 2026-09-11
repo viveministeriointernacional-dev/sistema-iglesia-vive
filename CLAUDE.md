@@ -280,6 +280,57 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-11** — **El tablero de Operación 72 deja de aparecerle a los
+  PASTORES** (pedido del usuario: «que solo le aparezca a los perfiles
+  administradores y consolidadores»). Lo destapó preguntando por qué al perfil
+  de **Jesús Polanía (PASTOR)** le salía Operación 72.
+  **La causa era `ROLES_CONSOLIDACION = [CONSOLIDADOR, PASTOR, ADMIN]`**, que
+  gobernaba a la vez el menú, la página y las 10 acciones del tablero.
+  - **`ROLES_OPERACION_72 = [ADMIN, CONSOLIDADOR]`** + **`puedeOperarOperacion72`**
+    en `auth.ts`. Aplicado en los **tres** sitios, no solo en el menú: esconder
+    la pestaña y dejar la página abierta por URL habría sido cosmético.
+  - **⚠️ EL PERMISO «coordina la consolidación» SIGUE ABRIENDO EL TABLERO**, sea
+    cual sea el rol, y esto no es una excepción caprichosa: ese permiso existe
+    justo para ver y operar el trabajo de todos los consolidadores, así que
+    ignorarlo lo dejaría sin sentido. **Medido antes de decidir:** de los 7
+    pastores activos, **2 lo tienen concedido a propósito** (Cristina Ceballos
+    y Lucero Artunduaga). Si se les quiere cerrar el tablero, **se les quita la
+    casilla en Administración** — no se cambia esta regla.
+  - **⚠️ LO QUE HABRÍA ROTO EL ATAJO FÁCIL:** en el menú, «Operación 72» y
+    **«Registrar persona» estaban en el MISMO bloque**. Quitar PASTOR de
+    `ROLES_CONSOLIDACION` a secas le habría quitado también el registro — y eso
+    contradice `ROLES_REGISTRO_SOLO_FICHA = [ADMIN, PASTOR]`, que existe para
+    que el pastor registre «solo la ficha». **Se separaron los dos renglones**;
+    `registro-interno` sigue con `ROLES_CONSOLIDACION`.
+  - **`requerirPermisoEnAccion`** nuevo en `auth.ts`: es a `requerirPermiso` lo
+    que `requerirRolEnAccion` es a `requerirRol`. Hacía falta porque las
+    acciones del tablero ahora autorizan **por permiso y no por rol**.
+  - **Efecto medido en las cuentas activas**: lo **pierden 5 pastores** (Jesús
+    Polanía, Juan Camilo Torres, Juliana Facundo, Paola Viveros, Pastor Luis
+    Alberto Facundo) y lo **conservan 15** (4 ADMIN + 9 consolidadores + las 2
+    pastoras que coordinan).
+
+- **2026-09-11** — **⚠️ HALLAZGO ABIERTO, sin resolver: 23 cuentas del equipo
+  tienen el hito OPERACIÓN 72 en curso para siempre.**
+  Salió al mirar el perfil de Jesús Polanía (el usuario preguntaba por el menú,
+  pero de paso apareció esto). **Todos los pastores, los 3 ADMIN, un mentor, 4
+  líderes de Alpha y 10 consolidadores** tienen ficha del **26 o 30 de agosto**,
+  creada por el **import masivo de HighLevel** — y ese camino **siempre crea
+  Operación 72** (§6), sin preguntar si la persona es nueva o es el pastor.
+  Les quedó: Op72 (hoy **ENTREGADA**, porque al ajustarles la fase se cierra
+  sola), una **«primera llamada» del import que nadie hizo**, y el hito
+  **`OPERACION_72` en `EN_CURSO`**.
+  **Ese hito no se puede completar nunca**: solo pasa a COMPLETADO **al entregar
+  a mentor desde el tablero**, y ellos nunca pasaron por ahí. Ni está hecho ni
+  se va a hacer.
+  **Lo propuesto (pendiente de respuesta del usuario): quitarles el hito, no
+  marcarlo completado.** Marcarlo diría que hicieron el proceso de
+  consolidación, y es falso —llevan años en la iglesia—. Quitarlo los deja como
+  el sistema ya los dejaría hoy: **el registro «solo la ficha» del 3-sep NO crea
+  ese hito** (`sinOperacion72` lo omite). Estas 23 fichas son anteriores a ese
+  camino, y de ahí viene el arrastre. **La Op72 cerrada NO se tocaría**: es el
+  rastro de cómo entraron los datos.
+
 - **2026-09-11** — **Las 7 «visitas» del 9-sep no eran visitas: eran gente que
   YA lleva proceso. Corregidas (6 por mí, 1 por el usuario).**
   **Cómo se descubrió, que es la parte que vale:** buscando a quién preguntarle

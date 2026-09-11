@@ -8,6 +8,7 @@ import {
   ROLES_ADMIN,
   tieneRed,
   ROLES_CONSOLIDACION,
+  puedeOperarOperacion72,
 } from "@/lib/auth";
 import { puedeVerAlpha } from "@/lib/alpha";
 import { puedeVerCasaDeFe } from "@/lib/casa-de-fe";
@@ -38,11 +39,16 @@ export default async function LayoutInterno({
           { href: "/mi-red", etiqueta: "Mi red" },
         ]
       : []),
+    // Operación 72 y «Registrar persona» ya NO van juntas: el tablero es de
+    // administración y consolidación (más quien coordine la consolidación),
+    // mientras que registrar a alguien lo sigue haciendo también el pastor
+    // —para eso existe `ROLES_REGISTRO_SOLO_FICHA`—, así que quitarle el
+    // tablero no le puede quitar el registro.
+    ...(puedeOperarOperacion72(usuario)
+      ? [{ href: "/operacion-72", etiqueta: "Operación 72" }]
+      : []),
     ...(ROLES_CONSOLIDACION.includes(usuario.role)
-      ? [
-          { href: "/operacion-72", etiqueta: "Operación 72" },
-          { href: "/registro-interno", etiqueta: "Registrar persona" },
-        ]
+      ? [{ href: "/registro-interno", etiqueta: "Registrar persona" }]
       : []),
     ...(puedeVerAlpha(usuario) || puedeVerCasaDeFe(usuario)
       ? [{ href: "/alpha", etiqueta: "Alpha y Casa de Fe" }]
