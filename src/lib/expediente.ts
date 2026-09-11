@@ -7,7 +7,8 @@ import {
   Role,
 } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
-import type { UsuarioSesion } from "@/lib/auth";
+import { tieneRed, type UsuarioSesion } from "@/lib/auth";
+import { nivelEnLaRamaDe } from "@/lib/red";
 import { ZONA_HORARIA } from "@/lib/dominio";
 import { horasRestantes, urgenciaDe } from "@/lib/op72";
 
@@ -111,6 +112,24 @@ export async function accesoAExpediente(
 
   if (esSuMentor || esSuConsolidador) {
     return { puedeVer: true, puedeVerNotas: true, puedeEscribir: true, esPropio };
+  }
+
+  // **La rama heredada: alguien a quien acompaña uno de sus discípulos.**
+  // Un líder ve lo que cuelga de él en cascada (es lo que muestran las dos
+  // vistas de «Mi red»), así que el expediente tiene que abrirse o la lista
+  // enseñaría nombres que al pulsarlos dan «no puedes ver».
+  //
+  // ⚠️ Pero solo **ver**: las notas pastorales y la escritura se quedan con
+  // quien de verdad la acompaña. Quien está dos niveles arriba supervisa el
+  // proceso; no es quien tiene la conversación.
+  //
+  // La consulta extra solo se paga aquí, después de que fallaran las
+  // comprobaciones baratas, y solo para quien puede tener rama.
+  if (tieneRed(usuario)) {
+    const nivel = await nivelEnLaRamaDe(usuario.id, learnerId);
+    if (nivel !== null) {
+      return { puedeVer: true, puedeVerNotas: false, puedeEscribir: false, esPropio };
+    }
   }
 
   // El aprendiz no entra a su expediente: su pantalla es «Mi proceso».

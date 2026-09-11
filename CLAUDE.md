@@ -280,6 +280,97 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-11** — **«Mi red» pasa a mostrar la rama EN CASCADA, no solo los
+  discípulos directos** (pedido del usuario: «solamente puedan ver la red que
+  están debajo de ellos… el pastor Jesús tiene a Sergio Gallo; si Sergio Gallo
+  está liderando a otra persona, el pastor Jesús lo puede ver»).
+  **⚠️ EL HALLAZGO QUE CAMBIA EL TRABAJO: el Árbol YA lo hacía y la Lista NO.**
+  `construirDesdeUsuario` en `arbol.ts` recorre `hijosPorMentor` recursivamente
+  desde siempre, pero `cargarRed` filtraba con
+  `mentorRelationships: { some: { mentorId } }`, o sea **un solo nivel**. Las
+  dos vistas de la MISMA pantalla enseñaban redes distintas, y la que se
+  quedaba corta era justo la que abre por defecto.
+  - **`ramaDeLaRed(mentorId)`** en `red.ts`: `WITH RECURSIVE` que baja por
+    `mentor_relationship`, saltando de expediente a cuenta por `person_id`
+    (es lo que permite que un discípulo sea a su vez mentor). Devuelve
+    `Map<learnerId, nivel>`.
+  - **`nivelEnLaRamaDe(mentorId, learnerId)`**: la misma cosa **al revés**,
+    subiendo. Para autorizar UN expediente sobra traer la rama entera: la
+    cadena hacia arriba tiene tantos pasos como niveles tenga la iglesia
+    (hoy **4**), no tantos como personas.
+  - **`UNION`, no `UNION ALL`**, en las dos: corta cualquier ciclo si por un
+    error de datos A acompaña a B y B a A. Es la misma salvaguarda que
+    `visitados` en `cargarArbol`.
+  - **⚠️ LO QUE HABRÍA DEJADO EL ARREGLO A MEDIAS: `accesoAExpediente` solo
+    autorizaba al mentor DIRECTO.** Sin tocarlo, la lista habría mostrado
+    nombres que al pulsarlos dan «no puedes ver» — peor que antes. Ahora la
+    rama heredada abre el expediente, **pero solo para VER**: `puedeVerNotas`
+    y `puedeEscribir` se quedan en `false`. Quien está dos niveles arriba
+    supervisa el proceso; no es quien tiene la conversación, y las notas
+    pastorales son del que acompaña (es la misma línea que la decisión del
+    3-sep de no meterlas en el correo al mentor).
+  - **El buscador también**, que documentaba «refleja `accesoAExpediente`» y
+    habría dejado de reflejarlo. Y de paso **dos incoherencias viejas ahí**:
+    el comentario decía «Enmascarado: solo los últimos dígitos» (falso desde
+    el 3-sep, ya no se enmascara nada) y el alcance pedía rol MENTOR, así que
+    **un líder con el permiso acumulable `canMentor` veía su rama en «Mi red»
+    y el buscador le devolvía cero** — el mismo bache de permisos del 7-sep.
+    Ahora usa `tieneRed`.
+  - **En la lista, la gente heredada dice quién la acompaña** («Con X») y la
+    propia sigue diciendo «Acompañamiento en curso». Sin eso la lista mezcla
+    en plano a los propios con los de más abajo y no se distinguen.
+  - **La vista completa NO cambió: sigue siendo PASTOR + ADMIN.** El
+    consolidador se queda fuera a propósito — su trabajo es el tablero de
+    Operación 72, que ya ve entero; la red es la cadena de mentoría. Quien
+    coordina la consolidación ya entra por `coordinaConsolidacion`.
+  - **⚠️ TRAMPA DE SQL, la sexta: los id de este esquema son `text`, no
+    `uuid`.** Prisma los crea como texto (`String @id @default(uuid())`), así
+    que escribir `${'$'}{mentorId}::uuid` revienta con «operator does not exist:
+    text = uuid». `tsc`, eslint y `cf:build` pasaron los tres en verde con el
+    cast puesto; **solo se vio ejecutándolo contra la base**.
+  - **Probado contra la base, y esta es la comprobación que vale:** se corrió
+    la versión que baja y la que sube para **todos** los pares líder-persona
+    de la iglesia → **193 de 193 coinciden, 0 discrepancias**. Si las dos
+    mitades no cuadraran, la lista mostraría a alguien cuyo expediente no
+    abre, o al revés.
+  - **Efecto medido: gana UNA persona, Jairo Esquivel (MENTOR), que pasa de
+    ver 1 a ver 2** (Yuli Perdomo, su discípula, y Sandra Barón, la discípula
+    de Yuli — literalmente el caso que describió el usuario). Nadie pierde
+    nada. Los otros cuatro líderes con rama indirecta (Administración,
+    Pastores Alejandro & Cristina, Juan Felipe Carvajal y Juan Camilo Torres)
+    ya son ADMIN o PASTOR y veían todo. **La regla importa para cuando la
+    iglesia crezca, no por lo que destapa hoy.**
+
+- **2026-09-11** — **Mateo Tabares limpiado: quedó igual a los otros seis**
+  (autorizado por el usuario: «está bien. Límpielo y déjelo igual a los otros
+  seis»). Era el que él mismo había movido por el camino viejo («Cerrar visita
+  y preparar entrega»), lo que le dejó en el expediente **una visita que nunca
+  se hizo**.
+  **Tenía DOS visitas falsas, no una**: la «Visita agendada» del 9-sep (la
+  tanda de Nini) y la «Visita realizada» del 11-sep (la del camino viejo).
+  Se anularon las dos con el mismo `annulled_by_id` y el mismo motivo que las
+  seis, y se le puso `prior_process_note` = «miembro activo de casa Vive» y el
+  `detail` con el formato de la acción nueva. Queda en **LISTA PARA ENTREGA**
+  con Laura Charry propuesta, **0 visitas vivas**, idéntico a los demás.
+  Probado con `BEGIN … ROLLBACK` en la misma llamada antes de aplicar.
+  **Dato de paso: el botón nuevo ya lo está usando el equipo.** Después del
+  merge entraron por ahí **Erika Vanesa Quintero, Salomé Rojas y Sandra
+  Milena**, cada una con su nota propia. Van 10 personas con
+  `prior_process_note`.
+
+- **2026-09-11** — **Las 23 cuentas del equipo con el hito OPERACIÓN 72 en
+  curso, listadas** (el usuario las pidió). Todas con ficha del **26-ago**
+  (salvo Cristina Ceballos y Lucero Artunduaga, del 31-ago) y con la Op72 ya
+  **ENTREGADA**: 3 ADMIN, 5 PASTOR, 1 MENTOR, 4 LÍDER DE ALPHA y 10
+  CONSOLIDADOR.
+  **⚠️ La consulta devuelve 24, no 23, y el de más NO va en la misma bolsa:
+  Johana Ramírez.** Es la ex-consolidadora que pasó a APRENDIZ el 3-sep; está
+  en fase **GANAR** y su Op72 sigue **LISTA_PARA_ENTREGA**, o sea **viva y en
+  el tablero**. En las otras 23 el hito es arrastre del import; en ella
+  corresponde a un proceso abierto. **Si se hace la limpieza, ella queda
+  fuera.**
+  Sigue pendiente la decisión de quitarles el hito (§9).
+
 - **2026-09-11** — **El tablero de Operación 72 deja de aparecerle a los
   PASTORES** (pedido del usuario: «que solo le aparezca a los perfiles
   administradores y consolidadores»). Lo destapó preguntando por qué al perfil
