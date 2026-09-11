@@ -30,7 +30,11 @@ import {
   solicitarBaja,
 } from "@/lib/baja";
 import { marcarComoAsistente } from "@/lib/asistente";
-import { exportarPrimeraLlamada, exportarVisita } from "@/lib/highlevel-salida";
+import {
+  anularVisitaEnHighLevel,
+  exportarPrimeraLlamada,
+  exportarVisita,
+} from "@/lib/highlevel-salida";
 import {
   contactaDeVerdad,
   ETIQUETA_LLAMADA,
@@ -356,6 +360,107 @@ export async function cerrarVisita(
       entityType: "operation72",
       entityId: operacion.id,
       metadata: { resumen: texto },
+    });
+  });
+
+  revalidatePath("/operacion-72");
+  revalidatePath(`/expediente/${operacion.learnerId}`);
+  return { ok: true };
+}
+
+/// Atajo para quien YA lleva proceso en la iglesia: pasa directo a LISTA PARA
+/// ENTREGA, pendiente de que le asignen mentor.
+///
+/// **El problema que resuelve.** El tablero da por hecho que la persona es
+/// nueva: hay que llamarla, acordar una visita y hacerla. Pero entra gente que
+/// **ya se congrega y ya lleva un proceso** —hizo Alpha, está en una Casa de
+/// Fe, se bautizó— y con ella esos tres pasos no tienen sentido: no hay nada
+/// que averiguar por teléfono ni ninguna casa que visitar. Lo único que le
+/// falta es **un mentor que la acompañe**. Sin este atajo había que fingir una
+/// llamada y una visita que nunca ocurrieron para poder entregarla.
+///
+/// **Sirve desde CUALQUIER columna del tablero** (iniciada, seguimiento,
+/// contactada o visita pendiente): que la persona ya esté en la iglesia no
+/// depende de en qué casilla haya caído su tarjeta.
+///
+/// **⚠️ NO se inventa ninguna visita.** `cerrarVisita` deja un
+/// `contact_attempt` de tipo VISITA con «Visita realizada», porque ahí sí se
+/// hizo. Aquí no se hizo nada, así que **no se crea ningún intento**: lo que
+/// pasó queda en `detail` (que es lo que lee el correo al mentor) y en la
+/// auditoría. Escribir «visita realizada» aquí sería meter en el expediente
+/// una visita que nadie hizo — el mismo error que evitan las otras acciones.
+///
+/// **Sí propone mentor**, igual que `cerrarVisita`, para que la tarjeta llegue
+/// a la última columna con su candidato y solo haya que confirmarlo.
+export async function pasarAEntregaPorProcesoPrevio(
+  operacionId: string,
+  datos: { nota: string },
+): Promise<ResultadoAccion> {
+  let usuario: UsuarioSesion;
+  try {
+    usuario = await requerirRolEnAccion(ROLES_CONSOLIDACION);
+  } catch (error) {
+    if (error instanceof ErrorDePermiso) return { ok: false, mensaje: error.message };
+    throw error;
+  }
+
+  const operacion = await cargarOperacion(operacionId, usuario);
+  if (!operacion) return { ok: false, mensaje: "Esta persona no está en tu lista." };
+  if (operacion.status === Operation72Status.LISTA_PARA_ENTREGA) {
+    return { ok: false, mensaje: "Ya está lista para entrega: solo falta asignarle mentor." };
+  }
+  // Las cuatro columnas desde las que aplica, escritas una por una a
+  // propósito: una tarjeta ENTREGADA o CERRADA ya salió del tablero.
+  const enElTablero: Operation72Status[] = [
+    Operation72Status.INICIADA,
+    Operation72Status.SEGUIMIENTO,
+    Operation72Status.CONTACTADA,
+    Operation72Status.VISITA_PENDIENTE,
+  ];
+  if (!enElTablero.includes(operacion.status)) {
+    return { ok: false, mensaje: "Alguien más ya movió esta tarjeta. Actualiza el tablero." };
+  }
+
+  // Es lo que va a leer el mentor en el correo de entrega, y lo único que le
+  // explica por qué esta persona llegó sin llamada ni visita.
+  const nota = datos.nota.trim();
+  if (nota.length < 10) {
+    return {
+      ok: false,
+      mensaje: "Cuenta qué proceso lleva ya: es lo que va a leer el mentor que la reciba.",
+    };
+  }
+
+  const prisma = await getPrisma();
+  const estadoAnterior = operacion.status;
+
+  await prisma.$transaction(async (tx) => {
+    const propuesta = await proponerMentor(tx, operacion.learnerId);
+
+    await tx.operation72.update({
+      where: { id: operacion.id },
+      data: {
+        status: Operation72Status.LISTA_PARA_ENTREGA,
+        detail: `Ya lleva proceso en la iglesia · ${nota}`,
+        // Además de `detail`, en su propia columna: `detail` lo reescribe la
+        // siguiente acción, y esto tiene que llegarle al mentor.
+        priorProcessNote: nota,
+        ...(propuesta
+          ? {
+              proposedMentorId: propuesta.mentorId,
+              proposedMentorNote: propuesta.detalle,
+              lineKnown: propuesta.conservaLinea,
+            }
+          : {}),
+      },
+    });
+
+    await auditar(tx, {
+      actorId: usuario.id,
+      action: "operacion72.pasa_a_entrega_por_proceso_previo",
+      entityType: "operation72",
+      entityId: operacion.id,
+      metadata: { nota, desde: estadoAnterior },
     });
   });
 
@@ -699,6 +804,116 @@ export async function reprogramarVisita(
 
   // Reflejo hacia HighLevel (best-effort, fuera de la transacción).
   await exportarVisita(operacion.learnerId, { cuando, virtual: datos.virtual });
+
+  revalidatePath("/operacion-72");
+  revalidatePath(`/expediente/${operacion.learnerId}`);
+  return { ok: true };
+}
+
+/// Deshace una visita que se le agendó a la persona equivocada.
+///
+/// **Es el tercer caso de «cambiar una visita», y no se parece a los otros
+/// dos.** «Se movió» apila un registro nuevo porque la visita existía y se
+/// corrió; «la fecha estaba mal escrita» corrige en su sitio porque la visita
+/// existía a otra hora. Aquí **la visita nunca existió para esta persona**: se
+/// le apuntó a quien no era.
+///
+/// Por eso el registro **se anula, no se borra**. Anulado deja de pintar en la
+/// tarjeta y de ordenar la columna —que es lo que había que arreglar— pero
+/// sigue visible, tachado, en el expediente. Borrarlo dejaría a la ficha sin
+/// ninguna explicación de por qué la tarjeta se movió y volvió, y eso es
+/// exactamente lo que alguien va a querer entender dentro de seis meses.
+///
+/// **Vuelve a CONTACTADA, no a INICIADA ni a SEGUIMIENTO** (decisión del
+/// usuario, 11-sep): la llamada a esta persona sí ocurrió y ya se habló con
+/// ella. Devolverla al principio la pondría otra vez en la fila de «hay que
+/// llamarla», que es falso, y le borraría de la vista el contacto que sí tuvo.
+///
+/// **La llamada de ese mismo envío se conserva** (decisión del usuario, mismo
+/// día): alguien marcó y alguien habló — lo que se equivocó fue a qué ficha se
+/// le apuntó la visita. Anularla le quitaría a esta persona un contacto que de
+/// verdad recibió y la dejaría pareciendo desatendida.
+export async function deshacerVisitaAgendada(
+  operacionId: string,
+  datos: { motivo: string },
+): Promise<ResultadoAccion> {
+  let usuario: UsuarioSesion;
+  try {
+    usuario = await requerirRolEnAccion(ROLES_CONSOLIDACION);
+  } catch (error) {
+    if (error instanceof ErrorDePermiso) return { ok: false, mensaje: error.message };
+    throw error;
+  }
+
+  const operacion = await cargarOperacion(operacionId, usuario);
+  if (!operacion) return { ok: false, mensaje: "Esta persona no está en tu lista." };
+  if (operacion.status !== Operation72Status.VISITA_PENDIENTE) {
+    return { ok: false, mensaje: "Alguien más ya movió esta tarjeta. Actualiza el tablero." };
+  }
+
+  // Corto, pero obligatorio: quien lea el expediente tachado después necesita
+  // saber qué pasó, y «se agendó por error» a secas no dice nada.
+  const motivo = datos.motivo.trim();
+  if (motivo.length < 10) {
+    return {
+      ok: false,
+      mensaje: "Cuenta en una línea qué pasó: es lo que va a leer quien abra el expediente.",
+    };
+  }
+
+  const prisma = await getPrisma();
+  const visita = await prisma.contactAttempt.findFirst({
+    where: {
+      operation72Id: operacion.id,
+      type: ContactType.VISITA,
+      scheduledAt: { not: null },
+      annulledAt: null,
+    },
+    orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }],
+    select: { id: true, scheduledAt: true },
+  });
+  if (!visita) {
+    return {
+      ok: false,
+      mensaje: "Esta tarjeta no tiene una visita acordada que deshacer.",
+    };
+  }
+
+  const ahora = new Date();
+
+  await prisma.$transaction(async (tx) => {
+    await tx.contactAttempt.update({
+      where: { id: visita.id },
+      data: {
+        annulledAt: ahora,
+        annulledById: usuario.id,
+        annulledReason: motivo,
+      },
+    });
+
+    await tx.operation72.update({
+      where: { id: operacion.id },
+      data: {
+        status: Operation72Status.CONTACTADA,
+        detail: "La visita se había agendado por error · acordar visita",
+      },
+    });
+
+    await auditar(tx, {
+      actorId: usuario.id,
+      action: "operacion72.visita_anulada",
+      entityType: "operation72",
+      entityId: operacion.id,
+      metadata: {
+        visitaEra: visita.scheduledAt?.toISOString() ?? null,
+        motivo,
+      },
+    });
+  });
+
+  // El CRM seguiría diciendo «visita confirmada» con su fecha, y el equipo
+  // trabaja solo con el CRM: iría a visitar a quien no era.
+  await anularVisitaEnHighLevel(operacion.learnerId);
 
   revalidatePath("/operacion-72");
   revalidatePath(`/expediente/${operacion.learnerId}`);

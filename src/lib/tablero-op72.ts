@@ -92,12 +92,15 @@ export async function seleccionarTarjetasDelTablero(
       JOIN person p ON p.id = lp.person_id
       -- La visita acordada más reciente. Es la misma que pinta la tarjeta, que
       -- toma el primer intento de tipo VISITA ordenando por occurred_at desc.
+      -- Las anuladas quedan fuera en los dos sitios: si aquí entraran, la
+      -- columna seguiría ordenándose por una visita que ya no existe.
       LEFT JOIN LATERAL (
         SELECT ca.scheduled_at
         FROM contact_attempt ca
         WHERE ca.operation72_id = o.id
           AND ca.type = 'VISITA'
           AND ca.scheduled_at IS NOT NULL
+          AND ca.annulled_at IS NULL
         ORDER BY ca.occurred_at DESC, ca.created_at DESC
         LIMIT 1
       ) v ON true

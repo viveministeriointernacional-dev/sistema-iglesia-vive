@@ -314,12 +314,25 @@ export default async function PaginaExpediente({
                         ) : null}
                         <span
                           className={`relative mt-1 h-[9px] w-[9px] rounded-full ${
-                            evento.tono === "verde" ? "bg-verde-500" : "bg-azul-900"
+                            evento.tono === "verde"
+                              ? "bg-verde-500"
+                              : evento.tono === "anulado"
+                                ? "bg-[rgba(19,28,36,.25)]"
+                                : "bg-azul-900"
                           }`}
                         />
                       </span>
                       <span className={`pl-3 ${ultimo ? "" : "pb-[18px]"}`}>
-                        <span className="block text-[13px] leading-[1.35] font-semibold text-tinta">
+                        {/* Tachado y en gris: el renglón se queda para explicar
+                            por qué la tarjeta se movió y volvió, pero nadie
+                            puede leerlo como algo que pasó de verdad. */}
+                        <span
+                          className={`block text-[13px] leading-[1.35] font-semibold ${
+                            evento.tono === "anulado"
+                              ? "text-[rgba(19,28,36,.42)] line-through"
+                              : "text-tinta"
+                          }`}
+                        >
                           {evento.titulo}
                         </span>
                         {evento.detalle ? (

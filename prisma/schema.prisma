@@ -82,7 +82,8 @@ model AppUser {
   relacionesComoMentor  MentorRelationship[] @relation("MentorDeRelacion")
   relacionesAutorizadas MentorRelationship[] @relation("AutorizadaPor")
   op72Propuestas        Operation72[]        @relation("MentorPropuesto")
-  contactosRegistrados  ContactAttempt[]
+  contactosRegistrados  ContactAttempt[]     @relation("RegistradoPor")
+  visitasAnuladas       ContactAttempt[]     @relation("AnuladaPor")
   notasEscritas         PrivateNote[]
   hitosRegistrados      Milestone[]
   temasRegistrados      FaithHouseProgress[]
@@ -409,6 +410,11 @@ model Operation72 {
   lineKnown          Boolean           @default(false) @map("line_known")
   proposedMentorId   String?           @map("proposed_mentor_id")
   proposedMentorNote String?           @map("proposed_mentor_note")
+  /// Qué proceso lleva ya en la iglesia quien pasó directo a entrega sin
+  /// llamada ni visita. **No vive en `detail`** a propósito: `detail` es un
+  /// resumen libre que cada acción reescribe, y esto tiene que sobrevivir para
+  /// que el mentor sepa por qué le llega así.
+  priorProcessNote   String?           @map("prior_process_note")
   createdAt          DateTime          @default(now()) @map("created_at")
   updatedAt          DateTime          @updatedAt @map("updated_at")
 
@@ -460,8 +466,17 @@ model ContactAttempt {
   byUserId      String?      @map("by_user_id")
   createdAt     DateTime     @default(now()) @map("created_at")
 
+  /// Cuándo se deshizo este registro por haberse hecho sobre la persona
+  /// equivocada. No se borra: anulado deja de pintar en la tarjeta y de
+  /// ordenar la columna, pero sigue visible —tachado— en el expediente, que es
+  /// lo único que explica por qué la tarjeta se movió y volvió.
+  annulledAt     DateTime? @map("annulled_at")
+  annulledById   String?   @map("annulled_by_id")
+  annulledReason String?   @map("annulled_reason")
+
   operation72 Operation72 @relation(fields: [operation72Id], references: [id], onDelete: Cascade)
-  byUser      AppUser?    @relation(fields: [byUserId], references: [id])
+  byUser      AppUser?    @relation("RegistradoPor", fields: [byUserId], references: [id])
+  annulledBy  AppUser?    @relation("AnuladaPor", fields: [annulledById], references: [id])
 
   @@index([operation72Id, occurredAt])
   /// Para las consultas del informe que filtran solo por fecha.

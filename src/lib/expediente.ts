@@ -133,7 +133,11 @@ export type HitoLineaDeTiempo = {
   fecha: Date;
   titulo: string;
   detalle: string | null;
-  tono: "verde" | "azul";
+  /// `anulado` = el registro se deshizo porque se había hecho sobre la persona
+  /// equivocada. Se pinta tachado y en gris: sigue a la vista porque es lo
+  /// único que explica por qué la tarjeta se movió y volvió, pero nadie puede
+  /// leerlo como algo que pasó de verdad.
+  tono: "verde" | "azul" | "anulado";
 };
 
 export type DatosExpediente = NonNullable<
@@ -194,6 +198,12 @@ export async function cargarExpediente(learnerId: string) {
               isVirtual: true,
               occurredAt: true,
               byUser: { select: { fullName: true } },
+              // Las anuladas SÍ entran aquí, a diferencia del tablero y del
+              // correo al mentor: el expediente es el sitio donde tiene que
+              // constar que esto se deshizo, y quién lo deshizo.
+              annulledAt: true,
+              annulledReason: true,
+              annulledBy: { select: { fullName: true } },
             },
           },
         },
@@ -274,14 +284,28 @@ export function construirLineaDeTiempo(
           .join(" · ")
       : null;
 
+    const anulado = Boolean(intento.annulledAt);
     eventos.push({
       fecha: intento.occurredAt,
       titulo: intento.result ?? "Contacto registrado",
       detalle:
-        [cita, intento.byUser?.fullName, incluyePrivado ? intento.note : null]
+        [
+          cita,
+          intento.byUser?.fullName,
+          incluyePrivado ? intento.note : null,
+          anulado
+            ? [
+                "SE DESHIZO: no era esta persona",
+                intento.annulledReason,
+                intento.annulledBy ? `lo deshizo ${intento.annulledBy.fullName}` : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")
+            : null,
+        ]
           .filter(Boolean)
           .join(" · ") || null,
-      tono: "azul",
+      tono: anulado ? "anulado" : "azul",
     });
   }
 

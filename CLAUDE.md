@@ -280,6 +280,166 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-11** — **⚠️ SEGUNDA VEZ QUE UN MERGE SE LLEVA SOLO PARTE DEL
+  TRABAJO. Regla nueva para que no haya una tercera.**
+  El **PR #80 se fusionó a los DOS MINUTOS de abrirlo** (abierto 19:20:34,
+  fusionado 19:22:23), cuando la rama solo tenía sus **dos primeros commits**.
+  Los **tres siguientes quedaron huérfanos** y **sus dos migraciones nunca
+  corrieron**: se comprobó en la base —0 columnas `annulled%`, 0
+  `prior_process_note`, 0 migraciones `202609112%` registradas— mientras `main`
+  sí tenía el arreglo de las cinco horas. Pasó igual con el PR #77 el mismo día.
+  **REGLA: NO abrir el PR hasta que TODO el trabajo esté empujado.** El usuario
+  fusiona en minutos, no en horas, así que un PR abierto es un PR que ya se
+  está fusionando. Si hace falta seguir trabajando después de abrirlo, avisarle
+  explícitamente de que no lo fusione todavía.
+  **Y la comprobación que lo destapa en un segundo**, que hay que hacer
+  siempre después de un merge:
+  `git log --oneline origin/main..origin/<rama>` — si devuelve algo, **eso se
+  quedó fuera**. Mirar el `commits` y el `head.sha` del PR también lo dice.
+  Arreglado con §5: rama rehecha desde `main`, los tres commits por encima
+  (`cherry-pick`), **cero duplicados verificados función por función** (la
+  lección del 6-sep), build y pruebas en verde, PR #81 nuevo.
+  ⚠️ **Ojo con la trampa de creer que ya está**: `main` contenía los commits del
+  PR y el sitio estaba desplegado, así que «el merge entró» era cierto **y aun
+  así faltaba la mitad del trabajo**. Que `main` avance no significa que
+  avanzara con todo.
+
+- **2026-09-11** — **Atajo para quien YA lleva proceso en la iglesia: pasa
+  directo a LISTA PARA ENTREGA** (pedido del usuario: «hay personas que ya
+  hacen parte de la iglesia, ya llevan un proceso, pero están en alguna fase de
+  Operación 72… pendiente por asignar mentor»).
+  **El problema, que es el de fondo del tablero:** Operación 72 da por hecho
+  que la persona es **nueva** —llamarla, acordar visita, hacerla—. Pero entra
+  gente que **ya se congrega y ya lleva proceso** (hizo Alpha, está en una Casa
+  de Fe, se bautizó), y con ella esos tres pasos no tienen sentido: no hay nada
+  que averiguar por teléfono ni ninguna casa que visitar. Lo único que le falta
+  es **mentor**. Sin el atajo había que **fingir una llamada y una visita que
+  nunca ocurrieron** para poder entregarla.
+  - **Enlace «Ya lleva proceso · pasar a entrega»** en el pie de la tarjeta,
+    **desde las CUATRO columnas** (iniciada, seguimiento, contactada, visita
+    pendiente): que alguien ya esté en la iglesia no depende de en qué casilla
+    cayó su tarjeta. `pasarAEntregaPorProcesoPrevio` en
+    `operacion-72/acciones.ts`. Las cuatro se escriben una por una en la acción
+    (no `ESTADOS_EN_TABLERO`, que incluye la quinta).
+  - **⚠️ NO se inventa ninguna visita.** `cerrarVisita` deja un
+    `contact_attempt` VISITA con «Visita realizada» porque ahí sí se hizo; aquí
+    **no se crea ningún intento**. Escribir «visita realizada» metería en el
+    expediente una visita que nadie hizo — el mismo error que evitan las otras
+    acciones del día.
+  - **Sí propone mentor** (`proponerMentor`, igual que `cerrarVisita`), así que
+    la tarjeta llega a la última columna con su candidato y solo hay que
+    confirmarlo. Queda **pendiente de mentor, NO entregada**.
+  - **⚠️ COLUMNA NUEVA `prior_process_note`** (migración
+    `20260911213000_proceso_previo`) **y no `detail`**, que fue el hallazgo
+    importante: `detail` es un resumen libre que **la siguiente acción
+    reescribe**, así que la nota se habría perdido justo antes de que el mentor
+    la necesitara.
+  - **⚠️ LO QUE CASI QUEDÓ MAL, y hay que recordarlo: el correo al mentor NO
+    lee `operation72.detail`.** Yo había escrito en el panel «es lo que va a
+    leer el mentor» y **era falso** — se comprobó con `grep detail` sobre
+    `correo-entrega.ts` y `correo.ts`: **cero coincidencias**. Arreglado de
+    verdad: la nota entra en el bloque **«quién es»** del correo como «Ya lleva
+    proceso». Va ahí y **no en el historial** porque no es algo que pasó en una
+    fecha, es quién es la persona — y sin ella el mentor recibiría **un
+    historial casi vacío** (solo el registro) sin saber por qué.
+  - **La tarjeta también lo dice.** Ojo: desde el 3-sep **la tarjeta no pinta
+    `detail`**, así que sin esto la persona aparecería en «Lista para entrega»
+    **sin ninguna explicación**. Se añadió al bloque verde de entrega: «Ya
+    lleva proceso · …».
+  - Auditoría `operacion72.pasa_a_entrega_por_proceso_previo` (catálogo en
+    `audit.ts` + `case` en `actividad.ts`, en verde, con `desde` = la columna de
+    la que venía).
+  - **La nota es obligatoria** (mín. 10 caracteres), como en los demás paneles:
+    es lo único que le explica al mentor por qué le llega alguien sin llamada
+    ni visita.
+  - Migración probada con `BEGIN … ROLLBACK` en la misma llamada, repetida
+    entera para comprobar que es idempotente, y verificado después que
+    producción quedó en 0 columnas.
+  - **Dato de contexto medido de paso: hay 47 personas en LISTA PARA ENTREGA**,
+    todas con mentor propuesto, esperando que alguien confirme la entrega.
+
+- **2026-09-11** — **Deshacer una visita agendada a la persona EQUIVOCADA: el
+  tercer caso, y el primero en que el tablero RETROCEDE** (pedido del usuario:
+  «se le asigna una visita por error… nos equivocamos de persona»).
+  **Por qué no servía nada de lo que había, que es lo que hay que entender
+  antes de tocar esto:** el tablero **solo avanzaba**. Las dos herramientas de
+  visita daban por hecho que la visita EXISTÍA — «se movió» (se corrió) y «la
+  fecha estaba mal escrita» (existía a otra hora). Aquí **la visita nunca
+  existió para esa persona**, y la única salida era dejarla esperando una
+  visita que nadie iba a hacer.
+  - **Botón «No era esta persona»** en la tarjeta, junto a «Cambiar la fecha»,
+    y solo si hay visita acordada. `deshacerVisitaAgendada` en
+    `operacion-72/acciones.ts`.
+  - **⚠️ EL REGISTRO SE ANULA, NO SE BORRA** (decisión del usuario). Migración
+    `20260911200000_visita_anulada`: `annulled_at`, `annulled_by_id`,
+    `annulled_reason` en `contact_attempt`. Anulado **deja de pintar en la
+    tarjeta y de ordenar la columna** —que es lo que había que arreglar— pero
+    **sigue visible, TACHADO, en el expediente**, con quién lo deshizo y por
+    qué. Borrarlo dejaría la ficha sin ninguna explicación de por qué la
+    tarjeta se movió y volvió, que es justo lo que alguien va a querer entender
+    dentro de seis meses.
+  - **⚠️ VUELVE A CONTACTADA, no a INICIADA ni a SEGUIMIENTO** (decisión del
+    usuario). La llamada a esa persona **sí ocurrió** y ya se habló con ella;
+    devolverla al principio la pondría otra vez en la fila de «hay que
+    llamarla», que es falso.
+  - **⚠️ LA LLAMADA DEL MISMO ENVÍO SE CONSERVA** (decisión del usuario).
+    Alguien marcó y alguien habló — lo que se equivocó fue **a qué ficha se le
+    apuntó la visita**. Anularla le quitaría a esa persona un contacto que de
+    verdad recibió y la dejaría pareciendo desatendida.
+  - **⚠️ LOS CINCO SITIOS QUE HAY QUE FILTRAR, y ninguno es opcional** (anular
+    sin tocarlos habría dejado la tarjeta exactamente igual):
+    1. `operacion-72/page.tsx` — la consulta de intentos (`annulledAt: null`):
+       pinta la visita acordada **y el último movimiento**.
+    2. `tablero-op72.ts` — el `LEFT JOIN LATERAL` de `ORDEN_VISITA`: sin el
+       filtro, la columna seguiría **ordenándose por una visita que ya no
+       existe**.
+    3. `correo-entrega.ts` — el mentor buscaría a alguien en una visita
+       retirada.
+    4. `administracion.ts` (asistentes) — una visita anulada **no cuenta como
+       contacto**: si contara, el indicador ámbar de «nadie le habla hace 90
+       días» daría por atendido a quien nadie atendió.
+    5. `expediente.ts` — **aquí SÍ entran**, es el único sitio donde deben
+       constar. Tono nuevo `anulado` en `HitoLineaDeTiempo` → tachado y gris.
+    `mi-proceso` **no** hizo falta tocarlo: `miHistoria` nunca incluyó los
+    contactos, así que la persona no ve esto.
+  - **`anularVisitaEnHighLevel`** limpia «Confirmación de visita» y «Fecha
+    visita» del contacto. **Sin esto el arreglo sería inútil**: el equipo de
+    consolidación trabaja **solo con el CRM** (§6), así que el CRM seguiría
+    diciendo «visita confirmada» y alguien iría a visitar a quien no era.
+  - Auditoría `operacion72.visita_anulada` (catálogo en `audit.ts` + `case` en
+    `actividad.ts`, en **rojo**: no es un ajuste de agenda, es un registro que
+    se retira). **NO entra en el contador de visitas del día**: se retiró, no
+    se hizo.
+  - Migración probada con `BEGIN … ROLLBACK` en la misma llamada, **incluida la
+    repetición entera para comprobar que es idempotente** (§5), y verificado
+    después que producción quedó en 0 columnas. La consulta de orden con el
+    filtro nuevo devuelve **28**, las mismas 28 tarjetas de VISITA PENDIENTE
+    con visita: ninguna pierde la suya.
+
+- **2026-09-11** — **El campo «Hora visita» de HighLevel quedó VIVO y probado
+  con envíos reales.** El usuario lo puso en el formulario **Registro Llamada
+  Línea** y llegó de inmediato: id **`YncLUTwKQ7eNkYLPhF3G`**, en `others` del
+  envío. Dos envíos el 11-sep: «4:00 pm» (prueba) y **«5 p.m» → Lourdes Cruz
+  González quedó con la visita el 14 de sept a las 17:00 hora Colombia**, o sea
+  que `horaDesdeCrm` y `fechaDesdeCrm` hacen lo suyo en producción.
+  **Cómo se comprueba sin entrar al panel** (receta): `GET
+  /forms/submissions?locationId=…&formId=07rGKuRchJO15bxL2Unj` con el PIT y
+  mirar si el id del campo aparece en `others`. ⚠️ **`GET /forms/` NO sirve para
+  esto**: devuelve los formularios con `fields: []`, así que no dice qué campos
+  tiene ninguno. **El envío real es la única evidencia.**
+  **Fallo encontrado al revisar, y arreglado: el resumen no imprimía la hora.**
+  El detalle del CRM se formateaba con día y mes a secas («Visita 14 de sept»)
+  aunque la hora ya estuviera guardada bien. Era correcto cuando la hora no
+  existía —imprimir el mediodía de relleno habría **afirmado una hora que nadie
+  pactó**— pero ahora hay que distinguir los dos casos.
+  **`horaConocidaDelCrm(valor, hora)`** dice si la hora la dijo alguien o es el
+  mediodía de relleno, y el detalle usa un formateador con hora solo en el
+  primer caso. **Esta distinción es la razón de ser del helper**: varias
+  observaciones dicen literalmente «está por confirmar la hora», así que ahí el
+  mediodía significa «falta confirmar» y mentir sobre eso es peor que no decirlo.
+  Corregido a mano el resumen de Lourdes (la única ya guardada con hora conocida
+  y resumen sin ella). **7 casos nuevos en `fecha-crm.test.ts`.**
+
 - **2026-09-11** — **⚠️ QUINTA TRAMPA DE FECHAS, y la más caliente: un
   `<input type="datetime-local">` manda la hora SIN ZONA, y el servidor corre
   en UTC.** Lo reportó el usuario después de que el arreglo del repintado no

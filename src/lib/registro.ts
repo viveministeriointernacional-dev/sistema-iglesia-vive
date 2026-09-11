@@ -20,6 +20,17 @@ const FORMATO_VISITA = new Intl.DateTimeFormat("es-CO", {
   timeZone: ZONA_HORARIA,
 });
 
+/// El mismo, con la hora. Se usa **solo cuando la hora se conoce de verdad**
+/// (ver `horaConocidaDelCrm`): imprimir el mediodía de relleno haría creer que
+/// la visita quedó pactada a esa hora, cuando lo que pasa es que nadie la dijo.
+const FORMATO_VISITA_CON_HORA = new Intl.DateTimeFormat("es-CO", {
+  day: "2-digit",
+  month: "short",
+  hour: "numeric",
+  minute: "2-digit",
+  timeZone: ZONA_HORARIA,
+});
+
 export type ResultadoSeguimientoCrm = "visita" | "llamada" | null;
 
 /// Aplica lo que la línea registró en el CRM sobre una persona que ya está en
@@ -125,6 +136,7 @@ export async function programarVisitaDesdeCrm(
 
   const esVirtual = visita.confirmacion === "virtual";
   const fecha = fechaValida(visita.fechaVisita, visita.horaVisita);
+  const conHora = horaConocidaDelCrm(visita.fechaVisita, visita.horaVisita);
 
   await db.contactAttempt.create({
     data: {
@@ -142,7 +154,9 @@ export async function programarVisitaDesdeCrm(
     data: {
       status: Operation72Status.VISITA_PENDIENTE,
       detail: [
-        fecha ? `Visita ${FORMATO_VISITA.format(fecha)}` : "Visita confirmada por la línea",
+        fecha
+          ? `Visita ${(conHora ? FORMATO_VISITA_CON_HORA : FORMATO_VISITA).format(fecha)}`
+          : "Visita confirmada por la línea",
         esVirtual ? "virtual" : null,
       ]
         .filter(Boolean)
@@ -189,6 +203,28 @@ export function fechaDesdeCrm(
     soloDia ? `${iso}T${enPunto ?? "12:00:00"}-05:00` : iso,
   );
   return Number.isNaN(fecha.getTime()) ? null : fecha;
+}
+
+/// ¿La hora de esta visita la dijo alguien, o es el mediodía de relleno?
+///
+/// `fechaDesdeCrm` cae en las 12:00 cuando no hay hora reconocible, y esa hora
+/// **no es un dato**: significa «falta confirmar». Quien pinte la visita tiene
+/// que poder distinguir las dos cosas, o el expediente acabará afirmando que se
+/// pactó una visita a mediodía que nadie pactó.
+export function horaConocidaDelCrm(
+  valor: string | null,
+  hora?: string | null,
+): boolean {
+  if (!valor) return false;
+  const dato = valor.trim();
+  const co = dato.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  const iso = co
+    ? `${co[3]}-${co[2].padStart(2, "0")}-${co[1].padStart(2, "0")}`
+    : dato;
+  // El día a secas no trae hora: depende del campo aparte. Cualquier otro
+  // formato que Postgres acepte ya la lleva dentro.
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return true;
+  return horaDesdeCrm(hora) !== null;
 }
 
 /// La hora suelta que escribe la línea, en lo que Postgres entiende.

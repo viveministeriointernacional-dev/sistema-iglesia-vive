@@ -287,6 +287,29 @@ export async function exportarVisita(
   }
 }
 
+/// Limpia en HighLevel la visita que se le había agendado por error.
+///
+/// Si no se limpiara, el CRM seguiría mostrando «Sí, visita confirmada» con su
+/// fecha, y el equipo —que trabaja **solo** con el CRM— iría a visitar a quien
+/// no era. Es justo el error que se está deshaciendo.
+export async function anularVisitaEnHighLevel(learnerId: string): Promise<void> {
+  const cred = await credenciales();
+  if (!cred) return;
+
+  try {
+    await actualizarCampos(
+      learnerId,
+      [
+        { id: CAMPO.confirmacionVisita, valor: "" },
+        { id: CAMPO.fechaVisita, valor: "" },
+      ],
+      cred,
+    );
+  } catch (error) {
+    console.error("No se pudo anular la visita en HighLevel", error);
+  }
+}
+
 /// Escribe en HighLevel quién consolida a esta persona (el «usuario asignado»
 /// del contacto). Es la mitad «sistema → CRM» de la sincronización de doble vía
 /// descrita en `src/lib/consolidador.ts`.
