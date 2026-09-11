@@ -12,7 +12,7 @@ import {
 import { getPrisma } from "@/lib/prisma";
 import { auditar, encolarEventoIntegracion } from "@/lib/audit";
 import { enviarCorreoDeEntrega } from "@/lib/correo-entrega";
-import { ZONA_HORARIA } from "@/lib/dominio";
+import { momentoDesdeCampo, ZONA_HORARIA } from "@/lib/dominio";
 import {
   DONDE_PUEDE_MENTOREAR,
   ErrorDePermiso,
@@ -235,14 +235,17 @@ export async function agendarVisita(
   if (operacion.status !== Operation72Status.CONTACTADA) {
     return { ok: false, mensaje: "Alguien más ya movió esta tarjeta. Actualiza el tablero." };
   }
-  if (Number.isNaN(Date.parse(datos.cuando))) {
+  // `momentoDesdeCampo` y no `new Date`: el campo manda la hora SIN zona y el
+  // servidor corre en UTC, así que `new Date` le restaba cinco horas a cada
+  // visita (4:30 p. m. quedaba guardada como 11:30 a. m.).
+  const cuando = momentoDesdeCampo(datos.cuando);
+  if (!cuando) {
     return { ok: false, mensaje: "La fecha y hora de la visita no son válidas." };
   }
   if (!datos.virtual && !datos.lugar.trim()) {
     return { ok: false, mensaje: "Escribe el lugar, o marca que la visita es virtual." };
   }
 
-  const cuando = new Date(datos.cuando);
   const lugar = datos.virtual ? null : datos.lugar.trim();
   const nota = datos.nota.trim() || null;
   const prisma = await getPrisma();
@@ -608,14 +611,17 @@ export async function reprogramarVisita(
   if (operacion.status !== Operation72Status.VISITA_PENDIENTE) {
     return { ok: false, mensaje: "Alguien más ya movió esta tarjeta. Actualiza el tablero." };
   }
-  if (Number.isNaN(Date.parse(datos.cuando))) {
+  // `momentoDesdeCampo` y no `new Date`: el campo manda la hora SIN zona y el
+  // servidor corre en UTC, así que `new Date` le restaba cinco horas a cada
+  // visita (4:30 p. m. quedaba guardada como 11:30 a. m.).
+  const cuando = momentoDesdeCampo(datos.cuando);
+  if (!cuando) {
     return { ok: false, mensaje: "La fecha y hora de la visita no son válidas." };
   }
   if (!datos.virtual && !datos.lugar.trim()) {
     return { ok: false, mensaje: "Escribe el lugar, o marca que la visita es virtual." };
   }
 
-  const cuando = new Date(datos.cuando);
   const lugar = datos.virtual ? null : datos.lugar.trim();
   const nota = datos.nota.trim() || null;
   const prisma = await getPrisma();

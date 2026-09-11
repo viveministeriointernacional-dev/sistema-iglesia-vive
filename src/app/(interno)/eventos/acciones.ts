@@ -10,7 +10,7 @@ import {
 import { getPrisma, type ClientePrisma } from "@/lib/prisma";
 import { auditar, encolarEventoIntegracion } from "@/lib/audit";
 import { ErrorDePermiso, obtenerUsuarioActual } from "@/lib/auth";
-import { nombreCompleto } from "@/lib/dominio";
+import { momentoDesdeCampo, nombreCompleto } from "@/lib/dominio";
 import {
   ETIQUETA_EVENTO,
   HITO_POR_TIPO,
@@ -48,7 +48,11 @@ export async function crearEvento(datos: {
   if (datos.titulo.trim().length < 3) {
     return { ok: false, mensaje: "Ponle un nombre al evento." };
   }
-  if (Number.isNaN(Date.parse(datos.fecha))) {
+  // El campo `datetime-local` manda la hora sin zona y el servidor corre en
+  // UTC: con `new Date` un evento de las 7 de la noche quedaba a las 2 de la
+  // tarde. `momentoDesdeCampo` le pone la hora de Colombia.
+  const comienza = momentoDesdeCampo(datos.fecha);
+  if (!comienza) {
     return { ok: false, mensaje: "La fecha no es válida." };
   }
 
@@ -63,7 +67,7 @@ export async function crearEvento(datos: {
       kind: datos.kind,
       title: datos.titulo.trim(),
       description: datos.descripcion.trim() || null,
-      startsAt: new Date(datos.fecha),
+      startsAt: comienza,
       location: datos.lugar.trim() || null,
       capacity: cupo,
       phases: datos.fases,
