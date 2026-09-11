@@ -280,6 +280,52 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-11** — **La vista de TODA la iglesia deja de ser del rol PASTOR:
+  ahora es del administrador y de quien coordina la consolidación** (pedido del
+  usuario con pantallazo: «una persona que es mentor o pastor, si no tiene
+  privilegios o asignación de consolidación general o perfil de administrador,
+  **no debería ver el total de personas que hay en el sistema**… solo le debería
+  mostrar la información que corresponda a las personas [de su red]»).
+  **La evidencia era el pantallazo:** con la sesión de **Jesús Polanía
+  (PASTOR)**, «Mi red» decía **«Toda la iglesia» y 361 personas** — y él tiene
+  **10** a cargo.
+  **⚠️ Y EL DAÑO NO ERA EL TÍTULO, ERAN LOS INDICADORES.** Los cinco tiles
+  (personas, con alertas, sin contacto +21d, Op72 vencida, para revisión) y las
+  cuatro barras de **personas por fase** salen **todos de `cargarRed`**, así que
+  le estaban contando el trabajo de toda la iglesia como si fuera suyo: **287
+  alertas y 277 Op72 vencidas que no le tocan**, tapando las de su propia gente.
+  Ahí es donde una pantalla deja de servir para trabajar.
+  - **`veTodaLaRed(usuario)`** en `auth.ts` = `ROLES_ADMIN` **o**
+    `coordinaConsolidacion`. **El rol PASTOR ya no entra.** Aplicado en
+    `red.ts` y `arbol.ts`, que **cada uno calculaba su propio
+    `esVistaCompleta`** con la misma expresión duplicada (`role === PASTOR ||
+    role === ADMIN`) — de ahí que hubiera que cambiarla en dos sitios.
+  - Como los indicadores ya salían de `cargarRed` **en las dos vistas** (regla
+    del 7-sep), recortar el alcance ahí arregló los cinco tiles, las cuatro
+    barras, la lista y el árbol **de una sola vez**. Esa decisión de hace cuatro
+    días es la que hizo que esto fuera un renglón y no un barrido.
+  - **Quien coordina la consolidación la conserva**, sea cual sea su rol: ese
+    permiso existe justo para mirar el trabajo de todos. Hoy la conservan los
+    **4 ADMIN** y **Cristina Ceballos** (PASTOR que coordina).
+  - **Efecto medido, cuenta por cuenta:** Jesús Polanía **361 → 10**, Juan
+    Camilo Torres → 10 (**5 de ellas indirectas**, o sea que para él el cambio
+    en cascada del mismo día también cuenta), Paola Viveros → 8, Juliana
+    Facundo → 5.
+  - **⚠️ DOS PASTORES SE QUEDAN CON LA PANTALLA EN CERO: Lucero Artunduaga y
+    Pastor Luis Alberto Facundo.** No es un fallo: **no tienen ninguna persona
+    asignada en mentoría**, así que su rama está vacía de verdad. Antes veían
+    361 porque el rol se lo regalaba. **Si se quiere que vean algo, hay que
+    asignarles discípulos** (o darles «coordina la consolidación»); no se arregla
+    en el código. Laura Charry también tiene rama 0, pero es ADMIN y sigue
+    viendo todo.
+  - **⚠️ LO QUE NO SE TOCÓ, y es una decisión, no un olvido:
+    `accesoAExpediente` y el buscador siguen abriéndole CUALQUIER expediente al
+    PASTOR.** Ver la ficha de alguien por quien te preguntan es acceso pastoral,
+    y es otra cosa que el tablero de «a quién le toca atención hoy» — el usuario
+    habló de los totales. Pero queda dicho: **un pastor sigue encontrando a las
+    361 en el buscador**, así que si eso también debe cerrarse, es una decisión
+    aparte (y se haría en `accesoAExpediente` + `ROLES_BUSCADOR`).
+
 - **2026-09-11** — **«Mi red» pasa a mostrar la rama EN CASCADA, no solo los
   discípulos directos** (pedido del usuario: «solamente puedan ver la red que
   están debajo de ellos… el pastor Jesús tiene a Sergio Gallo; si Sergio Gallo

@@ -100,7 +100,7 @@ export default async function PaginaMiRed({
           <p className="mt-2 max-w-[620px] text-[13px] leading-[1.45] font-medium text-[rgba(19,28,36,.55)]">
             {red.esVistaCompleta
               ? "Cada persona en proceso, con su fase y su estado."
-              : "Las personas que acompañas y cómo van."}{" "}
+              : "Tu red: a quien acompañas y a quien acompañan ellos."}{" "}
             En <strong className="font-bold text-tinta">Lista</strong> ves quién
             pide atención; en <strong className="font-bold text-tinta">Árbol</strong>,
             de quién cuelga cada una.

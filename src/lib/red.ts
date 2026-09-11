@@ -3,10 +3,9 @@ import {
   LearnerStatus,
   Operation72Status,
   Phase,
-  Role,
 } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
-import type { UsuarioSesion } from "@/lib/auth";
+import { veTodaLaRed, type UsuarioSesion } from "@/lib/auth";
 import { nombreCompleto } from "@/lib/dominio";
 import { horasRestantes, urgenciaDe } from "@/lib/op72";
 
@@ -131,7 +130,7 @@ export async function cargarRed(
   ahora = new Date(),
 ): Promise<ResumenDeLaRed> {
   const prisma = await getPrisma();
-  const esVistaCompleta = usuario.role === Role.PASTOR || usuario.role === Role.ADMIN;
+  const esVistaCompleta = veTodaLaRed(usuario);
 
   // La rama solo se calcula cuando hace falta recortar: quien ve todo no tiene
   // rama que recorrer.

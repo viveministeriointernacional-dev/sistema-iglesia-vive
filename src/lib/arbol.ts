@@ -7,7 +7,7 @@ import {
   Role,
 } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
-import type { UsuarioSesion } from "@/lib/auth";
+import { veTodaLaRed, type UsuarioSesion } from "@/lib/auth";
 import { nombreCompleto } from "@/lib/dominio";
 import { urgenciaDe } from "@/lib/op72";
 import { DIAS_SIN_CONTACTO } from "@/lib/red";
@@ -304,9 +304,10 @@ export async function cargarArbol(usuario: UsuarioSesion, ahora = new Date()) {
     if (comoLider) aprendizPorUsuario.set(comoLider.id, aprendiz);
   }
 
-  // El pastor y la administración ven todo: las raíces son los líderes que no
-  // cuelgan de nadie. Cualquier otro ve su propia rama y nada más (§9.2).
-  const esVistaCompleta = usuario.role === Role.PASTOR || usuario.role === Role.ADMIN;
+  // La administración y quien coordina la consolidación ven todo: las raíces
+  // son los líderes que no cuelgan de nadie. Cualquier otro —el pastor
+  // incluido— ve su propia rama y nada más (§9.2).
+  const esVistaCompleta = veTodaLaRed(usuario);
 
   if (!esVistaCompleta) {
     const propio = aprendizPorUsuario.get(usuario.id) ?? null;
