@@ -12,6 +12,11 @@ import {
 /// adelantadas. Usar siempre `timeZone: ZONA_HORARIA` en los formateadores.
 export const ZONA_HORARIA = "America/Bogota";
 
+/// El desfase de Colombia, fijo: UTC-5 todo el año, sin horario de verano.
+/// Se usa para leer lo que escribe un `<input type="datetime-local">`, que
+/// llega sin zona (ver `momentoDesdeCampo`).
+export const DESFASE_COLOMBIA = "-05:00";
+
 /// El día de hoy en Colombia, como `AAAA-MM-DD`. Sirve para poner por defecto
 /// (y como tope) los campos de fecha: el servidor corre en UTC, así que después
 /// de las 7 p. m. su «hoy» ya es el día siguiente para nosotros.
@@ -281,6 +286,36 @@ export function momentoParaCampo(fecha: Date): string {
   const dia = FORMATO_DIA_CLAVE.format(fecha);
   const hora = FORMATO_HORA_24.format(fecha);
   return `${dia}T${hora}`;
+}
+
+/// El camino de vuelta: lo que escribió un `<input type="datetime-local">`
+/// convertido a un momento real.
+///
+/// **Esto es la otra mitad de `momentoParaCampo` y es la que se olvida.** El
+/// campo manda `2026-09-12T16:30`, **sin zona**, y `new Date()` sobre una
+/// cadena así la resuelve en la zona del servidor — que en Cloudflare Workers
+/// es **UTC**. Resultado: las 4:30 de la tarde que escribió el consolidador se
+/// guardaban como 16:30 UTC, o sea **11:30 de la mañana en Colombia**: cinco
+/// horas menos, cada vez.
+///
+/// Por eso aquí se le pega el desfase de Colombia a mano. Se puede porque
+/// Colombia es UTC-5 fijo, sin horario de verano (ver `ZONA_HORARIA`).
+///
+/// Un valor que ya traiga zona (`Z` o `±HH:mm`) se respeta tal cual: así la
+/// función sigue sirviendo si algún día el dato llega de otra parte.
+export function momentoDesdeCampo(valor: string): Date | null {
+  const texto = valor.trim();
+  if (!texto) return null;
+
+  const local = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?$/.exec(
+    texto,
+  );
+  const iso = local
+    ? `${local[1]}-${local[2]}-${local[3]}T${local[4]}:${local[5]}:${local[6] ?? "00"}${DESFASE_COLOMBIA}`
+    : texto;
+
+  const fecha = new Date(iso);
+  return Number.isNaN(fecha.getTime()) ? null : fecha;
 }
 
 /// Un momento como se dice en voz alta: «hoy, 9:14 a. m.», «ayer, 4:32 p. m.»,

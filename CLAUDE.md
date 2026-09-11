@@ -280,6 +280,51 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-11** — **⚠️ QUINTA TRAMPA DE FECHAS, y la más caliente: un
+  `<input type="datetime-local">` manda la hora SIN ZONA, y el servidor corre
+  en UTC.** Lo reportó el usuario después de que el arreglo del repintado no
+  bastara: «se ajusta la hora de visita pero sale mal, no sé si es porque está
+  tomando el uso horario mal». **Tenía razón.**
+  **La causa.** El campo entrega `2026-09-11T16:30` — una cadena **sin `Z` y
+  sin `±HH:mm`**. `new Date()` sobre eso la resuelve **en la zona del
+  servidor**, que en Cloudflare Workers es **UTC**. Así que las 4:30 de la
+  tarde que escribía el consolidador se guardaban como 16:30 UTC, o sea
+  **11:30 de la mañana en Colombia**. **Cinco horas menos, en toda visita
+  agendada o movida desde el tablero, y en todo evento creado.**
+  **La prueba que lo cerró:** Ana López. El usuario dijo «la hora es 4:30 pm»,
+  la base decía **11:30 a. m.** — exactamente el desfase, sin margen de duda.
+  **Arreglo: `momentoDesdeCampo(valor)` en `dominio.ts`**, que es **la otra
+  mitad de `momentoParaCampo`**. Le pega `DESFASE_COLOMBIA` (`-05:00`, fijo
+  todo el año) antes de construir la fecha, y **respeta el valor que ya traiga
+  zona**. Usado en `agendarVisita`, `reprogramarVisita` y `crearEvento`.
+  **REGLA: nunca `new Date(<lo que venga de un datetime-local>)`. Siempre
+  `momentoDesdeCampo`.** Los dos helpers son un par: si se pinta el campo con
+  `momentoParaCampo`, se lee con `momentoDesdeCampo`. **La prueba que importa
+  es la de ida y vuelta** (`momento-campo.test.ts`): el panel de reprogramar
+  rellena con uno y guarda con el otro, así que si las dos mitades no cuadran,
+  **abrir el panel y guardar sin tocar nada corre la hora**.
+  **⚠️ Lo que salva de perseguir fantasmas: el camino del CRM NUNCA tuvo el
+  fallo.** `fechaDesdeCrm` ya construía la fecha con el offset puesto. Por eso
+  en la base convivían visitas buenas (las del CRM, con su hora correcta) y
+  malas (las del tablero, cinco horas antes), y comparar unas con otras es lo
+  que permite saber de qué lado está el error.
+  **Datos corregidos: las 9 tarjetas vivas de VISITA PENDIENTE agendadas desde
+  el tablero** (+5 h en `contact_attempt.scheduled_at` **y** en
+  `operation72.detail`, que es la regla del día anterior: cambiar solo la fecha
+  deja la tarjeta mintiendo). Ana López quedó en **11 de sept, 4:30 p. m.**,
+  que es exactamente lo que el usuario había escrito — la mejor comprobación de
+  que sumar 5 h reconstruye lo que se teclteó. Probado con `BEGIN … ROLLBACK` en
+  la misma llamada antes de aplicar.
+  **⚠️ PENDIENTE DEL USUARIO — 7 de esas 9 quedaron con hora inverosímil**
+  (Francisco Sandoval, Saidy Aragón, Jenny Ruiz, Valentina Cubillos y los tres
+  Tabares: todas del 9-sep entre 11:01 y 11:15). En esas, la hora guardada era
+  **exactamente el momento en que se llenó el formulario**, así que lo más
+  probable es que en el celular se abrió el selector, marcó «ahora» y se
+  aceptó. Corregirlas devuelve lo que se tecleó, pero **eso no es una hora de
+  visita real**: hay que preguntarle al equipo a qué hora era cada una.
+  **NO se tocaron las 54 visitas históricas** (columnas ya cerradas): la
+  corrección se limitó a lo que el equipo va a usar hoy.
+
 - **2026-09-11** — **⚠️ BUG REAL Y VIEJO: las acciones guardaban bien pero la
   PANTALLA no se repintaba.** Lo reportó el usuario: «a Ana López le acabo de
   cambiar la hora de visita pero no realizó el cambio». **Sí la realizó** — y
