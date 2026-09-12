@@ -60,11 +60,29 @@ export type Movimiento = {
 };
 
 export type ActividadDelDia = {
-  dia: string;
+  /// Los dos extremos del rango, en `AAAA-MM-DD` hora Colombia. Cuando se mira
+  /// un solo día valen lo mismo.
+  desde: string;
+  hasta: string;
+  /// `true` cuando los dos extremos son el mismo día: la pantalla habla en
+  /// singular («Actividad del día») y agrupa solo por hora.
+  esUnDia: boolean;
+  /// Qué rango se está mirando, ya escrito para leerlo.
   etiquetaDia: string;
-  diaAnterior: string;
-  diaSiguiente: string;
+  /// Un rango del mismo largo, corrido hacia atrás o hacia adelante. Las
+  /// flechas mueven el periodo completo, no un día: si miras una semana, ‹ te
+  /// lleva a la semana anterior.
+  anterior: { desde: string; hasta: string };
+  siguiente: { desde: string; hasta: string };
   esHoy: boolean;
+  /// Hoy en hora Colombia. La pantalla lo usa como `max` de los dos campos de
+  /// fecha: no hay actividad en el futuro, así que el calendario no la ofrece.
+  hoy: string;
+  /// ⚠️ `true` cuando la consulta topó con el límite y la lista quedó
+  /// incompleta. **Los seis contadores NO se ven afectados** (salen de un
+  /// `count` en la base), pero la lista sí, y hay que decirlo en pantalla en
+  /// vez de enseñar una lista corta como si fuera todo.
+  recortado: boolean;
   movimientos: Movimiento[];
   conteos: {
     registros: number;
@@ -78,10 +96,27 @@ export type ActividadDelDia = {
   total: number;
 };
 
+/// **Topes de la consulta.** Existen para que un rango largo no se traiga la
+/// base entera a la memoria del Worker.
+///
+/// ⚠️ Medido el 12-sep-2026: **el día con más movimientos tiene 900**, y la
+/// historia completa desde el 15-ago son 2 290. O sea que el tope viejo de
+/// 1 000 **ya estaba a punto de cortar un solo día** — y como los contadores se
+/// calculaban sobre la lista, habrían empezado a mentir sin avisar. De ahí que
+/// ahora los contadores salgan de un `count` en la base y no del arreglo.
+const TOPE_AUDITORIA = 3000;
+const TOPE_LLAMADAS = 1500;
+const TOPE_CORREOS = 900;
+
 const FORMATO_DIA_CLAVE = new Intl.DateTimeFormat("en-CA", {
   year: "numeric",
   month: "2-digit",
   day: "2-digit",
+  timeZone: ZONA_HORARIA,
+});
+const FORMATO_DIA_CORTO = new Intl.DateTimeFormat("es-CO", {
+  day: "numeric",
+  month: "short",
   timeZone: ZONA_HORARIA,
 });
 const FORMATO_DIA_LARGO = new Intl.DateTimeFormat("es-CO", {
@@ -94,6 +129,12 @@ const FORMATO_HORA = new Intl.DateTimeFormat("es-CO", {
   hour: "numeric",
   minute: "2-digit",
   hour12: true,
+  timeZone: ZONA_HORARIA,
+});
+const FORMATO_DIA_FRANJA = new Intl.DateTimeFormat("es-CO", {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
   timeZone: ZONA_HORARIA,
 });
 const FORMATO_FRANJA = new Intl.DateTimeFormat("es-CO", {
@@ -113,8 +154,21 @@ export function diaDeHoy(ahora = new Date()) {
   return FORMATO_DIA_CLAVE.format(ahora);
 }
 
+/// Devuelve el día solo si viene bien escrito. A diferencia de `diaValido`,
+/// **no cae a hoy**: hace falta distinguir «no lo pidió» de «pidió hoy».
+function diaSiSirve(valor: string | undefined): string | null {
+  return valor && /^\d{4}-\d{2}-\d{2}$/.test(valor) ? valor : null;
+}
+
 function diaValido(valor: string | undefined): string {
   return valor && /^\d{4}-\d{2}-\d{2}$/.test(valor) ? valor : diaDeHoy();
+}
+
+/// Cuántos días cubre el rango, contando los dos extremos.
+function diasDelRango(desde: string, hasta: string) {
+  const a = new Date(`${desde}T12:00:00-05:00`).getTime();
+  const b = new Date(`${hasta}T12:00:00-05:00`).getTime();
+  return Math.round((b - a) / 86_400_000) + 1;
 }
 
 function sumarDias(dia: string, n: number) {
@@ -128,8 +182,16 @@ function hora(fecha: Date) {
   return FORMATO_HORA.format(fecha).replace(/\.\s?m\./g, ". m.");
 }
 
-function franja(fecha: Date) {
-  return FORMATO_FRANJA.format(fecha).replace(/\.\s?m\./g, ". M.").toUpperCase();
+/// La cabecera que agrupa los movimientos.
+///
+/// ⚠️ **Con un rango de varios días hay que meter el día en la franja.** La
+/// lista agrupa comparando esta cadena con la anterior, así que sin el día las
+/// «11 P. M.» de dos días distintos se juntarían en un solo bloque y parecería
+/// que todo pasó la misma noche.
+function franja(fecha: Date, conDia = false) {
+  const hora = FORMATO_FRANJA.format(fecha).replace(/\.\s?m\./g, ". M.").toUpperCase();
+  if (!conDia) return hora;
+  return `${FORMATO_DIA_FRANJA.format(fecha).toUpperCase()} · ${hora}`;
 }
 
 type Meta = Record<string, unknown>;
@@ -142,18 +204,40 @@ function texto(valor: unknown): string | null {
 
 export async function cargarActividad(
   prisma: ClientePrisma,
-  opciones: { dia?: string; tipo?: string; consulta?: string } = {},
+  opciones: {
+    /// Un solo día. Se conserva para los enlaces guardados de antes.
+    dia?: string;
+    desdeDia?: string;
+    hastaDia?: string;
+    tipo?: string;
+    consulta?: string;
+  } = {},
 ): Promise<ActividadDelDia> {
-  const dia = diaValido(opciones.dia);
-  const desde = new Date(`${dia}T00:00:00-05:00`);
-  const hasta = new Date(`${dia}T23:59:59.999-05:00`);
+  // **Cómo se resuelve el rango.** `desdeDia` a secas significa ESE día, no
+  // «de ahí en adelante»: así elegir una fecha en el calendario es un solo
+  // gesto, y el segundo campo solo hace falta para un periodo.
+  const inicioPedido = diaSiSirve(opciones.desdeDia) ?? diaSiSirve(opciones.dia);
+  const finPedido = diaSiSirve(opciones.hastaDia);
+  const unico = diaValido(opciones.desdeDia ?? opciones.dia);
+  const [diaDesde, diaHasta] =
+    inicioPedido && finPedido
+      ? // Si vienen al revés se enderezan, en vez de devolver una lista vacía.
+        inicioPedido <= finPedido
+        ? [inicioPedido, finPedido]
+        : [finPedido, inicioPedido]
+      : [unico, unico];
+
+  const desde = new Date(`${diaDesde}T00:00:00-05:00`);
+  const hasta = new Date(`${diaHasta}T23:59:59.999-05:00`);
+  const dias = diasDelRango(diaDesde, diaHasta);
+  const esUnDia = dias === 1;
   const ahora = new Date();
 
   const [auditoria, llamadasCrm, correos, intentos] = await Promise.all([
     prisma.auditLog.findMany({
       where: { createdAt: { gte: desde, lte: hasta } },
       orderBy: { createdAt: "desc" },
-      take: 1000,
+      take: TOPE_AUDITORIA,
       select: {
         id: true,
         actorId: true,
@@ -168,7 +252,7 @@ export async function cargarActividad(
     prisma.callLog.findMany({
       where: { startedAt: { gte: desde, lte: hasta } },
       orderBy: { startedAt: "desc" },
-      take: 500,
+      take: TOPE_LLAMADAS,
       select: {
         id: true,
         startedAt: true,
@@ -186,7 +270,7 @@ export async function cargarActividad(
       .findMany({
         where: { createdAt: { gte: desde, lte: hasta } },
         orderBy: { createdAt: "desc" },
-        take: 300,
+        take: TOPE_CORREOS,
       })
       .catch(() => []),
     prisma.contactAttempt.findMany({
@@ -915,7 +999,7 @@ export async function cargarActividad(
       id: fila.id,
       cuando: fila.createdAt.toISOString(),
       hora: hora(fila.createdAt),
-      franja: franja(fila.createdAt),
+      franja: franja(fila.createdAt, !esUnDia),
       tipo,
       etiqueta,
       tono,
@@ -934,7 +1018,7 @@ export async function cargarActividad(
       id: `correo-${c.id}`,
       cuando: c.createdAt.toISOString(),
       hora: hora(c.createdAt),
-      franja: franja(c.createdAt),
+      franja: franja(c.createdAt, !esUnDia),
       tipo: "accesos",
       etiqueta: "CORREO",
       tono: c.sent ? "gris" : "rojo",
@@ -955,7 +1039,7 @@ export async function cargarActividad(
       id: `llamada-${l.id}`,
       cuando: l.startedAt.toISOString(),
       hora: hora(l.startedAt),
-      franja: franja(l.startedAt),
+      franja: franja(l.startedAt, !esUnDia),
       tipo: "llamadas",
       etiqueta: "LLAMADA CRM",
       tono: l.answered ? "azul" : "gris",
@@ -971,13 +1055,55 @@ export async function cargarActividad(
   const porTipo = Object.fromEntries(TIPOS_DE_ACTIVIDAD.map((tt) => [tt.valor, 0])) as Record<TipoActividad, number>;
   for (const mv of movimientos) porTipo[mv.tipo] += 1;
 
+  // **⚠️ Los seis contadores se cuentan EN LA BASE, no sobre `auditoria`.**
+  //
+  // Antes salían de filtrar el arreglo, y el arreglo viene con tope. Medido el
+  // 12-sep-2026: el día más movido tiene **900** registros y el tope era 1 000,
+  // así que un solo día ya estaba a punto de recortarse — y con un rango de
+  // varios días los contadores habrían empezado a **quedarse cortos sin avisar**,
+  // que es peor que no mostrarlos. Un `count` no se recorta nunca.
+  //
+  // Va en una sola consulta con `FILTER` porque el pooler cobra por viaje
+  // (`PrismaPg max:1` serializa, así que seis consultas serían seis latencias).
+  const [cuenta] = await prisma.$queryRaw<
+    {
+      registros: number;
+      llamadas: number;
+      contactadas: number;
+      visitas: number;
+      entregas: number;
+      fases: number;
+    }[]
+  >`
+    SELECT
+      count(*) FILTER (WHERE action = 'persona.registrada')::int AS registros,
+      count(*) FILTER (WHERE action = 'operacion72.contacto_registrado')::int AS llamadas,
+      count(*) FILTER (
+        WHERE action = 'operacion72.contacto_registrado'
+          AND metadata->>'contactada' = 'true'
+      )::int AS contactadas,
+      count(*) FILTER (WHERE action IN (
+        'operacion72.visita_agendada',
+        'operacion72.visita_reprogramada',
+        'operacion72.visita_corregida',
+        'operacion72.visita_cerrada'
+      ))::int AS visitas,
+      count(*) FILTER (WHERE action IN (
+        'operacion72.entregada',
+        'administracion.mentor_asignado'
+      ))::int AS entregas,
+      count(*) FILTER (WHERE action = 'fase.cambiada')::int AS fases
+    FROM audit_log
+    WHERE created_at BETWEEN ${desde} AND ${hasta}
+  `;
+
   const conteos = {
-    registros: auditoria.filter((f) => f.action === "persona.registrada").length,
-    llamadas: auditoria.filter((f) => f.action === "operacion72.contacto_registrado").length,
-    contactadas: auditoria.filter((f) => f.action === "operacion72.contacto_registrado" && meta(f.metadata).contactada === true).length,
-    visitas: auditoria.filter((f) => f.action === "operacion72.visita_agendada" || f.action === "operacion72.visita_reprogramada" || f.action === "operacion72.visita_corregida" || f.action === "operacion72.visita_cerrada").length,
-    entregas: auditoria.filter((f) => f.action === "operacion72.entregada" || f.action === "administracion.mentor_asignado").length,
-    fases: auditoria.filter((f) => f.action === "fase.cambiada").length,
+    registros: Number(cuenta?.registros ?? 0),
+    llamadas: Number(cuenta?.llamadas ?? 0),
+    contactadas: Number(cuenta?.contactadas ?? 0),
+    visitas: Number(cuenta?.visitas ?? 0),
+    entregas: Number(cuenta?.entregas ?? 0),
+    fases: Number(cuenta?.fases ?? 0),
   };
 
   const tipoFiltro = TIPOS_DE_ACTIVIDAD.some((tt) => tt.valor === opciones.tipo) ? (opciones.tipo as TipoActividad) : null;
@@ -986,12 +1112,26 @@ export async function cargarActividad(
     (mv) => (!tipoFiltro || mv.tipo === tipoFiltro) && (!consulta || mv.buscable.includes(consulta)),
   );
 
+  const hoy = diaDeHoy(ahora);
+
   return {
-    dia,
-    etiquetaDia: FORMATO_DIA_LARGO.format(new Date(`${dia}T12:00:00-05:00`)),
-    diaAnterior: sumarDias(dia, -1),
-    diaSiguiente: sumarDias(dia, 1),
-    esHoy: dia === diaDeHoy(ahora),
+    desde: diaDesde,
+    hasta: diaHasta,
+    esUnDia,
+    etiquetaDia: esUnDia
+      ? FORMATO_DIA_LARGO.format(new Date(`${diaDesde}T12:00:00-05:00`))
+      : `${FORMATO_DIA_CORTO.format(new Date(`${diaDesde}T12:00:00-05:00`))} – ${FORMATO_DIA_CORTO.format(new Date(`${diaHasta}T12:00:00-05:00`))}`,
+    // Las flechas mueven el periodo COMPLETO: de una semana a la semana
+    // anterior, no al día anterior. Es la misma idea que las flechas del
+    // informe (7-sep), para que ir atrás y volver caiga en el mismo sitio.
+    anterior: { desde: sumarDias(diaDesde, -dias), hasta: sumarDias(diaHasta, -dias) },
+    siguiente: { desde: sumarDias(diaDesde, dias), hasta: sumarDias(diaHasta, dias) },
+    esHoy: diaHasta >= hoy,
+    hoy,
+    recortado:
+      auditoria.length >= TOPE_AUDITORIA ||
+      llamadasCrm.length >= TOPE_LLAMADAS ||
+      correos.length >= TOPE_CORREOS,
     movimientos: filtrados,
     conteos,
     porTipo,
