@@ -35,9 +35,11 @@ export default async function PaginaCasaDeFe({
 
   if (!grupo) notFound();
 
-  // Solo entra quien la lleva, quien la abrió, o la dirección.
-  const puedeEditar = puedeAdministrarCasaDeFe(usuario, grupo);
-  if (!puedeEditar && grupo.createdById !== usuario.id) notFound();
+  // Solo entra quien la lleva, quien la abrió, la administración, o el líder
+  // que tiene al líder del grupo en su rama. Quien la abrió ya entra por
+  // `puedeAdministrarCasaDeFe`.
+  const puedeEditar = await puedeAdministrarCasaDeFe(usuario, grupo);
+  if (!puedeEditar) notFound();
 
   const miembros: MiembroVista[] = construirMiembros(grupo).map((miembro) => ({
     membershipId: miembro.membershipId,

@@ -61,7 +61,7 @@ export default async function PaginaAlpha() {
               <p className="text-[11.5px] leading-none font-medium text-[rgba(19,28,36,.5)]">
                 {esVistaCompletaDeAlpha(usuario)
                   ? "Todos los grupos de la iglesia"
-                  : "Los grupos que lideras"}{" "}
+                  : "Los que llevas y los de tu red"}{" "}
                 · {SESIONES_DE_ALPHA} sesiones de referencia
               </p>
             </div>
@@ -126,7 +126,7 @@ export default async function PaginaAlpha() {
               <p className="text-[11.5px] leading-none font-medium text-[rgba(19,28,36,.5)]">
                 {esVistaCompletaDeCasaDeFe(usuario)
                   ? "Todas las Casas de Fe de la iglesia"
-                  : "Las Casas de Fe que llevas"}{" "}
+                  : "Las que llevas y las de tu red"}{" "}
                 · 12 temas de referencia
               </p>
             </div>

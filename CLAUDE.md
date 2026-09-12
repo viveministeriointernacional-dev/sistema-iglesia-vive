@@ -280,6 +280,61 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-12** — **Alpha y Casa de Fe: cada líder ve los suyos y los de su
+  rama, no los de toda la iglesia** (pedido del usuario: «que solamente el
+  mentor o líder pueda ver los Alpha y Casas de Fe que tiene asignado o que
+  tienen asignado las personas que lidera»). Es la misma regla de «Mi red» del
+  11-sep, aplicada a la otra pantalla que enseñaba todo.
+  - **`lideresDeMiRama(mentorId)`** en `red.ts`: es `ramaDeLaRed` **proyectada a
+    `app_user`**. Hacía falta porque **los grupos se asignan a CUENTAS, no a
+    expedientes** (`leaderId` apunta a `app_user`), así que la rama de
+    expedientes no servía tal cual.
+  - `esVistaCompletaDeAlpha` y `esVistaCompletaDeCasaDeFe` pasan a
+    **`veTodaLaRed`** (administración o quien coordina la consolidación). **El
+    rol PASTOR ya no abre todos los grupos.** Las dos listas añaden
+    `leaderId: { in: lideresDeMiRama(...) }` a las condiciones que ya tenían.
+  - **⚠️ EL FALLO QUE `tsc` NO VE, Y ES DE SEGURIDAD — lo más importante de
+    esta entrada.** `puedeAdministrarGrupo` tuvo que volverse **`async`** (ahora
+    consulta la rama), y en `alpha/acciones.ts` y `casa-de-fe/acciones.ts` el
+    guardia era **`if (!puedeAdministrarGrupo(...))`**. Negar una **promesa** es
+    TypeScript perfectamente válido y `!promesa` es **siempre `false`**, así que
+    el guardia **habría dejado de bloquear a cualquiera**: todo el mundo podría
+    administrar cualquier grupo. `tsc` solo cazó los **dos** sitios donde el
+    valor se asignaba a un `boolean` (las dos páginas `[id]`); **los dos
+    guardias de las acciones los pasó en silencio.**
+    **REGLA: al volver `async` una función que ya se usaba como condición,
+    revisar A MANO cada `if (!fn(...))` — `tsc` solo avisa donde hay una
+    asignación tipada.**
+  - **⚠️ `createdById` entra en el permiso de administrar, y sin él esto era una
+    regresión.** Antes bastaba ser PASTOR para administrar cualquier grupo, así
+    que quien abría un Alpha y se lo asignaba a otra persona lo seguía
+    administrando **de rebote**. Al recortar la vista completa eso desaparecía:
+    **habría abierto un grupo y al instante no habría podido tocarlo.** Hubo que
+    añadir `createdById: true` al `select` de las dos acciones, que solo traían
+    `id`, `leaderId` y `closedAt`.
+    De paso, en las dos páginas `[id]` el `&& grupo.createdById !== usuario.id`
+    quedó **muerto** (ya lo cubre el permiso) y se quitó.
+  - **Estado medido de la base: en toda la iglesia hay 1 Alpha y 3 Casas de
+    Fe.** «Alpha Norte - Freddy y Nini» (Freddy Cadena, y **`created_by_id`
+    nulo**), «Alamor Norte Cas Hogar» (Santiago Viveros), y dos de Juan Felipe
+    Carvajal.
+  - **⚠️ CONSECUENCIA VISIBLE: a casi todos los pastores la sección les va a
+    quedar VACÍA.** Antes veían los 4 grupos; ahora **Jesús Polanía, Juliana
+    Facundo, Paola Viveros, Lucero Artunduaga y el Pastor Luis Alberto Facundo
+    ven 0**, porque no llevan ninguno ni lo lleva nadie de su rama. El único que
+    conserva algo es **Juan Camilo Torres: 1 Casa de Fe de su rama**. No es un
+    fallo, es la regla pedida — y **pueden seguir abriendo grupos**
+    (`puedeCrearAlpha` no cambió), que al crearlos les aparecen por
+    `createdById`.
+  - Los 4 ADMIN siguen viendo todo. Freddy Cadena y Santiago Viveros no pierden
+    nada: entran por `leaderId`.
+  - Rótulos de la pantalla ajustados: «Los grupos que lideras» → **«Los que
+    llevas y los de tu red»** (y su par en Casa de Fe), porque la lista ya no es
+    solo lo propio.
+  - `tsc`, eslint, **22/22 pruebas** y `npm run cf:build` en verde. SQL probado
+    contra la base para los **29** líderes de un tirón, sin el fallo del cast a
+    `uuid` (lección del 11-sep: los id de este esquema son `text`).
+
 - **2026-09-11** — **La vista de TODA la iglesia deja de ser del rol PASTOR:
   ahora es del administrador y de quien coordina la consolidación** (pedido del
   usuario con pantallazo: «una persona que es mentor o pastor, si no tiene

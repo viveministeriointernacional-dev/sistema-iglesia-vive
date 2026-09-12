@@ -1,6 +1,7 @@
 import { Role } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
-import type { UsuarioSesion } from "@/lib/auth";
+import { veTodaLaRed, type UsuarioSesion } from "@/lib/auth";
+import { lideresDeMiRama } from "@/lib/red";
 import { nombreCompleto } from "@/lib/dominio";
 
 /// Abrir y cerrar Casas de Fe es de dirección (pastor o mentor); llevarlas es de
@@ -19,27 +20,45 @@ export function puedeVerCasaDeFe(usuario: UsuarioSesion) {
   return usuario.canLeadFaithHouse || puedeCrearCasaDeFe(usuario);
 }
 
+/// **Quién ve TODAS las Casas de Fe de la iglesia.** Misma regla que Alpha y
+/// que «Mi red»: el rol PASTOR ya no las abre todas.
 export function esVistaCompletaDeCasaDeFe(usuario: UsuarioSesion) {
-  return usuario.role === Role.PASTOR || usuario.role === Role.ADMIN;
+  return veTodaLaRed(usuario);
 }
 
-/// Quién administra una Casa de Fe concreta: su líder asignado, o la dirección.
-export function puedeAdministrarCasaDeFe(
+/// **Quién administra una Casa de Fe concreta**: su líder, quien la abrió, la
+/// administración, o el líder que tiene al líder del grupo en su rama.
+/// `createdById` entra por la misma razón que en Alpha: sin él, quien abre una
+/// Casa de Fe y se la asigna a otra persona se queda sin poder tocarla.
+export async function puedeAdministrarCasaDeFe(
   usuario: UsuarioSesion,
-  grupo: { leaderId: string },
+  grupo: { leaderId: string; createdById?: string | null },
 ) {
-  return grupo.leaderId === usuario.id || esVistaCompletaDeCasaDeFe(usuario);
+  if (grupo.leaderId === usuario.id) return true;
+  if (grupo.createdById && grupo.createdById === usuario.id) return true;
+  if (esVistaCompletaDeCasaDeFe(usuario)) return true;
+  return (await lideresDeMiRama(usuario.id)).includes(grupo.leaderId);
 }
 
 export async function cargarCasasDeFe(usuario: UsuarioSesion) {
   const prisma = await getPrisma();
 
+  // La administración ve todas. Cualquier otro ve las que lleva, las que abrió,
+  // y **las que lleva alguien de su rama**.
+  const deLaRama = esVistaCompletaDeCasaDeFe(usuario)
+    ? []
+    : await lideresDeMiRama(usuario.id);
+
   return prisma.faithHouseGroup.findMany({
-    // El pastor y la administración ven todas. Un mentor ve las que abrió; un
-    // líder, las que lleva.
     where: esVistaCompletaDeCasaDeFe(usuario)
       ? {}
-      : { OR: [{ leaderId: usuario.id }, { createdById: usuario.id }] },
+      : {
+          OR: [
+            { leaderId: usuario.id },
+            { createdById: usuario.id },
+            { leaderId: { in: deLaRama } },
+          ],
+        },
     orderBy: { startDate: "desc" },
     select: {
       id: true,
