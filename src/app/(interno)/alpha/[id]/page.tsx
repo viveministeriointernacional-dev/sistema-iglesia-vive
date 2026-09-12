@@ -35,9 +35,11 @@ export default async function PaginaGrupoDeAlpha({
 
   if (!grupo) notFound();
 
-  // Solo entra quien lleva el grupo, quien lo abrió, o la dirección.
-  const puedeEditar = puedeAdministrarGrupo(usuario, grupo);
-  if (!puedeEditar && grupo.createdById !== usuario.id) notFound();
+  // Solo entra quien lleva el grupo, quien lo abrió, la administración, o el
+  // líder que tiene al líder del grupo en su rama. Quien lo abrió ya entra por
+  // `puedeAdministrarGrupo`, así que aquí no hace falta repetirlo.
+  const puedeEditar = await puedeAdministrarGrupo(usuario, grupo);
+  if (!puedeEditar) notFound();
 
   const ahora = new Date();
   const participantes = construirParticipantes(grupo, ahora);

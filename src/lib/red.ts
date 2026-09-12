@@ -81,6 +81,39 @@ export async function ramaDeLaRed(
   return new Map(filas.map((f) => [f.learner_id, Number(f.nivel)]));
 }
 
+/// **Las CUENTAS que cuelgan de quien mira**, no los expedientes.
+///
+/// Es `ramaDeLaRed` proyectada a `app_user`: de las personas de la rama, las
+/// que tienen cuenta. Sirve para «¿este grupo lo lleva alguien de mi rama?»,
+/// que es lo que decide si un Alpha o una Casa de Fe le corresponde a un
+/// líder — los grupos se asignan a cuentas, no a expedientes.
+///
+/// **NO se incluye la propia cuenta**: quien mira ya entra por `leaderId` o
+/// `createdById`, y meterla aquí escondería esa distinción.
+export async function lideresDeMiRama(mentorId: string): Promise<string[]> {
+  const prisma = await getPrisma();
+  const filas = await prisma.$queryRaw<{ id: string }[]>`
+    WITH RECURSIVE rama AS (
+      SELECT mr.learner_id
+      FROM mentor_relationship mr
+      WHERE mr.mentor_id = ${mentorId} AND mr.ended_at IS NULL
+      UNION
+      SELECT mr.learner_id
+      FROM rama r
+      JOIN learner_profile lp ON lp.id = r.learner_id
+      JOIN app_user u ON u.person_id = lp.person_id
+      JOIN mentor_relationship mr
+        ON mr.mentor_id = u.id AND mr.ended_at IS NULL
+    )
+    SELECT DISTINCT u.id
+    FROM rama r
+    JOIN learner_profile lp ON lp.id = r.learner_id
+    JOIN app_user u ON u.person_id = lp.person_id
+    WHERE u.active
+  `;
+  return filas.map((f) => f.id);
+}
+
 /// **A qué profundidad está un expediente bajo un líder** (nulo si no cuelga
 /// de él). Es `ramaDeLaRed` al revés: sube por la cadena de mentores desde la
 /// persona hasta encontrar al líder.

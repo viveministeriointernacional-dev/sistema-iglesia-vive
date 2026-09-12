@@ -30,10 +30,13 @@ async function casaPropia(groupId: string) {
   const prisma = await getPrisma();
   const grupo = await prisma.faithHouseGroup.findUnique({
     where: { id: groupId },
-    select: { id: true, leaderId: true, closedAt: true },
+    // `createdById`: quien la abrió debe poder operarla aunque la lleve otra
+    // persona.
+    select: { id: true, leaderId: true, createdById: true, closedAt: true },
   });
   if (!grupo) return { usuario, grupo: null };
-  if (!puedeAdministrarCasaDeFe(usuario, grupo)) return { usuario, grupo: null };
+  if (!(await puedeAdministrarCasaDeFe(usuario, grupo)))
+    return { usuario, grupo: null };
   return { usuario, grupo };
 }
 

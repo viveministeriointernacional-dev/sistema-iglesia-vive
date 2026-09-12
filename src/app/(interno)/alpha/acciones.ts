@@ -45,10 +45,13 @@ async function grupoPropio(programId: string) {
   const prisma = await getPrisma();
   const grupo = await prisma.alphaProgram.findUnique({
     where: { id: programId },
-    select: { id: true, leaderId: true, closedAt: true },
+    // `createdById` hace falta para que quien abrió el grupo pueda operarlo
+    // aunque se lo haya asignado a otra persona.
+    select: { id: true, leaderId: true, createdById: true, closedAt: true },
   });
   if (!grupo) return { usuario, grupo: null };
-  if (!puedeAdministrarGrupo(usuario, grupo)) return { usuario, grupo: null };
+  if (!(await puedeAdministrarGrupo(usuario, grupo)))
+    return { usuario, grupo: null };
   return { usuario, grupo };
 }
 

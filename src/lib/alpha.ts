@@ -1,6 +1,7 @@
 import { Role } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
-import type { UsuarioSesion } from "@/lib/auth";
+import { veTodaLaRed, type UsuarioSesion } from "@/lib/auth";
+import { lideresDeMiRama } from "@/lib/red";
 import { nombreCompleto } from "@/lib/dominio";
 
 /// Referencia del §5.7: 12 sesiones en unos 3 meses.
@@ -42,27 +43,54 @@ export function puedeVerAlpha(usuario: UsuarioSesion) {
   return usuario.canLeadAlpha || puedeCrearAlpha(usuario);
 }
 
-/// Quién administra un grupo concreto: su líder asignado, o la dirección.
-export function puedeAdministrarGrupo(
+/// **Quién administra un grupo concreto**: su líder, quien lo abrió, la
+/// administración, o el líder que tiene al líder del grupo en su rama.
+///
+/// ⚠️ **`createdById` entra aquí a propósito, y sin él esto sería una
+/// regresión.** Antes bastaba con ser PASTOR para administrar cualquier grupo,
+/// así que un pastor que abría un Alpha y se lo asignaba a otra persona podía
+/// seguir administrándolo **de rebote**. Al recortar la vista completa eso
+/// desaparecía: habría abierto un grupo y al instante no habría podido tocarlo.
+export async function puedeAdministrarGrupo(
   usuario: UsuarioSesion,
-  grupo: { leaderId: string },
+  grupo: { leaderId: string; createdById?: string | null },
 ) {
-  return grupo.leaderId === usuario.id || esVistaCompletaDeAlpha(usuario);
+  if (grupo.leaderId === usuario.id) return true;
+  if (grupo.createdById && grupo.createdById === usuario.id) return true;
+  if (esVistaCompletaDeAlpha(usuario)) return true;
+  return (await lideresDeMiRama(usuario.id)).includes(grupo.leaderId);
 }
 
+/// **Quién ve TODOS los Alpha de la iglesia.**
+///
+/// Regla del usuario (11-sep-2026), la misma que en «Mi red»: «que solamente
+/// el mentor o líder pueda ver los Alpha y Casas de Fe que tiene asignado o que
+/// tienen asignado las personas que lidera». Así que **el rol PASTOR ya no
+/// abre todos los grupos** — ve los suyos y los de su rama.
 export function esVistaCompletaDeAlpha(usuario: UsuarioSesion) {
-  return usuario.role === Role.PASTOR || usuario.role === Role.ADMIN;
+  return veTodaLaRed(usuario);
 }
 
 export async function cargarGrupos(usuario: UsuarioSesion) {
   const prisma = await getPrisma();
 
+  // La administración ve todo. Cualquier otro ve los que lleva, los que abrió,
+  // y **los que lleva alguien de su rama** — que es lo que convierte esta
+  // pantalla en «cómo van los Alpha de mi gente» en vez de un directorio.
+  const deLaRama = esVistaCompletaDeAlpha(usuario)
+    ? []
+    : await lideresDeMiRama(usuario.id);
+
   const grupos = await prisma.alphaProgram.findMany({
-    // El pastor y la administración ven todo. Un mentor ve los grupos que
-    // abrió; un líder, los que lleva.
     where: esVistaCompletaDeAlpha(usuario)
       ? {}
-      : { OR: [{ leaderId: usuario.id }, { createdById: usuario.id }] },
+      : {
+          OR: [
+            { leaderId: usuario.id },
+            { createdById: usuario.id },
+            { leaderId: { in: deLaRama } },
+          ],
+        },
     orderBy: { startDate: "desc" },
     select: {
       id: true,
