@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { CallOutcome, Operation72Status } from "@iglesia/prisma-client";
 import {
+  DESTINOS_REASIGNABLES,
   ETIQUETA_COLUMNA,
   MOTIVOS_DE_ASISTENTE,
   MOTIVOS_DE_BAJA,
@@ -22,7 +23,6 @@ import {
   reprogramarVisita,
   retirarSolicitudDesdeTablero,
   reasignarColumnaOp72,
-  DESTINOS_REASIGNABLES,
 } from "./acciones";
 
 export type MentorOpcion = { id: string; nombre: string; role: string };
