@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { CallOutcome, Operation72Status } from "@iglesia/prisma-client";
 import {
+  ETIQUETA_COLUMNA,
   MOTIVOS_DE_ASISTENTE,
   MOTIVOS_DE_BAJA,
   RESULTADOS_DE_LLAMADA,
@@ -20,6 +21,8 @@ import {
   pasarAEntregaPorProcesoPrevio,
   reprogramarVisita,
   retirarSolicitudDesdeTablero,
+  reasignarColumnaOp72,
+  DESTINOS_REASIGNABLES,
 } from "./acciones";
 
 export type MentorOpcion = { id: string; nombre: string; role: string };
@@ -119,17 +122,22 @@ type Panel =
   | "reprogramar"
   | "deshacer"
   | "yaEnIglesia"
+  | "reasignar"
   | null;
 
 export function TarjetaDePersona({
   persona,
   mentores,
   bajaRequiereAutorizacion,
+  puedeReasignar,
 }: {
   persona: TarjetaPersona;
   mentores: MentorOpcion[];
   /// Quien puede autorizar bajas las aplica directo; los demás las piden.
   bajaRequiereAutorizacion: boolean;
+  /// Solo administración puede devolver una tarjeta a otra columna: es la
+  /// reparación de un error, no una acción del día a día.
+  puedeReasignar: boolean;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [panel, setPanel] = useState<Panel>(null);
@@ -389,6 +397,18 @@ export function TarjetaDePersona({
             alCancelar={() => setPanel(null)}
           />
         </div>
+      ) : panel === "reasignar" ? (
+        <div className="mt-3 rounded-[10px] bg-papel p-3">
+          <FormularioDeReasignar
+            nombre={persona.nombre}
+            estadoActual={persona.estado}
+            enCurso={enCurso}
+            alGuardar={(datos) =>
+              ejecutar(() => reasignarColumnaOp72(persona.operacionId, datos))
+            }
+            alCancelar={() => setPanel(null)}
+          />
+        </div>
       ) : panel === "asistente" ? (
         <div className="mt-3 rounded-[10px] bg-papel p-3">
           <FormularioDeAsistente
@@ -477,6 +497,18 @@ export function TarjetaDePersona({
             >
               Asiste, no quiere proceso
             </button>
+            {/* Solo administración: devolver una tarjeta es reparar un error,
+                no parte del trabajo del día. */}
+            {puedeReasignar ? (
+              <button
+                type="button"
+                onClick={() => setPanel("reasignar")}
+                disabled={enCurso}
+                className="cursor-pointer border-0 bg-transparent p-0 text-[11px] leading-none font-semibold text-[rgba(19,28,36,.5)] disabled:opacity-60"
+              >
+                Se equivocaron de persona · devolver a otra columna
+              </button>
+            ) : null}
           </div>
         </>
       )}
@@ -711,6 +743,148 @@ function FormularioDeVisitaPorError({
 /// tablero que brinca tres pasos: quien lo usa tiene que ver que no se está
 /// inventando ninguna visita y que la persona no queda entregada todavía —
 /// queda esperando mentor.
+function FormularioDeReasignar({
+  nombre,
+  estadoActual,
+  enCurso,
+  alGuardar,
+  alCancelar,
+}: {
+  nombre: string;
+  estadoActual: Operation72Status;
+  enCurso: boolean;
+  alGuardar: (datos: {
+    destino: string;
+    nota: string;
+    visita?: { cuando: string; lugar: string; virtual: boolean };
+  }) => void;
+  alCancelar: () => void;
+}) {
+  const [destino, setDestino] = useState("");
+  const [nota, setNota] = useState("");
+  const [cuando, setCuando] = useState("");
+  const [lugar, setLugar] = useState("");
+  const [virtual, setVirtual] = useState(false);
+
+  const pideVisita = destino === Operation72Status.VISITA_PENDIENTE;
+  const visitaLista = !pideVisita || (cuando !== "" && (virtual || lugar.trim() !== ""));
+
+  return (
+    <div>
+      <p className="text-[12px] leading-[1.4] font-semibold text-tinta">
+        Devolver a {nombre} a la columna que le corresponde
+      </p>
+      <p className="mt-1 text-[11px] leading-[1.45] font-medium text-[rgba(19,28,36,.55)]">
+        Para cuando alguien se equivocó de persona y la tarjeta quedó donde no
+        debía. <strong className="font-bold">No se registra ninguna llamada</strong>{" "}
+        que nadie haya hecho: lo que queda es tu nota y la bitácora.
+      </p>
+      <p className="mt-[6px] text-[11px] leading-[1.45] font-medium text-[rgba(19,28,36,.55)]">
+        El <strong className="font-bold">plazo de 72 horas se reinicia</strong>{" "}
+        desde ahora, y si traía mentor propuesto se descarta.
+      </p>
+
+      <div className="mt-3">
+        <Etiqueta>¿A qué columna la devuelves?</Etiqueta>
+        <div className="mt-1 flex flex-wrap gap-[6px]">
+          {DESTINOS_REASIGNABLES.filter((e) => e !== estadoActual).map((estado) => (
+            <button
+              key={estado}
+              type="button"
+              aria-pressed={destino === estado}
+              onClick={() => setDestino(estado)}
+              className="opcion px-3 py-[9px] text-[11.5px]"
+            >
+              {ETIQUETA_COLUMNA[estado]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {pideVisita ? (
+        <div className="mt-3 rounded-[10px] bg-[rgba(19,28,36,.04)] p-3">
+          <p className="text-[11px] leading-[1.45] font-medium text-[rgba(19,28,36,.6)]">
+            Esa columna se ordena por fecha de visita, así que hace falta la
+            visita acordada — sin ella la tarjeta quedaría al final sin decir
+            cuándo es.
+          </p>
+          <label className="mt-2 block">
+            <Etiqueta>Fecha y hora de la visita</Etiqueta>
+            <input
+              type="datetime-local"
+              value={cuando}
+              onChange={(evento) => setCuando(evento.target.value)}
+              className="campo"
+            />
+          </label>
+          <div className="mt-3">
+            <Etiqueta>Lugar</Etiqueta>
+            <input
+              value={lugar}
+              onChange={(evento) => setLugar(evento.target.value)}
+              disabled={virtual}
+              placeholder="Su casa · la cafetería de la esquina"
+              className="campo font-medium disabled:opacity-50"
+            />
+            <button
+              type="button"
+              aria-pressed={virtual}
+              onClick={() => setVirtual(!virtual)}
+              className="opcion mt-2 px-3 py-[9px] text-[12px]"
+            >
+              Es virtual
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      <label className="mt-3 block">
+        <Etiqueta>¿Por qué la devuelves?</Etiqueta>
+        <textarea
+          value={nota}
+          onChange={(evento) => setNota(evento.target.value)}
+          rows={3}
+          className="campo"
+          placeholder="El consolidador la confundió con otra persona: la nota de «ya lleva proceso» no era de ella."
+        />
+        <span className="mt-[6px] block text-[10.5px] leading-[1.35] font-semibold text-[rgba(19,28,36,.45)]">
+          Es lo único que le va a explicar a quien abra el expediente por qué la
+          tarjeta se movió hacia atrás.
+        </span>
+      </label>
+
+      <div className="mt-3 flex gap-2">
+        <button
+          type="button"
+          disabled={enCurso || !destino || nota.trim().length < 10 || !visitaLista}
+          onClick={() =>
+            alGuardar({
+              destino,
+              nota,
+              ...(pideVisita ? { visita: { cuando, lugar, virtual } } : {}),
+            })
+          }
+          className="flex-1 cursor-pointer rounded-[8px] border-0 bg-azul-900 p-[10px] text-[11.5px] leading-none font-semibold text-white disabled:opacity-60"
+        >
+          {enCurso
+            ? "Guardando…"
+            : destino
+              ? `Devolver a ${ETIQUETA_COLUMNA[destino as Operation72Status]}`
+              : "Elige una columna"}
+        </button>
+        <button
+          type="button"
+          disabled={enCurso}
+          onClick={alCancelar}
+          className="cursor-pointer rounded-[8px] border border-[rgba(19,28,36,.18)] bg-white px-3 py-[10px] text-[11.5px] leading-none font-semibold text-tinta disabled:opacity-60"
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function FormularioDeProcesoPrevio({
   nombre,
   enCurso,

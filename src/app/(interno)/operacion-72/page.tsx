@@ -5,6 +5,7 @@ import {
   puedeAutorizarBaja,
   requerirPermiso,
   puedeOperarOperacion72,
+  puedeReasignarColumnaOp72,
   veTodaLaConsolidacion,
 } from "@/lib/auth";
 import { ESTADO_SOLICITUD } from "@/lib/baja";
@@ -752,7 +753,8 @@ export default async function TableroOperacion72({
                           key={persona.operacionId}
                           persona={persona}
                           mentores={mentores}
-                          bajaRequiereAutorizacion={bajaRequiereAutorizacion}
+                          puedeReasignar={puedeReasignarColumnaOp72(usuario)}
+                        bajaRequiereAutorizacion={bajaRequiereAutorizacion}
                         />
                       ))}
                       {personas.length === 0 ? (
@@ -791,6 +793,7 @@ export default async function TableroOperacion72({
                         key={persona.operacionId}
                         persona={persona}
                         mentores={mentores}
+                        puedeReasignar={puedeReasignarColumnaOp72(usuario)}
                         bajaRequiereAutorizacion={bajaRequiereAutorizacion}
                       />
                     ))

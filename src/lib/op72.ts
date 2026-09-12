@@ -49,6 +49,13 @@ export const COLUMNAS_OP72 = [
 /// Estados visibles en el tablero: al entregar, la tarjeta sale.
 export const ESTADOS_EN_TABLERO = COLUMNAS_OP72.map((c) => c.estado);
 
+/// El nombre de cada columna, para escribirlo en una frase. Sale de
+/// `COLUMNAS_OP72` para que no haya dos listas de nombres que se desincronicen.
+export const ETIQUETA_COLUMNA: Record<Operation72Status, string> =
+  Object.fromEntries(
+    COLUMNAS_OP72.map((c) => [c.estado, c.titulo]),
+  ) as Record<Operation72Status, string>;
+
 type Transicion = {
   siguiente: Operation72Status;
   etiqueta: string;

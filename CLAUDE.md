@@ -280,6 +280,75 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-12** — **Un administrador puede devolver una tarjeta a cualquier
+  columna de Operación 72** (pedido del usuario por el caso de **Francisco
+  Sandoval**: «el consolidador se equivocó y lo confundió con otra persona… que
+  yo pueda colocarle solamente con un clic, pasa a iniciada, o a seguimiento, o
+  a contactada, o a visita pendiente»).
+  **⚠️ EL ERROR LO PROPAGUÉ YO, y la auditoría lo cuenta completo:**
+  26-ago el import creó su ficha y su Op72 (plazo 29-ago) · **9-sep 16:02 Nini
+  Guerrón** registró una «visita agendada» con la nota «está recibiendo
+  mentoría de parejas (Pas. Cristina)» → lo movió a VISITA PENDIENTE ·
+  **11-sep 21:24 YO** lo pasé a LISTA PARA ENTREGA con esa nota, en el lote de
+  seis autorizado por el usuario. Si la nota era de otra persona, **la tomé al
+  pie de la letra sin verificarla contra nada más**.
+  **LECCIÓN: una observación escrita por el equipo es evidencia, no prueba.**
+  El 11-sep aprendí a leer la observación antes de teorizar; falta la otra
+  mitad — **cruzarla con el resto del expediente antes de mover a alguien**.
+  **⚠️ CONTACTADA era verificablemente la columna correcta, y así se comprobó:**
+  se buscaron todos los que tienen **exactamente su mismo rastro** (un solo
+  intento, la «Primera llamada (importado de HighLevel)» con `outcome` nulo) y
+  a los que nadie tocó después → **49 en CONTACTADA, 0 en INICIADA, 0 en
+  SEGUIMIENTO**. O sea que devolverlo a CONTACTADA **lo deja donde estaba antes
+  del 9-sep**, junto a sus 49 compañeros de import. **Es el mismo método del
+  11-sep: buscar casos que el sistema ya resolvió y ver dónde cayeron.**
+  - **`reasignarColumnaOp72`** en `operacion-72/acciones.ts` +
+    **`DESTINOS_REASIGNABLES`** (iniciada, seguimiento, contactada, visita
+    pendiente). **NO** están LISTA_PARA_ENTREGA (tiene dos caminos propios que
+    sí explican por qué) ni ENTREGADA/CERRADA (se sale del tablero por sus
+    acciones, no a mano).
+  - **SOLO ADMINISTRACIÓN** (`puedeReasignarColumnaOp72` en `auth.ts`,
+    = `ROLES_ADMIN`). No es trabajo del día: es reparar un error, reinicia el
+    plazo y borra el mentor propuesto. El consolidador que se equivoca avisa;
+    no se corrige a sí mismo. **El botón y la acción usan el MISMO predicado** —
+    esconder el botón y dejar la acción abierta habría sido cosmético.
+  - **⚠️ EL PLAZO SE REINICIA a 72 h desde ahora (decisión del usuario).** Se le
+    ofrecieron tres opciones y eligió reiniciar. Francisco tenía plazo del
+    29-ago, **vencido hacía dos semanas**: devolverlo con ese plazo lo habría
+    dejado **naciendo vencido**, sin margen para atenderlo. El costo asumido es
+    que el informe pierde el rastro de esas dos semanas paradas.
+  - **⚠️ VISITA PENDIENTE PIDE fecha, hora y lugar** (decisión del usuario).
+    **Esa columna se ordena por fecha de visita** (`ORDEN_VISITA`), así que sin
+    visita la tarjeta caería **al final, sin decir cuándo es**. Si se pone a
+    alguien ahí es porque hay una visita acordada. Usa `momentoDesdeCampo`, no
+    `new Date` (la trampa de las cinco horas del 11-sep).
+  - **⚠️ NO SE INVENTA NINGUNA LLAMADA.** Mover a seguimiento o contactada **no
+    crea ningún `contact_attempt`**: lo que queda es la nota y la auditoría. Es
+    la misma regla que `pasarAEntregaPorProcesoPrevio`.
+  - **Lo que traía de la entrega se descarta**: `proposedMentorId`,
+    `proposedMentorNote` y **`priorProcessNote`** a nulo — el mentor propuesto
+    era para un proceso que no le correspondía, y la nota de «ya lleva proceso»
+    **era justamente el dato equivocado**.
+  - **Si venía de VISITA PENDIENTE, la visita viva se ANULA y se limpia el
+    CRM** (`anularVisitaEnHighLevel`). Sin eso el equipo de consolidación, que
+    **trabaja solo con HighLevel** (§6), seguiría viendo «visita confirmada» e
+    iría a visitar a quien ya no la tiene.
+  - **`ETIQUETA_COLUMNA`** nuevo en `op72.ts`, derivado de `COLUMNAS_OP72` para
+    que no haya dos listas de nombres que se desincronicen.
+  - Auditoría **`operacion72.columna_reasignada`** (catálogo en `audit.ts` +
+    `case` en `actividad.ts`, en **ámbar**: no es avanzar ni retroceder, es
+    reparar — y sale a la vista porque reinicia el plazo). Nota obligatoria
+    (mín. 10 caracteres).
+  - **Tropiezo del día, el mismo de siempre:** `ESTADOS_EN_TABLERO.includes(...)`
+    no compila porque es una **tupla `readonly`** más estrecha que el union de
+    estados. Hay que copiarla a un arreglo del tipo ancho. **Es la tercera vez
+    que caigo en esto** (11-sep con las cuatro columnas).
+  - `tsc`, eslint, **22/22 pruebas** y `npm run cf:build` en verde. **Sin
+    migraciones.**
+  - **Francisco NO se corrigió por SQL a propósito**: que lo haga el usuario con
+    el botón, un caso a la vez y con su propia nota. Arreglarlo yo en lote sería
+    repetir justo lo que causó el problema.
+
 - **2026-09-12** — **Alpha y Casa de Fe: cada líder ve los suyos y los de su
   rama, no los de toda la iglesia** (pedido del usuario: «que solamente el
   mentor o líder pueda ver los Alpha y Casas de Fe que tiene asignado o que

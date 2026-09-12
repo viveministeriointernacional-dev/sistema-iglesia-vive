@@ -20,6 +20,7 @@ import {
   puedeConfirmarEntrega,
   requerirPermisoEnAccion,
   puedeOperarOperacion72,
+  puedeReasignarColumnaOp72,
   veTodaLaConsolidacion,
   type UsuarioSesion,
 } from "@/lib/auth";
@@ -37,6 +38,9 @@ import {
 } from "@/lib/highlevel-salida";
 import {
   contactaDeVerdad,
+  DURACION_OPERACION_72_HORAS,
+  ESTADOS_EN_TABLERO,
+  ETIQUETA_COLUMNA,
   ETIQUETA_LLAMADA,
   MOTIVOS_DE_ASISTENTE,
   MOTIVOS_DE_BAJA,
@@ -392,6 +396,200 @@ export async function cerrarVisita(
 ///
 /// **Sí propone mentor**, igual que `cerrarVisita`, para que la tarjeta llegue
 /// a la última columna con su candidato y solo haya que confirmarlo.
+/// **Las cuatro columnas a las que un administrador puede devolver una
+/// tarjeta.** No están LISTA_PARA_ENTREGA (para llegar ahí hay dos caminos
+/// propios, que sí dejan rastro de por qué) ni ENTREGADA/CERRADA (se sale del
+/// tablero por sus acciones, no a mano).
+export const DESTINOS_REASIGNABLES: Operation72Status[] = [
+  Operation72Status.INICIADA,
+  Operation72Status.SEGUIMIENTO,
+  Operation72Status.CONTACTADA,
+  Operation72Status.VISITA_PENDIENTE,
+];
+
+/// **Devolver una tarjeta a la columna que le corresponde, cuando alguien se
+/// equivocó de persona.** Solo administración.
+///
+/// **El caso que lo pidió (Francisco Sandoval, 12-sep-2026):** un consolidador
+/// lo confundió con otra persona y su nota lo mandó a LISTA PARA ENTREGA. El
+/// tablero no tenía forma de devolverlo: `deshacerVisitaAgendada` solo sirve
+/// desde VISITA_PENDIENTE y solo devuelve a CONTACTADA, y las demás acciones
+/// únicamente avanzan. La única salida era dejarlo esperando un mentor que no
+/// le correspondía.
+///
+/// **⚠️ NO SE INVENTA NINGUNA LLAMADA.** Mover a SEGUIMIENTO o CONTACTADA no
+/// crea ningún `contact_attempt`: escribir una llamada que nadie hizo es el
+/// error que evitan todas las acciones de esta pantalla. Lo que queda es la
+/// nota y la auditoría. La excepción es VISITA_PENDIENTE, que **sí** pide
+/// fecha, hora y lugar (decisión del usuario) — si se pone a alguien ahí es
+/// porque hay una visita acordada, y sin ella la tarjeta caería al final de la
+/// columna sin decir cuándo es, porque esa columna se ordena por fecha de
+/// visita.
+///
+/// **⚠️ EL PLAZO SE REINICIA a 72 horas desde hoy** (decisión del usuario).
+/// Francisco tenía plazo del 29-ago, vencido hacía dos semanas; devolverlo con
+/// ese plazo lo habría dejado naciendo vencido, sin margen para atenderlo.
+export async function reasignarColumnaOp72(
+  operacionId: string,
+  datos: {
+    destino: string;
+    nota: string;
+    visita?: { cuando: string; lugar: string; virtual: boolean };
+  },
+): Promise<ResultadoAccion> {
+  let usuario: UsuarioSesion;
+  try {
+    usuario = await requerirPermisoEnAccion(puedeReasignarColumnaOp72);
+  } catch (error) {
+    if (error instanceof ErrorDePermiso) return { ok: false, mensaje: error.message };
+    throw error;
+  }
+
+  const destino = DESTINOS_REASIGNABLES.find((e) => e === datos.destino);
+  if (!destino) return { ok: false, mensaje: "Elige a qué columna la devuelves." };
+
+  const nota = datos.nota.trim();
+  if (nota.length < 10) {
+    return {
+      ok: false,
+      mensaje: "Escribe por qué la devuelves (mínimo 10 caracteres).",
+    };
+  }
+
+  const operacion = await cargarOperacion(operacionId, usuario);
+  if (!operacion) return { ok: false, mensaje: "No encontramos esta persona." };
+  // `ESTADOS_EN_TABLERO` es una tupla readonly más estrecha que el union de
+  // estados, así que `includes` la rechaza. Se copia a un arreglo del tipo
+  // ancho (misma trampa que el 11-sep con las cuatro columnas).
+  const enElTablero: Operation72Status[] = [...ESTADOS_EN_TABLERO];
+  if (!enElTablero.includes(operacion.status)) {
+    return {
+      ok: false,
+      mensaje: "Esta persona ya salió del tablero; no se puede reasignar aquí.",
+    };
+  }
+  if (operacion.status === destino) {
+    return { ok: false, mensaje: "Ya está en esa columna." };
+  }
+
+  // La visita solo se pide —y solo se acepta— cuando el destino la necesita.
+  let cuando: Date | null = null;
+  let lugar: string | null = null;
+  const virtual = destino === Operation72Status.VISITA_PENDIENTE
+    ? Boolean(datos.visita?.virtual)
+    : false;
+
+  if (destino === Operation72Status.VISITA_PENDIENTE) {
+    cuando = momentoDesdeCampo(datos.visita?.cuando ?? "");
+    if (!cuando) {
+      return { ok: false, mensaje: "La fecha y hora de la visita no son válidas." };
+    }
+    if (!virtual && !(datos.visita?.lugar ?? "").trim()) {
+      return { ok: false, mensaje: "Escribe el lugar, o marca que la visita es virtual." };
+    }
+    lugar = virtual ? null : (datos.visita?.lugar ?? "").trim();
+  }
+
+  // Si venía con una visita acordada y se va a otra columna, esa visita deja de
+  // estar en pie: se ANULA (no se borra) y se limpia el CRM. Sin esto el equipo
+  // de consolidación, que trabaja solo con HighLevel, seguiría viendo «visita
+  // confirmada» e iría a visitar a alguien que ya no la tiene.
+  const salíaDeVisita =
+    operacion.status === Operation72Status.VISITA_PENDIENTE &&
+    destino !== Operation72Status.VISITA_PENDIENTE;
+
+  const desde = operacion.status;
+  const plazo = new Date(Date.now() + DURACION_OPERACION_72_HORAS * 3_600_000);
+  const prisma = await getPrisma();
+
+  await prisma.$transaction(async (tx) => {
+    if (salíaDeVisita) {
+      const viva = await tx.contactAttempt.findFirst({
+        where: {
+          operation72Id: operacion.id,
+          type: ContactType.VISITA,
+          scheduledAt: { not: null },
+          annulledAt: null,
+        },
+        orderBy: { occurredAt: "desc" },
+        select: { id: true },
+      });
+      if (viva) {
+        await tx.contactAttempt.update({
+          where: { id: viva.id },
+          data: {
+            annulledAt: new Date(),
+            annulledById: usuario.id,
+            annulledReason: `La tarjeta se devolvió a ${ETIQUETA_COLUMNA[destino]}: ${nota}`,
+          },
+        });
+      }
+    }
+
+    if (cuando) {
+      await tx.contactAttempt.create({
+        data: {
+          operation72Id: operacion.id,
+          type: ContactType.VISITA,
+          result: "Visita agendada",
+          note: nota,
+          scheduledAt: cuando,
+          place: lugar,
+          isVirtual: virtual,
+          byUserId: usuario.id,
+        },
+      });
+    }
+
+    await tx.operation72.update({
+      where: { id: operacion.id },
+      data: {
+        status: destino,
+        // El plazo se cuenta de nuevo: lo que se mide es la respuesta del
+        // equipo desde que la tarjeta vuelve a estar en su sitio.
+        deadlineAt: plazo,
+        detail: cuando
+          ? [`Visita ${FORMATO_VISITA.format(cuando)}`, virtual ? "virtual" : lugar]
+              .filter(Boolean)
+              .join(" · ")
+          : `Devuelta a ${ETIQUETA_COLUMNA[destino]} por administración · ${nota}`,
+        // Lo que traía de la entrega deja de valer: el mentor propuesto era
+        // para un proceso que no le correspondía, y la nota de «ya lleva
+        // proceso» era justamente el dato equivocado.
+        proposedMentorId: null,
+        proposedMentorNote: null,
+        priorProcessNote: null,
+      },
+    });
+
+    await auditar(tx, {
+      actorId: usuario.id,
+      action: "operacion72.columna_reasignada",
+      entityType: "operation72",
+      entityId: operacion.id,
+      metadata: {
+        desde,
+        hasta: destino,
+        nota,
+        plazoNuevo: plazo.toISOString(),
+        ...(cuando ? { visita: cuando.toISOString(), virtual, lugar } : {}),
+        ...(salíaDeVisita ? { visitaAnulada: true } : {}),
+      },
+    });
+  });
+
+  // Reflejo a HighLevel, best-effort y fuera de la transacción (es red).
+  if (cuando) {
+    await exportarVisita(operacion.learnerId, { cuando, virtual });
+  } else if (salíaDeVisita) {
+    await anularVisitaEnHighLevel(operacion.learnerId);
+  }
+
+  revalidatePath("/operacion-72");
+  revalidatePath(`/expediente/${operacion.learnerId}`);
+  return { ok: true };
+}
+
 export async function pasarAEntregaPorProcesoPrevio(
   operacionId: string,
   datos: { nota: string },
