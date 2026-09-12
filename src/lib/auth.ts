@@ -120,6 +120,17 @@ export function tieneRed(usuario: UsuarioSesion): boolean {
   return ROLES_CON_RED.includes(usuario.role) || usuario.canMentor;
 }
 
+/// **Quién puede devolver una tarjeta a cualquier columna de Operación 72.**
+///
+/// Solo la administración (pedido del usuario, 12-sep-2026: «solamente los
+/// administradores»). No es una acción del trabajo diario: es la reparación de
+/// un error, y mover una tarjeta hacia atrás reinicia el plazo de 72 horas y
+/// borra el mentor propuesto. El consolidador que se equivoca le avisa a un
+/// administrador; no se corrige a sí mismo.
+export function puedeReasignarColumnaOp72(usuario: UsuarioSesion): boolean {
+  return ROLES_ADMIN.includes(usuario.role);
+}
+
 /// **Quién ve la red de TODA la iglesia**, y no solo la rama que cuelga de él.
 ///
 /// Regla del usuario (11-sep-2026): «una persona que es mentor o pastor, si no

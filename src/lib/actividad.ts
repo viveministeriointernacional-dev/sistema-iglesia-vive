@@ -412,6 +412,31 @@ export async function cargarActividad(
         filas.push({ k: "Queda en", v: "LISTA PARA ENTREGA" });
         break;
       }
+      case "operacion72.columna_reasignada": {
+        // Ámbar: no es avanzar ni retroceder en el proceso, es reparar un
+        // error de registro. Y sale a la vista porque reinicia el plazo de 72
+        // horas, así que quien lea el informe tiene que saber por qué esa
+        // tarjeta aparece con el reloj en cero.
+        tipo = "op72"; etiqueta = "OP 72"; tono = "ambar";
+        const hasta = texto(m.hasta);
+        frase = [
+          A(),
+          t(" devolvió a "),
+          P(),
+          t(hasta ? ` a ${hasta.replace(/_/g, " ")}` : " a otra columna"),
+        ];
+        tituloDetalle = "Tarjeta devuelta por administración";
+        const porQue = texto(m.nota);
+        if (porQue) filas.push({ k: "Por qué", v: porQue });
+        const venia = texto(m.desde);
+        if (venia) filas.push({ k: "Estaba en", v: venia.replace(/_/g, " ") });
+        if (hasta) filas.push({ k: "Queda en", v: hasta.replace(/_/g, " ") });
+        filas.push({ k: "Plazo", v: "Se reinició · 72 h desde ahora" });
+        if (m.visitaAnulada) {
+          filas.push({ k: "Visita", v: "La que tenía acordada quedó anulada" });
+        }
+        break;
+      }
       case "operacion72.visita_anulada": {
         // Rojo, no azul: no es un ajuste de agenda, es un registro que se
         // retira porque se le hizo a la persona equivocada. Quien revisa el
