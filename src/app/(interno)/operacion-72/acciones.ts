@@ -39,6 +39,7 @@ import {
 import {
   contactaDeVerdad,
   DURACION_OPERACION_72_HORAS,
+  DESTINOS_REASIGNABLES,
   ESTADOS_EN_TABLERO,
   ETIQUETA_COLUMNA,
   ETIQUETA_LLAMADA,
@@ -396,17 +397,6 @@ export async function cerrarVisita(
 ///
 /// **Sí propone mentor**, igual que `cerrarVisita`, para que la tarjeta llegue
 /// a la última columna con su candidato y solo haya que confirmarlo.
-/// **Las cuatro columnas a las que un administrador puede devolver una
-/// tarjeta.** No están LISTA_PARA_ENTREGA (para llegar ahí hay dos caminos
-/// propios, que sí dejan rastro de por qué) ni ENTREGADA/CERRADA (se sale del
-/// tablero por sus acciones, no a mano).
-export const DESTINOS_REASIGNABLES: Operation72Status[] = [
-  Operation72Status.INICIADA,
-  Operation72Status.SEGUIMIENTO,
-  Operation72Status.CONTACTADA,
-  Operation72Status.VISITA_PENDIENTE,
-];
-
 /// **Devolver una tarjeta a la columna que le corresponde, cuando alguien se
 /// equivocó de persona.** Solo administración.
 ///

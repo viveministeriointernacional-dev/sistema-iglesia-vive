@@ -49,6 +49,26 @@ export const COLUMNAS_OP72 = [
 /// Estados visibles en el tablero: al entregar, la tarjeta sale.
 export const ESTADOS_EN_TABLERO = COLUMNAS_OP72.map((c) => c.estado);
 
+/// **Las cuatro columnas a las que un administrador puede devolver una
+/// tarjeta.** No están LISTA_PARA_ENTREGA (para llegar ahí hay dos caminos
+/// propios, que sí dejan rastro de por qué) ni ENTREGADA/CERRADA (se sale del
+/// tablero por sus acciones, no a mano).
+///
+/// ⚠️ **Vive AQUÍ y no en `operacion-72/acciones.ts`**, que es donde la puse
+/// primero y **reventó la pantalla en producción** con «This page couldn't
+/// load». Ese archivo lleva `"use server"`, y **un módulo así solo puede
+/// exportar funciones `async`**: exportar una constante desde ahí compila sin
+/// una queja —`tsc`, eslint y `cf:build` pasaron los tres— y falla **al
+/// ejecutarse**, cuando el componente de cliente la importa.
+/// Es la misma regla del 3-sep con `ROLES_REGISTRO_SOLO_FICHA` y la del 6-sep:
+/// **lo que usa el navegador va en el catálogo.**
+export const DESTINOS_REASIGNABLES: Operation72Status[] = [
+  Operation72Status.INICIADA,
+  Operation72Status.SEGUIMIENTO,
+  Operation72Status.CONTACTADA,
+  Operation72Status.VISITA_PENDIENTE,
+];
+
 /// El nombre de cada columna, para escribirlo en una frase. Sale de
 /// `COLUMNAS_OP72` para que no haya dos listas de nombres que se desincronicen.
 export const ETIQUETA_COLUMNA: Record<Operation72Status, string> =

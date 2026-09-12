@@ -280,6 +280,40 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-12** — **⚠️ TUMBÉ EL TABLERO EN PRODUCCIÓN, y era un error que YA
+  ESTABA ESCRITO EN ESTE ARCHIVO.** Al pulsar «Se equivocaron de persona ·
+  devolver a otra columna» salía la pantalla negra **«This page couldn't load ·
+  A server error occurred»** en `/operacion-72`.
+  **La causa: puse `DESTINOS_REASIGNABLES` (una constante) en
+  `operacion-72/acciones.ts`, que lleva `"use server"`** — y **un módulo
+  `"use server"` SOLO puede exportar funciones `async`**. `tarjeta.tsx`, que es
+  componente de cliente, la importaba de ahí, así que el módulo fallaba **al
+  ejecutarse** y se caía la página entera.
+  **⚠️ LO PEOR: `tsc --noEmit`, `eslint` y `npm run cf:build` pasaron LOS TRES
+  EN VERDE.** Es un fallo de ejecución, no de compilación: solo se ve abriendo
+  la pantalla. Y **la regla ya estaba en la bitácora del 3-sep**
+  (`ROLES_REGISTRO_SOLO_FICHA` tuvo que salir de `acciones.ts` por esto mismo) y
+  en la del 6-sep («lo que use el navegador va en el catálogo»). **La tenía
+  escrita y no la apliqué.**
+  - **Arreglo:** `DESTINOS_REASIGNABLES` se movió a **`src/lib/op72.ts`**, junto
+    a `ETIQUETA_COLUMNA`. `acciones.ts` la importa del catálogo como todo lo
+    demás, y ahí solo queda un `export type` (los tipos se borran al compilar,
+    así que no producen exportación en ejecución y sí valen).
+  - **⚠️ GUARDIÁN NUEVO, porque dos veces ya es un patrón:
+    `src/lib/use-server.test.ts`.** Recorre TODO `src`, busca los archivos cuya
+    primera línea es `"use server"` y falla si alguno exporta
+    `const`/`let`/`var`/`class`/`enum`/`default`. El mensaje de error dice
+    **archivo, línea y dónde moverlo**. `export type` y `export interface` los
+    deja pasar a propósito.
+  - **El guardián se comprobó al revés, que es lo que lo hace valer:** se volvió
+    a meter el error a propósito (`export const PRUEBA_DEL_GUARDIAN`) y la
+    prueba **falló señalando archivo y línea**; al quitarlo, verde otra vez.
+    **Una prueba que no se ve fallar no prueba nada.**
+  - **23/23 pruebas**, eslint y `cf:build` en verde.
+  **REGLA, ahora con quien la vigile: en un archivo `"use server"`, solo
+  funciones `async`. Cualquier lista, constante o mapa que toque el navegador va
+  al catálogo (`op72.ts`, `liderazgo-catalogo.ts`, `informe-catalogo.ts`…).**
+
 - **2026-09-12** — **Un administrador puede devolver una tarjeta a cualquier
   columna de Operación 72** (pedido del usuario por el caso de **Francisco
   Sandoval**: «el consolidador se equivocó y lo confundió con otra persona… que
