@@ -280,6 +280,71 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-12** — **«Actividad del día» con calendario y rango de fechas**
+  (pedido del usuario: «poder escoger la fecha… que se despliegue como un
+  calendario y yo pueda escoger allí, un día específico o también un rango»).
+  Antes solo había ‹ › para arrastrarse día a día — para ver el 15-ago había
+  que pulsar 28 veces.
+  - **Dos `input type="date"`** (Desde · Hasta) en un formulario GET. Es el
+    campo que **abre el calendario nativo del sistema**: sin librería y sin JS,
+    como el resto de los filtros de la plataforma.
+  - **⚠️ «Hasta» es OPCIONAL, y esa es la decisión de diseño:** dejarlo vacío
+    significa **ese solo día**. Así elegir una fecha es **un gesto** y elegir un
+    periodo son dos. Con dos campos obligatorios, ver un día concreto habría
+    costado escribir la misma fecha dos veces.
+  - **Atajos reutilizados del informe** (`atajosDelInforme`): Hoy · Ayer · Esta
+    semana · Semana pasada · Este mes · Mes pasado · Este año. Es el mismo
+    patrón que el usuario aprobó el 7-sep para el informe, así que las dos
+    pantallas se manejan igual.
+  - **Las flechas mueven el PERIODO COMPLETO**, no un día: si mira una semana,
+    ‹ lo lleva a la semana anterior. Igual que el informe.
+  - La URL queda `?desde=…` a secas cuando es un día, y `&hasta=…` solo si hay
+    rango. **`?dia=` sigue funcionando** para los enlaces guardados.
+  - `max` en los dos campos = hoy: no hay actividad en el futuro, así que el
+    calendario no la ofrece.
+  **⚠️ HALLAZGO QUE CAMBIÓ EL TRABAJO: los seis contadores se calculaban sobre
+  una lista RECORTADA, y ya estaban a punto de mentir.**
+  Salían de filtrar el arreglo `auditoria`, que venía con `take: 1000`.
+  **Medido: el día con más movimientos tiene 900 filas** (y la historia completa
+  desde el 15-ago son 2 290). O sea que **un solo día ya estaba al borde del
+  corte**, y con un rango de varios días los seis números habrían empezado a
+  quedarse cortos **sin avisar** — que es peor que no mostrarlos.
+  - **Ahora los seis se cuentan EN LA BASE**, en **una sola consulta** con
+    `count(*) FILTER (WHERE …)` (el pooler cobra por viaje: seis consultas
+    serían seis latencias con `PrismaPg max:1`). Un `count` no se recorta nunca.
+  - Topes con nombre (`TOPE_AUDITORIA` 3000 · `TOPE_LLAMADAS` 1500 ·
+    `TOPE_CORREOS` 900) y **`recortado` en el retorno**: si la lista topa, la
+    pantalla lo **dice en ámbar** («la lista quedó incompleta, los seis
+    indicadores sí son exactos, acorta el rango»). Enseñar una lista corta como
+    si fuera todo sería mentir.
+  - **Probado contra la base, y la comprobación que vale:** el pantallazo del
+    usuario del **7-sep** mostraba **0 · 18 · 9 · 8 · 4 · 2**, y la consulta
+    nueva da **exactamente eso**. Un rango de 12 días (1-sep → 12-sep) da 23 ·
+    66 · 31 · 157 · 68 · 10 con 1 097 filas de auditoría + 606 llamadas: por
+    debajo del tope, sin recorte.
+  **⚠️ SÉPTIMA TRAMPA DE FECHAS, y es la INVERSA de la del 8-sep — me hizo creer
+  que el código estaba mal cuando lo que estaba mal era mi prueba.**
+  Al probar el `count` a mano escribí los límites como **texto con offset**
+  (`'2026-09-07T00:00:00-05:00'`). Contra una columna **`timestamp without time
+  zone`**, Postgres coacciona ese literal a `timestamp` y **DESCARTA el
+  offset**, así que comparó contra medianoche UTC: dio 17 · 8 · 9 · 9 · 3 en vez
+  de 18 · 9 · 8 · 4 · 2. **El código nunca tuvo el fallo** — pasa `Date` de JS,
+  que Prisma manda como instantes UTC reales, que es lo correcto porque la
+  columna guarda UTC.
+  **REGLA: para probar a mano un rango de fechas contra estas columnas, escribir
+  los límites como instantes UTC** (`timestamp '2026-09-07 05:00:00'` para la
+  medianoche colombiana), **no como texto con `-05:00`.**
+  - **⚠️ Y una que se habría colado sin mirarla: la lista agrupa por FRANJA
+    comparando la cadena con la anterior.** Con un rango de varios días, las
+    «11 P. M.» de dos días distintos se habrían juntado en un solo bloque y
+    parecería que todo pasó la misma noche. `franja(fecha, conDia)` mete el día
+    delante (**«LUN 7 SEP · 11 P. M.»**) **solo** cuando el rango abarca más de
+    uno; en un día suelto la cabecera no cambia en nada.
+  - El título dice **«Actividad del día»** en singular solo cuando es un día;
+    con rango es **«Actividad»** y la etiqueta muestra los dos extremos.
+  - `tsc`, eslint, **23/23 pruebas** y `npm run cf:build` en verde. **Sin
+    migraciones.**
+
 - **2026-09-12** — **⚠️ TUMBÉ EL TABLERO EN PRODUCCIÓN, y era un error que YA
   ESTABA ESCRITO EN ESTE ARCHIVO.** Al pulsar «Se equivocaron de persona ·
   devolver a otra columna» salía la pantalla negra **«This page couldn't load ·
