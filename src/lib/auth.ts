@@ -21,6 +21,9 @@ export type UsuarioSesion = {
   /// Permiso para acompañar como mentor, independiente del rol: deja que un
   /// consolidador tenga discípulos sin dejar de ser consolidador.
   canMentor: boolean;
+  /// Ve todos los grupos de la iglesia (Casas de Fe y Alpha), lleve o no
+  /// alguno. Solo mirar: no administra ninguno.
+  veTodosLosGrupos: boolean;
 };
 
 /// Quién administra el sistema: personas, roles, permisos y procesos.
@@ -228,6 +231,7 @@ export const obtenerUsuarioActual = cache(
         canLeadFaithHouse: true,
         canMentor: true,
         coordinatesConsolidation: true,
+        canSeeAllGroups: true,
         active: true,
         authUserId: true,
       },
@@ -258,6 +262,7 @@ export const obtenerUsuarioActual = cache(
       canLeadFaithHouse: registro.canLeadFaithHouse,
       coordinaConsolidacion: registro.coordinatesConsolidation,
       canMentor: registro.canMentor,
+      veTodosLosGrupos: registro.canSeeAllGroups,
     };
   },
 );

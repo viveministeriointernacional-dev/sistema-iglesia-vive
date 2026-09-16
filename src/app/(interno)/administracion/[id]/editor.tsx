@@ -69,6 +69,7 @@ type Cuenta = {
   canLeadFaithHouse: boolean;
   canMentor: boolean;
   coordinatesConsolidation: boolean;
+  canSeeAllGroups: boolean;
 };
 
 export type BajaInfo = { motivo: string | null; fecha: string; por: string };
@@ -375,6 +376,7 @@ function PermisosCampos({
     canLeadFaithHouse: boolean;
   canMentor: boolean;
     coordinatesConsolidation: boolean;
+    canSeeAllGroups: boolean;
   };
   onChange: (parcial: Partial<typeof valores>) => void;
 }) {
@@ -426,6 +428,11 @@ function PermisosCampos({
           onChange={(v) => onChange({ coordinatesConsolidation: v })}
         />
         <Interruptor
+          etiqueta="Ve todos los grupos de la iglesia (solo mirar)"
+          activo={valores.canSeeAllGroups}
+          onChange={(v) => onChange({ canSeeAllGroups: v })}
+        />
+        <Interruptor
           etiqueta="Cuenta activa"
           activo={valores.active}
           onChange={(v) => onChange({ active: v })}
@@ -444,6 +451,7 @@ function SeccionRol({ cuenta }: { cuenta: Cuenta }) {
     canLeadFaithHouse: cuenta.canLeadFaithHouse,
     canMentor: cuenta.canMentor,
     coordinatesConsolidation: cuenta.coordinatesConsolidation,
+    canSeeAllGroups: cuenta.canSeeAllGroups,
   });
   const [estado, setEstado] = useState<null | EstadoAviso>(null);
   const [guardando, iniciar] = useTransition();
@@ -631,6 +639,7 @@ function SeccionCrearAcceso({ personId }: { personId: string }) {
     canLeadFaithHouse: false,
     canMentor: false,
     coordinatesConsolidation: false,
+    canSeeAllGroups: false,
   });
   const [estado, setEstado] = useState<null | EstadoAviso>(null);
   const [guardando, iniciar] = useTransition();

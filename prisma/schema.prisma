@@ -66,6 +66,13 @@ model AppUser {
   /// consolidadores, no solo los que tiene asignados. No cambia su rol ni le da
   /// poderes de pastor (red, cambios de fase, etc.).
   coordinatesConsolidation Boolean @default(false) @map("coordinates_consolidation")
+  /// Ve TODAS las Casas de Fe y todos los Alpha de la iglesia, aunque no lleve
+  /// ninguno ni cuelgue nadie de su rama. Es el permiso del liderazgo
+  /// transversal — intercesión, por ejemplo: gente que necesita saber dónde se
+  /// reúne cada grupo sin acompañar a nadie en particular.
+  /// **Solo mirar**: administrar un grupo sigue siendo de su líder, de quien lo
+  /// abrió, de la administración o de su rama.
+  canSeeAllGroups Boolean @default(false) @map("can_see_all_groups")
   /// Identificador de este usuario en HighLevel. Sirve para que, cuando llega
   /// un registro del CRM, el propietario del contacto se convierta en su
   /// consolidador. Nulo para quien no tiene cuenta en HighLevel.

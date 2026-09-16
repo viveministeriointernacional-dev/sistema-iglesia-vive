@@ -280,6 +280,57 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-16** — **Permiso nuevo «ve todos los grupos»: el líder de intercesión
+  vuelve a ver todas las Casas de Fe** (pedido del usuario: «el pastor Luis
+  Alberto Facundo, que es mentor, en su perfil pueda ver todas las casas de fe
+  que tiene cada persona asignada… porque él es el líder de intercesión»).
+  **Es el efecto que esta misma bitácora anunció el 12-sep y ahora hay que
+  destapar para un caso concreto.** Aquel día `esVistaCompletaDeCasaDeFe` pasó
+  de «rol PASTOR» a `veTodaLaRed`, y se escribió literalmente que **«el Pastor
+  Luis Alberto Facundo ve 0»** porque no acompaña a nadie. **Medido hoy y sigue
+  igual: 0 discípulos, 0 casas que lleva**, así que `lideresDeMiRama` le
+  devuelve vacío y la sección le queda en blanco. En la iglesia hay **15 Casas
+  de Fe abiertas (20 personas) y 2 Alpha**.
+  - **`app_user.can_see_all_groups`** (migración
+    `20260916120000_ve_todos_los_grupos`, con `ADD COLUMN IF NOT EXISTS`), en la
+    sesión como **`usuario.veTodosLosGrupos`**, y casilla **«Ve todos los grupos
+    de la iglesia (solo mirar)»** en Administración, junto a las de Alpha, Casa
+    de Fe, mentor y coordinación.
+  - **⚠️ NO se le devolvió la vista completa al rol PASTOR**, que era el atajo
+    fácil: eso desharía la decisión del 11-sep y volvería a enseñarle a los
+    otros cinco pastores grupos que no les tocan. **Es un permiso acumulable, la
+    misma forma que ya tienen `canMentor` y `coordinaConsolidacion`**, así que
+    mañana sirve para el siguiente liderazgo transversal sin tocar código ni
+    tener un nombre propio cableado.
+  - **⚠️ ES DE MIRAR, Y ESO OBLIGÓ A SEPARAR DOS PREGUNTAS QUE ERAN UNA.**
+    `puedeAdministrarGrupo` / `puedeAdministrarCasaDeFe` llamaban a
+    `esVistaCompletaDe*`; si se hubiera dejado así, **la casilla habría
+    repartido administración de toda la iglesia sin decirlo** (cerrar grupos,
+    cambiarles el líder, sacar gente). Ahora esas dos preguntan **`veTodaLaRed`
+    a secas** y la vista completa se queda para listar.
+  - **⚠️ Y HABRÍA SIDO PEOR QUE NADA SIN ESTO: las dos páginas `[id]` hacían
+    `if (!puedeEditar) notFound()`.** Con el permiso puesto, la lista le habría
+    mostrado los 15 nombres y **cada uno habría dado 404** — y lo que él pidió
+    es justamente ver «qué personas están» en cada una. **Es la lección del
+    11-sep con la rama heredada: si se enseña, tiene que abrir.**
+    `puedeEntrarACasaDeFe` y `puedeEntrarAGrupo`: se calculan **las dos
+    preguntas en un `Promise.all`** y `puedeEditar` sigue mandando sobre los
+    botones, que el componente ya sabía apagar.
+  - **También abre la sección**: `puedeVerAlpha` y `puedeVerCasaDeFe` aceptan el
+    permiso, para que mañana sirva en alguien que no sea pastor.
+  - **El expediente de cada miembro sí le abre** (comprobado en
+    `accesoAExpediente`: el rol PASTOR abre cualquiera), así que los enlaces de
+    la ficha del grupo no quedan muertos.
+  - **⚠️ ACCIÓN DEL USUARIO, después del despliegue:** Administración → buscar a
+    **Luis Alberto Facundo** → abrir su ficha → encender **«Ve todos los grupos
+    de la iglesia (solo mirar)»** → Guardar. **No se aplicó por SQL a propósito**
+    (la columna no existe hasta que el build corra la migración) y así queda
+    auditado quién se lo concedió.
+  - Migración probada contra la base con `BEGIN … ROLLBACK` en la misma llamada
+    y **repetida entera** para comprobar que es idempotente; verificado después
+    que producción quedó en **0 columnas**.
+  - `tsc`, eslint, **27/27 pruebas** y `npm run cf:build` en verde.
+
 - **2026-09-12** — **«Actividad del día» con calendario y rango de fechas**
   (pedido del usuario: «poder escoger la fecha… que se despliegue como un
   calendario y yo pueda escoger allí, un día específico o también un rango»).

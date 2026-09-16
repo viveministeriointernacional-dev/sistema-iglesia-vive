@@ -122,6 +122,7 @@ export default async function PaginaPersonaAdmin({
                   canLeadFaithHouse: persona.user.canLeadFaithHouse,
                   canMentor: persona.user.canMentor,
                   coordinatesConsolidation: persona.user.coordinatesConsolidation,
+                  canSeeAllGroups: persona.user.canSeeAllGroups,
                 }
               : null
           }
