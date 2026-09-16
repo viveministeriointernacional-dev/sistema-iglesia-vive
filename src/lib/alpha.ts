@@ -40,7 +40,9 @@ export function puedeCrearAlpha(usuario: UsuarioSesion) {
 /// Quién puede entrar a la sección de Alpha: quien tiene el permiso de
 /// liderar, y quien puede abrir grupos.
 export function puedeVerAlpha(usuario: UsuarioSesion) {
-  return usuario.canLeadAlpha || puedeCrearAlpha(usuario);
+  return (
+    usuario.canLeadAlpha || usuario.veTodosLosGrupos || puedeCrearAlpha(usuario)
+  );
 }
 
 /// **Quién administra un grupo concreto**: su líder, quien lo abrió, la
@@ -57,7 +59,12 @@ export async function puedeAdministrarGrupo(
 ) {
   if (grupo.leaderId === usuario.id) return true;
   if (grupo.createdById && grupo.createdById === usuario.id) return true;
-  if (esVistaCompletaDeAlpha(usuario)) return true;
+  // ⚠️ Aquí va `veTodaLaRed` y NO `esVistaCompletaDeAlpha`, aunque hasta hoy
+  // fueran lo mismo. El permiso «ve todos los grupos» es de MIRAR: quien ora
+  // por los grupos tiene que saber dónde se reúne cada uno, no cambiarles el
+  // líder ni cerrarlos. Si esto llamara a `esVistaCompletaDeAlpha`, la casilla
+  // repartiría administración de toda la iglesia sin decirlo en ninguna parte.
+  if (veTodaLaRed(usuario)) return true;
   return (await lideresDeMiRama(usuario.id)).includes(grupo.leaderId);
 }
 
@@ -67,8 +74,23 @@ export async function puedeAdministrarGrupo(
 /// el mentor o líder pueda ver los Alpha y Casas de Fe que tiene asignado o que
 /// tienen asignado las personas que lidera». Así que **el rol PASTOR ya no
 /// abre todos los grupos** — ve los suyos y los de su rama.
+/// Y **el permiso acumulable «ve todos los grupos»** (16-sep-2026), que es la
+/// otra puerta: el líder de intercesión no acompaña a nadie, así que su rama
+/// está vacía y la pantalla le quedaba en blanco. Solo abre la lista — para
+/// administrar sigue haciendo falta llevar el grupo, haberlo abierto, ser
+/// administración o tener a su líder en la rama.
 export function esVistaCompletaDeAlpha(usuario: UsuarioSesion) {
-  return veTodaLaRed(usuario);
+  return veTodaLaRed(usuario) || usuario.veTodosLosGrupos;
+}
+
+/// **Quién puede ABRIR la ficha de un Alpha concreto**, aunque no pueda
+/// tocarlo. Ver la nota en `puedeEntrarACasaDeFe`.
+export async function puedeEntrarAGrupo(
+  usuario: UsuarioSesion,
+  grupo: { leaderId: string; createdById?: string | null },
+) {
+  if (esVistaCompletaDeAlpha(usuario)) return true;
+  return puedeAdministrarGrupo(usuario, grupo);
 }
 
 export async function cargarGrupos(usuario: UsuarioSesion) {

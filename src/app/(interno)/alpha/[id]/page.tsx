@@ -6,6 +6,7 @@ import {
   cargarGrupo,
   construirParticipantes,
   puedeAdministrarGrupo,
+  puedeEntrarAGrupo,
   puedeVerAlpha,
   SESIONES_DE_ALPHA,
 } from "@/lib/alpha";
@@ -35,11 +36,14 @@ export default async function PaginaGrupoDeAlpha({
 
   if (!grupo) notFound();
 
-  // Solo entra quien lleva el grupo, quien lo abrió, la administración, o el
-  // líder que tiene al líder del grupo en su rama. Quien lo abrió ya entra por
-  // `puedeAdministrarGrupo`, así que aquí no hace falta repetirlo.
-  const puedeEditar = await puedeAdministrarGrupo(usuario, grupo);
-  if (!puedeEditar) notFound();
+  // Entra quien lleva el grupo, quien lo abrió, la administración, el líder que
+  // tiene al líder del grupo en su rama — y, **solo a mirar**, quien tiene el
+  // permiso «ve todos los grupos». Por eso son dos preguntas y no una.
+  const [puedeEditar, puedeEntrar] = await Promise.all([
+    puedeAdministrarGrupo(usuario, grupo),
+    puedeEntrarAGrupo(usuario, grupo),
+  ]);
+  if (!puedeEntrar) notFound();
 
   const ahora = new Date();
   const participantes = construirParticipantes(grupo, ahora);

@@ -551,6 +551,7 @@ export async function cargarPersonaAdmin(personId: string) {
           canLeadFaithHouse: true,
           canMentor: true,
           coordinatesConsolidation: true,
+          canSeeAllGroups: true,
         },
       },
     },

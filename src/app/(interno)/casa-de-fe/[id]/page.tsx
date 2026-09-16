@@ -5,6 +5,7 @@ import {
   cargarCasaDeFe,
   construirMiembros,
   puedeAdministrarCasaDeFe,
+  puedeEntrarACasaDeFe,
   puedeVerCasaDeFe,
 } from "@/lib/casa-de-fe";
 import { CasaDeFe, type MiembroVista } from "./grupo";
@@ -35,11 +36,15 @@ export default async function PaginaCasaDeFe({
 
   if (!grupo) notFound();
 
-  // Solo entra quien la lleva, quien la abrió, la administración, o el líder
-  // que tiene al líder del grupo en su rama. Quien la abrió ya entra por
-  // `puedeAdministrarCasaDeFe`.
-  const puedeEditar = await puedeAdministrarCasaDeFe(usuario, grupo);
-  if (!puedeEditar) notFound();
+  // Entra quien la lleva, quien la abrió, la administración, el líder que tiene
+  // al líder del grupo en su rama — y, **solo a mirar**, quien tiene el permiso
+  // «ve todos los grupos». De ahí que sean dos preguntas y no una: antes bastaba
+  // con `puedeEditar`, y eso dejaba fuera a quien puede verla sin tocarla.
+  const [puedeEditar, puedeEntrar] = await Promise.all([
+    puedeAdministrarCasaDeFe(usuario, grupo),
+    puedeEntrarACasaDeFe(usuario, grupo),
+  ]);
+  if (!puedeEntrar) notFound();
 
   const miembros: MiembroVista[] = construirMiembros(grupo).map((miembro) => ({
     membershipId: miembro.membershipId,
