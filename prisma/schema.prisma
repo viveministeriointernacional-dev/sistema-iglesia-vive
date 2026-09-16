@@ -118,6 +118,9 @@ model AppUser {
   bajasPedidas           BajaRequest[]           @relation("PidioLaBaja")
   bajasResueltas         BajaRequest[]           @relation("ResolvioLaBaja")
   llavesMaestras         MasterKey[]             @relation("CreoLlaveMaestra")
+  vistasPropias          ViewUserAccess[]        @relation("VistaDeLaCuenta")
+  vistasDeRolCambiadas   ViewRoleAccess[]        @relation("CambioVistaDeRol")
+  vistasDeCuentaCambiadas ViewUserAccess[]       @relation("CambioVistaDeCuenta")
 
   @@index([role, active])
   @@map("app_user")
@@ -1142,4 +1145,51 @@ model MasterKey {
   createdBy AppUser @relation("CreoLlaveMaestra", fields: [createdById], references: [id])
 
   @@map("master_key")
+}
+
+/// **Qué menús ve cada ROL** (pedido del usuario, 16-sep-2026: «que se pueda
+/// habilitar por perfil cada menú o vista dentro de la plataforma»).
+///
+/// Una fila por (vista, rol). **Si no hay fila, manda el defecto del catálogo**,
+/// que es exactamente lo que ese rol veía antes de que existiera esta tabla
+/// (`POR_DEFECTO_SEGUN_ROL` en `vistas-catalogo.ts`). Por eso desplegar esto sin
+/// configurar nada deja la plataforma igual que estaba.
+///
+/// ⚠️ Administración y Llave maestra **no** se guardan aquí: no son
+/// configurables (ver `VISTAS_FUERA_DEL_CONFIGURADOR`).
+model ViewRoleAccess {
+  id        String   @id @default(uuid())
+  /// El `VistaId` del catálogo. Texto y no enum: las vistas se añaden y se
+  /// quitan con el código, no con una migración.
+  view      String
+  role      Role
+  enabled   Boolean
+  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedById String @map("updated_by_id")
+
+  updatedBy AppUser @relation("CambioVistaDeRol", fields: [updatedById], references: [id])
+
+  @@unique([view, role])
+  @@map("view_role_access")
+}
+
+/// **La excepción de una cuenta concreta**, por encima de lo que diga su rol.
+///
+/// Existe por el caso del líder de intercesión (15-sep-2026): una persona que
+/// necesita una pantalla que a su rol no le toca, sin cambiársela a los otros
+/// seis pastores. Sin fila, la cuenta sigue a su rol.
+model ViewUserAccess {
+  id        String   @id @default(uuid())
+  view      String
+  userId    String   @map("user_id")
+  enabled   Boolean
+  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedById String @map("updated_by_id")
+
+  user      AppUser @relation("VistaDeLaCuenta", fields: [userId], references: [id], onDelete: Cascade)
+  updatedBy AppUser @relation("CambioVistaDeCuenta", fields: [updatedById], references: [id])
+
+  @@unique([view, userId])
+  @@index([userId])
+  @@map("view_user_access")
 }

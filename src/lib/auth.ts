@@ -3,6 +3,12 @@ import { redirect } from "next/navigation";
 import { Role } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import {
+  vistaHabilitada,
+  vistasHabilitadas,
+  type ConfiguracionDeVistas,
+} from "@/lib/vistas";
+import { type VistaId } from "@/lib/vistas-catalogo";
 
 export type UsuarioSesion = {
   id: string;
@@ -24,6 +30,10 @@ export type UsuarioSesion = {
   /// Ve todos los grupos de la iglesia (Casas de Fe y Alpha), lleve o no
   /// alguno. Solo mirar: no administra ninguno.
   veTodosLosGrupos: boolean;
+  /// Las pantallas que tiene encendidas, ya resueltas: su excepción propia si
+  /// la hay, si no la de su rol, y si no el defecto de siempre. Se calcula una
+  /// vez por petición en `obtenerUsuarioActual`.
+  vistas: readonly VistaId[];
 };
 
 /// Quién administra el sistema: personas, roles, permisos y procesos.
@@ -251,21 +261,52 @@ export const obtenerUsuarioActual = cache(
       });
     }
 
+    // Un solo viaje más para las dos tablas de vistas. Con `PrismaPg max:1`
+    // las consultas se serializan sobre la única conexión, así que cada viaje
+    // se paga en latencia del pooler: se piden las dos de un tirón y no una
+    // por tabla. Son tablas diminutas (13 vistas × 6 roles como máximo).
+    const [porRol, porCuenta] = await prisma.$transaction([
+      prisma.viewRoleAccess.findMany({
+        where: { role: registro.role },
+        select: { view: true, role: true, enabled: true },
+      }),
+      prisma.viewUserAccess.findMany({
+        where: { userId: registro.id },
+        select: { view: true, enabled: true },
+      }),
+    ]);
+
+    const perfil = {
+      role: registro.role,
+      canLeadAlpha: registro.canLeadAlpha,
+      canLeadFaithHouse: registro.canLeadFaithHouse,
+      canMentor: registro.canMentor,
+      coordinaConsolidacion: registro.coordinatesConsolidation,
+      veTodosLosGrupos: registro.canSeeAllGroups,
+    };
+
     return {
       id: registro.id,
       email: registro.email,
       fullName: registro.fullName,
-      role: registro.role,
       personId: registro.personId,
       teamId: registro.teamId,
-      canLeadAlpha: registro.canLeadAlpha,
-      canLeadFaithHouse: registro.canLeadFaithHouse,
-      coordinaConsolidacion: registro.coordinatesConsolidation,
-      canMentor: registro.canMentor,
-      veTodosLosGrupos: registro.canSeeAllGroups,
+      ...perfil,
+      vistas: vistasHabilitadas(perfil, { porRol, porCuenta }),
     };
   },
 );
+
+/// Recalcula las vistas de un perfil con una configuración concreta. Lo usa la
+/// pantalla de administración para enseñar el efecto de un cambio sin abrir la
+/// sesión de nadie.
+export function resolverVista(
+  vista: VistaId,
+  perfil: Parameters<typeof vistaHabilitada>[1],
+  configuracion: ConfiguracionDeVistas,
+): boolean {
+  return vistaHabilitada(vista, perfil, configuracion);
+}
 
 /// Quién ve y opera toda la consolidación: pastor y administrador siempre, y el
 /// consolidador con permiso de coordinación. El consolidador común solo ve lo
@@ -296,6 +337,33 @@ export async function requerirPermiso(
 ): Promise<UsuarioSesion> {
   const usuario = await requerirUsuario();
   if (!tienePermiso(usuario)) redirect("/sin-permiso");
+  return usuario;
+}
+
+/// ¿Tiene encendida esta pantalla?
+export function tieneVista(usuario: UsuarioSesion, vista: VistaId): boolean {
+  return usuario.vistas.includes(vista);
+}
+
+/// **El guardia de una pantalla configurable.**
+///
+/// ⚠️ Va en la página, no solo en el menú. Esconder la pestaña y dejar la
+/// dirección abierta sería cosmético — es la misma lección del 11-sep-2026 con
+/// el tablero de Operación 72, donde hubo que aplicar el permiso en los tres
+/// sitios y no solo en el menú.
+export async function requerirVista(vista: VistaId): Promise<UsuarioSesion> {
+  const usuario = await requerirUsuario();
+  if (!tieneVista(usuario, vista)) redirect("/sin-permiso");
+  return usuario;
+}
+
+/// La misma, para una Server Action.
+export async function requerirVistaEnAccion(
+  vista: VistaId,
+): Promise<UsuarioSesion> {
+  const usuario = await obtenerUsuarioActual();
+  if (!usuario) throw new ErrorDePermiso("Tu sesión expiró. Vuelve a entrar.");
+  if (!tieneVista(usuario, vista)) throw new ErrorDePermiso();
   return usuario;
 }
 
