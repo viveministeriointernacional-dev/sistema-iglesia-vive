@@ -167,6 +167,7 @@ export default async function PaginaInforme({
 
         <Tiles informe={informe} />
         <BloqueEfectividad informe={informe} />
+        <BloqueBrecha informe={informe} />
         <BloqueRecorrido informe={informe} />
         <BloqueActividad informe={informe} />
 
@@ -904,5 +905,151 @@ function Celda({ children, fuerte = false }: { children: React.ReactNode; fuerte
     >
       {children}
     </td>
+  );
+}
+
+/// **Se marca más de lo que se registra.**
+///
+/// El discador guarda cada marcación; el formulario es lo único que mueve la
+/// tarjeta. Quien marca y no registra hace el trabajo y lo deja invisible: esa
+/// persona se ve en el tablero como si nadie la hubiera atendido.
+///
+/// El bloque no se pinta cuando no se marcó a nadie en el periodo — sin
+/// marcaciones no hay brecha que medir, y un cero grande en rojo diría algo
+/// que no es.
+function BloqueBrecha({ informe }: { informe: Informe }) {
+  const { brecha, quienMarco } = informe;
+  if (brecha.personasMarcadas === 0) return null;
+
+  const pctSinRegistro = porcentaje(brecha.sinRegistro, brecha.personasMarcadas);
+  const hayBrecha = brecha.sinRegistro > 0;
+  const tope = Math.max(1, ...quienMarco.map((f) => f.marcaciones));
+
+  return (
+    <section className="mt-3">
+      <h2 className="text-[15px] leading-[1.2] font-bold text-tinta">
+        Se marca más de lo que se registra
+      </h2>
+      <p className="mt-1 max-w-[80ch] text-[12.5px] leading-[1.5] text-[rgba(19,28,36,.55)]">
+        El discador deja constancia de cada marcación. El formulario es lo único
+        que mueve la tarjeta. La distancia entre los dos es trabajo que se hizo y
+        no quedó escrito.
+      </p>
+
+      <div
+        className={`tarjeta mt-3 p-[15px] ${hayBrecha ? "border-[rgba(180,70,47,.3)]" : ""}`}
+      >
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
+          <p
+            className={`text-[38px] leading-none font-extrabold tracking-[-.02em] ${hayBrecha ? "text-rojo" : "text-verde-600"}`}
+          >
+            {brecha.sinRegistro}
+          </p>
+          <div className="min-w-[260px] flex-1">
+            <p className="text-[14px] leading-[1.45] font-bold text-tinta">
+              {hayBrecha
+                ? "personas recibieron una llamada que no consta en su expediente"
+                : "personas marcadas sin registro: todo lo que se marcó quedó escrito"}
+            </p>
+            <p className="mt-1 text-[12.5px] leading-[1.5] text-[rgba(19,28,36,.55)]">
+              Se marcó a {brecha.personasMarcadas} personas con ficha.{" "}
+              {brecha.conRegistro} tienen registro y {brecha.sinRegistro} no
+              tienen ninguno
+              {hayBrecha ? ` — el ${pctSinRegistro} % del trabajo telefónico` : ""}.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 flex h-[14px] gap-[2px]">
+          <div
+            className="rounded-l-[4px] bg-verde-600"
+            style={{ width: `${porcentaje(brecha.conRegistro, brecha.personasMarcadas)}%` }}
+          />
+          <div
+            className="rounded-r-[4px] bg-rojo"
+            style={{ width: `${pctSinRegistro}%` }}
+          />
+        </div>
+        <div className="mt-[9px] flex flex-wrap gap-x-5 gap-y-2">
+          <Llave color="bg-verde-600" texto={`${brecha.conRegistro} con registro`} />
+          <Llave color="bg-rojo" texto={`${brecha.sinRegistro} marcadas sin registro`} />
+        </div>
+      </div>
+
+      {brecha.visitasSinLlamada > 0 ? (
+        <div className="aviso-ambar mt-3">
+          <p className="etiqueta-seccion text-ambar-texto">
+            LA MISMA BRECHA, POR OTRO CAMINO
+          </p>
+          <p className="mt-[6px] text-[13px] leading-[1.5] text-tinta">
+            De las{" "}
+            <strong className="font-bold">
+              {brecha.visitasAcordadas} visitas acordadas
+            </strong>{" "}
+            en el periodo,{" "}
+            <strong className="font-bold">
+              {brecha.visitasSinLlamada} no tienen ninguna llamada contestada
+              registrada
+            </strong>
+            . Nadie acuerda una visita sin haber hablado antes — esas
+            conversaciones ocurrieron y no quedaron anotadas.
+          </p>
+        </div>
+      ) : null}
+
+      {quienMarco.length > 0 ? (
+        <div className="tarjeta mt-3 overflow-hidden">
+          <div className="grid grid-cols-[1fr_auto] gap-x-4 border-b border-[rgba(19,28,36,.07)] bg-papel px-[15px] py-[10px]">
+            <span className="etiqueta-seccion">QUIÉN MARCÓ</span>
+            <span className="etiqueta-seccion text-right">MARCACIONES</span>
+          </div>
+          {quienMarco.map((fila) => (
+            <div
+              key={fila.nombre}
+              className="grid grid-cols-[1fr_auto] items-center gap-x-4 border-b border-[rgba(19,28,36,.07)] px-[15px] py-[9px] last:border-b-0"
+            >
+              <div>
+                <p className="text-[13px] leading-none font-bold text-tinta">
+                  {fila.nombre}
+                </p>
+                <div className="mt-[6px] flex h-[10px] max-w-[320px] gap-[2px] overflow-hidden rounded-[3px] bg-papel">
+                  <div
+                    className="bg-verde-600"
+                    style={{ width: `${(100 * fila.contestadas) / tope}%` }}
+                  />
+                  <div
+                    className="bg-azul-700"
+                    style={{
+                      width: `${(100 * (fila.marcaciones - fila.contestadas)) / tope}%`,
+                    }}
+                  />
+                </div>
+                <p className="mt-[5px] text-[11px] leading-none font-medium text-[rgba(19,28,36,.45)]">
+                  {fila.contestadas} contestadas · {fila.personas} personas ·{" "}
+                  {fila.minutos} min
+                </p>
+              </div>
+              <span className="text-right text-[15px] leading-none font-extrabold text-tinta">
+                {fila.marcaciones}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="mt-[10px] flex flex-wrap gap-x-5 gap-y-2">
+        <Llave color="bg-verde-600" texto="Contestadas" />
+        <Llave color="bg-azul-700" texto="No contestadas" />
+      </div>
+    </section>
+  );
+}
+
+function Llave({ color, texto }: { color: string; texto: string }) {
+  return (
+    <span className="inline-flex items-center gap-[7px] text-[11.5px] leading-none font-semibold text-[rgba(19,28,36,.55)]">
+      <span className={`h-[11px] w-[11px] rounded-[2px] ${color}`} />
+      {texto}
+    </span>
   );
 }

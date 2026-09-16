@@ -293,6 +293,33 @@ export type FilaConsolidador = {
   sinTocar: number;
 };
 
+/// **La distancia entre marcar y registrar.**
+///
+/// El discador deja constancia de cada marcación (`call_log`); el formulario es
+/// lo único que mueve la tarjeta. Quien marca y no registra hace el trabajo y
+/// lo deja invisible: en el tablero esa persona se ve como si nadie la hubiera
+/// atendido (§6 de CLAUDE.md).
+export type Brecha = {
+  personasMarcadas: number;
+  conRegistro: number;
+  sinRegistro: number;
+  /// Las visitas acordadas en el periodo, y cuántas de ellas sin que conste
+  /// una llamada contestada. Nadie acuerda una visita sin hablar antes con la
+  /// persona, así que esas conversaciones ocurrieron y no se anotaron. Es la
+  /// MISMA brecha medida por otro camino, y por eso vale: son dos fuentes
+  /// independientes apuntando al mismo hueco.
+  visitasAcordadas: number;
+  visitasSinLlamada: number;
+};
+
+export type FilaDeMarcaciones = {
+  nombre: string;
+  marcaciones: number;
+  contestadas: number;
+  personas: number;
+  minutos: number;
+};
+
 export type Informe = {
   rango: Rango;
   registros: Comparacion;
@@ -322,6 +349,8 @@ export type Informe = {
   op72: { estado: Operation72Status; cuantas: number }[];
   hitosPorTipo: { kind: string; cuantos: number }[];
   consolidadores: FilaConsolidador[];
+  brecha: Brecha;
+  quienMarco: FilaDeMarcaciones[];
 };
 
 /// El orden en que la iglesia recorre las fases. `Phase` no lo garantiza.
@@ -362,6 +391,8 @@ export async function cargarInforme(
     op72,
     hitosPorTipo,
     consolidadores,
+    brecha,
+    quienMarco,
   ] = await Promise.all([
     contarMovimientos(prisma, desde, hasta, desdePrevio, hastaPrevio),
     medirEfectividad(prisma, desde, hasta, corteEnPlazo),
@@ -392,6 +423,8 @@ export async function cargarInforme(
       _count: { _all: true },
     }),
     medirConsolidadores(prisma, desde, hasta),
+    medirBrecha(prisma, desde, hasta),
+    contarMarcaciones(prisma, desde, hasta),
   ]);
 
   const personasPorFase = new Map(
@@ -438,7 +471,117 @@ export async function cargarInforme(
       .map((fila) => ({ kind: fila.kind as string, cuantos: fila._count._all }))
       .sort((a, b) => b.cuantos - a.cuantos),
     consolidadores,
+    brecha,
+    quienMarco,
   };
+}
+
+/// **Cuánta gente recibió una llamada que no quedó escrita.**
+///
+/// Dos medidas independientes del mismo hueco:
+/// 1. De las personas a las que se marcó en el periodo, cuántas tienen al menos
+///    un registro de llamada en ese mismo periodo.
+/// 2. De las visitas acordadas en el periodo, cuántas se acordaron sin que
+///    conste ninguna llamada contestada.
+///
+/// ⚠️ **Los límites se comparan contra `Date` de JS**, que Prisma manda como
+/// `timestamptz`. Es la forma correcta con estas columnas (`timestamp without
+/// time zone` que guardan UTC); escribir `AT TIME ZONE 'America/Bogota'` a
+/// secas sobre ellas suma cinco horas en vez de restarlas.
+async function medirBrecha(
+  prisma: ClientePrisma,
+  desde: Date,
+  hasta: Date,
+): Promise<Brecha> {
+  const [fila] = await prisma.$queryRaw<
+    {
+      personas_marcadas: number;
+      con_registro: number;
+      sin_registro: number;
+      visitas_acordadas: number;
+      visitas_sin_llamada: number;
+    }[]
+  >`
+    WITH marcadas AS (
+      SELECT DISTINCT lp.id AS learner_id
+      FROM call_log cl
+      JOIN highlevel_contact hc ON hc.contact_id = cl.contact_id
+      JOIN learner_profile lp ON lp.person_id = hc.person_id
+      WHERE cl.started_at BETWEEN ${desde} AND ${hasta}
+    ),
+    registradas AS (
+      SELECT DISTINCT o.learner_id
+      FROM contact_attempt ca
+      JOIN operation72 o ON o.id = ca.operation72_id
+      WHERE ca.type IN ('LLAMADA', 'INTENTO_LLAMADA')
+        AND ca.annulled_at IS NULL
+        AND ca.occurred_at BETWEEN ${desde} AND ${hasta}
+    ),
+    visitas AS (
+      SELECT DISTINCT o.id
+      FROM contact_attempt ca
+      JOIN operation72 o ON o.id = ca.operation72_id
+      WHERE ca.type = 'VISITA'
+        AND ca.result = 'Visita agendada'
+        AND ca.annulled_at IS NULL
+        AND ca.occurred_at BETWEEN ${desde} AND ${hasta}
+    )
+    SELECT
+      (SELECT count(*) FROM marcadas)::int AS personas_marcadas,
+      (SELECT count(*) FROM marcadas m
+        WHERE EXISTS (SELECT 1 FROM registradas r WHERE r.learner_id = m.learner_id))::int AS con_registro,
+      (SELECT count(*) FROM marcadas m
+        WHERE NOT EXISTS (SELECT 1 FROM registradas r WHERE r.learner_id = m.learner_id))::int AS sin_registro,
+      (SELECT count(*) FROM visitas)::int AS visitas_acordadas,
+      (SELECT count(*) FROM visitas v
+        WHERE NOT EXISTS (
+          SELECT 1 FROM contact_attempt c
+          WHERE c.operation72_id = v.id
+            AND c.type = 'LLAMADA'
+            AND c.outcome::text LIKE 'CONTESTO%'
+            AND c.annulled_at IS NULL
+        ))::int AS visitas_sin_llamada
+  `;
+
+  return {
+    personasMarcadas: fila?.personas_marcadas ?? 0,
+    conRegistro: fila?.con_registro ?? 0,
+    sinRegistro: fila?.sin_registro ?? 0,
+    visitasAcordadas: fila?.visitas_acordadas ?? 0,
+    visitasSinLlamada: fila?.visitas_sin_llamada ?? 0,
+  };
+}
+
+/// Quién marcó, del discador. Es la otra mitad de la brecha: sin esto se sabe
+/// que hay llamadas sin registrar, pero no de quién.
+///
+/// Sale de `call_log`, así que incluye a cualquiera que marque en el CRM —
+/// tenga o no cuenta enlazada en el sistema. Los que no la tienen salen juntos
+/// como «Sin cuenta enlazada», que es en sí un aviso: sus llamadas no se le
+/// pueden atribuir a nadie.
+async function contarMarcaciones(
+  prisma: ClientePrisma,
+  desde: Date,
+  hasta: Date,
+): Promise<FilaDeMarcaciones[]> {
+  return prisma.$queryRaw<FilaDeMarcaciones[]>`
+    SELECT
+      coalesce(
+        nullif(trim(concat(p.first_name, ' ', p.last_name)), ''),
+        cl.caller_name,
+        'Sin cuenta enlazada'
+      ) AS nombre,
+      count(*)::int AS marcaciones,
+      count(*) FILTER (WHERE cl.answered)::int AS contestadas,
+      count(DISTINCT cl.contact_id)::int AS personas,
+      (round(coalesce(sum(cl.duration_seconds), 0) / 60.0))::int AS minutos
+    FROM call_log cl
+    LEFT JOIN app_user u ON u.id = cl.app_user_id
+    LEFT JOIN person p ON p.id = u.person_id
+    WHERE cl.started_at BETWEEN ${desde} AND ${hasta}
+    GROUP BY 1
+    ORDER BY marcaciones DESC
+  `;
 }
 
 /// Las seis cifras de arriba, con su comparación contra el periodo anterior.

@@ -152,6 +152,28 @@ export function veTodaLaRed(usuario: UsuarioSesion): boolean {
   return ROLES_ADMIN.includes(usuario.role) || usuario.coordinaConsolidacion;
 }
 
+/// **Quién ve la pantalla de Procesos** (`/administracion/procesos`), la que se
+/// revisa en la reunión de pastores de los miércoles.
+///
+/// Administración y pastores, y los dos ven **la iglesia completa**.
+///
+/// ⚠️ **Esto NO contradice `veTodaLaRed`, aunque lo parezca — son dos preguntas
+/// distintas.** Aquella regla (11-sep) le recortó a los pastores «Mi red»
+/// porque ahí la pantalla responde *«a quién me toca atender hoy»*, y contarle
+/// a un pastor las 287 alertas de toda la iglesia le tapa las de su propia
+/// gente. Procesos responde otra cosa: *«cómo va la iglesia y a quién le
+/// repartimos las personas que esperan mentor»*. Esa conversación no se puede
+/// tener viendo solo la rama propia — el pastor con cero discípulos es
+/// precisamente el que hay que ver en la tabla.
+///
+/// Decisión del usuario (16-sep-2026), eligiendo entre las tres opciones que se
+/// le ofrecieron: administradores y pastores, con la iglesia completa.
+export const ROLES_PROCESOS: Role[] = [Role.ADMIN, Role.PASTOR];
+
+export function puedeVerProcesos(usuario: UsuarioSesion): boolean {
+  return ROLES_PROCESOS.includes(usuario.role);
+}
+
 /// Quién puede buscar personas y abrir expedientes desde el buscador. Coincide
 /// con quienes `accesoAExpediente` deja ver algún expediente: los aprendices y
 /// líderes Alpha no buscan (no abren expedientes ajenos).
