@@ -1,13 +1,7 @@
 import Link from "next/link";
 import { Operation72Status, type Prisma, Role } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
-import {
-  puedeAutorizarBaja,
-  requerirPermiso,
-  puedeOperarOperacion72,
-  puedeReasignarColumnaOp72,
-  veTodaLaConsolidacion,
-} from "@/lib/auth";
+import { puedeAutorizarBaja, puedeReasignarColumnaOp72, requerirVista, veTodaLaConsolidacion } from "@/lib/auth";
 import { ESTADO_SOLICITUD } from "@/lib/baja";
 import {
   momentoLegible,
@@ -93,7 +87,7 @@ export default async function TableroOperacion72({
     n?: string;
   }>;
 }) {
-  const usuario = await requerirPermiso(puedeOperarOperacion72);
+  const usuario = await requerirVista("operacion-72");
   const {
     q: consultaCruda,
     orden: ordenCrudo,

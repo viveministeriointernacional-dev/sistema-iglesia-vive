@@ -1,13 +1,12 @@
 import { notFound } from "next/navigation";
 import { diaLargo, momentoLargo } from "@/lib/dominio";
 import { getPrisma } from "@/lib/prisma";
-import { requerirRol } from "@/lib/auth";
+import { requerirVista } from "@/lib/auth";
 import {
   ASISTENCIA_MINIMA_ESCUELA,
   cargarEscuela,
   construirParticipantesDeEscuela,
   esVistaCompletaDeEscuela,
-  ROLES_ENTRENAR,
   TAREAS_MINIMAS,
 } from "@/lib/entrenar";
 import { Escuela, type ParticipanteVista, type SesionVista } from "./escuela";
@@ -37,7 +36,7 @@ export default async function PaginaDeEscuela({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const usuario = await requerirRol(ROLES_ENTRENAR);
+  const usuario = await requerirVista("escuela");
   const escuela = await cargarEscuela(id);
 
   if (!escuela) notFound();

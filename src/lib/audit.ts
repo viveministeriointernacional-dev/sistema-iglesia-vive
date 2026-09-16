@@ -61,6 +61,10 @@ export type AccionAuditada =
   // toca el consolidador, pero queda a la vista en «Actividad del día» en vez
   // de perderse en la respuesta del webhook.
   | "highlevel.usuario_sin_mapear"
+  // Configurador de vistas por perfil (16-sep-2026): qué menús ve cada rol y
+  // las excepciones por cuenta.
+  | "vistas.rol_cambiado"
+  | "vistas.excepcion_cambiada"
   | "registro_publico.recibido"
   // Formulario público del liderazgo: la persona actualiza su propia ficha y
   // declara sus hitos. Lo que dice que hace queda pendiente de confirmar.

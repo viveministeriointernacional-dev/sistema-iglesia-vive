@@ -5,7 +5,7 @@ import {
   MilestoneStatus,
 } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
-import { ETIQUETA_ROL, requerirUsuario, tieneRed } from "@/lib/auth";
+import { ETIQUETA_ROL, requerirVista, tieneRed } from "@/lib/auth";
 import {
   cargarExpediente,
   diasEnFase,
@@ -36,7 +36,7 @@ const FECHA_LARGA = new Intl.DateTimeFormat("es-CO", {
 /// herramienta de quien acompaña: lleva alertas de gestión, notas pastorales y
 /// el estado de la Operación 72. Nada de eso es para el aprendiz (§3.1, §10).
 export default async function MiProceso() {
-  const usuario = await requerirUsuario();
+  const usuario = await requerirVista("mi-proceso");
 
   const prisma = await getPrisma();
   const propio = usuario.personId

@@ -1,12 +1,11 @@
 import Link from "next/link";
 import { diaLargo } from "@/lib/dominio";
-import { requerirPermiso } from "@/lib/auth";
+import { requerirVista } from "@/lib/auth";
 import {
   cargarGrupos,
   esVistaCompletaDeAlpha,
   lideresPosibles,
   puedeCrearAlpha,
-  puedeVerAlpha,
   SESIONES_DE_ALPHA,
 } from "@/lib/alpha";
 import {
@@ -14,7 +13,6 @@ import {
   esVistaCompletaDeCasaDeFe,
   lideresPosiblesCasaDeFe,
   puedeCrearCasaDeFe,
-  puedeVerCasaDeFe,
 } from "@/lib/casa-de-fe";
 import { NuevoGrupo } from "./nuevo-grupo";
 import { NuevaCasaDeFe } from "../casa-de-fe/nuevo-grupo";
@@ -24,12 +22,16 @@ export const dynamic = "force-dynamic";
 
 
 export default async function PaginaAlpha() {
-  const usuario = await requerirPermiso(
-    (u) => puedeVerAlpha(u) || puedeVerCasaDeFe(u),
-  );
+  const usuario = await requerirVista("grupos");
 
-  const veAlpha = puedeVerAlpha(usuario);
-  const veCasaDeFe = puedeVerCasaDeFe(usuario);
+  // ⚠️ Las dos secciones van juntas desde el 16-sep-2026. Antes cada una tenía
+  // su propio permiso (`canLeadAlpha` / `canLeadFaithHouse`), así que quien
+  // llevaba solo Alpha veía media pantalla. Ahora la vista «Alpha y Casa de
+  // Fe» abre las dos, y las casillas de líder se quedan con su otro oficio:
+  // ser elegible para que te asignen un grupo. Es lo que se le explicó al
+  // usuario al aprobar el mockup del configurador.
+  const veAlpha = true;
+  const veCasaDeFe = true;
 
   const [grupos, lideresAlpha, casas, lideresCasa] = await Promise.all([
     veAlpha ? cargarGrupos(usuario) : Promise.resolve([]),

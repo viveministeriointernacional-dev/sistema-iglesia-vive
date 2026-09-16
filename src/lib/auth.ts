@@ -67,14 +67,10 @@ export function puedeAutorizarBaja(usuario: UsuarioSesion): boolean {
   return ROLES_AUTORIZAN_BAJA.includes(usuario.role);
 }
 
-export const ETIQUETA_ROL: Record<Role, string> = {
-  APRENDIZ: "Aprendiz",
-  CONSOLIDADOR: "Consolidador",
-  LIDER_ALPHA: "Líder Alpha",
-  MENTOR: "Mentor",
-  PASTOR: "Pastor",
-  ADMIN: "Administrador",
-};
+// Los nombres de los roles viven en el catálogo, porque los usa también la
+// matriz de vistas, que es un componente de cliente. Se reexporta para no
+// tocar los sitios que ya los importaban de aquí.
+export { ETIQUETA_ROL } from "@/lib/roles-catalogo";
 
 /// Quién puede operar el tablero de Operación 72 y registrar personas nuevas.
 export const ROLES_CONSOLIDACION: Role[] = [

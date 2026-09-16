@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requerirRol, ROLES_ADMIN } from "@/lib/auth";
+import { requerirVista } from "@/lib/auth";
 import { ZONA_HORARIA } from "@/lib/dominio";
 import { listarDadosDeBaja, listarSolicitudesDeBaja } from "@/lib/administracion";
 
@@ -34,7 +34,7 @@ const ETIQUETA_OP72: Record<string, string> = {
 /// Las bajas, en un solo sitio: primero lo que hay que responder, después lo
 /// que ya salió. Nadie se retira del sistema sin pasar por aquí.
 export default async function PaginaDeBajas() {
-  await requerirRol(ROLES_ADMIN);
+  await requerirVista("bajas");
   const [pendientes, salidas] = await Promise.all([
     listarSolicitudesDeBaja(),
     listarDadosDeBaja(),

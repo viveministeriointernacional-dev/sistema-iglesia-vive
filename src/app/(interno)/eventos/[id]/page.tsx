@@ -1,14 +1,13 @@
 import { notFound } from "next/navigation";
 import { EventKind } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
-import { requerirRol } from "@/lib/auth";
+import { requerirVista } from "@/lib/auth";
 import { nombreCompleto, ZONA_HORARIA } from "@/lib/dominio";
 import {
   cargarEvento,
   ETIQUETA_EVENTO,
   ocupanCupo,
   puedeProgramar,
-  ROLES_OPERAN_EVENTOS,
 } from "@/lib/eventos";
 import { Evento, type InscripcionVista } from "./evento";
 
@@ -44,7 +43,7 @@ export default async function PaginaEvento({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const usuario = await requerirRol(ROLES_OPERAN_EVENTOS);
+  const usuario = await requerirVista("eventos");
   const evento = await cargarEvento(id);
 
   if (!evento) notFound();

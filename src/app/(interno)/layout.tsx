@@ -1,20 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Role } from "@iglesia/prisma-client";
 import { salir } from "@/app/ingresar/acciones";
-import {
-  ETIQUETA_ROL,
-  requerirUsuario,
-  ROLES_ADMIN,
-  tieneRed,
-  ROLES_CONSOLIDACION,
-  puedeOperarOperacion72,
-  puedeVerProcesos,
-} from "@/lib/auth";
-import { puedeVerAlpha } from "@/lib/alpha";
-import { puedeVerCasaDeFe } from "@/lib/casa-de-fe";
-import { ROLES_ENTRENAR } from "@/lib/entrenar";
-import { ROLES_OPERAN_EVENTOS } from "@/lib/eventos";
+import { ETIQUETA_ROL, requerirUsuario, ROLES_ADMIN } from "@/lib/auth";
+import { VISTA_POR_ID } from "@/lib/vistas-catalogo";
 import { PestanasSuperiores } from "@/components/pestanas-superiores";
 
 function iniciales(nombre: string) {
@@ -32,47 +20,23 @@ export default async function LayoutInterno({
 }) {
   const usuario = await requerirUsuario();
 
-  const pestanas = [
-    ...(tieneRed(usuario)
-      ? [
-          // El árbol vive dentro de «Mi red» desde el 7-sep-2026: era la misma
-          // gente con el mismo buscador, solo ordenada de otra forma.
-          { href: "/mi-red", etiqueta: "Mi red" },
-        ]
-      : []),
-    // Operación 72 y «Registrar persona» ya NO van juntas: el tablero es de
-    // administración y consolidación (más quien coordine la consolidación),
-    // mientras que registrar a alguien lo sigue haciendo también el pastor
-    // —para eso existe `ROLES_REGISTRO_SOLO_FICHA`—, así que quitarle el
-    // tablero no le puede quitar el registro.
-    ...(puedeOperarOperacion72(usuario)
-      ? [{ href: "/operacion-72", etiqueta: "Operación 72" }]
-      : []),
-    ...(ROLES_CONSOLIDACION.includes(usuario.role)
-      ? [{ href: "/registro-interno", etiqueta: "Registrar persona" }]
-      : []),
-    ...(puedeVerAlpha(usuario) || puedeVerCasaDeFe(usuario)
-      ? [{ href: "/alpha", etiqueta: "Alpha y Casa de Fe" }]
-      : []),
-    ...(ROLES_ENTRENAR.includes(usuario.role)
-      ? [{ href: "/escuela", etiqueta: "Escuela" }]
-      : []),
-    ...(ROLES_OPERAN_EVENTOS.includes(usuario.role)
-      ? [{ href: "/eventos", etiqueta: "Eventos" }]
-      : []),
-    ...(usuario.role === Role.APRENDIZ
-      ? [{ href: "/mi-proceso", etiqueta: "Mi proceso" }]
-      : []),
-    // Procesos va en el menú y no solo dentro de Administración porque el
-    // pastor no entra a /administracion (es de ADMIN): sin esta pestaña no
-    // tendría por dónde llegar a la pantalla que se revisa el miércoles.
-    ...(puedeVerProcesos(usuario)
-      ? [{ href: "/administracion/procesos", etiqueta: "Procesos" }]
-      : []),
-    ...(ROLES_ADMIN.includes(usuario.role)
-      ? [{ href: "/administracion", etiqueta: "Administración" }]
-      : []),
-  ];
+  // **La barra se arma desde las vistas que tenga encendidas**, en el orden del
+  // catálogo. Antes cada renglón traía su propio predicado de rol aquí mismo;
+  // ahora esa decisión vive en `/administracion/vistas` y esto solo la pinta.
+  //
+  // ⚠️ Esconder una pestaña no cierra su página: cada pantalla repite el
+  // guardia con `requerirVista`. Es la lección del 11-sep-2026 — quitar del
+  // menú y dejar la dirección abierta sería cosmético.
+  const pestanas = usuario.vistas.map((id) => {
+    const vista = VISTA_POR_ID.get(id);
+    return { href: vista?.ruta ?? "/", etiqueta: vista?.nombre ?? id };
+  });
+
+  // Administración no es configurable (es desde donde se configura todo lo
+  // demás), así que se añade aparte y al final, como siempre.
+  if (ROLES_ADMIN.includes(usuario.role)) {
+    pestanas.push({ href: "/administracion", etiqueta: "Administración" });
+  }
 
   return (
     <div className="min-h-screen bg-escritorio">

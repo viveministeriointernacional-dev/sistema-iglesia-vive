@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { diaLargo } from "@/lib/dominio";
-import { requerirRol, ROLES_BUSCADOR } from "@/lib/auth";
+import { ROLES_BUSCADOR, requerirVista } from "@/lib/auth";
 import {
   cargarEscuelas,
   esVistaCompletaDeEscuela,
-  ROLES_ENTRENAR,
 } from "@/lib/entrenar";
 import { BuscadorPersonas } from "@/components/buscador-personas";
 import { NuevaEscuela } from "./nueva-escuela";
@@ -14,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 
 export default async function PaginaEscuela() {
-  const usuario = await requerirRol(ROLES_ENTRENAR);
+  const usuario = await requerirVista("escuela");
   const escuelas = await cargarEscuelas(usuario);
 
   return (

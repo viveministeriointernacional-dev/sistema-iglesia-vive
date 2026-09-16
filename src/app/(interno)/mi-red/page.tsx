@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { momentoCorto } from "@/lib/dominio";
 import { Phase } from "@iglesia/prisma-client";
-import { requerirPermiso, tieneRed } from "@/lib/auth";
+import { requerirVista } from "@/lib/auth";
 import { cargarArbol } from "@/lib/arbol";
 import { cargarRed, DIAS_SIN_CONTACTO, type PersonaDeLaRed } from "@/lib/red";
 import { cargarEquipo } from "@/lib/equipo";
@@ -47,7 +47,7 @@ export default async function PaginaMiRed({
 }: {
   searchParams: Promise<{ vista?: string; fase?: string }>;
 }) {
-  const usuario = await requerirPermiso(tieneRed);
+  const usuario = await requerirVista("mi-red");
   const { vista: vistaCruda, fase: faseCruda } = await searchParams;
 
   const vista: Vista = (VISTAS as readonly string[]).includes(vistaCruda ?? "")

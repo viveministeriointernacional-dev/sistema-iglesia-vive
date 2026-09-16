@@ -280,6 +280,100 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-16** — **Vistas por perfil: cada menú de la plataforma se enciende y
+  se apaga desde Administración** (pedido del usuario: «quiero que se pueda
+  habilitar por perfil cada menú o vista dentro de la plataforma»; mockup
+  aprobado: claude.ai/artifact/N7yT8TqLEhyH61NRnscUgG).
+  Hasta hoy, cambiar quién ve qué era **código, revisión y fusión** — es
+  literalmente lo que se hizo el 11-sep con Operación 72, el 12-sep con Alpha y
+  Casa de Fe, y esta misma mañana con el líder de intercesión. Ahora es un
+  interruptor.
+  **Dos decisiones del usuario, elegidas con `AskUserQuestion`:**
+  **(1) por ROL, con excepciones por persona**; **(2) enciende y apaga, con un
+  tope de seguridad**.
+  - **`vistas-catalogo.ts`** (13 vistas, con ruta, alcance y valor de fábrica) ·
+    **`vistas.ts`** (la resolución, **pura y sin base de datos**, por eso se
+    puede probar) · modelos **`ViewRoleAccess`** y **`ViewUserAccess`**
+    (migración `20260916150000_vistas_por_perfil`).
+  - **El orden manda: excepción de la cuenta → fila de su rol → defecto.**
+  - **⚠️ LO QUE HABRÍA SIDO UNA REGRESIÓN SILENCIOSA EL DÍA DEL DESPLIEGUE: el
+    defecto NO puede mirar solo el rol.** Hoy **10 de los 11 consolidadores**
+    ven «Alpha y Casa de Fe» por la casilla **«Líder de Alpha»**, no por su rol;
+    con un defecto por rol a secas, esas diez personas habrían perdido la
+    pantalla en el momento del merge, sin que nadie tocara nada.
+    `PERMISOS_QUE_ABREN` recoge esos permisos acumulables y entran **solo en el
+    paso 3**: en cuanto hay una fila configurada, manda la fila — si no, apagar
+    una vista no surtiría efecto en quien tuviera la casilla y **el interruptor
+    estaría mintiendo**.
+  - **⚠️ Y LA PRUEBA QUE LO VIGILA (`vistas.test.ts`, 7 casos).** La tabla
+    `LO_QUE_VEIA_CADA_ROL` **no se derivó del catálogo** —eso sería comprobar
+    que una constante es igual a sí misma— sino de **leer los ocho predicados
+    viejos** (`tieneRed`, `puedeOperarOperacion72`, `ROLES_CONSOLIDACION`,
+    `puedeVerAlpha`/`puedeVerCasaDeFe`, `ROLES_ENTRENAR`,
+    `ROLES_OPERAN_EVENTOS`, `puedeVerProcesos`, `ROLES_ADMIN`).
+    **Comprobada al revés**: se le quitó «Escuela» a MENTOR a propósito y la
+    prueba falló; al restaurar, verde. **34/34.**
+  - **⚠️ EL GUARDIA VA EN LA PÁGINA, NO SOLO EN EL MENÚ**, que es la lección del
+    11-sep: **19 páginas** pasaron a `requerirVista`, y **las 10 acciones de
+    servidor del tablero de Operación 72** a `requerirVistaEnAccion`. Esconder
+    la pestaña y dejar la dirección abierta habría sido cosmético.
+  - **Fuera del configurador a propósito: Administración y Llave maestra.**
+    La primera **es la pantalla desde la que se configura esto**: si se pudiera
+    encender desde aquí, cualquiera con ella encendida podría encenderse todo lo
+    demás.
+  - **Las 6 sub-pantallas de Administración entran como renglones propios**
+    (Informe, Actividad, Llamadas, Asistentes, Bajas, Procesos), así que se le
+    puede dar el Informe a un pastor **sin** darle crear accesos ni cambiar
+    roles. Al encenderle una, le sale su pestaña — como ya pasa con «Procesos».
+  - **⚠️ CAMBIO DE COMPORTAMIENTO: «Alpha y Casa de Fe» abre ahora las DOS
+    secciones.** Antes cada una tenía su permiso, así que quien llevaba solo
+    Alpha veía media pantalla. Las casillas `canLeadAlpha`/`canLeadFaithHouse`
+    **siguen existiendo** con su otro oficio: ser elegible para que te asignen
+    un grupo.
+  - **`ETIQUETA_ROL` se mudó a `src/lib/roles-catalogo.ts`** y `auth.ts` la
+    reexporta: la matriz es componente de cliente y `auth.ts` arrastra Prisma
+    (`pg`, `net`, `dns`). Es la regla del 6-sep, y **`tsc` no la habría visto**.
+  - Auditoría `vistas.rol_cambiado` y `vistas.excepcion_cambiada`, las dos con
+    su `case` en `actividad.ts` (en ámbar). Ojo: en la excepción, `encendida:
+    null` significa **«vuelve a seguir a su rol»**, que no es lo mismo que
+    apagarla.
+  - Migración probada con `BEGIN … ROLLBACK` en la misma llamada y **repetida
+    entera** (idempotente); verificado después que producción quedó en **0
+    tablas**. `tsc`, eslint, **34/34** y `npm run cf:build` en verde.
+
+- **2026-09-16** — **Permiso «ve todos los grupos» VIVO** (PR #88 fusionado).
+  Verificado: la columna `can_see_all_groups` existe y
+  `20260916120000_ve_todos_los_grupos` quedó registrada en `app_migration`.
+  `git log --oneline origin/main..origin/<rama>` **vacío**: no se quedó nada
+  fuera. **Falta que el usuario encienda la casilla** a Luis Alberto Facundo.
+
+- **2026-09-16** — **⚠️ La contraseña de un pastor se cambió CINCO veces en una
+  hora y por eso «no podía entrar». No era la cuenta ni el sistema.**
+  El usuario reportó que no lograba ingresar con el perfil de **Luis Alberto
+  Facundo**. La cuenta estaba **sana**: activa, PASTOR, enlazada a `auth.users`,
+  correo confirmado, sin bloqueo, y **sin los NULL del 3-sep**.
+  **La evidencia que lo cerró:** `last_sign_in_at` = **ese mismo día 9:23:40**,
+  o sea que **un ingreso SÍ funcionó**. La cronología: 8:39 restablecida por el
+  admin · 8:45 el propio pastor se puso una por `/recuperar` · 9:12 admin ·
+  **9:23 ingreso con éxito** · 9:31 admin · 9:35 admin. **Los dos últimos
+  cambios anularon la clave con la que se acababa de entrar.**
+  Logs de Auth: **~27 `400: Invalid login credentials`** entre 9:22 y 9:39,
+  **ningún 429 y ningún error de servidor** — o sea, rechazos legítimos.
+  **REGLA: ante un «no puedo entrar», mirar `last_sign_in_at` ANTES de tocar la
+  contraseña.** Si es reciente, el problema es qué clave se está escribiendo, y
+  restablecerla otra vez **empeora** el problema.
+  **Se le puso la clave por SQL** con `extensions.crypt(clave, gen_salt('bf',
+  10))` — bcrypt `$2a$` de 60 caracteres, que es lo que GoTrue acepta. Probado
+  con `BEGIN … ROLLBACK` y **comprobado que la clave buena verifica, que una
+  mayúscula distinta NO entra y que un espacio al final tampoco**.
+  **⚠️ Matiz que NO estaba escrito y hay que recordar: `auth.users` usa
+  `timestamptz`, no `timestamp` sin zona como las tablas del modelo.** Ahí
+  `AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota'` **suma 5 h** (daba las
+  19:23 en vez de las 9:23). Para `auth.users` basta **un solo**
+  `AT TIME ZONE 'America/Bogota'`.
+  **La llave maestra es el camino bueno para esto** y estaba sin estrenar ese
+  día: viva desde el 6-sep y usada con éxito el 10-sep.
+
 - **2026-09-16** — **Permiso nuevo «ve todos los grupos»: el líder de intercesión
   vuelve a ver todas las Casas de Fe** (pedido del usuario: «el pastor Luis
   Alberto Facundo, que es mentor, en su perfil pueda ver todas las casas de fe

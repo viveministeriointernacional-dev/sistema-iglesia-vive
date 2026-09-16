@@ -9,6 +9,12 @@ import { cargarDeclaracionPendiente } from "@/lib/liderazgo";
 import { ZONA_HORARIA } from "@/lib/dominio";
 import { DeclaracionDeLiderazgo } from "./declaracion";
 import { EditorPersona } from "./editor";
+import { porDefecto } from "@/lib/vistas";
+import { VISTAS } from "@/lib/vistas-catalogo";
+import {
+  VistasDeLaCuenta,
+  type VistaDeLaCuenta,
+} from "./vistas-de-la-cuenta";
 
 const FECHA_DECLARACION = new Intl.DateTimeFormat("es-CO", {
   timeZone: ZONA_HORARIA,
@@ -44,6 +50,46 @@ export default async function PaginaPersonaAdmin({
 
   const aprendiz = persona.learnerProfile;
   const prisma = await getPrisma();
+
+  // Qué pantallas ve esta cuenta. Solo se consulta si tiene acceso creado: una
+  // ficha sin cuenta no tiene menús que configurar.
+  const cuentaId = persona.user?.id ?? null;
+  const [filasDeRol, filasDeCuenta] = cuentaId
+    ? await prisma.$transaction([
+        prisma.viewRoleAccess.findMany({
+          where: { role: persona.user!.role },
+          select: { view: true, enabled: true },
+        }),
+        prisma.viewUserAccess.findMany({
+          where: { userId: cuentaId },
+          select: { view: true, enabled: true },
+        }),
+      ])
+    : [[], []];
+
+  const porRol = new Map(filasDeRol.map((f) => [f.view, f.enabled]));
+  const excepciones = new Map(filasDeCuenta.map((f) => [f.view, f.enabled]));
+
+  const vistasDeLaCuenta: VistaDeLaCuenta[] = persona.user
+    ? VISTAS.map((v) => ({
+        id: v.id,
+        nombre: v.nombre,
+        // Lo que le daría su rol: la fila configurada si la hay, y si no el
+        // defecto **con sus permisos reales** — porque hoy una casilla como
+        // «líder de Alpha» también abre pantallas.
+        porSuRol:
+          porRol.get(v.id) ??
+          porDefecto(v.id, {
+            role: persona.user!.role,
+            canLeadAlpha: persona.user!.canLeadAlpha,
+            canLeadFaithHouse: persona.user!.canLeadFaithHouse,
+            canMentor: persona.user!.canMentor,
+            coordinaConsolidacion: persona.user!.coordinatesConsolidation,
+            veTodosLosGrupos: persona.user!.canSeeAllGroups,
+          }),
+        excepcion: excepciones.get(v.id) ?? null,
+      }))
+    : [];
   const mentores = aprendiz ? await mentoresElegibles(prisma) : [];
 
   // Lo que la persona declaró de sí misma en el formulario público de
@@ -145,6 +191,15 @@ export default async function PaginaPersonaAdmin({
               : null
           }
         />
+
+        {persona.user ? (
+          <div className="mt-[14px]">
+            <VistasDeLaCuenta
+              userId={persona.user.id}
+              vistas={vistasDeLaCuenta}
+            />
+          </div>
+        ) : null}
       </div>
     </main>
   );
