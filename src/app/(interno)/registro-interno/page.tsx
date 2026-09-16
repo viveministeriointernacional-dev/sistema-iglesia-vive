@@ -1,14 +1,10 @@
-import {
-  requerirRol,
-  ROLES_CONSOLIDACION,
-  ROLES_REGISTRO_SOLO_FICHA,
-} from "@/lib/auth";
+import { ROLES_REGISTRO_SOLO_FICHA, requerirVista } from "@/lib/auth";
 import { AsistenteDeRegistro } from "./asistente";
 
 export const metadata = { title: "Registrar persona · Iglesia Vive" };
 
 export default async function PaginaRegistro() {
-  const usuario = await requerirRol(ROLES_CONSOLIDACION);
+  const usuario = await requerirVista("registro-interno");
   const puedeElegirDestino = ROLES_REGISTRO_SOLO_FICHA.includes(usuario.role);
 
   return (

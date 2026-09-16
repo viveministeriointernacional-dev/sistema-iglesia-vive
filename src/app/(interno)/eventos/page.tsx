@@ -1,12 +1,11 @@
 import Link from "next/link";
 import { EventKind } from "@iglesia/prisma-client";
-import { requerirRol, ROLES_BUSCADOR } from "@/lib/auth";
+import { ROLES_BUSCADOR, requerirVista } from "@/lib/auth";
 import {
   cargarEventos,
   ETIQUETA_EVENTO,
   ocupanCupo,
   puedeProgramar,
-  ROLES_OPERAN_EVENTOS,
 } from "@/lib/eventos";
 import { ZONA_HORARIA } from "@/lib/dominio";
 import { BuscadorPersonas } from "@/components/buscador-personas";
@@ -27,7 +26,7 @@ const FECHA = new Intl.DateTimeFormat("es-CO", {
 type EventoDeLista = Awaited<ReturnType<typeof cargarEventos>>["proximos"][number];
 
 export default async function PaginaEventos() {
-  const usuario = await requerirRol(ROLES_OPERAN_EVENTOS);
+  const usuario = await requerirVista("eventos");
   const { proximos, pasados } = await cargarEventos();
 
   return (

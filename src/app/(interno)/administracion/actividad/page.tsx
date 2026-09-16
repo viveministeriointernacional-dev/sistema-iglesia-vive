@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requerirRol, ROLES_ADMIN } from "@/lib/auth";
+import { requerirVista } from "@/lib/auth";
 import { cargarActividad, TIPOS_DE_ACTIVIDAD } from "@/lib/actividad";
 import { atajosDelInforme } from "@/lib/informe";
 import { getPrisma } from "@/lib/prisma";
@@ -35,7 +35,7 @@ export default async function PaginaActividad({
     q?: string;
   }>;
 }) {
-  await requerirRol(ROLES_ADMIN);
+  await requerirVista("actividad");
   const { desde, hasta, dia, tipo, q } = await searchParams;
   const prisma = await getPrisma();
   const actividad = await cargarActividad(prisma, {

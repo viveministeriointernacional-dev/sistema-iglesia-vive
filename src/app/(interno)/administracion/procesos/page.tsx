@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Phase } from "@iglesia/prisma-client";
-import { requerirPermiso, puedeVerProcesos } from "@/lib/auth";
+import { requerirVista } from "@/lib/auth";
 import {
   cargarProcesos,
   type GrupoDeProcesos,
@@ -37,7 +37,7 @@ export default async function PaginaDeProcesos({
 }: {
   searchParams: Promise<{ q?: string; filtro?: string }>;
 }) {
-  await requerirPermiso(puedeVerProcesos);
+  await requerirVista("procesos");
 
   const parametros = await searchParams;
   const busqueda = (parametros.q ?? "").trim();

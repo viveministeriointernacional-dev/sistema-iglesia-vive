@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Phase } from "@iglesia/prisma-client";
-import { requerirRol, ROLES_ADMIN } from "@/lib/auth";
+import { requerirVista } from "@/lib/auth";
 import { momentoLegible, telefonoLegible, ZONA_HORARIA } from "@/lib/dominio";
 import {
   calcularRango,
@@ -42,7 +42,7 @@ export default async function PaginaDetalle({
 }: {
   searchParams: Promise<{ desde?: string; hasta?: string; filtro?: string }>;
 }) {
-  await requerirRol(ROLES_ADMIN);
+  await requerirVista("informe");
   const { desde, hasta, filtro: filtroCrudo } = await searchParams;
   const rango = calcularRango(desde, hasta);
   const filtro = filtroValido(filtroCrudo);

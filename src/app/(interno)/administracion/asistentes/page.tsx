@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requerirRol, ROLES_ADMIN } from "@/lib/auth";
+import { requerirVista } from "@/lib/auth";
 import {
   DIAS_SIN_CONTACTO,
   listarAsistentes,
@@ -45,7 +45,7 @@ export default async function PaginaDeAsistentes({
 }: {
   searchParams: Promise<{ q?: string; filtro?: string }>;
 }) {
-  await requerirRol(ROLES_ADMIN);
+  await requerirVista("asistentes");
   const parametros = await searchParams;
   const busqueda = (parametros.q ?? "").trim();
   const filtro: Filtro =

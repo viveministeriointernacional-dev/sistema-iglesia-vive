@@ -1,13 +1,12 @@
 import { notFound } from "next/navigation";
 import { diaLargo, momentoLargo } from "@/lib/dominio";
-import { requerirPermiso } from "@/lib/auth";
+import { requerirVista } from "@/lib/auth";
 import {
   ASISTENCIA_MINIMA,
   cargarGrupo,
   construirParticipantes,
   puedeAdministrarGrupo,
   puedeEntrarAGrupo,
-  puedeVerAlpha,
   SESIONES_DE_ALPHA,
 } from "@/lib/alpha";
 import { Grupo, type ParticipanteVista, type SesionVista } from "./grupo";
@@ -31,7 +30,7 @@ export default async function PaginaGrupoDeAlpha({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const usuario = await requerirPermiso(puedeVerAlpha);
+  const usuario = await requerirVista("grupos");
   const grupo = await cargarGrupo(id);
 
   if (!grupo) notFound();

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ETIQUETA_ROL, requerirRol, ROLES_ADMIN } from "@/lib/auth";
+import { ETIQUETA_ROL, requerirVista } from "@/lib/auth";
 import { ZONA_HORARIA } from "@/lib/dominio";
 import {
   detalleLlamadasPersona,
@@ -128,7 +128,7 @@ export default async function PaginaLlamadas({
     hl?: string;
   }>;
 }) {
-  await requerirRol(ROLES_ADMIN);
+  await requerirVista("llamadas");
   const { desde: desdeP, hasta: hastaP, persona, hl } = await searchParams;
   const rango = rangoDesdeParametros(desdeP, hastaP);
 

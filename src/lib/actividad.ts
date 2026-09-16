@@ -868,6 +868,40 @@ export async function cargarActividad(
         tipo = "accesos"; etiqueta = "ACCESOS"; tono = "gris";
         frase = [A(), t(" creó el acceso de "), P(), t(texto(m.role) ? ` · rol ${texto(m.role)}` : texto(m.tipo) ? ` · ${texto(m.tipo)}` : "")];
         break;
+      case "vistas.rol_cambiado": {
+        tipo = "accesos"; etiqueta = "ACCESOS"; tono = "ambar";
+        const vista = typeof m.vista === "string" ? m.vista : "una pantalla";
+        const rol = typeof m.rol === "string" ? m.rol : "un rol";
+        const encendida = m.encendida === true;
+        frase = [
+          A(),
+          t(encendida ? " le encendió " : " le apagó "),
+          b(typeof m.nombreVista === "string" ? m.nombreVista : vista),
+          t(" a "),
+          b(rol),
+        ];
+        tituloDetalle = "El cambio";
+        filas.push({ k: "Pantalla", v: String(m.nombreVista ?? vista) });
+        filas.push({ k: "Perfil", v: rol });
+        filas.push({ k: "Queda", v: encendida ? "encendida" : "apagada" });
+        break;
+      }
+
+      case "vistas.excepcion_cambiada": {
+        tipo = "accesos"; etiqueta = "ACCESOS"; tono = "ambar";
+        const quien = (fila.entityId && nombreUsuario.get(fila.entityId)) ?? "una cuenta";
+        const nombreVista = String(m.nombreVista ?? m.vista ?? "una pantalla");
+        // `null` = se quitó la excepción y la cuenta vuelve a seguir a su rol.
+        const valor = m.encendida === null || m.encendida === undefined
+          ? "sigue a su rol"
+          : m.encendida === true ? "encendida solo para esta cuenta" : "apagada solo para esta cuenta";
+        frase = [A(), t(" cambió "), b(nombreVista), t(" para "), b(quien), t(` · ${valor}`)];
+        tituloDetalle = "El cambio";
+        filas.push({ k: "Pantalla", v: nombreVista });
+        filas.push({ k: "Queda", v: valor });
+        break;
+      }
+
       case "administracion.rol_actualizado": {
         tipo = "accesos"; etiqueta = "ACCESOS"; tono = "gris";
         const quien = (fila.entityId && nombreUsuario.get(fila.entityId)) ?? "un usuario";

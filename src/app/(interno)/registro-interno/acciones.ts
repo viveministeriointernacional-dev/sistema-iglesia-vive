@@ -9,7 +9,7 @@ import { exportarContactoNuevo } from "@/lib/highlevel-salida";
 import {
   ErrorDePermiso,
   requerirRolEnAccion,
-  ROLES_CONSOLIDACION,
+  requerirVistaEnAccion,
   ROLES_REGISTRO_SOLO_FICHA,
 } from "@/lib/auth";
 import { nombreCompleto, normalizarTelefono } from "@/lib/dominio";
@@ -37,7 +37,7 @@ export type InvitadorEncontrado = {
 export async function buscarInvitador(
   consulta: string,
 ): Promise<InvitadorEncontrado[]> {
-  await requerirRolEnAccion(ROLES_CONSOLIDACION);
+  await requerirVistaEnAccion("registro-interno");
 
   const texto = consulta.trim();
   if (texto.length < 2) return [];
@@ -104,9 +104,11 @@ export async function guardarRegistro(
 ): Promise<ResultadoRegistro> {
   let usuario;
   try {
-    usuario = await requerirRolEnAccion(
-      opciones.soloFicha ? ROLES_REGISTRO_SOLO_FICHA : ROLES_CONSOLIDACION,
-    );
+    // Guardar «solo la ficha» sigue siendo de ADMIN y PASTOR por su propia
+    // regla; el alta normal la gobierna ahora la vista «Registrar persona».
+    usuario = opciones.soloFicha
+      ? await requerirRolEnAccion(ROLES_REGISTRO_SOLO_FICHA)
+      : await requerirVistaEnAccion("registro-interno");
   } catch (error) {
     if (error instanceof ErrorDePermiso) {
       return { ok: false, errores: {}, mensaje: error.message };

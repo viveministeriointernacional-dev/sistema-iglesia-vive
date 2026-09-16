@@ -87,6 +87,12 @@ export default async function PaginaAdministracion({
             >
               Bajas
             </Link>
+            <Link
+              href="/administracion/vistas"
+              className="rounded-[9px] border border-[rgba(19,28,36,.16)] px-[14px] py-[10px] text-[12px] leading-none font-semibold text-tinta hover:border-azul-700 hover:text-azul-700"
+            >
+              Vistas
+            </Link>
           </div>
         </header>
 

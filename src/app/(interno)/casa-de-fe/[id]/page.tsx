@@ -1,12 +1,11 @@
 import { notFound } from "next/navigation";
 import { diaLargo } from "@/lib/dominio";
-import { requerirPermiso } from "@/lib/auth";
+import { requerirVista } from "@/lib/auth";
 import {
   cargarCasaDeFe,
   construirMiembros,
   puedeAdministrarCasaDeFe,
   puedeEntrarACasaDeFe,
-  puedeVerCasaDeFe,
 } from "@/lib/casa-de-fe";
 import { CasaDeFe, type MiembroVista } from "./grupo";
 
@@ -31,7 +30,7 @@ export default async function PaginaCasaDeFe({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const usuario = await requerirPermiso(puedeVerCasaDeFe);
+  const usuario = await requerirVista("grupos");
   const grupo = await cargarCasaDeFe(id);
 
   if (!grupo) notFound();

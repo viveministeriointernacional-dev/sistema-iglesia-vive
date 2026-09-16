@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requerirRol, ROLES_ADMIN } from "@/lib/auth";
+import { requerirVista } from "@/lib/auth";
 import { ESTADO_SOLICITUD } from "@/lib/baja";
 import { cargarSolicitudDeBaja } from "@/lib/administracion";
 import { textoDeHorario, ZONA_HORARIA } from "@/lib/dominio";
@@ -38,7 +38,7 @@ export default async function PaginaSolicitudDeBaja({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requerirRol(ROLES_ADMIN);
+  await requerirVista("bajas");
   const { id } = await params;
   const solicitud = await cargarSolicitudDeBaja(id);
   if (!solicitud) notFound();

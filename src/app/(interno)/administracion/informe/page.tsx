@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Operation72Status, Phase } from "@iglesia/prisma-client";
-import { requerirRol, ROLES_ADMIN } from "@/lib/auth";
+import { requerirVista } from "@/lib/auth";
 import { ETIQUETA_HITO } from "@/lib/administracion";
 import {
   atajosDelInforme,
@@ -75,7 +75,7 @@ export default async function PaginaInforme({
 }: {
   searchParams: Promise<{ desde?: string; hasta?: string }>;
 }) {
-  await requerirRol(ROLES_ADMIN);
+  await requerirVista("informe");
   const { desde, hasta } = await searchParams;
   const prisma = await getPrisma();
   const informe = await cargarInforme(prisma, { desde, hasta });
