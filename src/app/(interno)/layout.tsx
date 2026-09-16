@@ -9,6 +9,7 @@ import {
   tieneRed,
   ROLES_CONSOLIDACION,
   puedeOperarOperacion72,
+  puedeVerProcesos,
 } from "@/lib/auth";
 import { puedeVerAlpha } from "@/lib/alpha";
 import { puedeVerCasaDeFe } from "@/lib/casa-de-fe";
@@ -61,6 +62,12 @@ export default async function LayoutInterno({
       : []),
     ...(usuario.role === Role.APRENDIZ
       ? [{ href: "/mi-proceso", etiqueta: "Mi proceso" }]
+      : []),
+    // Procesos va en el menú y no solo dentro de Administración porque el
+    // pastor no entra a /administracion (es de ADMIN): sin esta pestaña no
+    // tendría por dónde llegar a la pantalla que se revisa el miércoles.
+    ...(puedeVerProcesos(usuario)
+      ? [{ href: "/administracion/procesos", etiqueta: "Procesos" }]
       : []),
     ...(ROLES_ADMIN.includes(usuario.role)
       ? [{ href: "/administracion", etiqueta: "Administración" }]
