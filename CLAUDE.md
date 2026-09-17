@@ -280,6 +280,27 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-17** — **Hora, lugar y calendario VIVOS (PR #90 fusionado) y las
+  vistas por perfil también (PR #89).** Verificado en la base: las **5 columnas
+  nuevas en `faith_house_group` y las 5 en `alpha_program`**,
+  `app_user.calendar_token` con su **índice único** `app_user_calendar_token_key`,
+  y `20260917150000_reuniones_y_calendario` registrada en `app_migration` (es la
+  última aplicada). Antes quedó `20260916150000_vistas_por_perfil` con sus dos
+  tablas. `git log --oneline origin/main..origin/<rama>` **vacío**: no se quedó
+  nada fuera, ni en el 89 ni en el 90.
+  **⚠️ Matiz del despliegue que conviene recordar: la migración corre AL EMPEZAR
+  el build, el worker se activa al terminarlo.** A los 2 minutos del merge la
+  base ya tenía las 11 columnas **y `/calendario/<token>.ics` seguía devolviendo
+  307** (o sea, la ruta aún no estaba en el bundle: §4). No es un fallo, son los
+  ~5 minutos de Workers Builds. **No diagnosticar «no se aplicó» mirando solo la
+  URL** ni al revés.
+  **Estado medido al quedar vivo: 16 Casas de Fe y 3 Alpha abiertos, los 19 sin
+  día, sin hora y sin dirección**, y 33 cuentas activas, **ninguna con enlace de
+  calendario**. Es el punto de partida esperado: nadie puede inventarle a un
+  grupo el día en que se reúne. **Acción del equipo:** cada líder entra a la
+  ficha de su grupo → «Poner día, hora y dirección», y luego cada persona pide
+  su enlace en Alpha y Casa de Fe.
+
 - **2026-09-17** — **Hora, lugar y calendario de los grupos** (pedido del
   usuario: «que las casas de fe y alpha se pueda agregarle hora y fecha y poder
   sincronizar la direccion con el mapa de google como el calendario para que
