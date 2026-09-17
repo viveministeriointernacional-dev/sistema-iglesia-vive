@@ -39,6 +39,10 @@ export type AccionAuditada =
   | "casa_de_fe.miembro_inscrito"
   | "casa_de_fe.miembro_retirado"
   | "alpha.grupo_creado"
+  // Se cambió el día, la hora, la periodicidad o la dirección del grupo. Va
+  // auditado porque mueve la reunión en el calendario de todos sus miembros.
+  | "alpha.reunion_actualizada"
+  | "casa_de_fe.reunion_actualizada"
   | "alpha.focus_day"
   | "alpha.validado"
   | "alpha.desvalidado"
@@ -83,6 +87,9 @@ export type AccionAuditada =
   | "acceso.llave_maestra_cambiada"
   | "acceso.llave_maestra_revocada"
   | "acceso.llave_maestra_usada"
+  // Se generó o se rehízo el enlace de calendario de una cuenta. El token NO
+  // se guarda en la auditoría: es una credencial.
+  | "acceso.enlace_calendario_rehecho"
   | "administracion.hito_editado"
   | "administracion.mentor_asignado"
   | "administracion.dado_de_baja"

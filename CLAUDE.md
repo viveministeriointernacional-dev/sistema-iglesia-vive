@@ -280,6 +280,96 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-17** — **Hora, lugar y calendario de los grupos** (pedido del
+  usuario: «que las casas de fe y alpha se pueda agregarle hora y fecha y poder
+  sincronizar la direccion con el mapa de google como el calendario para que
+  cada lider o persona que tenga un alpha o casa de fe pueda verlo en su
+  calendario»; mockup aprobado:
+  claude.ai/artifact/1xH2euKFgJacyhmVwjoSub).
+  **Punto de partida medido: una Casa de Fe solo guardaba nombre, fecha de
+  inicio y líder** — sin hora, sin dirección y sin reuniones. Alpha tenía sus 12
+  sesiones con fecha pero **tampoco con hora**. Lo único con hora y lugar era
+  `Event`.
+  **Dos decisiones del usuario, elegidas con `AskUserQuestion`:**
+  **(1) día fijo de la semana + hora**, no fecha por fecha; **(2) enlace de
+  suscripción `.ics`** que se actualiza solo, no conectar con la cuenta de
+  Google por OAuth.
+  - Campos nuevos en los dos modelos (`weekday`, `meeting_time`,
+    `every_n_weeks`, `duration_minutes`, `address`) + **`app_user.calendar_token`**
+    (migración `20260917150000_reuniones_y_calendario`).
+  - **`reunion-catalogo.ts`** (puro, 15 pruebas) · **`calendario.ts`** (el .ics,
+    13 pruebas) · componentes compartidos `campos-de-reunion.tsx` y
+    `reunion-del-grupo.tsx` · ruta pública `/calendario/[token].ics`.
+  - **⚠️ LA DECISIÓN QUE EVITA LA TRAMPA DE LAS CINCO HORAS: la hora se guarda
+    como TEXTO «HH:mm», no como `DateTime`.** «Los miércoles a las 7 p. m.» **no
+    es un instante**: es una regla que se repite, y en Colombia son siempre las
+    7 p. m. Guardarla como marca de tiempo obligaría a inventarse una fecha y a
+    convertirla en cada lectura — que es exactamente el fallo del 11-sep. Y todo
+    el cálculo de días se hace sobre **fechas civiles «AAAA-MM-DD»**, no sobre
+    `Date`.
+  - **⚠️ EN EL .ICS LA HORA VA CON `TZID` Y SU `VTIMEZONE`, NUNCA EN UTC.** Un
+    `DTSTART` con `TZID` **obliga** a incluir la definición de la zona; sin
+    ella algunos clientes se la inventan y la reunión de las 7 p. m. sale a otra
+    hora. Colombia no tiene horario de verano, así que la `VTIMEZONE` es una
+    sola regla fija de −05:00.
+  - **Se manda una `RRULE`, no una lista de fechas**: el calendario del teléfono
+    genera las repeticiones hasta el infinito y este servidor no tiene que
+    decidir hasta cuándo. `INTERVAL` cubre el «cada 15 días».
+  - **⚠️ EL `DTSTART` TIENE QUE CAER EN EL DÍA DE LA REPETICIÓN.** Si el grupo se
+    abre un lunes y se reúne los miércoles, dejar el lunes como inicio hace que
+    varios clientes **añadan una reunión ese lunes** que nadie pactó.
+    `primeraFecha` lo adelanta al primer día correcto. Probado.
+  - **⚠️ ESCAPAR Y PLEGAR NO ES COSMÉTICO.** La coma es separador en el formato,
+    así que **cualquier dirección real de Neiva** («Calle 19 # 5-42, Barrio…»)
+    rompería el archivo sin escapar. Y las líneas no pueden pasar de **75
+    OCTETOS** — se cuenta en bytes, no en caracteres, porque una tilde ocupa dos
+    y partir por la mitad de una letra produce un archivo corrupto.
+  - **La periodicidad se cuenta desde el INICIO del grupo, no desde hoy.** Con
+    «cada 15 días», cuál de los dos miércoles toca depende de cuándo empezaron;
+    contar desde hoy desplazaría la serie y el grupo aparecería la semana
+    equivocada. Es una de las pruebas.
+  - **El feed incluye los grupos que la persona LLEVA y los que TIENE
+    INSCRITOS**, que es lo que lo hace útil para la iglesia y no solo para los
+    20 líderes. Las inscripciones apuntan al **expediente**, no a la cuenta, así
+    que hay que saltar por `person_id`.
+  - **⚠️ EL TOKEN ES UNA CREDENCIAL, NO UN IDENTIFICADOR.** Los calendarios no
+    saben iniciar sesión, así que **la URL es lo único que autoriza**: nace nulo
+    (nadie tiene enlace hasta pedirlo), sale de `crypto.getRandomValues` —nunca
+    de `Math.random`—, **no se escribe en la auditoría**, y hay botón para
+    rehacerlo. Un token desconocido devuelve **404 a secas**, sin decir si la
+    cuenta existe. La ruta va en `RUTAS_PUBLICAS` (§recordatorio de sep-2026).
+  - **El mapa es un ENLACE, no un mapa incrustado** (decisión mía): dibujarlo
+    dentro de la página exige clave de API de Google con facturación activa, y
+    el enlace además abre la app del celular. **La dirección no se valida contra
+    Google**: muchas direcciones de barrio no existen en el mapa como se dicen.
+  - **⚠️ `tsc --noEmit` PASÓ EN VERDE Y `npm run cf:build` CAZÓ DOS ERRORES DE
+    TIPOS** en la prueba (`address: null` y `papel: "participa"` sobre un
+    literal con tipos estrechos). **Es la lección del 6-sep, otra vez**: el
+    build es el que manda. Se arregló exportando `ReunionParaCalendario` y
+    tipando el literal.
+  - **⚠️ DOS VECES SEGUIDAS EL FALLO ERA MI PRUEBA, NO EL CÓDIGO** (la lección
+    del 12-sep): `find("DTSTART")` encuentra el de la **`VTIMEZONE`**, que va
+    antes del evento; y `includes("Z")` da siempre positivo por la **Z de
+    `TZID`**. Las dos quedaron anotadas en el propio archivo de pruebas.
+  - **Probado al revés**: se metieron a propósito la hora en UTC y la dirección
+    sin escapar, y **fallaron las dos pruebas que debían**; al restaurar, verde.
+  - **Estado medido: 16 Casas de Fe y 3 Alpha abiertos — 19 grupos, ninguno con
+    día ni hora**, y 38 cuentas sin enlace. Todos siguen funcionando igual; la
+    ficha lo dice en ámbar y **mientras no tengan hora no salen en ningún
+    calendario**. No se les puede inventar el día ni el lugar.
+  - **Lo que hay que decirle al equipo: Google refresca estos enlaces cada
+    varias horas, no al instante.** Es límite de Google. El iPhone y Outlook
+    respetan el `REFRESH-INTERVAL` de 2 h que va en el archivo.
+  - Auditoría `alpha.reunion_actualizada`, `casa_de_fe.reunion_actualizada` y
+    `acceso.enlace_calendario_rehecho`, las tres con su `case` en
+    `actividad.ts`. La de la reunión guarda **antes y ahora**: sin el «antes»
+    nadie sabría después si se movió de día o si se le puso hora por primera vez.
+  - Migración probada con `BEGIN … ROLLBACK` en la misma llamada y **repetida
+    entera**; comprobado además que **el índice único rechaza dos cuentas con el
+    mismo token** (si no, cada una vería el calendario de la otra) y que los 38
+    nulos no chocan entre sí. Producción quedó en **0 columnas**.
+  - `tsc`, eslint, **61/61 pruebas** y `npm run cf:build` en verde.
+
 - **2026-09-16** — **Vistas por perfil: cada menú de la plataforma se enciende y
   se apaga desde Administración** (pedido del usuario: «quiero que se pueda
   habilitar por perfil cada menú o vista dentro de la plataforma»; mockup

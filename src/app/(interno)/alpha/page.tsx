@@ -1,6 +1,8 @@
 import Link from "next/link";
-import { diaLargo } from "@/lib/dominio";
+import { headers } from "next/headers";
+import { diaLargo, hoyEnColombia } from "@/lib/dominio";
 import { requerirVista } from "@/lib/auth";
+import { getPrisma } from "@/lib/prisma";
 import {
   cargarGrupos,
   esVistaCompletaDeAlpha,
@@ -14,6 +16,7 @@ import {
   lideresPosiblesCasaDeFe,
   puedeCrearCasaDeFe,
 } from "@/lib/casa-de-fe";
+import { MiCalendario } from "./mi-calendario";
 import { NuevoGrupo } from "./nuevo-grupo";
 import { NuevaCasaDeFe } from "../casa-de-fe/nuevo-grupo";
 
@@ -23,6 +26,22 @@ export const dynamic = "force-dynamic";
 
 export default async function PaginaAlpha() {
   const usuario = await requerirVista("grupos");
+  const hoy = hoyEnColombia();
+
+  // El enlace de calendario de quien está mirando, y cuántas de sus reuniones
+  // tienen ya día y hora (sin eso no salen en ningún calendario).
+  const prisma = await getPrisma();
+  const cuenta = await prisma.appUser.findUnique({
+    where: { id: usuario.id },
+    select: { calendarToken: true },
+  });
+
+  // La URL se arma en el servidor para que el bloque funcione sin JavaScript
+  // y para no depender de lo que el navegador crea que es su propio origen.
+  const base = (await headers()).get("host");
+  const enlaceDeCalendario = cuenta?.calendarToken
+    ? `https://${base}/calendario/${cuenta.calendarToken}.ics`
+    : null;
 
   // ⚠️ Las dos secciones van juntas desde el 16-sep-2026. Antes cada una tenía
   // su propio permiso (`canLeadAlpha` / `canLeadFaithHouse`), así que quien
@@ -70,7 +89,7 @@ export default async function PaginaAlpha() {
 
             {puedeCrearAlpha(usuario) ? (
               <div className="mt-4">
-                <NuevoGrupo lideres={lideresAlpha} />
+                <NuevoGrupo lideres={lideresAlpha} hoy={hoy} />
               </div>
             ) : null}
 
@@ -135,7 +154,7 @@ export default async function PaginaAlpha() {
 
             {puedeCrearCasaDeFe(usuario) ? (
               <div className="mt-4">
-                <NuevaCasaDeFe lideres={lideresCasa} />
+                <NuevaCasaDeFe lideres={lideresCasa} hoy={hoy} />
               </div>
             ) : null}
 
@@ -182,6 +201,16 @@ export default async function PaginaAlpha() {
             )}
           </section>
         ) : null}
+        <section className="mt-9">
+          <MiCalendario
+            enlaceInicial={enlaceDeCalendario}
+            cuantasReuniones={
+              [...grupos, ...casas].filter(
+                (g) => g.weekday !== null && g.meetingTime !== null,
+              ).length
+            }
+          />
+        </section>
       </div>
     </main>
   );

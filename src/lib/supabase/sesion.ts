@@ -13,6 +13,9 @@ const RUTAS_PUBLICAS = [
   "/api/integraciones/highlevel/llamada",
   "/api/integraciones/highlevel/visita",
   "/api/integraciones/highlevel/asignacion",
+  // El feed de calendario: los calendarios no saben iniciar sesión, así que el
+  // token de la URL es lo único que autoriza (ver `calendario/[token]`).
+  "/calendario",
 ];
 
 export function esRutaPublica(pathname: string) {

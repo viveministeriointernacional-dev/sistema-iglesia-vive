@@ -3,6 +3,11 @@ import { momentoLegible, nombreCompleto, ZONA_HORARIA } from "@/lib/dominio";
 import { HITOS_DEL_RECORRIDO } from "@/lib/expediente";
 import { ETIQUETA_LLAMADA } from "@/lib/op72";
 import type { ClientePrisma } from "@/lib/prisma";
+import {
+  diaDeLaSemana,
+  fraseDeFrecuencia,
+  horaLegible,
+} from "@/lib/reunion-catalogo";
 
 /// La actividad del día: todo lo que quedó en la bitácora de auditoría (más
 /// las llamadas reales del CRM y los correos enviados), traducido a frases que
@@ -817,6 +822,31 @@ export async function cargarActividad(
         tipo = "grupos"; etiqueta = "GRUPOS"; tono = "verde";
         frase = [A(), t(" actualizó el tema "), b(`${texto(m.tema) ?? ""} ${texto(m.nombre) ?? ""}`.trim()), t(" de "), P(), t(texto(m.estado) ? ` · ${texto(m.estado)}` : "")];
         break;
+      case "alpha.reunion_actualizada":
+      case "casa_de_fe.reunion_actualizada": {
+        tipo = "grupos"; etiqueta = "GRUPOS"; tono = "ambar";
+        const quien =
+          (fila.entityId &&
+            (nombreAlpha.get(fila.entityId) ?? nombreCasa.get(fila.entityId))) ??
+          (fila.action.startsWith("alpha") ? "un grupo de Alpha" : "una Casa de Fe");
+        frase = [A(), t(" cambió la reunión de "), b(quien)];
+        tituloDetalle = "Cómo queda";
+        const ahora = (m.ahora ?? {}) as Record<string, unknown>;
+        const antes = (m.antes ?? {}) as Record<string, unknown>;
+        const legible = (r: Record<string, unknown>) => {
+          const dia = diaDeLaSemana(typeof r.dia === "number" ? r.dia : null);
+          const hora = typeof r.hora === "string" ? r.hora : null;
+          if (!dia || !hora) return "sin día ni hora";
+          return `${dia.plural} a las ${horaLegible(hora)} · ${fraseDeFrecuencia(Number(r.cada) || 1)}`;
+        };
+        filas.push({ k: "Antes", v: legible(antes) });
+        filas.push({ k: "Ahora", v: legible(ahora) });
+        if (typeof ahora.direccion === "string" && ahora.direccion) {
+          filas.push({ k: "Dirección", v: ahora.direccion });
+        }
+        break;
+      }
+
       case "alpha.grupo_creado": {
         tipo = "grupos"; etiqueta = "GRUPOS"; tono = "verde";
         const nombre = texto(m.nombre) ?? (fila.entityId && nombreAlpha.get(fila.entityId)) ?? "un grupo";

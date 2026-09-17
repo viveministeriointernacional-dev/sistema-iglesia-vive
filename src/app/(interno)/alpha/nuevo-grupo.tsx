@@ -2,16 +2,25 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { CamposDeReunion } from "@/components/campos-de-reunion";
+import { REUNION_VACIA, type DatosDeReunion } from "@/lib/reunion-catalogo";
 import { crearGrupo } from "./acciones";
 
 export type LiderPosible = { id: string; fullName: string; role: string };
 
-export function NuevoGrupo({ lideres }: { lideres: LiderPosible[] }) {
+export function NuevoGrupo({
+  lideres,
+  hoy,
+}: {
+  lideres: LiderPosible[];
+  hoy: string;
+}) {
   const router = useRouter();
   const [abierto, setAbierto] = useState(false);
   const [nombre, setNombre] = useState("");
   const [inicio, setInicio] = useState("");
   const [liderId, setLiderId] = useState("");
+  const [reunion, setReunion] = useState<DatosDeReunion>(REUNION_VACIA);
   const [error, setError] = useState<string | null>(null);
   const [enCurso, iniciar] = useTransition();
 
@@ -28,7 +37,7 @@ export function NuevoGrupo({ lideres }: { lideres: LiderPosible[] }) {
   }
 
   return (
-    <div className="tarjeta max-w-[560px] p-4">
+    <div className="tarjeta max-w-[640px] p-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block">
           <span className="etiqueta-campo">Nombre del grupo</span>
@@ -63,6 +72,12 @@ export function NuevoGrupo({ lideres }: { lideres: LiderPosible[] }) {
             ))}
           </select>
         </label>
+        <CamposDeReunion
+          valores={reunion}
+          onChange={(parcial) => setReunion((v) => ({ ...v, ...parcial }))}
+          inicio={inicio}
+          hoy={hoy}
+        />
       </div>
 
       {lideres.length === 0 ? (
@@ -79,7 +94,7 @@ export function NuevoGrupo({ lideres }: { lideres: LiderPosible[] }) {
           onClick={() => {
             setError(null);
             iniciar(async () => {
-              const resultado = await crearGrupo(nombre, inicio, liderId);
+              const resultado = await crearGrupo(nombre, inicio, liderId, reunion);
               if (!resultado.ok) {
                 setError(resultado.mensaje);
                 return;
@@ -87,6 +102,7 @@ export function NuevoGrupo({ lideres }: { lideres: LiderPosible[] }) {
               setNombre("");
               setInicio("");
               setLiderId("");
+              setReunion(REUNION_VACIA);
               setAbierto(false);
               router.refresh();
             });
