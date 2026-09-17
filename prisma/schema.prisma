@@ -73,6 +73,13 @@ model AppUser {
   /// **Solo mirar**: administrar un grupo sigue siendo de su líder, de quien lo
   /// abrió, de la administración o de su rama.
   canSeeAllGroups Boolean @default(false) @map("can_see_all_groups")
+  /// El código secreto de su enlace de calendario (`/calendario/<token>.ics`).
+  ///
+  /// ⚠️ **Es una credencial, no un identificador.** Los calendarios no piden
+  /// usuario ni contraseña, así que la URL es lo único que autoriza: quien la
+  /// tenga ve esas reuniones. Nace nulo (nadie tiene enlace hasta que lo pide)
+  /// y se puede rehacer, lo que invalida el anterior al instante.
+  calendarToken String? @unique @map("calendar_token")
   /// Identificador de este usuario en HighLevel. Sirve para que, cuando llega
   /// un registro del CRM, el propietario del contacto se convierta en su
   /// consolidador. Nulo para quien no tiene cuenta en HighLevel.
@@ -503,6 +510,25 @@ model AlphaProgram {
   name      String
   startDate DateTime  @map("start_date") @db.Date
   endDate   DateTime? @map("end_date") @db.Date
+  /// **Cuándo se reúne**: el día de la semana, en la convención de JavaScript
+  /// (0 = domingo … 6 = sábado), y la hora como **texto «HH:mm» en hora de
+  /// Colombia**.
+  ///
+  /// ⚠️ La hora NO se guarda como instante a propósito, y esa es la decisión
+  /// que evita la trampa de las cinco horas (11-sep-2026). «Los miércoles a
+  /// las 7 p. m.» no es un momento en el tiempo: es una regla que se repite, y
+  /// en Colombia son siempre las 7 p. m. Guardarla como `DateTime` obligaría a
+  /// elegir una fecha cualquiera y a convertirla en cada lectura.
+  weekday         Int?    @map("weekday")
+  meetingTime     String? @map("meeting_time")
+  /// Cada cuántas semanas: 1 = cada semana, 2 = cada 15 días.
+  everyNWeeks     Int     @default(1) @map("every_n_weeks")
+  durationMinutes Int     @default(90) @map("duration_minutes")
+  /// La dirección tal como la escribe quien lleva el grupo. **No se valida
+  /// contra Google**: muchas direcciones de barrio no existen en el mapa como
+  /// se dicen, y un validador estricto rechazaría direcciones correctas. Si
+  /// Maps no la encuentra, el texto sigue sirviendo para llamar y preguntar.
+  address         String? @map("address")
   /// Quien lleva el grupo: lo administra, pero no lo abre ni lo cierra.
   leaderId  String    @map("leader_id")
   /// Quien lo abrió: pastor o mentor.
@@ -694,6 +720,25 @@ model FaithHouseGroup {
   id          String    @id @default(uuid())
   name        String
   startDate   DateTime  @map("start_date") @db.Date
+  /// **Cuándo se reúne**: el día de la semana, en la convención de JavaScript
+  /// (0 = domingo … 6 = sábado), y la hora como **texto «HH:mm» en hora de
+  /// Colombia**.
+  ///
+  /// ⚠️ La hora NO se guarda como instante a propósito, y esa es la decisión
+  /// que evita la trampa de las cinco horas (11-sep-2026). «Los miércoles a
+  /// las 7 p. m.» no es un momento en el tiempo: es una regla que se repite, y
+  /// en Colombia son siempre las 7 p. m. Guardarla como `DateTime` obligaría a
+  /// elegir una fecha cualquiera y a convertirla en cada lectura.
+  weekday         Int?    @map("weekday")
+  meetingTime     String? @map("meeting_time")
+  /// Cada cuántas semanas: 1 = cada semana, 2 = cada 15 días.
+  everyNWeeks     Int     @default(1) @map("every_n_weeks")
+  durationMinutes Int     @default(90) @map("duration_minutes")
+  /// La dirección tal como la escribe quien lleva el grupo. **No se valida
+  /// contra Google**: muchas direcciones de barrio no existen en el mapa como
+  /// se dicen, y un validador estricto rechazaría direcciones correctas. Si
+  /// Maps no la encuentra, el texto sigue sirviendo para llamar y preguntar.
+  address         String? @map("address")
   leaderId    String    @map("leader_id")
   createdById String?   @map("created_by_id")
   teamId      String?   @map("team_id")

@@ -9,9 +9,19 @@ import {
   Phase,
 } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
+import {
+  normalizarReunion,
+  REUNION_VACIA,
+  type DatosDeReunion,
+} from "@/lib/reunion-catalogo";
+import { guardarReunionDeGrupo } from "@/lib/reunion";
 import { colaDeTelefono, nombreCompleto } from "@/lib/dominio";
 import { auditar, encolarEventoIntegracion } from "@/lib/audit";
-import { ErrorDePermiso, obtenerUsuarioActual } from "@/lib/auth";
+import {
+  ErrorDePermiso,
+  obtenerUsuarioActual,
+  requerirVistaEnAccion,
+} from "@/lib/auth";
 import {
   cargarGrupo,
   construirParticipantes,
@@ -61,6 +71,7 @@ export async function crearGrupo(
   nombre: string,
   inicio: string,
   liderId: string,
+  reunion: DatosDeReunion = REUNION_VACIA,
 ): Promise<Resultado> {
   const usuario = await usuarioQueAbreGrupos();
 
@@ -70,6 +81,9 @@ export async function crearGrupo(
   if (Number.isNaN(Date.parse(inicio))) {
     return { ok: false, mensaje: "La fecha de inicio no es válida." };
   }
+
+  const limpia = normalizarReunion(reunion);
+  if (!limpia.ok) return { ok: false, mensaje: limpia.mensaje };
 
   const prisma = await getPrisma();
   const lider = await prisma.appUser.findFirst({
@@ -90,6 +104,7 @@ export async function crearGrupo(
       leaderId: lider.id,
       createdById: usuario.id,
       teamId: lider.teamId ?? usuario.teamId,
+      ...limpia.datos,
     },
     select: { id: true, name: true },
   });
@@ -599,5 +614,44 @@ export async function crearEInscribir(
   });
 
   revalidatePath(`/alpha/${programId}`);
+  return { ok: true };
+}
+
+/// Guarda el día, la hora, la periodicidad y la dirección del grupo.
+export async function guardarReunion(
+  grupoId: string,
+  datos: DatosDeReunion,
+): Promise<Resultado> {
+  let usuario;
+  try {
+    usuario = await requerirVistaEnAccion("grupos");
+  } catch (error) {
+    if (error instanceof ErrorDePermiso) return { ok: false, mensaje: error.message };
+    throw error;
+  }
+
+  const prisma = await getPrisma();
+  const grupo = await prisma.alphaProgram.findUnique({
+    where: { id: grupoId },
+    select: { id: true, leaderId: true, createdById: true },
+  });
+  if (!grupo) return { ok: false, mensaje: "No se encontró el grupo." };
+
+  // Mover la reunión le cambia el calendario a todos sus miembros, así que lo
+  // hace quien administra el grupo, no cualquiera que pueda verlo.
+  if (!(await puedeAdministrarGrupo(usuario, grupo))) {
+    return { ok: false, mensaje: "No administras este grupo." };
+  }
+
+  const resultado = await guardarReunionDeGrupo(
+    "alpha",
+    grupoId,
+    usuario.id,
+    datos,
+  );
+  if (!resultado.ok) return resultado;
+
+  revalidatePath("/alpha");
+  revalidatePath(`/alpha/${grupoId}`);
   return { ok: true };
 }

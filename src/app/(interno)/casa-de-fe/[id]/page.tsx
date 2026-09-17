@@ -1,6 +1,10 @@
 import { notFound } from "next/navigation";
 import { diaLargo } from "@/lib/dominio";
 import { requerirVista } from "@/lib/auth";
+import { hoyEnColombia } from "@/lib/dominio";
+import { ReunionDelGrupo } from "@/components/reunion-del-grupo";
+import { diaISO } from "@/lib/reunion-catalogo";
+import { guardarReunion } from "../acciones";
 import {
   cargarCasaDeFe,
   construirMiembros,
@@ -66,6 +70,23 @@ export default async function PaginaCasaDeFe({
             {grupo.closedAt ? " · cerrada" : ""}
           </p>
         </header>
+
+        <div className="mb-[14px]">
+          <ReunionDelGrupo
+            nombre={grupo.name}
+            reunion={{
+              weekday: grupo.weekday,
+              meetingTime: grupo.meetingTime,
+              everyNWeeks: grupo.everyNWeeks,
+              durationMinutes: grupo.durationMinutes,
+              address: grupo.address,
+            }}
+            inicio={diaISO(grupo.startDate)}
+            hoy={hoyEnColombia()}
+            puedeEditar={puedeEditar}
+            guardar={guardarReunion.bind(null, grupo.id)}
+          />
+        </div>
 
         <CasaDeFe
           groupId={grupo.id}
