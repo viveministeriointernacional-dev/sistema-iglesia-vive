@@ -80,6 +80,8 @@ export default async function PaginaCasaDeFe({
               everyNWeeks: grupo.everyNWeeks,
               durationMinutes: grupo.durationMinutes,
               address: grupo.address,
+              latitude: grupo.latitude,
+              longitude: grupo.longitude,
             }}
             inicio={diaISO(grupo.startDate)}
             hoy={hoyEnColombia()}

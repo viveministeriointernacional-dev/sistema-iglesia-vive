@@ -73,6 +73,7 @@ export function NuevoGrupo({
           </select>
         </label>
         <CamposDeReunion
+          nombre={nombre}
           valores={reunion}
           onChange={(parcial) => setReunion((v) => ({ ...v, ...parcial }))}
           inicio={inicio}

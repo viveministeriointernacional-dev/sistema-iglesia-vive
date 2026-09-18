@@ -13,6 +13,7 @@ const CASA: ReunionParaCalendario = {
   everyNWeeks: 1,
   durationMinutes: 90,
   address: "Calle 19 # 5-42, Barrio Álamos Norte, Neiva",
+  punto: null,
   inicio: "2026-09-23",
   clase: "Casa de Fe",
   papel: "lleva",
@@ -134,6 +135,26 @@ test("⚠️ ninguna línea pasa de 75 octetos, contando las tildes como dos", (
   const lugar = desplegar(largo).find((l) => l.startsWith("LOCATION:"))!;
   assert.ok(lugar.includes("Guaduales"));
   assert.ok(lugar.includes("Colombia"));
+});
+
+test("⚠️ el punto del mapa va como GEO, con punto y coma y SIN escapar", () => {
+  // `GEO` separa latitud y longitud con «;», que aquí es sintaxis del campo y
+  // no un carácter del texto: pasarlo por `escapar` lo dejaría en «\\;» y el
+  // calendario descartaría el campo entero. Y el decimal es punto, no coma,
+  // porque esto lo lee una máquina.
+  const lineas = delEvento(ics([{ ...CASA, punto: { lat: 2.93861, lng: -75.28612 } }]));
+  const linea = lineas.find((l) => l.startsWith("GEO:"));
+  assert.equal(linea, "GEO:2.938610;-75.286120");
+
+  // La dirección escrita NO se pierde: el punto es un extra.
+  assert.ok(lineas.some((l) => l.startsWith("LOCATION:")));
+});
+
+test("sin punto marcado no se escribe GEO", () => {
+  // Es el estado de los 19 grupos que ya existen. Un GEO vacío o en (0, 0)
+  // pondría la reunión en el Atlántico.
+  const lineas = delEvento(ics());
+  assert.equal(lineas.filter((l) => l.startsWith("GEO")).length, 0);
 });
 
 test("el identificador del evento es estable entre refrescos", () => {

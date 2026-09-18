@@ -10,6 +10,7 @@ import {
   etiquetaDeDuracion,
   fraseDeLaReunion,
   proximasReuniones,
+  puntoDeReunion,
   type DatosDeReunion,
 } from "@/lib/reunion-catalogo";
 
@@ -54,6 +55,10 @@ export function ReunionDelGrupo({
   const [guardando, iniciar] = useTransition();
 
   const frase = fraseDeLaReunion(reunion);
+  const punto = puntoDeReunion(reunion);
+  const lugar = { address: reunion.address, punto };
+  const verEnElMapa = enlaceDelMapa(lugar);
+  const comoLlegar = enlaceComoLlegar(lugar);
   const proximas = proximasReuniones(
     {
       weekday: reunion.weekday,
@@ -73,6 +78,7 @@ export function ReunionDelGrupo({
           hora: reunion.meetingTime,
           duracionMinutos: reunion.durationMinutes,
           direccion: reunion.address,
+          punto,
         })
       : null;
 
@@ -82,6 +88,7 @@ export function ReunionDelGrupo({
         <h2 className="etiqueta-seccion">CUÁNDO Y DÓNDE SE REÚNE</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <CamposDeReunion
+            nombre={nombre}
             valores={borrador}
             onChange={(parcial) => setBorrador((v) => ({ ...v, ...parcial }))}
             inicio={inicio}
@@ -171,12 +178,20 @@ export function ReunionDelGrupo({
               DÓNDE
             </span>
             <span className="text-[14px] leading-[1.35] font-semibold">
-              {reunion.address ?? "No quedó registrada"}
+              {reunion.address ?? (punto ? "Marcada solo en el mapa" : "No quedó registrada")}
             </span>
-            {reunion.address ? (
+            {punto ? (
+              <span className="text-[12px] leading-[1.4] font-semibold text-verde-700">
+                Con el punto marcado en el mapa
+              </span>
+            ) : null}
+            {/* Los botones salen si hay dirección **o** punto: se puede tener
+                el pin puesto sin haber escrito la dirección, y ese enlace
+                funciona igual —mejor, de hecho—. */}
+            {verEnElMapa && comoLlegar ? (
               <div className="mt-[7px] flex flex-wrap gap-2">
                 <a
-                  href={enlaceDelMapa(reunion.address)}
+                  href={verEnElMapa}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="boton-secundario"
@@ -184,7 +199,7 @@ export function ReunionDelGrupo({
                   Ver en el mapa
                 </a>
                 <a
-                  href={enlaceComoLlegar(reunion.address)}
+                  href={comoLlegar}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="boton-secundario"

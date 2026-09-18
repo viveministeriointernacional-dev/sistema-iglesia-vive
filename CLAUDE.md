@@ -280,6 +280,94 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-18** — **Ubicar la Casa de Fe o el Alpha en el mapa, con el pin**
+  (pedido del usuario: «que se pueda ubicar no solamente con la dirección, sino
+  que haya una opción extra que también se pueda ubicar por medio de un mapa»;
+  mockup aprobado: claude.ai/artifact/5zuqpCZJUa23xtuoXHLnji).
+  **La razón de ser, y lo que hay que conservar: en muchos barrios de Neiva la
+  dirección escrita NO existe en el mapa como se dice.** Ya estaba escrito el
+  17-sep («la dirección no se valida contra Google») y esto es la otra mitad:
+  buscar «Calle 19 # 5-42, Álamos Norte» deja a quien va en la mitad de la
+  cuadra. Unas coordenadas señalan la casa.
+  **Dos decisiones del usuario, la segunda tras ver el primer mockup:**
+  **(1) mapa dentro de la página** (de tres opciones: mapa incrustado, pegar un
+  enlace de Google Maps, o las dos); **(2) el mapa NO va dentro del cuadro del
+  formulario — se abre en grande, encima de todo**, porque apretado no se puede
+  marcar con precisión, que es justo para lo que sirve.
+  - Columnas `latitude`/`longitude` en los **dos** modelos (migración
+    `20260918150000_punto_en_el_mapa`) · **`selector-de-punto.tsx`** (el mapa) ·
+    catálogo ampliado en `reunion-catalogo.ts` · `GEO` en el .ics.
+  - **⚠️ EL MAPA QUE SE DIBUJA ES DE OPENSTREETMAP, NO DE GOOGLE, Y NO ES
+    CAPRICHO: dibujar un mapa de Google dentro de la página exige clave de API
+    con facturación activa** (tarjeta). Se comprobó antes de decidir que en el
+    repo **no hay ninguna clave de mapas ni ninguna librería de mapas**. Los
+    botones «Ver en el mapa» y «Cómo llegar» **siguen abriendo Google**, que es
+    la app que la gente tiene; lo único que cambia es que ahora reciben el punto
+    exacto en vez de un texto para buscar. Librería: **Leaflet**, cargada con
+    `import()` dentro del efecto porque toca `window` al cargarse.
+  - **⚠️ EL PIN VA CLAVADO EN EL CENTRO Y LO QUE SE MUEVE ES EL MAPA.** En el
+    celular, arrastrar un pin lo taparía con el dedo en el momento exacto de
+    afinarlo. Por eso el pin es HTML encima del mapa con `pointer-events-none`
+    —el dedo lo atraviesa— y el punto se lee de `map.getCenter()`.
+  - **⚠️ SIN PUNTO PREVIO, «Usar este punto» NACE APAGADO.** Si estuviera
+    encendido, un clic de más guardaría **el centro de Neiva** como el lugar del
+    grupo, y nadie notaría el error hasta que alguien fuera a visitar. Se
+    enciende al mover el mapa, buscar o usar la ubicación. Y como Leaflet **no
+    distingue el movimiento del dedo del que hace el código**, hay una bandera
+    (`programatico`) alrededor de cada `setView`: sin ella, el encuadre inicial
+    contaría como «ya lo movió» y el botón nacería encendido igual.
+  - **⚠️ LA BÚSQUEDA (Nominatim) SE CONSULTA AL ENVIAR, NUNCA AL TECLEAR.** Su
+    política lo prohíbe expresamente como autocompletado y una consulta por
+    letra nos dejaría sin servicio. El `accept-language` va **como parámetro y
+    no como cabecera**: una cabecera propia obliga al navegador a pedir permiso
+    antes (preflight) y Nominatim no lo contesta. Y el buscador **solo acerca al
+    barrio** — el punto que vale es el del pin, que es la regla de arriba.
+  - **⚠️ MEDIA COORDENADA NO UBICA NADA**, y se defiende en tres capas: el
+    CHECK de la base (`("latitude" IS NULL) = ("longitude" IS NULL)` + rangos),
+    `normalizarReunion` con su mensaje, y `puntoDe` como puerta única. Una
+    latitud sola abriría un enlace a un punto de Greenwich sin que nadie lo note.
+  - **Se redondea a 6 decimales (~11 cm).** Los quince que manda el navegador
+    ensuciarían la auditoría cada vez que alguien roza el mapa.
+  - **⚠️ DOS FORMATOS DE NÚMERO, Y MEZCLARLOS ROMPE TODO:** `puntoLegible` para
+    una persona («2,938610 · −75,286120», coma y menos de verdad) y
+    `puntoParaMaquina` para una URL o el .ics («2.938610,-75.286120»). Si la
+    coordenada saliera con coma en una URL, Google leería dos parámetros.
+  - **⚠️ EN EL .ICS, `GEO` LLEVA PUNTO Y COMA Y NO SE ESCAPA.** Ahí el «;» es la
+    sintaxis del campo, no un carácter del texto: pasarlo por `escapar` lo
+    dejaría en «\;» y el cliente **descartaría el campo entero**. Es la
+    contracara de la regla del 17-sep, donde la coma de la dirección SÍ hay que
+    escaparla. Las dos cosas conviven en el mismo evento.
+  - **La dirección escrita no desaparece ni se vuelve opcional**: es la que se
+    dicta por teléfono y la que una persona lee en su calendario. El punto es un
+    extra. Y los botones de la ficha salen si hay dirección **o** punto: se
+    puede tener el pin sin haber escrito la dirección, y ese enlace funciona
+    mejor.
+  - El renglón del formulario viene **cerrado**: quien no lo necesite no ve
+    ningún mapa y la pantalla le queda igual que antes. Al crear un grupo el
+    punto entra solo, por el `...limpia.datos` que ya existía.
+  - **⚠️ `npm install` SE LLEVÓ EL CLIENTE DE PRISMA** (vive en
+    `node_modules/@iglesia/prisma-client`, §3) y `tsc` escupió 20 errores de
+    «Cannot find module» que no tenían nada que ver con el trabajo. Se arregla
+    con **`npx prisma generate`**. Anotarlo porque asusta y despista.
+  - **⚠️ Y tsc NO VE LAS SELECCIONES DE PRISMA POR SÍ SOLO:** añadir las
+    columnas al literal de la página dio error, pero lo que faltaba estaba en
+    **`alpha.ts` y `casa-de-fe.ts`** (dos `select` cada uno). Tres archivos por
+    columna nueva, no uno.
+  - Auditoría: el `punto` entra en el `antes` y en el `ahora` de
+    `alpha.reunion_actualizada` / `casa_de_fe.reunion_actualizada`, **como una
+    sola cadena**: lo que interesa al leer la bitácora es si el punto cambió, y
+    dos números sueltos obligan a comparar a ojo cuál se movió.
+  - **Probado al revés, que es lo que hace valer una prueba:** se pasó `GEO` por
+    `escapar` y se le dio prioridad a la dirección sobre el pin; **fallaron las
+    dos pruebas que debían** (la 9 y la 53), y al restaurar, verde.
+  - Migración probada con `BEGIN … ROLLBACK` en la misma llamada, **repetida
+    entera**, y con las **4 comprobaciones del CHECK** (rechaza media
+    coordenada, rechaza fuera de rango, acepta un punto de Neiva, acepta volver
+    a sin marcar). Producción quedó en **0 columnas**.
+  - Comprobado en el build que **Leaflet y su CSS quedan solo en el paquete del
+    navegador** (`0 leaflet` dentro de `worker.js`).
+  - `tsc`, eslint, **68/68 pruebas** y `npm run cf:build` en verde.
+
 - **2026-09-17** — **Hora, lugar y calendario VIVOS (PR #90 fusionado) y las
   vistas por perfil también (PR #89).** Verificado en la base: las **5 columnas
   nuevas en `faith_house_group` y las 5 en `alpha_program`**,
