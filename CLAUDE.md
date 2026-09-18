@@ -280,6 +280,31 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-18** — **El punto en el mapa quedó VIVO (PR #91 fusionado).**
+  Verificado en la base: **2 columnas nuevas en `faith_house_group` y 2 en
+  `alpha_program`**, los **2 CHECK** (`%_punto_valido`) y
+  `20260918150000_punto_en_el_mapa` registrada como **la última aplicada**.
+  `git log --oneline origin/main..origin/<rama>` **vacío**: no se quedó nada
+  fuera.
+  **⚠️ CÓMO SE COMPROBÓ QUE EL DESPLIEGUE ESTÁ VIVO, y esta receta sirve para
+  cualquier PR que añada una librería:** se pidió al worker **la hoja de estilos
+  de Leaflet que produjo este build** —
+  `/_next/static/chunks/0n8kzvw2z_6as.css` → **200, 10 572 bytes, con la regla
+  `leaflet-container` dentro**. Ese archivo **no existía antes del PR #91**, así
+  que su presencia es prueba positiva. Es la vuelta buena a la lección del
+  11-sep: **comparar nombres de paquete para demostrar que algo NO está
+  desplegado da falsos negativos, pero pedir un archivo que solo existe en el
+  build nuevo sí prueba que SÍ está.**
+  **⚠️ DATO BUENO Y MEDIDO: el equipo YA está usando lo de ayer.** De las 16
+  Casas de Fe abiertas, **2 tienen día y hora puestos** y **1 tiene dirección**:
+  - **Casa de Familia Jhon Alexis** (Juan Felipe Carvajal) — lunes 17:00, cada
+    semana, 1 hora, **sin dirección todavía**.
+  - **Casa de Fe Ingrith Rodríguez** (Paola Viveros) — viernes 18:00, cada
+    semana, 1 hora, «Carrera 19 No 10 - 32 / Iglesia Vive».
+  Los 3 Alpha siguen sin día ni hora, y **ningún grupo tiene punto en el mapa
+  todavía** (es de hoy). Punto de partida esperado: nada de esto se le puede
+  inventar a un grupo.
+
 - **2026-09-18** — **Ubicar la Casa de Fe o el Alpha en el mapa, con el pin**
   (pedido del usuario: «que se pueda ubicar no solamente con la dirección, sino
   que haya una opción extra que también se pueda ubicar por medio de un mapa»;
