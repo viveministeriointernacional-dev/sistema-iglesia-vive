@@ -5,6 +5,9 @@ import {
   esHoraValida,
   etiquetaDeDuracion,
   fraseDeFrecuencia,
+  puntoDe,
+  puntoParaMaquina,
+  type PuntoEnElMapa,
 } from "@/lib/reunion-catalogo";
 
 /// **El calendario de reuniones de una persona, como archivo .ics.**
@@ -28,6 +31,10 @@ export type ReunionParaCalendario = {
   everyNWeeks: number;
   durationMinutes: number;
   address: string | null;
+  /// El punto exacto, si alguien lo marcó con el pin. Va al evento como `GEO`,
+  /// y es lo que le permite a quien recibe la reunión en su teléfono pulsar
+  /// «Cómo llegar» y aterrizar en la casa.
+  punto: PuntoEnElMapa | null;
   /// «AAAA-MM-DD»: desde cuándo se repite.
   inicio: string;
   /// Qué es y qué papel tiene la persona, para la descripción del evento.
@@ -79,6 +86,8 @@ export async function reunionesDeLaCuenta(
     everyNWeeks: true,
     durationMinutes: true,
     address: true,
+    latitude: true,
+    longitude: true,
     leader: { select: { fullName: true } },
   } as const;
 
@@ -125,6 +134,7 @@ export async function reunionesDeLaCuenta(
       everyNWeeks: fila.everyNWeeks,
       durationMinutes: fila.durationMinutes,
       address: fila.address,
+      punto: puntoDe(fila.latitude, fila.longitude),
       inicio: diaISO(fila.startDate),
       clase,
       papel,
@@ -249,6 +259,11 @@ export function construirIcs(datos: {
       `SUMMARY:${escapar(r.nombre)}`,
       `DESCRIPTION:${descripcion}`,
       ...(r.address ? [`LOCATION:${escapar(r.address)}`] : []),
+      // ⚠️ `GEO` lleva las coordenadas separadas por **punto y coma**, con
+      // punto decimal, y **NO se escapa**: aquí el «;» es la sintaxis del
+      // campo, no un carácter del texto. Pasarlo por `escapar` lo convertiría
+      // en «\;» y el cliente descartaría el campo entero.
+      ...(r.punto ? [`GEO:${puntoParaMaquina(r.punto, ";")}`] : []),
       "END:VEVENT",
     );
   }

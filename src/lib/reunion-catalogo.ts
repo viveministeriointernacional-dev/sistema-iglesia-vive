@@ -161,18 +161,107 @@ export function proximasReuniones(
   return lista;
 }
 
-// ------------------------------------------------------------- enlaces
+// ---------------------------------------------------- el punto en el mapa
 
-/// Abre el punto en Google Maps. **Es un enlace y no un mapa incrustado a
-/// propósito**: dibujar el mapa dentro de la página exige una clave de API con
-/// facturación activa, y el enlace además abre la app del celular, que es lo
-/// que de verdad usa quien va de camino.
-export function enlaceDelMapa(direccion: string): string {
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(direccion)}`;
+/// El punto exacto donde se reúne el grupo, marcado con el pin.
+export type PuntoEnElMapa = { lat: number; lng: number };
+
+/// Donde se abre el mapa cuando el grupo todavía no tiene punto: el centro de
+/// Neiva. Abrirlo en el (0, 0) del mundo dejaría al líder en medio del
+/// Atlántico teniendo que arrastrar el planeta hasta su barrio.
+export const CENTRO_DE_NEIVA: PuntoEnElMapa = { lat: 2.9273, lng: -75.2819 };
+
+/// Con cuántos decimales se guarda. Seis son unos **11 cm**: de sobra para
+/// señalar una casa, y corta de raíz que el navegador mande quince decimales de
+/// basura que luego ensucian la auditoría cada vez que alguien roza el mapa.
+const DECIMALES_DEL_PUNTO = 6;
+
+/// ⚠️ **Media coordenada no ubica nada.** Las dos van juntas o no van: una
+/// latitud sola abriría un enlace a un punto de la línea de Greenwich sin que
+/// nadie note el error. La base lo repite con un CHECK.
+export function esPuntoValido(lat: number, lng: number): boolean {
+  return (
+    Number.isFinite(lat) &&
+    Number.isFinite(lng) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lng >= -180 &&
+    lng <= 180
+  );
 }
 
-export function enlaceComoLlegar(direccion: string): string {
-  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(direccion)}`;
+function redondear(valor: number): number {
+  return Number(valor.toFixed(DECIMALES_DEL_PUNTO));
+}
+
+/// Un par de coordenadas → punto, o `null` si no sirve. Es la puerta única:
+/// nada entra al modelo sin pasar por aquí.
+export function puntoDe(
+  lat: number | null | undefined,
+  lng: number | null | undefined,
+): PuntoEnElMapa | null {
+  if (lat === null || lat === undefined || lng === null || lng === undefined) {
+    return null;
+  }
+  if (!esPuntoValido(lat, lng)) return null;
+  return { lat: redondear(lat), lng: redondear(lng) };
+}
+
+/// Como se le enseña a una persona: «2,93861 · −75,28612». Coma decimal y
+/// signo menos de verdad, que es como se escriben los números en español.
+export function puntoLegible(punto: PuntoEnElMapa): string {
+  const escribir = (n: number) =>
+    n.toFixed(DECIMALES_DEL_PUNTO).replace("-", "\u2212").replace(".", ",");
+  return `${escribir(punto.lat)} · ${escribir(punto.lng)}`;
+}
+
+/// Como lo pide una URL o un archivo .ics: «2.93861,-75.28612». **Punto
+/// decimal y menos de ASCII, siempre**, sin importar el idioma de quien mire:
+/// aquí lo lee una máquina.
+export function puntoParaMaquina(punto: PuntoEnElMapa, separador = ","): string {
+  return `${punto.lat.toFixed(DECIMALES_DEL_PUNTO)}${separador}${punto.lng.toFixed(DECIMALES_DEL_PUNTO)}`;
+}
+
+// ------------------------------------------------------------- enlaces
+
+/// Dónde se reúne el grupo, para armar un enlace: lo que se escribió y, si
+/// alguien lo marcó, el punto exacto.
+export type LugarDeLaReunion = {
+  address: string | null;
+  punto: PuntoEnElMapa | null;
+};
+
+/// ⚠️ **El punto manda sobre la dirección escrita**, y en eso está todo el
+/// valor de esta función. Buscar «Calle 19 # 5-42, Álamos Norte» en Google
+/// deja a quien va en la mitad de la cuadra —o en otro barrio— porque muchas
+/// direcciones de barrio no existen en el mapa como se dicen. Unas
+/// coordenadas, en cambio, señalan la casa.
+///
+/// Sin dirección y sin punto no hay enlace: devuelve `null` y quien lo llama
+/// no pinta el botón.
+function enlaceDeGoogleMaps(
+  lugar: LugarDeLaReunion,
+  camino: "search" | "dir",
+): string | null {
+  const parametro = camino === "search" ? "query" : "destination";
+  const destino = lugar.punto
+    ? puntoParaMaquina(lugar.punto)
+    : lugar.address?.trim() || null;
+  if (!destino) return null;
+  return `https://www.google.com/maps/${camino}/?api=1&${parametro}=${encodeURIComponent(destino)}`;
+}
+
+/// Abre el lugar en Google Maps. **Es un enlace y no un mapa incrustado a
+/// propósito**: dibujar un mapa de Google dentro de la página exige una clave
+/// de API con facturación activa, y el enlace además abre la app del celular,
+/// que es lo que de verdad usa quien va de camino. (El mapa que sí se dibuja
+/// dentro de la plataforma, el de marcar el pin, es de OpenStreetMap.)
+export function enlaceDelMapa(lugar: LugarDeLaReunion): string | null {
+  return enlaceDeGoogleMaps(lugar, "search");
+}
+
+export function enlaceComoLlegar(lugar: LugarDeLaReunion): string | null {
+  return enlaceDeGoogleMaps(lugar, "dir");
 }
 
 /// El enlace que abre Google Calendar con UNA reunión ya cargada.
@@ -188,6 +277,9 @@ export function enlaceGoogleCalendar(datos: {
   hora: string;
   duracionMinutos: number;
   direccion: string | null;
+  /// Si el grupo tiene el pin puesto, va también: Google lo entiende como
+  /// ubicación y abre la casa exacta en vez de buscar el texto.
+  punto?: PuntoEnElMapa | null;
 }): string | null {
   if (!esHoraValida(datos.hora)) return null;
 
@@ -209,7 +301,10 @@ export function enlaceGoogleCalendar(datos: {
     dates: `${inicio}/${finTexto}`,
     ctz: "America/Bogota",
   });
-  if (datos.direccion) parametros.set("location", datos.direccion);
+  // La dirección escrita es lo que una persona lee en su calendario, así que
+  // manda para mostrar; si no hay, van las coordenadas antes que nada.
+  const lugar = datos.direccion ?? (datos.punto ? puntoParaMaquina(datos.punto) : null);
+  if (lugar) parametros.set("location", lugar);
 
   return `https://calendar.google.com/calendar/render?${parametros.toString()}`;
 }
@@ -222,6 +317,11 @@ export type DatosDeReunion = {
   everyNWeeks: number;
   durationMinutes: number;
   address: string | null;
+  /// Las coordenadas van sueltas y no como `PuntoEnElMapa` porque esto es
+  /// exactamente lo que se escribe en la base: dos columnas. Para mostrarlas o
+  /// armar un enlace se convierten con `puntoDeReunion`.
+  latitude: number | null;
+  longitude: number | null;
 };
 
 export const REUNION_VACIA: DatosDeReunion = {
@@ -230,7 +330,17 @@ export const REUNION_VACIA: DatosDeReunion = {
   everyNWeeks: 1,
   durationMinutes: 90,
   address: null,
+  latitude: null,
+  longitude: null,
 };
+
+/// Las dos columnas → el punto, o `null` si el grupo no lo tiene marcado.
+export function puntoDeReunion(datos: {
+  latitude: number | null;
+  longitude: number | null;
+}): PuntoEnElMapa | null {
+  return puntoDe(datos.latitude, datos.longitude);
+}
 
 /// Valida y limpia lo que llega del formulario.
 ///
@@ -245,6 +355,8 @@ export function normalizarReunion(crudo: {
   everyNWeeks: string | number;
   durationMinutes: string | number;
   address: string | null;
+  latitude?: string | number | null;
+  longitude?: string | number | null;
 }): { ok: true; datos: DatosDeReunion } | { ok: false; mensaje: string } {
   const diaTexto =
     crudo.weekday === null || crudo.weekday === "" ? null : String(crudo.weekday);
@@ -280,6 +392,31 @@ export function normalizarReunion(crudo: {
     return { ok: false, mensaje: "La dirección es demasiado larga." };
   }
 
+  // El punto del mapa. Vacío es lo normal: 19 grupos existen sin él y seguirán
+  // funcionando igual.
+  const vacia = (v: string | number | null | undefined) =>
+    v === null || v === undefined || v === "";
+  const hayLat = !vacia(crudo.latitude);
+  const hayLng = !vacia(crudo.longitude);
+
+  if (hayLat !== hayLng) {
+    return {
+      ok: false,
+      mensaje: "El punto del mapa quedó a medias. Vuelve a marcarlo o quítalo.",
+    };
+  }
+
+  let punto: PuntoEnElMapa | null = null;
+  if (hayLat && hayLng) {
+    punto = puntoDe(Number(crudo.latitude), Number(crudo.longitude));
+    if (!punto) {
+      return {
+        ok: false,
+        mensaje: "El punto del mapa no es válido. Vuelve a marcarlo.",
+      };
+    }
+  }
+
   return {
     ok: true,
     datos: {
@@ -288,6 +425,8 @@ export function normalizarReunion(crudo: {
       everyNWeeks: cada,
       durationMinutes: duracion,
       address: direccion,
+      latitude: punto?.lat ?? null,
+      longitude: punto?.lng ?? null,
     },
   };
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { SelectorDePunto } from "@/components/selector-de-punto";
 import {
   DIAS_DE_LA_SEMANA,
   DURACIONES,
@@ -8,6 +10,8 @@ import {
   fraseDeFrecuencia,
   horaLegible,
   proximasReuniones,
+  puntoDeReunion,
+  puntoLegible,
   type DatosDeReunion,
 } from "@/lib/reunion-catalogo";
 
@@ -19,6 +23,7 @@ export function CamposDeReunion({
   onChange,
   inicio,
   hoy,
+  nombre,
 }: {
   valores: DatosDeReunion;
   onChange: (parcial: Partial<DatosDeReunion>) => void;
@@ -26,7 +31,12 @@ export function CamposDeReunion({
   /// próximas fechas de verdad mientras se llena el formulario.
   inicio: string;
   hoy: string;
+  /// Para el título del mapa cuando se abre. Al abrir un grupo nuevo todavía
+  /// no tiene nombre, así que es opcional.
+  nombre?: string;
 }) {
+  const [mapaAbierto, setMapaAbierto] = useState(false);
+  const punto = puntoDeReunion(valores);
   const hora = valores.meetingTime ?? "";
   const completo = valores.weekday !== null && esHoraValida(hora);
 
@@ -118,6 +128,86 @@ export function CamposDeReunion({
           className="campo"
         />
       </label>
+
+      {/* **El punto exacto**, debajo de la dirección y cerrado por defecto.
+          Quien no lo necesite no ve ningún mapa: el formulario queda igual que
+          antes. La dirección NO se reemplaza — es la que se dicta por teléfono;
+          el punto es lo que hace que «Cómo llegar» lleve a la casa. */}
+      <div className="sm:col-span-2">
+        <span className="etiqueta-campo">Punto exacto en el mapa</span>
+
+        {punto ? (
+          <div className="mt-[7px] flex flex-wrap items-center gap-[14px] rounded-[9px] border border-[rgba(19,28,36,.18)] bg-white px-[15px] py-[14px]">
+            <svg viewBox="0 0 24 24" fill="none" className="h-[21px] w-[21px] flex-shrink-0" aria-hidden="true">
+              <path
+                d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z"
+                fill="#eef4e8"
+                stroke="#4f7038"
+                strokeWidth="1.7"
+                strokeLinejoin="round"
+              />
+              <path d="m8.9 9.9 2.2 2.2 4-4.2" stroke="#4f7038" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <div className="min-w-[180px] flex-grow">
+              <p className="text-[13.5px] leading-[1.25] font-bold text-verde-700">
+                Marcado en el mapa
+              </p>
+              <p className="mt-[5px] text-[12px] leading-[1.45] font-medium text-[rgba(19,28,36,.55)]">
+                Quien vaya por primera vez llega al punto exacto, no a la mitad de la
+                cuadra.{" "}
+                <span className="font-mono text-[11.5px] text-[rgba(19,28,36,.42)]">
+                  {puntoLegible(punto)}
+                </span>
+              </p>
+            </div>
+            <button type="button" onClick={() => setMapaAbierto(true)} className="boton-secundario">
+              Ver y cambiar el punto
+            </button>
+            <button
+              type="button"
+              onClick={() => onChange({ latitude: null, longitude: null })}
+              className="cursor-pointer border-0 bg-transparent p-1 text-[11.5px] leading-none font-semibold text-rojo underline"
+            >
+              Quitarlo
+            </button>
+          </div>
+        ) : (
+          <div className="mt-[7px] flex flex-wrap items-center gap-[14px] rounded-[9px] border border-dashed border-[rgba(19,28,36,.24)] bg-white px-[15px] py-[14px]">
+            <svg viewBox="0 0 24 24" fill="none" className="h-[21px] w-[21px] flex-shrink-0" aria-hidden="true">
+              <path
+                d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z"
+                stroke="rgba(19,28,36,.4)"
+                strokeWidth="1.7"
+                strokeLinejoin="round"
+              />
+              <circle cx="12" cy="10" r="2.6" stroke="rgba(19,28,36,.4)" strokeWidth="1.7" />
+            </svg>
+            <div className="min-w-[180px] flex-grow">
+              <p className="text-[13.5px] leading-[1.25] font-bold">Sin marcar</p>
+              <p className="mt-[5px] text-[12px] leading-[1.45] font-medium text-[rgba(19,28,36,.55)]">
+                Opcional. En muchos barrios la dirección escrita no aparece en el mapa,
+                y quien va por primera vez se pierde.
+              </p>
+            </div>
+            <button type="button" onClick={() => setMapaAbierto(true)} className="boton-secundario">
+              Marcar en el mapa
+            </button>
+          </div>
+        )}
+      </div>
+
+      {mapaAbierto ? (
+        <SelectorDePunto
+          nombreDelGrupo={nombre?.trim() || "Este grupo"}
+          direccion={valores.address}
+          inicial={punto}
+          onCerrar={() => setMapaAbierto(false)}
+          onUsar={(nuevo) => {
+            onChange({ latitude: nuevo.lat, longitude: nuevo.lng });
+            setMapaAbierto(false);
+          }}
+        />
+      ) : null}
 
       {/* La confirmación en palabras. Sin esto, «3» y «19:00» en dos casillas
           no dicen a nadie que la reunión es el miércoles por la tarde. */}

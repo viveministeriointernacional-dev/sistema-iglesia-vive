@@ -529,6 +529,13 @@ model AlphaProgram {
   /// se dicen, y un validador estricto rechazaría direcciones correctas. Si
   /// Maps no la encuentra, el texto sigue sirviendo para llamar y preguntar.
   address         String? @map("address")
+  /// El punto exacto, marcado con el pin en el mapa. Es **un extra sobre la
+  /// dirección, no su reemplazo**: la dirección es la que se dicta por
+  /// teléfono, y el punto es lo que hace que «Cómo llegar» lleve a la casa y
+  /// no a la mitad de la cuadra. Nulo mientras nadie lo haya marcado, y los
+  /// dos van juntos o no van.
+  latitude        Float?  @map("latitude")
+  longitude       Float?  @map("longitude")
   /// Quien lleva el grupo: lo administra, pero no lo abre ni lo cierra.
   leaderId  String    @map("leader_id")
   /// Quien lo abrió: pastor o mentor.
@@ -739,6 +746,13 @@ model FaithHouseGroup {
   /// se dicen, y un validador estricto rechazaría direcciones correctas. Si
   /// Maps no la encuentra, el texto sigue sirviendo para llamar y preguntar.
   address         String? @map("address")
+  /// El punto exacto, marcado con el pin en el mapa. Es **un extra sobre la
+  /// dirección, no su reemplazo**: la dirección es la que se dicta por
+  /// teléfono, y el punto es lo que hace que «Cómo llegar» lleve a la casa y
+  /// no a la mitad de la cuadra. Nulo mientras nadie lo haya marcado, y los
+  /// dos van juntos o no van.
+  latitude        Float?  @map("latitude")
+  longitude       Float?  @map("longitude")
   leaderId    String    @map("leader_id")
   createdById String?   @map("created_by_id")
   teamId      String?   @map("team_id")
