@@ -440,3 +440,145 @@ export function diaISO(fecha: Date): string {
   const z = (n: number) => String(n).padStart(2, "0");
   return `${fecha.getUTCFullYear()}-${z(fecha.getUTCMonth() + 1)}-${z(fecha.getUTCDate())}`;
 }
+
+// ------------------------------------------------- la semana del calendario
+
+/// Una semana civil, de LUNES a DOMINGO, como siete fechas «AAAA-MM-DD».
+///
+/// Lunes primero porque así se lee una semana en Colombia — y porque es como
+/// la muestra el calendario del que el usuario partió.
+export type SemanaCivil = { inicio: string; fin: string; dias: string[] };
+
+export function semanaDe(dia: string): SemanaCivil {
+  // 0 = domingo en la convención de JavaScript, así que el lunes está a
+  // «día - 1» pasos, y el domingo a seis (no a menos uno).
+  const cuantos = (diaDeLaSemanaDe(dia) + 6) % 7;
+  const lunes = comoNumero(dia) - cuantos * UN_DIA;
+  const dias = Array.from({ length: 7 }, (_, i) => comoDia(lunes + i * UN_DIA));
+  return { inicio: dias[0], fin: dias[6], dias };
+}
+
+export function correrSemana(inicio: string, semanas: number): string {
+  return comoDia(comoNumero(inicio) + semanas * 7 * UN_DIA);
+}
+
+/// **¿A este grupo le toca reunirse ese día?**
+///
+/// Tiene que caer en su día de la semana **y** en su serie: con «cada 15 días»
+/// solo le toca uno de cada dos, y **cuál de los dos se cuenta desde el INICIO
+/// del grupo**, no desde hoy ni desde el lunes de la semana que se esté
+/// mirando. Contarlo desde otro sitio desplaza la serie y el grupo aparecería
+/// la semana equivocada (es la regla del 17-sep-2026).
+///
+/// Antes del arranque del grupo no le toca nunca: una semana de hace un año no
+/// debe mostrar grupos que todavía no existían.
+export function leTocaEseDia(
+  grupo: { weekday: number | null; everyNWeeks: number; inicio: string },
+  dia: string,
+): boolean {
+  if (grupo.weekday === null || !diaDeLaSemana(grupo.weekday)) return false;
+  if (diaDeLaSemanaDe(dia) !== grupo.weekday) return false;
+
+  const cada = grupo.everyNWeeks >= 1 ? Math.trunc(grupo.everyNWeeks) : 1;
+
+  let primera = comoNumero(grupo.inicio);
+  while (new Date(primera).getUTCDay() !== grupo.weekday) primera += UN_DIA;
+
+  const cuando = comoNumero(dia);
+  if (cuando < primera) return false;
+
+  const semanas = Math.round((cuando - primera) / (7 * UN_DIA));
+  return semanas % cada === 0;
+}
+
+/// Un bloque de tiempo dentro de un día, en minutos desde la medianoche.
+export type BloqueDelDia = { inicio: number; fin: number };
+
+export function minutosDesdeMedianoche(hhmm: string): number {
+  const [hh, mm] = hhmm.split(":").map(Number);
+  return hh * 60 + mm;
+}
+
+/// **La franja de horas que hay que dibujar.**
+///
+/// Se calcula a partir de lo que hay, no se fija en 24 horas: los grupos de
+/// esta iglesia caen todos entre las 5 y las 10 de la noche, así que una
+/// rejilla de medianoche a medianoche sería 80 % de vacío y habría que
+/// desplazarla para ver algo. Si mañana alguien pone uno a las 7 de la mañana,
+/// la franja se estira sola.
+///
+/// `MINIMO_DE_FRANJA` evita el otro extremo: con un solo grupo de una hora, una
+/// rejilla de una sola fila no se lee como un calendario.
+const MINIMO_DE_FRANJA = 5;
+
+export function franjaDeLasHoras(bloques: BloqueDelDia[]): {
+  desde: number;
+  hasta: number;
+} {
+  if (bloques.length === 0) return { desde: 17, hasta: 22 };
+
+  let desde = Math.floor(Math.min(...bloques.map((b) => b.inicio)) / 60);
+  let hasta = Math.ceil(Math.max(...bloques.map((b) => b.fin)) / 60);
+
+  while (hasta - desde < MINIMO_DE_FRANJA) {
+    if (hasta < 24) hasta += 1;
+    else if (desde > 0) desde -= 1;
+    else break;
+  }
+  return { desde, hasta };
+}
+
+/// **Reparte en columnas las reuniones que se cruzan dentro de un mismo día.**
+///
+/// ⚠️ Sin esto, dos reuniones a la misma hora **se taparían la una a la otra**
+/// y el conteo del día sería mentira. Pasa de verdad: los martes hay una a las
+/// 6:00 y otra a las 6:30, las dos de una hora.
+///
+/// El método es el de siempre para intervalos: se agrupan los bloques que se
+/// cruzan **en cadena** (A con B, B con C, aunque A y C no se toquen) y dentro
+/// de cada grupo cada bloque se pone en la primera columna que ya esté libre.
+/// El ancho se decide por grupo y no por día entero, para que una reunión
+/// suelta a otra hora siga ocupando todo el ancho.
+///
+/// Dos reuniones que se tocan —una acaba a las 7:00 y la otra empieza a las
+/// 7:00— **no se cruzan**, y por eso la comparación es estricta.
+export function repartirEnColumnas<T extends BloqueDelDia>(
+  bloques: T[],
+): (T & { columna: number; deCuantas: number })[] {
+  const orden = [...bloques].sort(
+    (a, b) => a.inicio - b.inicio || a.fin - b.fin,
+  );
+
+  const salida: (T & { columna: number; deCuantas: number })[] = [];
+  let racimo: (T & { columna: number; deCuantas: number })[] = [];
+  let finDelRacimo = -1;
+  let finPorColumna: number[] = [];
+
+  const cerrar = () => {
+    const columnas = finPorColumna.length;
+    for (const b of racimo) b.deCuantas = columnas;
+    salida.push(...racimo);
+    racimo = [];
+    finPorColumna = [];
+    finDelRacimo = -1;
+  };
+
+  for (const bloque of orden) {
+    // Empieza cuando el racimo anterior ya terminó: son independientes.
+    if (racimo.length > 0 && bloque.inicio >= finDelRacimo) cerrar();
+
+    let columna = finPorColumna.findIndex((fin) => fin <= bloque.inicio);
+    if (columna === -1) {
+      columna = finPorColumna.length;
+      finPorColumna.push(bloque.fin);
+    } else {
+      finPorColumna[columna] = bloque.fin;
+    }
+
+    racimo.push({ ...bloque, columna, deCuantas: 1 });
+    finDelRacimo = Math.max(finDelRacimo, bloque.fin);
+  }
+  if (racimo.length > 0) cerrar();
+
+  return salida;
+}

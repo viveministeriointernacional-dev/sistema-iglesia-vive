@@ -15,6 +15,12 @@ import {
   puntoDe,
   puntoLegible,
   puntoParaMaquina,
+  correrSemana,
+  franjaDeLasHoras,
+  leTocaEseDia,
+  minutosDesdeMedianoche,
+  repartirEnColumnas,
+  semanaDe,
 } from "./reunion-catalogo";
 
 test("la hora se lee como la dice la gente", () => {
@@ -280,4 +286,139 @@ test("con una hora inválida no se genera enlace", () => {
     }),
     null,
   );
+});
+
+// ------------------------------------------- la semana del calendario
+
+test("la semana va de lunes a domingo, mire uno el día que mire", () => {
+  // El sábado, el domingo y el propio lunes tienen que caer en la MISMA
+  // semana. El domingo es el que se escapa si uno resta mal: en la convención
+  // de JavaScript es el 0, así que «día - 1» lo mandaría a la semana anterior.
+  for (const dia of ["2026-09-14", "2026-09-19", "2026-09-20"]) {
+    const s = semanaDe(dia);
+    assert.equal(s.inicio, "2026-09-14", dia);
+    assert.equal(s.fin, "2026-09-20", dia);
+    assert.equal(s.dias.length, 7);
+    assert.ok(s.dias.includes(dia));
+  }
+  assert.deepEqual(semanaDe("2026-09-19").dias, [
+    "2026-09-14", "2026-09-15", "2026-09-16", "2026-09-17",
+    "2026-09-18", "2026-09-19", "2026-09-20",
+  ]);
+});
+
+test("moverse de semana cruza el fin de mes y el fin de año", () => {
+  assert.equal(correrSemana("2026-09-28", 1), "2026-10-05");
+  assert.equal(correrSemana("2026-09-14", -1), "2026-09-07");
+  assert.equal(correrSemana("2026-12-28", 1), "2027-01-04");
+});
+
+test("un grupo semanal le toca todas las semanas, en su día y no en otro", () => {
+  // 1 de septiembre de 2026 es martes.
+  const grupo = { weekday: 2, everyNWeeks: 1, inicio: "2026-09-01" };
+  for (const martes of ["2026-09-01", "2026-09-08", "2026-09-15", "2026-09-22"]) {
+    assert.equal(leTocaEseDia(grupo, martes), true, martes);
+  }
+  assert.equal(leTocaEseDia(grupo, "2026-09-16"), false); // miércoles
+  // Antes de que el grupo existiera no le toca: una semana de hace un año no
+  // debe enseñar grupos que todavía no se habían abierto.
+  assert.equal(leTocaEseDia(grupo, "2026-08-25"), false);
+});
+
+test("⚠️ «cada 15 días» se cuenta desde el INICIO del grupo, no desde hoy", () => {
+  // Si se contara desde el lunes de la semana que se está mirando, la serie se
+  // desplazaría y el grupo aparecería la semana equivocada.
+  const grupo = { weekday: 2, everyNWeeks: 2, inicio: "2026-09-01" };
+  assert.equal(leTocaEseDia(grupo, "2026-09-01"), true);
+  assert.equal(leTocaEseDia(grupo, "2026-09-08"), false);
+  assert.equal(leTocaEseDia(grupo, "2026-09-15"), true);
+  assert.equal(leTocaEseDia(grupo, "2026-09-22"), false);
+  assert.equal(leTocaEseDia(grupo, "2026-09-29"), true);
+
+  // El mismo grupo empezando una semana después cae en las semanas CONTRARIAS.
+  const corrido = { weekday: 2, everyNWeeks: 2, inicio: "2026-09-08" };
+  assert.equal(leTocaEseDia(corrido, "2026-09-15"), false);
+  assert.equal(leTocaEseDia(corrido, "2026-09-22"), true);
+});
+
+test("un grupo sin día no le toca nunca", () => {
+  assert.equal(
+    leTocaEseDia({ weekday: null, everyNWeeks: 1, inicio: "2026-09-01" }, "2026-09-15"),
+    false,
+  );
+});
+
+test("⚠️ el martes real: las que se cruzan se parten, las demás van enteras", () => {
+  // Son los cinco grupos que de verdad hay el martes. Alejandra (6:00–7:00) y
+  // Virtual Luis (6:30–7:30) se cruzan; sin repartirlos, uno taparía al otro.
+  const m = minutosDesdeMedianoche;
+  const puestos = repartirEnColumnas([
+    { id: "joiner", inicio: m("17:00"), fin: m("18:00") },
+    { id: "alejandra", inicio: m("18:00"), fin: m("19:00") },
+    { id: "virtual", inicio: m("18:30"), fin: m("19:30") },
+    { id: "jaime", inicio: m("19:00"), fin: m("20:00") },
+    { id: "oscar", inicio: m("20:00"), fin: m("21:00") },
+  ]);
+  const por = (id: string) => puestos.find((p) => p.id === id)!;
+
+  // Las que no se cruzan con nadie ocupan todo el ancho.
+  assert.deepEqual(
+    { c: por("joiner").columna, de: por("joiner").deCuantas },
+    { c: 0, de: 1 },
+  );
+  assert.deepEqual(
+    { c: por("oscar").columna, de: por("oscar").deCuantas },
+    { c: 0, de: 1 },
+  );
+
+  // Las tres encadenadas se reparten en dos columnas, y Jaime reaprovecha la
+  // de Alejandra porque ella ya terminó cuando él empieza.
+  for (const id of ["alejandra", "virtual", "jaime"]) {
+    assert.equal(por(id).deCuantas, 2, id);
+  }
+  assert.equal(por("alejandra").columna, 0);
+  assert.equal(por("virtual").columna, 1);
+  assert.equal(por("jaime").columna, 0);
+
+  assert.equal(puestos.length, 5);
+});
+
+test("dos reuniones que se TOCAN no se cruzan", () => {
+  // Una acaba a las 7:00 y la otra empieza a las 7:00: caben en la misma
+  // columna y cada una ocupa todo el ancho. Con la comparación mal puesta,
+  // media pantalla se partiría en dos sin necesidad.
+  const puestos = repartirEnColumnas([
+    { inicio: 1080, fin: 1140 },
+    { inicio: 1140, fin: 1200 },
+  ]);
+  assert.deepEqual(puestos.map((p) => p.deCuantas), [1, 1]);
+  assert.deepEqual(puestos.map((p) => p.columna), [0, 0]);
+});
+
+test("tres a la misma hora se parten en tres", () => {
+  const puestos = repartirEnColumnas([
+    { inicio: 1080, fin: 1140 },
+    { inicio: 1080, fin: 1140 },
+    { inicio: 1080, fin: 1140 },
+  ]);
+  assert.deepEqual(puestos.map((p) => p.deCuantas), [3, 3, 3]);
+  assert.deepEqual(puestos.map((p) => p.columna).sort(), [0, 1, 2]);
+});
+
+test("la franja de horas se ajusta a lo que hay, sin dibujar el día entero", () => {
+  const m = minutosDesdeMedianoche;
+  // Los grupos reales: el más temprano a las 5 y el último acaba a las 10.
+  assert.deepEqual(
+    franjaDeLasHoras([
+      { inicio: m("17:00"), fin: m("18:00") },
+      { inicio: m("20:30"), fin: m("22:00") },
+    ]),
+    { desde: 17, hasta: 22 },
+  );
+  // Uno solo no deja una rejilla de una fila: se estira al mínimo.
+  const suelto = franjaDeLasHoras([{ inicio: m("19:00"), fin: m("20:00") }]);
+  assert.ok(suelto.hasta - suelto.desde >= 5, JSON.stringify(suelto));
+  assert.ok(suelto.desde <= 19 && suelto.hasta >= 20);
+  // Uno a las 7 de la mañana estira la franja hacia arriba.
+  assert.equal(franjaDeLasHoras([{ inicio: m("07:00"), fin: m("08:30") }]).desde, 7);
 });
