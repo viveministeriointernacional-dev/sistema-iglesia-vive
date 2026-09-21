@@ -280,6 +280,106 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-19** — **El calendario semanal de los grupos** (pedido del usuario
+  con un pantallazo de su propio Google: «me gustaría poder ver las casas de fe
+  como se ven en un calendario, así poder ver cuántas casas de fe hay por
+  día»; mockup aprobado: claude.ai/artifact/NEXo48fueJE4ZrTUDsdggA).
+  **Dos decisiones del usuario, elegidas con `AskUserQuestion`:**
+  **(1) pestaña dentro de «Alpha y Casa de Fe»**, no pantalla nueva en el menú;
+  **(2) semana real con fechas y flechas**, no semana tipo.
+  - **`calendario-semanal.tsx`** (componente de **servidor**: la semana, el día
+    del celular y el filtro viajan por la URL, sin una línea de JavaScript) +
+    5 funciones puras en `reunion-catalogo.ts` con **9 pruebas**.
+  - **⚠️ CERO CONSULTAS NUEVAS, y no es casualidad:** `cargarGrupos` y
+    `cargarCasasDeFe` ya traían `weekday`, `meetingTime`, `everyNWeeks`,
+    `durationMinutes`, líder y conteo, **y ya traían el alcance aplicado** (cada
+    líder los suyos y los de su rama, administración todos — la regla del
+    12-sep). El calendario se arma con lo que la página ya tenía. Con
+    `PrismaPg max:1` cada viaje de más es una latencia de más (§7).
+    **Y por vivir dentro de esa pantalla, hereda el permiso: no hubo que crear
+    ninguna vista nueva en el configurador.**
+  - **⚠️ EL REPARTO EN COLUMNAS ES LO QUE HACE QUE EL CONTEO NO MIENTA.** Los
+    martes hay una a las 6:00 y otra a las 6:30, las dos de una hora: **se
+    cruzan de verdad**. Sin repartirlas, una taparía a la otra. `repartirEnColumnas`
+    agrupa los bloques que se cruzan **en cadena** (A con B, B con C, aunque A y
+    C no se toquen) y dentro de cada racimo da a cada uno la primera columna
+    libre. El ancho se decide **por racimo, no por día**: una reunión suelta a
+    otra hora sigue ocupando todo el ancho.
+  - **⚠️ DOS QUE SE TOCAN NO SE CRUZAN.** Una acaba a las 7:00 y otra empieza a
+    las 7:00: caben en la misma columna. La comparación es `fin <= inicio`, y
+    con `<` media pantalla se partiría en dos sin necesidad. **Probado al
+    revés**: se cambió a `<` y fallaron las dos pruebas que debían.
+  - **⚠️ LA PERIODICIDAD SE CUENTA DESDE EL INICIO DEL GRUPO** (la regla del
+    17-sep, ahora con quien la vigile): `leTocaEseDia`. **Probado al revés**:
+    se ancló la cuenta en una fecha fija y fallaron las dos pruebas de
+    periodicidad. Hoy **ningún grupo es «cada 15 días»**, así que esto no se
+    nota — importa el día que alguien lo ponga, y por eso se eligió semana real
+    y no semana tipo.
+  - **La franja de horas se calcula, no se fija en 24.** `franjaDeLasHoras` la
+    saca de lo que hay: hoy da **17 → 22**, que es justo donde caen los 10
+    grupos. Una rejilla de medianoche a medianoche sería 80 % de vacío — en el
+    Google del usuario había que bajar hasta las 13:00 para ver algo. Con un
+    solo grupo se estira a un mínimo de 5 horas para que no quede una rejilla
+    de una fila.
+  - **⚠️ EN EL CELULAR NO VA LA REJILLA.** Siete columnas por horas en 390 px
+    dan tarjetas de dos centímetros. Se conservan **los conteos por día** —que
+    es lo que el usuario pidió— y debajo la lista del día que se toque. Las dos
+    vistas se pintan en el servidor y se cambian con `hidden sm:flex` /
+    `sm:hidden`: sin JavaScript y sin dos rutas.
+  - **⚠️ LOS GRUPOS SIN DÍA NO SE PUEDEN CALLAR.** Salen en ámbar debajo, con
+    nombre y líder, enlazados a su ficha. Sin eso la pantalla mostraría **10 de
+    16** y cualquiera concluiría que la iglesia tiene 10 Casas de Fe.
+  - **Tropiezo propio, y vale anotarlo:** el primer `delDia` metía el minuto de
+    inicio de la reunión en el campo `inicio`, **que ya existía con otro
+    significado** (la fecha en que arrancó el grupo). Un objeto pisaba al otro y
+    lo tapé con un `as unknown as`. Se rehízo con el grupo **anidado**
+    (`{ grupo, inicio, fin }`), sin ningún cast. **Un `as unknown as` casi
+    siempre está tapando un modelo mal hecho.**
+  - **⚠️ LA COMPROBACIÓN QUE MÁS VALE, y no la dio ninguna herramienta:** se
+    pasaron **los 10 grupos reales** por la misma matemática de la pantalla y se
+    comparó con el pantallazo del propio usuario, que tenía abierta la semana
+    del **21 al 27**. Dio **idéntico**: LUN 2 · MAR 5 · MIÉ 1 · JUE 1 · VIE 1 ·
+    SÁB 0 · DOM 0, con el martes repartido en dos columnas y Jaime
+    reaprovechando la de Alejandra. **Es la forma de verificar una pantalla
+    cuando no se puede abrir el navegador: correr su lógica con datos de
+    producción y cruzarla con algo que el usuario ya vio.**
+  - **Estado medido: de 16 Casas de Fe abiertas, 10 ya tienen día y hora** (ayer
+    eran 2), 7 con punto en el mapa y 5 con dirección. **El martes concentra 5
+    de 10 y el fin de semana está en cero** — que es justo lo que esta pantalla
+    hace visible de un golpe. Los 3 Alpha siguen sin día.
+  - **⚠️ 4 grupos tienen punto pero NO dirección escrita**, y por eso en el
+    Google del usuario la ubicación de esos eventos sale como **coordenadas
+    crudas**: el .ics no escribe `LOCATION` sin dirección y el cliente enseña el
+    `GEO`. No es un fallo; se arregla escribiéndoles la dirección. Son Sur Casa
+    Cristian, Joiner & Maria Isabel, Oscar & Dana y Carlos Zambrano.
+  - `tsc`, eslint, **77/77 pruebas** y `npm run cf:build` en verde. **Sin
+    migraciones.**
+
+- **2026-09-18** — **El punto en el mapa quedó VIVO (PR #91 fusionado).**
+  Verificado en la base: **2 columnas nuevas en `faith_house_group` y 2 en
+  `alpha_program`**, los **2 CHECK** (`%_punto_valido`) y
+  `20260918150000_punto_en_el_mapa` registrada como **la última aplicada**.
+  `git log --oneline origin/main..origin/<rama>` **vacío**: no se quedó nada
+  fuera.
+  **⚠️ CÓMO SE COMPROBÓ QUE EL DESPLIEGUE ESTÁ VIVO, y esta receta sirve para
+  cualquier PR que añada una librería:** se pidió al worker **la hoja de estilos
+  de Leaflet que produjo este build** —
+  `/_next/static/chunks/0n8kzvw2z_6as.css` → **200, 10 572 bytes, con la regla
+  `leaflet-container` dentro**. Ese archivo **no existía antes del PR #91**, así
+  que su presencia es prueba positiva. Es la vuelta buena a la lección del
+  11-sep: **comparar nombres de paquete para demostrar que algo NO está
+  desplegado da falsos negativos, pero pedir un archivo que solo existe en el
+  build nuevo sí prueba que SÍ está.**
+  **⚠️ DATO BUENO Y MEDIDO: el equipo YA está usando lo de ayer.** De las 16
+  Casas de Fe abiertas, **2 tienen día y hora puestos** y **1 tiene dirección**:
+  - **Casa de Familia Jhon Alexis** (Juan Felipe Carvajal) — lunes 17:00, cada
+    semana, 1 hora, **sin dirección todavía**.
+  - **Casa de Fe Ingrith Rodríguez** (Paola Viveros) — viernes 18:00, cada
+    semana, 1 hora, «Carrera 19 No 10 - 32 / Iglesia Vive».
+  Los 3 Alpha siguen sin día ni hora, y **ningún grupo tiene punto en el mapa
+  todavía** (es de hoy). Punto de partida esperado: nada de esto se le puede
+  inventar a un grupo.
+
 - **2026-09-18** — **Ubicar la Casa de Fe o el Alpha en el mapa, con el pin**
   (pedido del usuario: «que se pueda ubicar no solamente con la dirección, sino
   que haya una opción extra que también se pueda ubicar por medio de un mapa»;
