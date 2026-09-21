@@ -280,6 +280,29 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-21** — **El calendario semanal quedó VIVO (PR #92 fusionado).**
+  `git log --oneline origin/main..origin/<rama>` **vacío**: no se quedó nada
+  fuera. **Sin migraciones**, así que en la base no había nada que comprobar —
+  y por eso esta vez la única prueba posible era la del bundle.
+  **⚠️ CÓMO SE COMPROBÓ SIN NAVEGADOR, y es la variante que faltaba de la
+  receta del 18-sep: el calendario es un componente de SERVIDOR, así que NO
+  produce ningún paquete de JavaScript nuevo que pedirle al worker.** Lo que sí
+  produce es **CSS**: la rejilla trae clases de Tailwind que antes no existían.
+  Se compiló **el propio commit de la fusión** (`npm run cf:build`) y salió
+  `3ldsp1w0itu99.css`, **54 978 bytes** — y el worker sirve **ese mismo nombre
+  con ese mismo tamaño exacto**. El nombre lleva hash del contenido, así que
+  coincidir en nombre **y** en bytes es prueba positiva.
+  **REGLA, como remate de la del 18-sep: si el trabajo es de servidor, la
+  huella del despliegue es la hoja de estilos, no un chunk de JS.**
+  **Estado medido al quedar vivo (idéntico al de ayer, y es lo esperado a los
+  3 minutos del merge): 16 Casas de Fe abiertas, 10 con día y hora**, 7 con
+  punto en el mapa, 5 con dirección escrita. **Los 3 Alpha siguen sin día**, así
+  que hoy el calendario los muestra a los tres en el bloque ámbar de abajo.
+  **Siguen los 4 con punto pero SIN dirección escrita** (Sur Casa Cristian,
+  Joiner & Maria Isabel, Oscar & Dana, Carlos Zambrano): son los que en el
+  Google del usuario enseñan **coordenadas crudas** como ubicación. Se arregla
+  escribiéndoles la dirección en la ficha del grupo; no es un fallo del .ics.
+
 - **2026-09-19** — **El calendario semanal de los grupos** (pedido del usuario
   con un pantallazo de su propio Google: «me gustaría poder ver las casas de fe
   como se ven en un calendario, así poder ver cuántas casas de fe hay por
