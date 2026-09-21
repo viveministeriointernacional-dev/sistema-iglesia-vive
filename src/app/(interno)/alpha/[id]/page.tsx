@@ -1,10 +1,18 @@
 import { notFound } from "next/navigation";
 import { diaLargo, momentoLargo } from "@/lib/dominio";
 import { requerirVista } from "@/lib/auth";
+import { paraPermiso } from "@/lib/encargados-catalogo";
 import { hoyEnColombia } from "@/lib/dominio";
 import { ReunionDelGrupo } from "@/components/reunion-del-grupo";
 import { diaISO } from "@/lib/reunion-catalogo";
-import { guardarReunion } from "../acciones";
+import {
+  guardarReunion,
+  alphaCambiarLider,
+  alphaAnadirEncargado,
+  alphaQuitarEncargado,
+  alphaCuentasQuePuedenLlevar,
+} from "../acciones";
+import { EncargadosDelGrupo } from "@/components/encargados-del-grupo";
 import {
   ASISTENCIA_MINIMA,
   cargarGrupo,
@@ -42,9 +50,10 @@ export default async function PaginaGrupoDeAlpha({
   // Entra quien lleva el grupo, quien lo abrió, la administración, el líder que
   // tiene al líder del grupo en su rama — y, **solo a mirar**, quien tiene el
   // permiso «ve todos los grupos». Por eso son dos preguntas y no una.
+  const permiso = paraPermiso(grupo);
   const [puedeEditar, puedeEntrar] = await Promise.all([
-    puedeAdministrarGrupo(usuario, grupo),
-    puedeEntrarAGrupo(usuario, grupo),
+    puedeAdministrarGrupo(usuario, permiso),
+    puedeEntrarAGrupo(usuario, permiso),
   ]);
   if (!puedeEntrar) notFound();
 
@@ -103,6 +112,28 @@ export default async function PaginaGrupoDeAlpha({
             {validados} {validados === 1 ? "validada" : "validadas"}
           </p>
         </header>
+
+        <EncargadosDelGrupo
+          clase="alpha"
+          lider={{
+            id: grupo.leader.id,
+            fullName: grupo.leader.fullName,
+            role: grupo.leader.role,
+          }}
+          encargados={grupo.coLeaders.map((encargado) => ({
+            // `id` es la CUENTA, no el renglón de la tabla: es lo que reciben
+            // las acciones y lo que compara `candidatosDisponibles`.
+            id: encargado.userId,
+            fullName: encargado.user.fullName,
+            role: encargado.user.role,
+            desde: encargado.addedAt,
+          }))}
+          puedeEditar={puedeEditar}
+          cuentasQuePuedenLlevar={alphaCuentasQuePuedenLlevar.bind(null, grupo.id)}
+          cambiarLider={alphaCambiarLider.bind(null, grupo.id)}
+          anadirEncargado={alphaAnadirEncargado.bind(null, grupo.id)}
+          quitarEncargado={alphaQuitarEncargado.bind(null, grupo.id)}
+        />
 
         <div className="mb-[14px]">
           <ReunionDelGrupo

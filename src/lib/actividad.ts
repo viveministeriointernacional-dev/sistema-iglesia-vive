@@ -398,6 +398,14 @@ export async function cargarActividad(
   const nombreAlpha = new Map(alphas.map((a) => [a.id, a.name]));
   const tituloEvento = new Map(eventos.map((e) => [e.id, e.title]));
 
+  /// El nombre de un grupo, sea Alpha o Casa de Fe. Los dos tipos comparten
+  /// varias acciones (el líder, los encargados), así que resolverlo en un solo
+  /// sitio evita repetir el mismo encadenado en cada `case`.
+  const nombreDelGrupo = (fila: { entityId: string | null; action: string }) =>
+    (fila.entityId &&
+      (nombreAlpha.get(fila.entityId) ?? nombreCasa.get(fila.entityId))) ??
+    (fila.action.startsWith("alpha") ? "un grupo de Alpha" : "una Casa de Fe");
+
   const correosPorLearner = new Map<string, (typeof correos)[number][]>();
   for (const c of correos) {
     if (!c.learnerId) continue;
@@ -844,6 +852,41 @@ export async function cargarActividad(
         if (typeof ahora.direccion === "string" && ahora.direccion) {
           filas.push({ k: "Dirección", v: ahora.direccion });
         }
+        break;
+      }
+
+      case "alpha.lider_cambiado":
+      case "casa_de_fe.lider_cambiado": {
+        // Ámbar y no verde: no es avanzar en un proceso, es que un grupo
+        // cambió de manos. Sale a la vista porque le mueve la pantalla y el
+        // calendario a dos personas de golpe.
+        tipo = "grupos"; etiqueta = "GRUPOS"; tono = "ambar";
+        const quien = nombreDelGrupo(fila);
+        frase = [A(), t(" cambió el líder de "), b(quien), t(" · ahora "), b(texto(m.ahora) ?? "otra persona")];
+        tituloDetalle = "El cambio";
+        filas.push({ k: "Antes", v: texto(m.antes) ?? "sin registrar" });
+        filas.push({ k: "Ahora", v: texto(m.ahora) ?? "sin registrar" });
+        // Que el saliente se queda de encargado NO es evidente al leer la
+        // bitácora, y es justo lo que alguien se va a preguntar.
+        if (m.quedaDeEncargado === true && texto(m.antes)) {
+          filas.push({ k: "El anterior", v: `${texto(m.antes)} queda de encargado` });
+        }
+        observacion = texto(m.nota);
+        break;
+      }
+      case "alpha.encargado_anadido":
+      case "casa_de_fe.encargado_anadido":
+      case "alpha.encargado_quitado":
+      case "casa_de_fe.encargado_quitado": {
+        const quitado = fila.action.endsWith("quitado");
+        tipo = "grupos"; etiqueta = "GRUPOS"; tono = quitado ? "ambar" : "verde";
+        frase = [
+          A(),
+          t(quitado ? " quitó de encargado a " : " puso de encargado a "),
+          b(texto(m.encargado) ?? "alguien"),
+          t(" en "),
+          b(nombreDelGrupo(fila)),
+        ];
         break;
       }
 

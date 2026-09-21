@@ -3,6 +3,10 @@ import { getPrisma } from "@/lib/prisma";
 import { veTodaLaRed, type UsuarioSesion } from "@/lib/auth";
 import { lideresDeMiRama } from "@/lib/red";
 import { nombreCompleto } from "@/lib/dominio";
+import {
+  quienesLoLlevan,
+  type GrupoParaPermiso,
+} from "@/lib/encargados-catalogo";
 
 /// Referencia del §5.7: 12 sesiones en unos 3 meses.
 export const SESIONES_DE_ALPHA = 12;
@@ -55,9 +59,10 @@ export function puedeVerAlpha(usuario: UsuarioSesion) {
 /// desaparecía: habría abierto un grupo y al instante no habría podido tocarlo.
 export async function puedeAdministrarGrupo(
   usuario: UsuarioSesion,
-  grupo: { leaderId: string; createdById?: string | null },
+  grupo: GrupoParaPermiso,
 ) {
   if (grupo.leaderId === usuario.id) return true;
+  if (grupo.coLeaderIds.includes(usuario.id)) return true;
   if (grupo.createdById && grupo.createdById === usuario.id) return true;
   // ⚠️ Aquí va `veTodaLaRed` y NO `esVistaCompletaDeAlpha`, aunque hasta hoy
   // fueran lo mismo. El permiso «ve todos los grupos» es de MIRAR: quien ora
@@ -65,7 +70,8 @@ export async function puedeAdministrarGrupo(
   // líder ni cerrarlos. Si esto llamara a `esVistaCompletaDeAlpha`, la casilla
   // repartiría administración de toda la iglesia sin decirlo en ninguna parte.
   if (veTodaLaRed(usuario)) return true;
-  return (await lideresDeMiRama(usuario.id)).includes(grupo.leaderId);
+  const deLaRama = await lideresDeMiRama(usuario.id);
+  return quienesLoLlevan(grupo).some((id) => deLaRama.includes(id));
 }
 
 /// **Quién ve TODOS los Alpha de la iglesia.**
@@ -87,7 +93,7 @@ export function esVistaCompletaDeAlpha(usuario: UsuarioSesion) {
 /// tocarlo. Ver la nota en `puedeEntrarACasaDeFe`.
 export async function puedeEntrarAGrupo(
   usuario: UsuarioSesion,
-  grupo: { leaderId: string; createdById?: string | null },
+  grupo: GrupoParaPermiso,
 ) {
   if (esVistaCompletaDeAlpha(usuario)) return true;
   return puedeAdministrarGrupo(usuario, grupo);
@@ -111,6 +117,11 @@ export async function cargarGrupos(usuario: UsuarioSesion) {
             { leaderId: usuario.id },
             { createdById: usuario.id },
             { leaderId: { in: deLaRama } },
+            // Los que lleva como ENCARGADO, y los que encarga alguien de su
+            // rama. Sin estas dos, poner a alguien de encargado le daría el
+            // permiso de administrar un grupo que no le aparece en la lista.
+            { coLeaders: { some: { userId: usuario.id } } },
+            { coLeaders: { some: { userId: { in: deLaRama } } } },
           ],
         },
     orderBy: { startDate: "desc" },
@@ -155,7 +166,16 @@ export async function cargarGrupo(programId: string) {
       closedAt: true,
       leaderId: true,
       createdById: true,
-      leader: { select: { fullName: true } },
+      leader: { select: { id: true, fullName: true, role: true } },
+      coLeaders: {
+        orderBy: { addedAt: "asc" },
+        select: {
+          id: true,
+          userId: true,
+          addedAt: true,
+          user: { select: { fullName: true, role: true } },
+        },
+      },
       sessions: {
         orderBy: { number: "asc" },
         select: {

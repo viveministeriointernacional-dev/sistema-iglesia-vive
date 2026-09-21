@@ -93,12 +93,29 @@ export async function reunionesDeLaCuenta(
 
   const [alphasQueLleva, casasQueLleva, alphasDondeParticipa, casasDondeParticipa] =
     await prisma.$transaction([
+      // ⚠️ «Que lleva» incluye ahora los grupos donde es ENCARGADO, no solo
+      // aquellos donde figura como líder. Si no, a quien lleva una casa en
+      // pareja le faltaría en su calendario justamente la casa que reúne cada
+      // semana. Va como `OR` dentro de la MISMA consulta a propósito: con
+      // `PrismaPg max:1` cada viaje de más es una latencia de más (§7).
       prisma.alphaProgram.findMany({
-        where: { ...donde, leaderId: cuenta.id },
+        where: {
+          ...donde,
+          OR: [
+            { leaderId: cuenta.id },
+            { coLeaders: { some: { userId: cuenta.id } } },
+          ],
+        },
         select: seleccion,
       }),
       prisma.faithHouseGroup.findMany({
-        where: { ...donde, leaderId: cuenta.id },
+        where: {
+          ...donde,
+          OR: [
+            { leaderId: cuenta.id },
+            { coLeaders: { some: { userId: cuenta.id } } },
+          ],
+        },
         select: seleccion,
       }),
       prisma.alphaProgram.findMany({

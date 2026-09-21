@@ -1,10 +1,18 @@
 import { notFound } from "next/navigation";
 import { diaLargo } from "@/lib/dominio";
 import { requerirVista } from "@/lib/auth";
+import { paraPermiso } from "@/lib/encargados-catalogo";
 import { hoyEnColombia } from "@/lib/dominio";
 import { ReunionDelGrupo } from "@/components/reunion-del-grupo";
 import { diaISO } from "@/lib/reunion-catalogo";
-import { guardarReunion } from "../acciones";
+import {
+  guardarReunion,
+  casaDeFeCambiarLider,
+  casaDeFeAnadirEncargado,
+  casaDeFeQuitarEncargado,
+  casaDeFeCuentasQuePuedenLlevar,
+} from "../acciones";
+import { EncargadosDelGrupo } from "@/components/encargados-del-grupo";
 import {
   cargarCasaDeFe,
   construirMiembros,
@@ -43,9 +51,10 @@ export default async function PaginaCasaDeFe({
   // al líder del grupo en su rama — y, **solo a mirar**, quien tiene el permiso
   // «ve todos los grupos». De ahí que sean dos preguntas y no una: antes bastaba
   // con `puedeEditar`, y eso dejaba fuera a quien puede verla sin tocarla.
+  const permiso = paraPermiso(grupo);
   const [puedeEditar, puedeEntrar] = await Promise.all([
-    puedeAdministrarCasaDeFe(usuario, grupo),
-    puedeEntrarACasaDeFe(usuario, grupo),
+    puedeAdministrarCasaDeFe(usuario, permiso),
+    puedeEntrarACasaDeFe(usuario, permiso),
   ]);
   if (!puedeEntrar) notFound();
 
@@ -70,6 +79,28 @@ export default async function PaginaCasaDeFe({
             {grupo.closedAt ? " · cerrada" : ""}
           </p>
         </header>
+
+        <EncargadosDelGrupo
+          clase="casa-de-fe"
+          lider={{
+            id: grupo.leader.id,
+            fullName: grupo.leader.fullName,
+            role: grupo.leader.role,
+          }}
+          encargados={grupo.coLeaders.map((encargado) => ({
+            // `id` es la CUENTA, no el renglón de la tabla: es lo que reciben
+            // las acciones y lo que compara `candidatosDisponibles`.
+            id: encargado.userId,
+            fullName: encargado.user.fullName,
+            role: encargado.user.role,
+            desde: encargado.addedAt,
+          }))}
+          puedeEditar={puedeEditar}
+          cuentasQuePuedenLlevar={casaDeFeCuentasQuePuedenLlevar.bind(null, grupo.id)}
+          cambiarLider={casaDeFeCambiarLider.bind(null, grupo.id)}
+          anadirEncargado={casaDeFeAnadirEncargado.bind(null, grupo.id)}
+          quitarEncargado={casaDeFeQuitarEncargado.bind(null, grupo.id)}
+        />
 
         <div className="mb-[14px]">
           <ReunionDelGrupo
