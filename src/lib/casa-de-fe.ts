@@ -3,6 +3,10 @@ import { getPrisma } from "@/lib/prisma";
 import { veTodaLaRed, type UsuarioSesion } from "@/lib/auth";
 import { lideresDeMiRama } from "@/lib/red";
 import { nombreCompleto } from "@/lib/dominio";
+import {
+  quienesLoLlevan,
+  type GrupoParaPermiso,
+} from "@/lib/encargados-catalogo";
 
 /// Abrir y cerrar Casas de Fe es de dirección (pastor o mentor); llevarlas es de
 /// quien tiene el permiso. Igual que en Alpha, se elige el líder al abrirla.
@@ -42,14 +46,19 @@ export function esVistaCompletaDeCasaDeFe(usuario: UsuarioSesion) {
 /// Casa de Fe y se la asigna a otra persona se queda sin poder tocarla.
 export async function puedeAdministrarCasaDeFe(
   usuario: UsuarioSesion,
-  grupo: { leaderId: string; createdById?: string | null },
+  grupo: GrupoParaPermiso,
 ) {
   if (grupo.leaderId === usuario.id) return true;
+  // Un encargado la administra IGUAL que el líder: inscribe, retira, cambia
+  // día, hora y lugar. Es la decisión del usuario del 21-sep-2026, y la razón
+  // de ser de la figura: las casas se llevan en pareja.
+  if (grupo.coLeaderIds.includes(usuario.id)) return true;
   if (grupo.createdById && grupo.createdById === usuario.id) return true;
   // `veTodaLaRed` y no `esVistaCompletaDeCasaDeFe`: ver todos los grupos es un
   // permiso de mirar, no de administrar. Ver la nota en `alpha.ts`.
   if (veTodaLaRed(usuario)) return true;
-  return (await lideresDeMiRama(usuario.id)).includes(grupo.leaderId);
+  const deLaRama = await lideresDeMiRama(usuario.id);
+  return quienesLoLlevan(grupo).some((id) => deLaRama.includes(id));
 }
 
 /// **Quién puede ABRIR la ficha de una Casa de Fe concreta**, aunque no pueda
@@ -60,7 +69,7 @@ export async function puedeAdministrarCasaDeFe(
 /// la rama heredada de «Mi red»: si se enseña, tiene que abrir.
 export async function puedeEntrarACasaDeFe(
   usuario: UsuarioSesion,
-  grupo: { leaderId: string; createdById?: string | null },
+  grupo: GrupoParaPermiso,
 ) {
   if (esVistaCompletaDeCasaDeFe(usuario)) return true;
   return puedeAdministrarCasaDeFe(usuario, grupo);
@@ -83,6 +92,11 @@ export async function cargarCasasDeFe(usuario: UsuarioSesion) {
             { leaderId: usuario.id },
             { createdById: usuario.id },
             { leaderId: { in: deLaRama } },
+            // Las que lleva como ENCARGADO, y las que encarga alguien de su
+            // rama. Sin estas dos, poner a alguien de encargado le daría el
+            // permiso de administrar una casa que no le sale en la lista.
+            { coLeaders: { some: { userId: usuario.id } } },
+            { coLeaders: { some: { userId: { in: deLaRama } } } },
           ],
         },
     orderBy: { startDate: "desc" },
@@ -123,7 +137,16 @@ export async function cargarCasaDeFe(groupId: string) {
       closedAt: true,
       leaderId: true,
       createdById: true,
-      leader: { select: { fullName: true } },
+      leader: { select: { id: true, fullName: true, role: true } },
+      coLeaders: {
+        orderBy: { addedAt: "asc" },
+        select: {
+          id: true,
+          userId: true,
+          addedAt: true,
+          user: { select: { fullName: true, role: true } },
+        },
+      },
       members: {
         orderBy: { joinedAt: "asc" },
         select: {

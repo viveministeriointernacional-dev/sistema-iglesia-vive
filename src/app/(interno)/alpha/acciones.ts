@@ -26,10 +26,17 @@ import {
   cargarGrupo,
   construirParticipantes,
   puedeAdministrarGrupo,
+  lideresPosibles,
   puedeCrearAlpha,
   puedeVerAlpha,
   SESIONES_DE_ALPHA,
 } from "@/lib/alpha";
+import { paraPermiso } from "@/lib/encargados-catalogo";
+import {
+  anadirEncargadoAlGrupo,
+  cambiarLiderDelGrupo,
+  quitarEncargadoDelGrupo,
+} from "@/lib/encargados";
 
 export type Resultado = { ok: true } | { ok: false; mensaje: string };
 
@@ -57,10 +64,16 @@ async function grupoPropio(programId: string) {
     where: { id: programId },
     // `createdById` hace falta para que quien abrió el grupo pueda operarlo
     // aunque se lo haya asignado a otra persona.
-    select: { id: true, leaderId: true, createdById: true, closedAt: true },
+    select: {
+      id: true,
+      leaderId: true,
+      createdById: true,
+      closedAt: true,
+      coLeaders: { select: { userId: true } },
+    },
   });
   if (!grupo) return { usuario, grupo: null };
-  if (!(await puedeAdministrarGrupo(usuario, grupo)))
+  if (!(await puedeAdministrarGrupo(usuario, paraPermiso(grupo))))
     return { usuario, grupo: null };
   return { usuario, grupo };
 }
@@ -633,13 +646,18 @@ export async function guardarReunion(
   const prisma = await getPrisma();
   const grupo = await prisma.alphaProgram.findUnique({
     where: { id: grupoId },
-    select: { id: true, leaderId: true, createdById: true },
+    select: {
+      id: true,
+      leaderId: true,
+      createdById: true,
+      coLeaders: { select: { userId: true } },
+    },
   });
   if (!grupo) return { ok: false, mensaje: "No se encontró el grupo." };
 
   // Mover la reunión le cambia el calendario a todos sus miembros, así que lo
   // hace quien administra el grupo, no cualquiera que pueda verlo.
-  if (!(await puedeAdministrarGrupo(usuario, grupo))) {
+  if (!(await puedeAdministrarGrupo(usuario, paraPermiso(grupo)))) {
     return { ok: false, mensaje: "No administras este grupo." };
   }
 
@@ -654,4 +672,91 @@ export async function guardarReunion(
   revalidatePath("/alpha");
   revalidatePath(`/alpha/${grupoId}`);
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Quiénes lo llevan: el líder y los encargados
+// ---------------------------------------------------------------------------
+
+/// **Cambia el líder del grupo.** El anterior queda de encargado, así que no
+/// pierde el grupo de su lista ni de su calendario.
+export async function alphaCambiarLider(
+  programId: string,
+  nuevoLiderId: string,
+  nota: string,
+): Promise<Resultado> {
+  const { usuario, grupo } = await grupoPropio(programId);
+  if (!grupo) return { ok: false, mensaje: "Este grupo no es tuyo." };
+
+  const resultado = await cambiarLiderDelGrupo(
+    "alpha",
+    programId,
+    usuario.id,
+    nuevoLiderId,
+    nota,
+  );
+  if (!resultado.ok) return resultado;
+
+  revalidatePath("/alpha");
+  revalidatePath(`/alpha/${programId}`);
+  return { ok: true };
+}
+
+/// **Pone a alguien de encargado**, que administra el grupo igual que el líder.
+export async function alphaAnadirEncargado(
+  programId: string,
+  userId: string,
+): Promise<Resultado> {
+  const { usuario, grupo } = await grupoPropio(programId);
+  if (!grupo) return { ok: false, mensaje: "Este grupo no es tuyo." };
+
+  const resultado = await anadirEncargadoAlGrupo(
+    "alpha",
+    programId,
+    usuario.id,
+    userId,
+  );
+  if (!resultado.ok) return resultado;
+
+  revalidatePath("/alpha");
+  revalidatePath(`/alpha/${programId}`);
+  return { ok: true };
+}
+
+/// **Quita a un encargado.** Al líder no se le quita por aquí: para eso está el
+/// cambio de líder, que además pide decir por qué.
+export async function alphaQuitarEncargado(
+  programId: string,
+  userId: string,
+): Promise<Resultado> {
+  const { usuario, grupo } = await grupoPropio(programId);
+  if (!grupo) return { ok: false, mensaje: "Este grupo no es tuyo." };
+
+  const resultado = await quitarEncargadoDelGrupo(
+    "alpha",
+    programId,
+    usuario.id,
+    userId,
+  );
+  if (!resultado.ok) return resultado;
+
+  revalidatePath("/alpha");
+  revalidatePath(`/alpha/${programId}`);
+  return { ok: true };
+}
+
+/// **Las cuentas que pueden llevar este tipo de grupo**: activas y con el
+/// permiso. Sirve para las dos listas del panel — la de líder y la de
+/// encargados —, y por eso vienen TODAS: descartar aquí a quien ya lleva el
+/// grupo dejaría sin candidatos al `<select>` de líder, donde un encargado
+/// actual es justamente el caso normal.
+///
+/// Quién queda fuera de la lista de «añadir» lo decide el componente con
+/// `candidatosDisponibles`, que es pura y vive en el catálogo.
+export async function alphaCuentasQuePuedenLlevar(
+  programId: string,
+): Promise<{ id: string; fullName: string; role: string }[]> {
+  const { grupo } = await grupoPropio(programId);
+  if (!grupo) return [];
+  return lideresPosibles();
 }

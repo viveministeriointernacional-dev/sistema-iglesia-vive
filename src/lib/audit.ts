@@ -43,6 +43,12 @@ export type AccionAuditada =
   // auditado porque mueve la reunión en el calendario de todos sus miembros.
   | "alpha.reunion_actualizada"
   | "casa_de_fe.reunion_actualizada"
+  | "alpha.lider_cambiado"
+  | "casa_de_fe.lider_cambiado"
+  | "alpha.encargado_anadido"
+  | "casa_de_fe.encargado_anadido"
+  | "alpha.encargado_quitado"
+  | "casa_de_fe.encargado_quitado"
   | "alpha.focus_day"
   | "alpha.validado"
   | "alpha.desvalidado"

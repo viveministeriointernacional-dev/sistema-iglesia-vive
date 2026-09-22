@@ -280,6 +280,126 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-21** — **Cambiar el líder de un grupo, y ponerle dos o más
+  encargados** (pedido del usuario: «que se pueda cambiar el líder de casa de
+  fe y que se puedan poner dos o más encargados tanto para casa de fe como
+  alpha»; mockup aprobado: claude.ai/artifact/8BzdzVEN3ywwyTzRnY6Ryc).
+  **⚠️ LA EVIDENCIA QUE JUSTIFICA ESTO NO ESTABA EN EL PEDIDO, ESTABA EN LOS
+  DATOS: el equipo ya venía metiendo al segundo encargado DENTRO DEL NOMBRE del
+  grupo**, porque el modelo solo aceptaba un dueño. Son **7 grupos nombrados en
+  pareja**: «Joiner **& Maria Isabel**», «Oscar **& Dana**», «Jaime
+  **& Geraldine**», «Juan Palencia **& Pola Lizeth**», «Jeison **y Lorena**»
+  (dos grupos) y «Freddy **y Nini**». Mirar la base antes de diseñar es lo que
+  convirtió esto de «una funcionalidad más» en «arreglar algo que la gente ya
+  estaba parcheando a mano».
+  **Y el segundo problema, que el mismo cambio resuelve:** el líder registrado
+  **no era quien lleva el grupo**. «Casa de fe Carlos Zambrano» figuraba a
+  nombre de **Juan Felipe Carvajal**; «Oscar & Dana», a nombre de **Harold
+  Narváez**. **7 de las 16 Casas de Fe** estaban a nombre de Juan Felipe y **5**
+  a nombre de Lucero — porque las abrieron ellos, y `leader_id` se fijaba al
+  crear **sin ninguna forma de moverlo**. No existía acción para cambiarlo.
+  **Tres decisiones del usuario, elegidas con `AskUserQuestion`:**
+  **(1) el encargado puede LO MISMO que el líder**; **(2) lo cambia quien ya
+  administra el grupo**, no solo administración; **(3) al cambiar el líder, el
+  anterior QUEDA DE ENCARGADO**, no sale.
+  - Tablas `alpha_co_leader` y `faith_house_co_leader` (migración
+    `20260921150000_encargados_del_grupo`) · **`encargados-catalogo.ts`** (puro,
+    **10 pruebas**) · **`encargados.ts`** (el núcleo de las tres operaciones,
+    compartido por los dos tipos como ya hacía `reunion.ts`) ·
+    **`encargados-del-grupo.tsx`** (la sección, idéntica en las dos fichas).
+  - **⚠️ EL LÍDER SIGUE SIENDO UNO SOLO.** `leader_id` no cambia de forma: es
+    quien responde por el grupo. Un modelo con N líderes iguales habría dejado
+    sin respuesta «¿de quién es esta casa?», que es lo que el encabezado de la
+    ficha y el informe llevan meses contestando.
+  - **⚠️ LA DECISIÓN QUE EVITA UN AGUJERO MUDO: `coLeaderIds` es OBLIGATORIO en
+    `GrupoParaPermiso`.** Si hubiera sido opcional, cualquier consulta que
+    olvidara traer los encargados habría dejado a un encargado **sin poder tocar
+    su propio grupo**, y nadie habría sabido por qué «no le sale el botón». Al
+    hacerlo obligatorio, **`tsc` señaló los 8 puntos de llamada uno por uno** y
+    no quedó ninguno al azar. **Es la contracara de la lección del 12-sep**:
+    aquel día el compilador no podía ver una promesa negada; aquí se le dio algo
+    que sí puede ver. Y `paraPermiso()` es la puerta única, para que no haya un
+    `.map()` distinto en cada sitio.
+  - **Repasado A MANO, por la regla del 12-sep:** los 4 guardias siguen siendo
+    `if (!(await puede…))` con el `await` DENTRO de la negación. Se barrió todo
+    `src` buscando `!puedeX(` sin `await`: las 9 coincidencias son funciones
+    **síncronas**, donde eso es correcto.
+  - **⚠️ NO BASTABA CON EL PERMISO: había que abrirle también la LISTA y el
+    CALENDARIO.** Poner a alguien de encargado y no tocar `cargarGrupos` /
+    `cargarCasasDeFe` le habría dado permiso sobre un grupo **que no le aparece
+    en ninguna pantalla**. Y sin tocar `calendario.ts`, a quien lleva una casa en
+    pareja le faltaría en su `.ics` justamente la casa que reúne cada semana.
+    Las tres consultas llevan el encargado **dentro del mismo `OR`**, sin un solo
+    viaje nuevo: con `PrismaPg max:1` cada viaje de más es una latencia de más.
+  - **⚠️ LA LISTA DE CUENTAS SE PIDE AL ABRIR EL PANEL, no al cargar la ficha.**
+    Solo la necesita quien va a cambiar algo; cargarla siempre se la cobraría a
+    todo el que abre el grupo a mirar.
+  - **⚠️ LA ACCIÓN DEVUELVE TODAS LAS CUENTAS ELEGIBLES Y FILTRA EL COMPONENTE**,
+    y no al revés. Descartar en el servidor a quien ya lleva el grupo habría
+    dejado **sin candidatos al `<select>` de líder**, donde ascender a un
+    encargado actual es justo el caso normal. El descarte lo hace
+    `candidatosDisponibles`, que es **pura y vive en el catálogo**, así que la
+    misma función decide el permiso y pinta la lista: si divergieran, la ficha
+    enseñaría a alguien que el permiso no reconoce.
+  - **⚠️ EL LÍDER NUEVO DEJA DE SER ENCARGADO, o quedaría DOS VECES** en la
+    ficha y el índice único de la base rechazaría el renglón con un error que no
+    le dice nada a nadie. `encargadosTrasCambiarLider` lo resuelve, y el cambio
+    entero va **en una sola transacción**: el grupo no puede quedar con líder
+    nuevo y la lista de encargados a medias.
+  - **La cuenta se valida en el SERVIDOR aunque el `<select>` solo ofrezca las
+    correctas**: un desplegable es una sugerencia del navegador, no una
+    garantía. Sin eso se podría dejar el grupo a nombre de una cuenta
+    desactivada, que ni siquiera puede entrar.
+  - **Nota obligatoria al cambiar de líder** (mín. 10 caracteres), como en los
+    demás paneles. Auditoría `alpha.lider_cambiado` /
+    `casa_de_fe.lider_cambiado` (**en ámbar**: no es avanzar, es que un grupo
+    cambia de manos) más `…encargado_anadido` / `…encargado_quitado`, las seis
+    con su `case` en `actividad.ts`. La del líder guarda **antes y ahora**: sin
+    el «antes» la bitácora no dice a quién se le quitó el grupo.
+  - **Probado al revés, que es lo que hace valer una prueba:** se dejó al líder
+    nuevo también de encargado y se quitó al líder del descarte del buscador;
+    **fallaron exactamente las tres pruebas que debían** (la 18, la 19 y la 21).
+    Al restaurar, verde.
+  - Migración probada con `BEGIN … ROLLBACK` en la misma llamada, **repetida
+    entera**, y con **3 comprobaciones** (inserta un encargado real, el único
+    rechaza el repetido, la FK rechaza un grupo inexistente). Producción quedó
+    en **0 tablas**.
+  - **Estado medido: 27 cuentas activas pueden llevar una Casa de Fe y 29 un
+    Alpha**, así que el desplegable tiene con qué. **PERO ⚠️ de las 7 parejas
+    que están en los nombres, la mayoría NO tiene cuenta en el sistema** —
+    Geraldine, Dana y Lorena no aparecen. **Solo se puede poner de encargado a
+    quien tenga cuenta**, así que esas casas no se pueden arreglar hasta
+    crearles el acceso. (Ojo con el método: un cruce por nombre con `like` da
+    **falsos positivos** —Pola casó con Pola**nia** y Maria con Maria**na**—;
+    hay que mirarlos a ojo, no fiarse del conteo.)
+  - **Lo que NO se hizo a propósito:** renombrar los 7 grupos que llevan la
+    pareja en el título. Eso lo hace el equipo desde la ficha, caso por caso;
+    arreglarlo yo en lote sería decidir por ellos cuál de los dos nombres queda.
+  - `tsc`, eslint, **87/87 pruebas** (77 + 10) y `npm run cf:build` en verde.
+
+- **2026-09-21** — **El calendario semanal quedó VIVO (PR #92 fusionado).**
+  `git log --oneline origin/main..origin/<rama>` **vacío**: no se quedó nada
+  fuera. **Sin migraciones**, así que en la base no había nada que comprobar —
+  y por eso esta vez la única prueba posible era la del bundle.
+  **⚠️ CÓMO SE COMPROBÓ SIN NAVEGADOR, y es la variante que faltaba de la
+  receta del 18-sep: el calendario es un componente de SERVIDOR, así que NO
+  produce ningún paquete de JavaScript nuevo que pedirle al worker.** Lo que sí
+  produce es **CSS**: la rejilla trae clases de Tailwind que antes no existían.
+  Se compiló **el propio commit de la fusión** (`npm run cf:build`) y salió
+  `3ldsp1w0itu99.css`, **54 978 bytes** — y el worker sirve **ese mismo nombre
+  con ese mismo tamaño exacto**. El nombre lleva hash del contenido, así que
+  coincidir en nombre **y** en bytes es prueba positiva.
+  **REGLA, como remate de la del 18-sep: si el trabajo es de servidor, la
+  huella del despliegue es la hoja de estilos, no un chunk de JS.**
+  **Estado medido al quedar vivo (idéntico al de ayer, y es lo esperado a los
+  3 minutos del merge): 16 Casas de Fe abiertas, 10 con día y hora**, 7 con
+  punto en el mapa, 5 con dirección escrita. **Los 3 Alpha siguen sin día**, así
+  que hoy el calendario los muestra a los tres en el bloque ámbar de abajo.
+  **Siguen los 4 con punto pero SIN dirección escrita** (Sur Casa Cristian,
+  Joiner & Maria Isabel, Oscar & Dana, Carlos Zambrano): son los que en el
+  Google del usuario enseñan **coordenadas crudas** como ubicación. Se arregla
+  escribiéndoles la dirección en la ficha del grupo; no es un fallo del .ics.
+
 - **2026-09-19** — **El calendario semanal de los grupos** (pedido del usuario
   con un pantallazo de su propio Google: «me gustaría poder ver las casas de fe
   como se ven en un calendario, así poder ver cuántas casas de fe hay por

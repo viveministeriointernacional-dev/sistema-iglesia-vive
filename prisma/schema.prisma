@@ -105,6 +105,10 @@ model AppUser {
   gruposAlphaAbiertos   AlphaProgram[]       @relation("AbrioAlpha")
   casasDeFeLideradas    FaithHouseGroup[]    @relation("LiderCasaFe")
   casasDeFeAbiertas     FaithHouseGroup[]    @relation("AbrioCasaFe")
+  alphaQueEncarga       AlphaCoLeader[]      @relation("EncargadoDeAlpha")
+  alphaQueEncargo       AlphaCoLeader[]      @relation("PusoEncargadoDeAlpha")
+  casasQueEncarga       FaithHouseCoLeader[] @relation("EncargadoDeCasaFe")
+  casasQueEncargo       FaithHouseCoLeader[] @relation("PusoEncargadoDeCasaFe")
   validacionesAlpha     AlphaEnrollment[]    @relation("ValidacionAlpha")
   asistenciasAlpha      AlphaAttendance[]
   registrosCreados      LearnerProfile[]     @relation("RegistradaPor")
@@ -550,6 +554,7 @@ model AlphaProgram {
   team        Team?             @relation(fields: [teamId], references: [id])
   sessions    AlphaSession[]
   enrollments AlphaEnrollment[]
+  coLeaders   AlphaCoLeader[]
 
   @@index([leaderId, closedAt])
   @@map("alpha_program")
@@ -764,6 +769,7 @@ model FaithHouseGroup {
   createdBy AppUser?                @relation("AbrioCasaFe", fields: [createdById], references: [id])
   team      Team?                   @relation(fields: [teamId], references: [id])
   members   FaithHouseGroupMember[]
+  coLeaders FaithHouseCoLeader[]
 
   @@index([leaderId, closedAt])
   @@map("faith_house_group")
@@ -780,6 +786,50 @@ model FaithHouseGroupMember {
 
   @@unique([groupId, learnerId])
   @@map("faith_house_group_member")
+}
+
+/// **Quien lleva un Alpha JUNTO al lider.**
+///
+/// El lider sigue siendo uno solo (`AlphaProgram.leaderId`): es quien responde
+/// por el grupo. Un encargado lo **administra igual que el** —inscribe, retira,
+/// cambia dia, hora y lugar— y el grupo le aparece en su propio calendario.
+///
+/// Nacio porque el equipo ya llevaba las casas EN PAREJA y lo anotaba en el
+/// nombre del grupo a falta de sitio: «Casa de Fe Joiner & Maria Isabel»,
+/// «Oscar & Dana», «Jaime & Geraldine».
+model AlphaCoLeader {
+  id         String   @id @default(uuid())
+  programId  String   @map("program_id")
+  userId     String   @map("user_id")
+  /// Quien lo puso de encargado. Nulo si esa cuenta desapareciera: el renglon
+  /// sobrevive porque lo que importa es que esta persona lleva el grupo.
+  addedById  String?  @map("added_by_id")
+  addedAt    DateTime @default(now()) @map("added_at")
+
+  program AlphaProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  user    AppUser      @relation("EncargadoDeAlpha", fields: [userId], references: [id], onDelete: Cascade)
+  addedBy AppUser?     @relation("PusoEncargadoDeAlpha", fields: [addedById], references: [id])
+
+  @@unique([programId, userId])
+  @@index([userId])
+  @@map("alpha_co_leader")
+}
+
+/// **Quien lleva una Casa de Fe JUNTO al lider.** Ver `AlphaCoLeader`.
+model FaithHouseCoLeader {
+  id        String   @id @default(uuid())
+  groupId   String   @map("group_id")
+  userId    String   @map("user_id")
+  addedById String?  @map("added_by_id")
+  addedAt   DateTime @default(now()) @map("added_at")
+
+  group   FaithHouseGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user    AppUser         @relation("EncargadoDeCasaFe", fields: [userId], references: [id], onDelete: Cascade)
+  addedBy AppUser?        @relation("PusoEncargadoDeCasaFe", fields: [addedById], references: [id])
+
+  @@unique([groupId, userId])
+  @@index([userId])
+  @@map("faith_house_co_leader")
 }
 
 // ---------------------------------------------- Auditoría e integraciones
