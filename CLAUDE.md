@@ -280,6 +280,51 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-22** — **Los encargados quedaron VIVOS (PR #93 fusionado), y el
+  equipo los estrenó a los CUATRO MINUTOS.**
+  Verificado en la base: **2 tablas nuevas** (`alpha_co_leader`,
+  `faith_house_co_leader`), sus **6 claves foráneas** y **6 índices**, y
+  `20260921150000_encargados_del_grupo` registrada como la última aplicada
+  (08:28, un minuto después del merge).
+  `git log --oneline origin/main..origin/<rama>` **vacío**: no se quedó nada
+  fuera. Despliegue comprobado con la receta del 21-sep: producción sirve
+  **`10b5oaxhj-3n_.css`**, exactamente el archivo que produjo el build de este
+  código.
+  **⚠️ LA MEJOR PRUEBA NO LA PUSE YO: a las 08:31 —cuatro minutos después de
+  quedar vivo— «Administración Iglesia Vive» añadió a NINI GUERRÓN y a LAURA
+  CHARRY como encargadas de «Alpha Norte - Freddy y Nini».** O sea, el primer
+  uso real fue **justo el caso que motivó todo**: el grupo que llevaba la
+  pareja metida en el nombre, y Nini quedó por fin registrada como quien lo
+  lleva de verdad, no como una palabra en el título.
+
+  **⚠️ LECCIÓN NUEVA, Y ESTA ES LA QUE HAY QUE GUARDAR: «✅ Deployment
+  successful» en un PR NO significa que esté fusionado ni desplegado.**
+  El usuario dijo «ya fusioné» y **no estaba fusionado**: el PR #93 seguía
+  `open`, `merged: false`, y `main` estaba todavía en el merge del #92. Lo que
+  había visto era **el comentario del bot de Cloudflare en el PR**, que dice
+  «✅ Deployment successful!» con un enlace de vista previa — pero eso es el
+  **build de la RAMA**, no producción. Cloudflare lo construye en cada PR para
+  poder probarlo antes de fusionar, y el ✅ verde se lee como «ya quedó».
+  **Cómo se distingue en un segundo, y sirve para siempre:**
+  `git log --oneline origin/main..origin/<rama>` — si devuelve commits, **no
+  está fusionado**, por muchos ✅ que haya en el PR. Y el estado del PR
+  (`merged: true/false`) es la otra mitad.
+  **Es el complemento de la regla del 11-sep**: aquella avisa de un merge que
+  se lleva solo PARTE del trabajo; esta, de un merge que **no ocurrió** y
+  parece que sí. En los dos casos la comprobación es la misma consulta.
+  **⚠️ Y un matiz que hay que saber decirle al usuario: la vista previa de la
+  rama apunta a la BASE DE DATOS REAL.** Así que sirve para mirar el resto del
+  sitio, pero una pantalla que dependa de una migración todavía sin aplicar le
+  va a dar error ahí — no es un fallo del código.
+
+  **Estado de arranque medido:** 18 Casas de Fe y 3 Alpha abiertos (las casas
+  eran 16 el 19-sep: el equipo abrió 2 más), **27 cuentas pueden llevar una
+  Casa de Fe y 29 un Alpha**, así que el desplegable tiene con qué.
+  **Acción del equipo:** en cada grupo llevado en pareja, entrar a la ficha →
+  «Cambiar quién la lleva» → añadir al segundo. Y **recordar que solo se puede
+  poner de encargado a quien tenga CUENTA**: Geraldine, Dana y Lorena todavía
+  no la tienen, así que a esas casas hay que crearles el acceso antes.
+
 - **2026-09-21** — **Cambiar el líder de un grupo, y ponerle dos o más
   encargados** (pedido del usuario: «que se pueda cambiar el líder de casa de
   fe y que se puedan poner dos o más encargados tanto para casa de fe como
