@@ -86,6 +86,8 @@ export default async function PaginaPersonaAdmin({
             canMentor: persona.user!.canMentor,
             coordinaConsolidacion: persona.user!.coordinatesConsolidation,
             veTodosLosGrupos: persona.user!.canSeeAllGroups,
+            llevaGi: persona.user!.canLeadGi,
+            coordinaGi: persona.user!.coordinatesGi,
           }),
         excepcion: excepciones.get(v.id) ?? null,
       }))
@@ -169,6 +171,8 @@ export default async function PaginaPersonaAdmin({
                   canMentor: persona.user.canMentor,
                   coordinatesConsolidation: persona.user.coordinatesConsolidation,
                   canSeeAllGroups: persona.user.canSeeAllGroups,
+                  canLeadGi: persona.user.canLeadGi,
+                  coordinatesGi: persona.user.coordinatesGi,
                 }
               : null
           }

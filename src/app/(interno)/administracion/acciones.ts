@@ -117,6 +117,8 @@ export type RolYPermisos = {
   canMentor: boolean;
   coordinatesConsolidation: boolean;
   canSeeAllGroups: boolean;
+  canLeadGi: boolean;
+  coordinatesGi: boolean;
 };
 
 /// Actualiza el rol y los permisos de una cuenta ya existente.
@@ -154,6 +156,8 @@ export async function guardarRolYPermisos(
         canMentor: datos.canMentor,
         coordinatesConsolidation: datos.coordinatesConsolidation,
         canSeeAllGroups: datos.canSeeAllGroups,
+        canLeadGi: datos.canLeadGi,
+        coordinatesGi: datos.coordinatesGi,
       },
     });
 
@@ -169,6 +173,8 @@ export async function guardarRolYPermisos(
         canMentor: datos.canMentor,
         coordinatesConsolidation: datos.coordinatesConsolidation,
         canSeeAllGroups: datos.canSeeAllGroups,
+        canLeadGi: datos.canLeadGi,
+        coordinatesGi: datos.coordinatesGi,
         active: datos.active,
       },
     });
@@ -345,6 +351,8 @@ export async function crearAcceso(
           canMentor: datos.canMentor,
           coordinatesConsolidation: datos.coordinatesConsolidation,
           canSeeAllGroups: datos.canSeeAllGroups,
+          canLeadGi: datos.canLeadGi,
+          coordinatesGi: datos.coordinatesGi,
           personId: persona.id,
         },
       });

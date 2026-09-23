@@ -73,6 +73,18 @@ model AppUser {
   /// **Solo mirar**: administrar un grupo sigue siendo de su líder, de quien lo
   /// abrió, de la administración o de su rama.
   canSeeAllGroups Boolean @default(false) @map("can_see_all_groups")
+  /// **Lleva GI**: acompaña a un grupo de jóvenes dentro de Generación
+  /// Imparable, les marca el devocional diario y escribe las observaciones.
+  ///
+  /// ⚠️ Es un permiso acumulable, como llevar Alpha o acompañar como mentor, y
+  /// **no cambia la línea de mentoría de nadie**: Mariana Valentina Narváez es
+  /// líder de GI y sigue siendo discípula de Paola Viveros. GI y la mentoría
+  /// son dos estructuras que conviven.
+  canLeadGi Boolean @default(false) @map("can_lead_gi")
+  /// **Coordina GI**: los pastores del movimiento juvenil. Ven a todos los
+  /// líderes de GI y a todos los jóvenes, lleven o no un grupo ellos mismos.
+  /// Es a GI lo que `coordinatesConsolidation` es a la consolidación.
+  coordinatesGi Boolean @default(false) @map("coordinates_gi")
   /// El código secreto de su enlace de calendario (`/calendario/<token>.ics`).
   ///
   /// ⚠️ **Es una credencial, no un identificador.** Los calendarios no piden
@@ -132,6 +144,10 @@ model AppUser {
   vistasPropias          ViewUserAccess[]        @relation("VistaDeLaCuenta")
   vistasDeRolCambiadas   ViewRoleAccess[]        @relation("CambioVistaDeRol")
   vistasDeCuentaCambiadas ViewUserAccess[]       @relation("CambioVistaDeCuenta")
+  giQueLleva             GiAssignment[]          @relation("LiderDeGi")
+  giQueAsigno            GiAssignment[]          @relation("AsignoAGi")
+  devocionalesMarcados   GiDevotional[]          @relation("MarcoDevocional")
+  observacionesDeGi      GiNote[]                @relation("EscribioObservacionGi")
 
   @@index([role, active])
   @@map("app_user")
@@ -371,6 +387,9 @@ model LearnerProfile {
   phaseChanges        PhaseChange[]
   statusChanges       LearnerStatusChange[]
   bajaRequests        BajaRequest[]
+  giAssignments       GiAssignment[]
+  giDevotionals       GiDevotional[]
+  giNotes             GiNote[]
 
   @@index([phase, status])
   /// El alcance «solo mis personas» del tablero y el cálculo de carga.
@@ -1301,4 +1320,83 @@ model ViewUserAccess {
   @@unique([view, userId])
   @@index([userId])
   @@map("view_user_access")
+}
+
+/// **A qué líder de GI está asignado un joven.**
+///
+/// Es la misma forma que `MentorRelationship` —se cierra, no se borra— y a
+/// propósito: quién acompañó a quién dentro de GI es historia, y borrarla
+/// dejaría los devocionales de hace tres meses sin dueño.
+///
+/// ⚠️ **GI no toca la mentoría.** Un joven tiene su mentor por un lado y su
+/// líder de GI por otro, y casi nunca son la misma persona. Por eso esto es
+/// una tabla aparte y no una columna en `mentor_relationship`.
+///
+/// ⚠️ **Un joven tiene UN solo líder de GI vivo a la vez**, y lo garantiza un
+/// índice único PARCIAL que vive solo en la migración
+/// (`gi_assignment_learner_vivo_key ... WHERE ended_at IS NULL`): Prisma no
+/// sabe expresar un único parcial. Si se regenera el esquema desde la base, ese
+/// índice no aparece aquí — **no se debe borrar de la migración**.
+model GiAssignment {
+  id           String    @id @default(uuid())
+  learnerId    String    @map("learner_id")
+  leaderId     String    @map("leader_id")
+  assignedById String?   @map("assigned_by_id")
+  startedAt    DateTime  @default(now()) @map("started_at")
+  endedAt      DateTime? @map("ended_at")
+
+  learner    LearnerProfile @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  leader     AppUser        @relation("LiderDeGi", fields: [leaderId], references: [id], onDelete: Cascade)
+  assignedBy AppUser?       @relation("AsignoAGi", fields: [assignedById], references: [id])
+
+  @@index([leaderId, endedAt])
+  @@map("gi_assignment")
+}
+
+/// **Un día en que el joven hizo el devocional.**
+///
+/// ⚠️ `day` es `@db.Date`: «el devocional del martes 22» es un DÍA, no un
+/// instante, así que se guarda y se compara como fecha civil «AAAA-MM-DD» y se
+/// pinta con `diaCorto` —nunca con `momentoCorto`—. Es la regla del 8-sep-2026.
+///
+/// `markedAt` sí es una marca de tiempo real, y no sobra: dice si el líder va
+/// al día o si marca la semana entera el domingo por la noche.
+model GiDevotional {
+  id         String   @id @default(uuid())
+  learnerId  String   @map("learner_id")
+  day        DateTime @db.Date
+  markedById String   @map("marked_by_id")
+  markedAt   DateTime @default(now()) @map("marked_at")
+
+  learner  LearnerProfile @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  markedBy AppUser        @relation("MarcoDevocional", fields: [markedById], references: [id], onDelete: Cascade)
+
+  @@unique([learnerId, day])
+  @@index([day])
+  @@map("gi_devotional")
+}
+
+/// **Lo que el líder de GI escribe sobre un joven un día concreto.**
+///
+/// ⚠️ Vive APARTE del devocional, y no como una columna suya, por un caso que
+/// es el normal y no el raro: el joven que esta semana no marcó ni un día y
+/// sobre el que el líder sí tiene algo que decir («está en exámenes, retoma el
+/// jueves»). Si la observación colgara de la marca, para escribirla habría que
+/// marcar un devocional que no se hizo.
+///
+/// **No es una nota pastoral.** `PrivateNote` es privada del mentor; esto lo
+/// leen los pastores de GI y el mentor de la línea, y así se dice en pantalla.
+model GiNote {
+  id        String   @id @default(uuid())
+  learnerId String   @map("learner_id")
+  day       DateTime @db.Date
+  body      String
+  authorId  String   @map("author_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  learner LearnerProfile @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  author  AppUser        @relation("EscribioObservacionGi", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([learnerId, day])
+  @@map("gi_note")
 }

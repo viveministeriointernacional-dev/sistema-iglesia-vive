@@ -41,6 +41,7 @@ export const ETIQUETA_ALCANCE: Record<AlcanceDeVista, string> = {
 
 export type VistaId =
   | "mi-red"
+  | "gi"
   | "operacion-72"
   | "registro-interno"
   | "grupos"
@@ -73,6 +74,15 @@ export const VISTAS: readonly DefinicionDeVista[] = [
     ruta: "/mi-red",
     alcance: "rama",
     alcanceDetalle: "Sus discípulos y los de ellos, hacia abajo",
+    grupo: "menu",
+  },
+  {
+    id: "gi",
+    nombre: "GI",
+    ruta: "/gi",
+    alcance: "rama",
+    alcanceDetalle:
+      "Los jóvenes que acompaña en GI · los de su línea si es mentor · todo el movimiento si lo coordina",
     grupo: "menu",
   },
   {
@@ -194,6 +204,15 @@ export function esVistaConocida(valor: string): valor is VistaId {
 /// si alguien cambia un predicado y se olvida de esta tabla, salta.
 export const POR_DEFECTO_SEGUN_ROL: Record<VistaId, readonly Role[]> = {
   "mi-red": [Role.MENTOR, Role.PASTOR, Role.ADMIN],
+  // ⚠️ GI es la ÚNICA vista de esta tabla que no reconstruye nada: el
+  // movimiento juvenil no existía en la plataforma antes del 23-sep-2026, así
+  // que aquí no hay un «antes» que respetar y este renglón es una decisión, no
+  // una foto. Se le da a quien acompaña una línea —el usuario pidió que el
+  // informe lo vieran «los pastores de GI y el mentor o pastor asignado de esa
+  // línea»— y, por `PERMISOS_QUE_ABREN`, a quien lleve o coordine GI, sea cual
+  // sea su rol: el líder de GI del caso real es una joven de 14 años con
+  // cuenta de LÍDER DE ALPHA.
+  gi: [Role.MENTOR, Role.PASTOR, Role.ADMIN],
   "operacion-72": [Role.ADMIN, Role.CONSOLIDADOR],
   "registro-interno": [Role.CONSOLIDADOR, Role.PASTOR, Role.ADMIN],
   grupos: [Role.MENTOR, Role.PASTOR, Role.ADMIN],
@@ -226,9 +245,10 @@ export const POR_DEFECTO_SEGUN_ROL: Record<VistaId, readonly Role[]> = {
 /// elegible para que te asignen un grupo, acompañar discípulos—; lo que dejan
 /// de gobernar en cuanto hay una fila configurada es el menú.
 export const PERMISOS_QUE_ABREN: Partial<
-  Record<VistaId, readonly ("canLeadAlpha" | "canLeadFaithHouse" | "canMentor" | "coordinaConsolidacion" | "veTodosLosGrupos")[]>
+  Record<VistaId, readonly ("canLeadAlpha" | "canLeadFaithHouse" | "canMentor" | "coordinaConsolidacion" | "veTodosLosGrupos" | "llevaGi" | "coordinaGi")[]>
 > = {
   "mi-red": ["canMentor"],
+  gi: ["llevaGi", "coordinaGi"],
   "operacion-72": ["coordinaConsolidacion"],
   grupos: ["canLeadAlpha", "canLeadFaithHouse", "veTodosLosGrupos"],
 };

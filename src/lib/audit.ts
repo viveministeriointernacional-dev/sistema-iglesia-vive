@@ -48,6 +48,12 @@ export type AccionAuditada =
   | "alpha.encargado_anadido"
   | "casa_de_fe.encargado_anadido"
   | "alpha.encargado_quitado"
+  // GI · Generación Imparable. ⚠️ Solo se auditan la entrada y la salida del
+  // movimiento: el devocional diario NO, porque son 18 jóvenes por 7 días —más
+  // de 120 movimientos por semana— y ahogarían «Actividad del día». Cada marca
+  // ya guarda por sí sola quién la puso y cuándo.
+  | "gi.joven_asignado"
+  | "gi.joven_quitado"
   | "casa_de_fe.encargado_quitado"
   | "alpha.focus_day"
   | "alpha.validado"

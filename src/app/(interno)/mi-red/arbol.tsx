@@ -7,8 +7,18 @@ import type { ArbolDeRed, NodoDeRed } from "@/lib/arbol";
 /// dos vistas se fundieran en «Mi red» (7-sep-2026). Es la misma gente que la
 /// vista de lista, ordenada por de quién cuelga cada una.
 
-function Nodo({ nodo, nivel }: { nodo: NodoDeRed; nivel: number }) {
-  const tarjeta = <Tarjeta nodo={nodo} />;
+function Nodo({
+  nodo,
+  nivel,
+  mentorId,
+}: {
+  nodo: NodoDeRed;
+  nivel: number;
+  /// La cuenta de quien lo acompaña: el nodo del que cuelga. Sirve para decir
+  /// si el grupo al que va lo lleva su propio mentor o alguien de otra línea.
+  mentorId?: string | null;
+}) {
+  const tarjeta = <Tarjeta nodo={nodo} mentorId={mentorId} />;
 
   if (!nodo.hijos.length) {
     return <div style={{ paddingLeft: nivel * 18 }}>{tarjeta}</div>;
@@ -21,14 +31,25 @@ function Nodo({ nodo, nivel }: { nodo: NodoDeRed; nivel: number }) {
       </summary>
       <div className="mt-2 flex flex-col gap-2 border-l border-[rgba(19,28,36,.12)] pl-2">
         {nodo.hijos.map((hijo) => (
-          <Nodo key={hijo.userId ?? hijo.learnerId} nodo={hijo} nivel={nivel + 1} />
+          <Nodo
+            key={hijo.userId ?? hijo.learnerId}
+            nodo={hijo}
+            nivel={nivel + 1}
+            mentorId={nodo.userId}
+          />
         ))}
       </div>
     </details>
   );
 }
 
-function Tarjeta({ nodo }: { nodo: NodoDeRed }) {
+function Tarjeta({
+  nodo,
+  mentorId,
+}: {
+  nodo: NodoDeRed;
+  mentorId?: string | null;
+}) {
   const nombre = nodo.learnerId ? (
     <Link
       href={`/expediente/${nodo.learnerId}`}
@@ -64,6 +85,51 @@ function Tarjeta({ nodo }: { nodo: NodoDeRed }) {
           ) : null}
         </span>
       </span>
+
+      {nodo.reune.length || nodo.giACargo || nodo.enElGrupoDe.length ? (
+        <span className="flex w-full flex-wrap gap-1">
+          {nodo.reune.map((grupo) => (
+            <Link
+              key={`${grupo.tipo}-${grupo.id}`}
+              href={`/${grupo.tipo}/${grupo.id}`}
+              className="rounded-[20px] bg-azul-100 px-2 py-1 text-[10px] leading-none font-bold text-azul-700"
+            >
+              Lleva {grupo.nombre} · reúne a {grupo.personas}
+            </Link>
+          ))}
+
+          {/* Sin enlace a propósito: quien mira la red puede no tener
+              encendida la pantalla de GI, y un enlace que lleva a «no tienes
+              permiso» es peor que ningún enlace. */}
+          {nodo.giACargo ? (
+            <span className="rounded-[20px] bg-ambar-fondo px-2 py-1 text-[10px] leading-none font-bold text-ambar-texto">
+              Líder de GI · acompaña a {nodo.giACargo}
+            </span>
+          ) : null}
+
+          {/* ⚠️ El grupo al que VA solo se dice cuando NO lo lleva su propio
+              mentor. Si lo llevara él, el renglón ya cuelga de esa persona y
+              repetirlo sería ruido; cuando es otro —hoy, 9 de los 20 miembros
+              de Casa de Fe— es justo el dato que faltaba. */}
+          {nodo.enElGrupoDe
+            .filter(
+              (grupo) =>
+                grupo.liderId !== mentorId && grupo.liderId !== nodo.userId,
+            )
+            .map((grupo) => (
+              /* Tampoco lleva enlace: el grupo lo lleva alguien de otra línea,
+                 y la ficha de ese grupo puede estar fuera del alcance de quien
+                 mira. Si se enseña, tiene que abrir (la regla del 16-sep-2026)
+                 — así que lo que no abre, no se enseña como enlace. */
+              <span
+                key={`va-${grupo.tipo}-${grupo.id}`}
+                className="rounded-[20px] bg-papel px-2 py-1 text-[10px] leading-none font-bold text-[rgba(19,28,36,.5)]"
+              >
+                Va a {grupo.nombre} · la lleva {grupo.lider}
+              </span>
+            ))}
+        </span>
+      ) : null}
 
       {nodo.alertas.length ? (
         <span className="flex flex-wrap gap-1">
@@ -132,11 +198,18 @@ export function VistaArbol({
 
   return (
     <>
+      <QuienReune arbol={arbol} />
+
       <section className="tarjeta mt-[14px] p-5">
         <h2 className="etiqueta-seccion">ESTRUCTURA</h2>
         <div className="mt-4 flex flex-col gap-2">
           {arbol.raices.map((raiz) => (
-            <Nodo key={raiz.userId ?? raiz.learnerId} nodo={raiz} nivel={0} />
+            <Nodo
+              key={raiz.userId ?? raiz.learnerId}
+              nodo={raiz}
+              nivel={0}
+              mentorId={null}
+            />
           ))}
         </div>
       </section>
@@ -172,4 +245,79 @@ function aplanar(nodos: NodoDeRed[]): NodoDeRed[] {
     if (nodo.hijos.length) salida.push(...aplanar(nodo.hijos));
   }
   return salida;
+}
+
+/// **Quién reúne, en esta línea.**
+///
+/// Es el resumen que contesta de un golpe lo que el árbol solo insinuaba: en
+/// una red no solo hay mentores; hay gente que además reúne a otros cada
+/// semana —una Casa de Fe, un Alpha, un grupo de GI— y eso no se veía en
+/// ninguna parte.
+function QuienReune({ arbol }: { arbol: ArbolDeRed }) {
+  const nodos = aplanar([...arbol.raices, ...(arbol.sinMentor ?? [])]);
+
+  const llevanGrupo = nodos.filter((n) => n.reune.length).length;
+  const lideresDeGi = nodos.filter((n) => n.giACargo).length;
+
+  // ⚠️ «De otra línea» se calcula con el mentor REAL de cada quien, que en el
+  // árbol es el nodo del que cuelga. Es el caso que motivó todo: Dana Pere va
+  // a la Casa de Fe de Hárold y su mentora es Paola Viveros.
+  let deOtraLinea = 0;
+  const contar = (nodo: NodoDeRed, mentorId: string | null) => {
+    if (
+      nodo.enElGrupoDe.some(
+        (g) => g.liderId !== mentorId && g.liderId !== nodo.userId,
+      )
+    ) {
+      deOtraLinea += 1;
+    }
+    for (const hijo of nodo.hijos) contar(hijo, nodo.userId);
+  };
+  for (const raiz of arbol.raices) contar(raiz, null);
+
+  if (!llevanGrupo && !lideresDeGi && !deOtraLinea) return null;
+
+  return (
+    <section className="tarjeta mt-[14px] p-5">
+      <h2 className="etiqueta-seccion">EN ESTA LÍNEA, QUIÉN REÚNE</h2>
+      <p className="mt-2 text-[11.5px] leading-[1.5] font-medium text-[rgba(19,28,36,.5)]">
+        Nadie cambia de sitio en el árbol: cada persona sigue colgando de su
+        mentor, y quién reúne a quién se ve en su renglón.
+      </p>
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Cuenta titulo="LLEVAN UN ALPHA O UNA CASA DE FE" valor={llevanGrupo} />
+        <Cuenta titulo="SON LÍDERES DE GI" valor={lideresDeGi} />
+        <Cuenta
+          titulo="SU GRUPO LO LLEVA ALGUIEN DE OTRA LÍNEA"
+          valor={deOtraLinea}
+          ambar
+        />
+      </div>
+    </section>
+  );
+}
+
+function Cuenta({
+  titulo,
+  valor,
+  ambar,
+}: {
+  titulo: string;
+  valor: number;
+  ambar?: boolean;
+}) {
+  return (
+    <div className="rounded-[10px] bg-papel p-4">
+      <p className="text-[9.5px] leading-none font-bold tracking-[.08em] text-[rgba(19,28,36,.45)]">
+        {titulo}
+      </p>
+      <p
+        className={`mt-2 font-serif text-[24px] leading-none font-normal ${
+          ambar ? "text-ambar-texto" : "text-tinta"
+        }`}
+      >
+        {valor}
+      </p>
+    </div>
+  );
 }

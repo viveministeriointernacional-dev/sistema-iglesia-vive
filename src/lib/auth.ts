@@ -30,6 +30,11 @@ export type UsuarioSesion = {
   /// Ve todos los grupos de la iglesia (Casas de Fe y Alpha), lleve o no
   /// alguno. Solo mirar: no administra ninguno.
   veTodosLosGrupos: boolean;
+  /// Lleva un grupo de jóvenes dentro de GI: les marca el devocional y
+  /// escribe las observaciones.
+  llevaGi: boolean;
+  /// Coordina GI: los pastores del movimiento juvenil.
+  coordinaGi: boolean;
   /// Las pantallas que tiene encendidas, ya resueltas: su excepción propia si
   /// la hay, si no la de su rol, y si no el defecto de siempre. Se calcula una
   /// vez por petición en `obtenerUsuarioActual`.
@@ -161,6 +166,34 @@ export function veTodaLaRed(usuario: UsuarioSesion): boolean {
   return ROLES_ADMIN.includes(usuario.role) || usuario.coordinaConsolidacion;
 }
 
+/// **GI · Generación Imparable.**
+///
+/// Tres preguntas distintas, y conviene no confundirlas:
+///
+/// - **`puedeLlevarGi`** — acompaña a un grupo de jóvenes: es quien marca el
+///   devocional y escribe las observaciones.
+/// - **`veTodoGi`** — los pastores del movimiento (Juan Camilo y Juliana) y la
+///   administración: ven a todos los líderes y a todos los jóvenes.
+/// - **`puedeAsignarGi`** — reparte los jóvenes entre los líderes de GI. Es lo
+///   mismo que coordinarlo: quien decide quién acompaña a quién.
+///
+/// ⚠️ **Ninguna de las tres toca la mentoría.** Un mentor o un pastor ve el GI
+/// de la gente de su línea —lo pidió el usuario— pero **no marca**: eso es del
+/// líder de GI, que es quien habla con el joven todos los días. La puerta del
+/// mentor no está aquí, está en `accesoAGi` (`gi.ts`), porque depende de la
+/// rama y no del rol.
+export function puedeLlevarGi(usuario: UsuarioSesion): boolean {
+  return usuario.llevaGi || veTodoGi(usuario);
+}
+
+export function veTodoGi(usuario: UsuarioSesion): boolean {
+  return ROLES_ADMIN.includes(usuario.role) || usuario.coordinaGi;
+}
+
+export function puedeAsignarGi(usuario: UsuarioSesion): boolean {
+  return veTodoGi(usuario);
+}
+
 /// **Quién ve la pantalla de Procesos** (`/administracion/procesos`), la que se
 /// revisa en la reunión de pastores de los miércoles.
 ///
@@ -238,6 +271,8 @@ export const obtenerUsuarioActual = cache(
         canMentor: true,
         coordinatesConsolidation: true,
         canSeeAllGroups: true,
+        canLeadGi: true,
+        coordinatesGi: true,
         active: true,
         authUserId: true,
       },
@@ -279,6 +314,8 @@ export const obtenerUsuarioActual = cache(
       canMentor: registro.canMentor,
       coordinaConsolidacion: registro.coordinatesConsolidation,
       veTodosLosGrupos: registro.canSeeAllGroups,
+      llevaGi: registro.canLeadGi,
+      coordinaGi: registro.coordinatesGi,
     };
 
     return {

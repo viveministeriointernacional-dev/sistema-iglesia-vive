@@ -70,6 +70,8 @@ type Cuenta = {
   canMentor: boolean;
   coordinatesConsolidation: boolean;
   canSeeAllGroups: boolean;
+  canLeadGi: boolean;
+  coordinatesGi: boolean;
 };
 
 export type BajaInfo = { motivo: string | null; fecha: string; por: string };
@@ -377,6 +379,8 @@ function PermisosCampos({
   canMentor: boolean;
     coordinatesConsolidation: boolean;
     canSeeAllGroups: boolean;
+    canLeadGi: boolean;
+    coordinatesGi: boolean;
   };
   onChange: (parcial: Partial<typeof valores>) => void;
 }) {
@@ -433,6 +437,16 @@ function PermisosCampos({
           onChange={(v) => onChange({ canSeeAllGroups: v })}
         />
         <Interruptor
+          etiqueta="Lleva GI (marca el devocional de sus jóvenes)"
+          activo={valores.canLeadGi}
+          onChange={(v) => onChange({ canLeadGi: v })}
+        />
+        <Interruptor
+          etiqueta="Coordina GI (pastor del movimiento juvenil)"
+          activo={valores.coordinatesGi}
+          onChange={(v) => onChange({ coordinatesGi: v })}
+        />
+        <Interruptor
           etiqueta="Cuenta activa"
           activo={valores.active}
           onChange={(v) => onChange({ active: v })}
@@ -452,6 +466,8 @@ function SeccionRol({ cuenta }: { cuenta: Cuenta }) {
     canMentor: cuenta.canMentor,
     coordinatesConsolidation: cuenta.coordinatesConsolidation,
     canSeeAllGroups: cuenta.canSeeAllGroups,
+    canLeadGi: cuenta.canLeadGi,
+    coordinatesGi: cuenta.coordinatesGi,
   });
   const [estado, setEstado] = useState<null | EstadoAviso>(null);
   const [guardando, iniciar] = useTransition();
@@ -640,6 +656,8 @@ function SeccionCrearAcceso({ personId }: { personId: string }) {
     canMentor: false,
     coordinatesConsolidation: false,
     canSeeAllGroups: false,
+    canLeadGi: false,
+    coordinatesGi: false,
   });
   const [estado, setEstado] = useState<null | EstadoAviso>(null);
   const [guardando, iniciar] = useTransition();
