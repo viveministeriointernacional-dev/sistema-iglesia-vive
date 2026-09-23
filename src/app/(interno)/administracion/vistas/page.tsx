@@ -57,6 +57,8 @@ export default async function PaginaVistas() {
           canMentor: false,
           coordinaConsolidacion: false,
           veTodosLosGrupos: false,
+          llevaGi: false,
+          coordinaGi: false,
         });
     }
   }

@@ -170,6 +170,13 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 - **Indicadores de carga** al navegar (`(interno)/loading.tsx`).
 - **1 sola conexión de BD por petición** (`PrismaPg max:1`) para no agotar el
   pooler de Supabase (evita errores 1102 / «max clients»).
+- **GI · Generación Imparable**: permisos `can_lead_gi` / `coordinates_gi`,
+  reparto de jóvenes (`gi_assignment`), devocional diario (`gi_devotional`) y
+  observaciones (`gi_note`). Pantallas `/gi` y `/gi/[id]`. **GI no cambia la
+  línea de mentoría de nadie**, y solo marca el líder de GI.
+- **La red dice quién reúne**: el árbol de «Mi red» enseña en cada renglón los
+  grupos que esa persona lleva, a cuántos reúne y si es líder de GI, **sin
+  cambiar de quién cuelga nadie**.
 - **Tablero de llamadas** (solo ADMIN): tabla `call_log`, webhook, y
   `/administracion/llamadas` (global + por persona + historial individual con «A
   quién se llamó»). Libs: `src/lib/llamadas.ts`, `src/lib/llamada-highlevel.ts`.
@@ -279,6 +286,131 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 - Validar deploy sin credenciales: `npx wrangler deploy --dry-run --outdir /tmp/x`
 
 ## 12. Bitácora (añadir lo nuevo arriba)
+
+- **2026-09-23** — **GI · Generación Imparable, y la red que enseña quién
+  reúne** (pedido del usuario, dos cosas en un mismo mensaje; mockup aprobado:
+  claude.ai/artifact/JvvTDBFb1a3zVMFqCH429c).
+  **Lo que pidió:** (1) GI, el movimiento juvenil que llevan los pastores **Juan
+  Camilo Torres y Juliana Facundo**, con líderes de GI que tienen jóvenes
+  asignados y un **devocional diario en forma de checklist**, con observación
+  opcional, visible para los pastores de GI «y obviamente el mentor o pastor
+  asignado de esa línea»; (2) que la red muestre a los **mentores de mentores**:
+  «el pastor Juan Felipe Carvajal tiene a Harold Narváez, y Harold a su vez está
+  liderando una casa de fe… debajo de Harold están estas dos personas, pero
+  hacen parte de la red del pastor Felipe».
+  **Cuatro decisiones del usuario, elegidas con `AskUserQuestion`:**
+  **(1) calendario día por día**, no una racha; **(2) marca SOLO el líder de
+  GI**; **(3) en la red, cada persona sigue colgando de su mentor y el grupo se
+  ve como DATO**; **(4) la asistencia a los eventos juveniles queda para una
+  segunda vuelta.**
+  - Migración `20260923150000_generacion_imparable`: `app_user.can_lead_gi` y
+    `.coordinates_gi`, más **`gi_assignment`**, **`gi_devotional`** y
+    **`gi_note`**. Catálogo puro **`gi-catalogo.ts`** (14 pruebas), núcleo
+    **`gi.ts`**, pantallas **`/gi`** y **`/gi/[id]`**.
+  - **⚠️ LA DECISIÓN QUE SOSTIENE TODO: GI NO CAMBIA LA LÍNEA DE NADIE.**
+    Mariana Valentina Narváez es **líder de GI** y sigue siendo **discípula de
+    Paola Viveros**. Por eso es una tabla aparte y no un campo en
+    `mentor_relationship`, y por eso la pantalla de los pastores enseña además
+    **los mismos jóvenes repartidos por línea de mentoría**: si no se dijera,
+    cualquiera leería GI como una segunda jerarquía.
+  - **⚠️ EL ALCANCE DE UN LÍDER DE GI NO ES SU RAMA, y esto es lo que habría
+    quedado roto sin mirarlo:** un líder de GI acompaña a jóvenes **de otras
+    líneas**. Si el alcance fuera solo `ramaDeLaRed`, Mariana no vería a la
+    mitad de su propio grupo. `alcanceDeGi` suma **la rama Y los suyos**.
+  - **⚠️ MARCA SOLO EL LÍDER DE GI, y hay un dato que lo obliga: de los 18
+    jóvenes entre 13 y 26 años, SOLO MARIANA TIENE CUENTA.** Un checklist que
+    llenara el joven no lo llenaría nadie. El mentor y el pastor de la línea
+    **ven y no marcan** (`accesoAGi` devuelve `puedeVer` / `puedeMarcar` por
+    separado): quien habla con el joven todos los días es su líder, y dos
+    personas marcando lo mismo desde sitios distintos vuelven el dato inútil.
+  - **⚠️ UN DÍA QUE NO HA LLEGADO NO SE PUEDE MARCAR**, y se comprueba **en el
+    servidor** además de en la pantalla. Sin eso, el domingo por la mañana se
+    podría dejar marcada la semana entera y el conteo diría que el movimiento va
+    al 100 % por un clic. Por lo mismo **el denominador son los días que ya
+    pasaron**: «11 de 15» el miércoles, no «11 de 35».
+  - **⚠️ SI HOY NO ESTÁ MARCADO TODAVÍA, LA RACHA NO SE CORTA.** Marcar lo hace
+    el líder, casi siempre por la tarde; cortarla a las 7 de la mañana diría que
+    alguien falló cuando lo único que pasó es que el día no ha terminado.
+  - **⚠️ LA OBSERVACIÓN VIVE APARTE DEL DEVOCIONAL** (`gi_note`, no una columna
+    de `gi_devotional`), por el caso que es el normal y no el raro: el joven que
+    esta semana **no marcó ni un día** y sobre el que el líder sí tiene algo que
+    decir («está en exámenes, retoma el jueves»). Si colgara de la marca, para
+    escribirla habría que marcar un devocional que no se hizo.
+  - **⚠️ EL DEVOCIONAL DIARIO NO SE AUDITA, a propósito y medido:** son 18
+    jóvenes × 7 días, **más de 120 movimientos por semana**, y ahogarían
+    «Actividad del día» —que tiene 2 290 filas desde agosto— hasta dejarla
+    inservible. Cada marca ya guarda sola **quién** y **cuándo**
+    (`marked_by_id`, `marked_at`). Lo que sí se audita es **entrar y salir del
+    movimiento** (`gi.joven_asignado` / `gi.joven_quitado`, con su `case` en
+    `actividad.ts`).
+  - **⚠️ `router.refresh()` en cada marca**, la regla del 11-sep: marcar un
+    devocional **no mueve la tarjeta de sitio**, así que sin repintar el líder
+    pulsa, no ve cambiar nada y vuelve a pulsar. Y se pinta **antes** de que
+    conteste el servidor (si falla, se devuelve como estaba y se dice por qué):
+    esperar medio segundo por cada uno de 35 cuadros haría la pantalla pesada.
+  - **Las fechas son CIVILES «AAAA-MM-DD» de punta a punta**, nunca `Date`:
+    `day` es `@db.Date` y se ancla al **mediodía de Colombia** al guardar. A
+    medianoche UTC son las 7 de la tarde del día anterior en Neiva, y el
+    devocional del martes quedaría como el del lunes.
+  - **La vista «GI» entra en el configurador** (`vistas-catalogo.ts`) y es **la
+    única cuyo defecto no reconstruye nada**: GI no existía antes, así que ese
+    renglón es una decisión y no una foto. Se dice en el comentario y en la
+    prueba, para que nadie lo lea como las otras doce.
+  - **⚠️ GI LA ABRE EL PERMISO, NO EL ROL**, y el caso real lo exige: la líder
+    de GI es una **joven de 14 años con cuenta de LÍDER DE ALPHA**. Si dependiera
+    del rol, quien marca el devocional de cinco jóvenes no vería la pantalla
+    donde se marca. Prueba propia para eso.
+
+  **La red — «quién reúne a quién»:**
+  - `NodoDeRed` gana **`reune`** (los Alpha y Casas de Fe que lleva, como líder
+    **o como encargada**, con cuánta gente reúne), **`enElGrupoDe`** y
+    **`giACargo`**. Las tres salen de **UN solo `$transaction`**, que es un solo
+    viaje al pooler: con `PrismaPg max:1` tres consultas sueltas serían tres
+    latencias en fila.
+  - **⚠️ NADIE CAMBIA DE SITIO EN EL ÁRBOL** (decisión del usuario). Un árbol
+    donde los miembros de una Casa de Fe colgaran de su líder rompería la
+    pregunta que el árbol contesta —quién acompaña a quién— y pondría a la misma
+    persona en dos sitios. **Medido: de 29 inscripciones vivas (Casa de Fe +
+    Alpha), 19 las lleva alguien que NO es su mentor.**
+  - **⚠️ EL DISTINTIVO «VA A …» SOLO SALE CUANDO NO LO LLEVA SU PROPIO MENTOR.**
+    Si lo llevara él, el renglón ya cuelga de esa persona y repetirlo sería
+    ruido. Se compara por **id de cuenta**, no por nombre.
+  - **⚠️ LO QUE NO ABRE, NO SE ENSEÑA COMO ENLACE** (la regla del 16-sep al
+    revés): «Lleva …» sí es enlace —ese grupo lo lleva alguien de la rama de
+    quien mira, así que su ficha le abre—, pero **«Va a …» y «Líder de GI» son
+    texto**: el grupo puede estar fuera de su alcance y la pantalla de GI puede
+    estar apagada para él, y un enlace que lleva a «no tienes permiso» es peor
+    que ningún enlace.
+  - Resumen nuevo **«EN ESTA LÍNEA, QUIÉN REÚNE»** con tres cuentas. **Medido
+    hoy: 11 cuentas reúnen a alguien** en un Alpha o una Casa de Fe.
+  - **El caso del pedido, comprobado contra la base:** «Casa de fe Oscar &
+    Dana», la lleva **Hárold Narváez**; **Oscar Enrique Hurtado** es de la línea
+    de Juan Felipe Carvajal y **Dana Pere** de la de Paola Viveros. Los dos
+    siguen colgando de sus pastores, y ahora el renglón de Harold dice que
+    **reúne a 2** y el de cada uno, de qué casa es.
+
+  - **⚠️ ACCIÓN DEL USUARIO, después del despliegue** (nada de esto se aplicó
+    por SQL a propósito: las columnas no existen hasta que el build corra la
+    migración, y así queda auditado quién lo concedió):
+    1. Administración → **Juan Camilo Torres** y **Juliana Facundo** → encender
+       **«Coordina GI (pastor del movimiento juvenil)»**.
+    2. Administración → **Mariana Valentina Narváez** → encender **«Lleva GI»**.
+    3. Entrar a **GI** → «Repartir jóvenes entre los líderes de GI» y asignarle
+       sus jóvenes. **Solo se puede poner de líder de GI a quien tenga cuenta.**
+  - Migración probada con `BEGIN … ROLLBACK` en la misma llamada, **repetida
+    entera**, y con **7 comprobaciones** (asigna, rechaza dos líderes vivos para
+    el mismo joven, deja reasignar al cerrar el anterior, rechaza el día marcado
+    dos veces, acepta el mismo día en otro joven, acepta observación sin
+    devocional, y la FK rechaza a un joven inexistente). Producción quedó en
+    **0 tablas y 0 columnas**.
+  - **Probado al revés**, que es lo que hace valer una prueba: se cambió
+    `esDiaFuturo` a `>=` y se ancló la racha solo en hoy; **fallaron exactamente
+    las cuatro pruebas que debían**, y al restaurar, verde.
+  - `tsc`, eslint, **103/103 pruebas** (87 + 14 de GI + 2 de vistas) y
+    `npm run cf:build` en verde.
+  - **Lo que NO se hizo, y es la segunda vuelta que el usuario aplazó:** el
+    control de asistencia a los eventos juveniles. Se apoyará en el modelo
+    `Event`, que ya existe.
 
 - **2026-09-22** — **Los encargados quedaron VIVOS (PR #93 fusionado), y el
   equipo los estrenó a los CUATRO MINUTOS.**

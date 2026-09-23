@@ -27,7 +27,7 @@ export const TIPOS_DE_ACTIVIDAD: { valor: TipoActividad; etiqueta: string }[] = 
   { valor: "op72", etiqueta: "Operación 72" },
   { valor: "personas", etiqueta: "Personas" },
   { valor: "mentoria", etiqueta: "Mentoría y fases" },
-  { valor: "grupos", etiqueta: "Grupos (Alpha · Casa de Fe)" },
+  { valor: "grupos", etiqueta: "Grupos (Alpha · Casa de Fe · GI)" },
   { valor: "eventos", etiqueta: "Eventos y Escuela" },
   { valor: "accesos", etiqueta: "Accesos y permisos" },
   { valor: "crm", etiqueta: "HighLevel" },
@@ -886,6 +886,25 @@ export async function cargarActividad(
           b(texto(m.encargado) ?? "alguien"),
           t(" en "),
           b(nombreDelGrupo(fila)),
+        ];
+        break;
+      }
+
+      case "gi.joven_asignado":
+      case "gi.joven_quitado": {
+        // GI vive en el mismo cajón que los grupos: es la otra forma en que la
+        // iglesia reúne gente. El devocional diario NO entra aquí a propósito
+        // (más de 120 marcas por semana ahogarían esta pantalla): lo que se
+        // registra es la entrada y la salida del movimiento.
+        const salio = fila.action.endsWith("quitado");
+        tipo = "grupos"; etiqueta = "GI"; tono = salio ? "ambar" : "verde";
+        frase = [
+          A(),
+          t(salio ? " sacó de GI a " : " puso en GI a "),
+          b(texto(m.joven) ?? "alguien"),
+          ...(texto(m.lider)
+            ? [t(salio ? " · lo llevaba " : " · lo lleva "), b(texto(m.lider)!)]
+            : []),
         ];
         break;
       }

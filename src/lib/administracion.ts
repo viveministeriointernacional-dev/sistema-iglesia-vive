@@ -552,6 +552,8 @@ export async function cargarPersonaAdmin(personId: string) {
           canMentor: true,
           coordinatesConsolidation: true,
           canSeeAllGroups: true,
+          canLeadGi: true,
+          coordinatesGi: true,
         },
       },
     },

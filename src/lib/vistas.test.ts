@@ -18,6 +18,8 @@ function perfil(role: Role, extra: Partial<PerfilParaVistas> = {}): PerfilParaVi
     canMentor: false,
     coordinaConsolidacion: false,
     veTodosLosGrupos: false,
+    llevaGi: false,
+    coordinaGi: false,
     ...extra,
   };
 }
@@ -30,13 +32,19 @@ function perfil(role: Role, extra: Partial<PerfilParaVistas> = {}): PerfilParaVi
 /// antes del cambio: `tieneRed`, `puedeOperarOperacion72`, `ROLES_CONSOLIDACION`,
 /// `puedeVerAlpha`/`puedeVerCasaDeFe`, `ROLES_ENTRENAR`, `ROLES_OPERAN_EVENTOS`,
 /// `puedeVerProcesos` y `ROLES_ADMIN`.
+///
+/// ⚠️ **«gi» es la única excepción, y hay que decirlo: no reconstruye nada.**
+/// GI no existía en la plataforma antes del 23-sep-2026, así que su renglón es
+/// una decisión (quien acompaña una línea la ve) y no una foto del pasado. Lo
+/// demás de esta tabla sí sale de leer los predicados viejos.
 const LO_QUE_VEIA_CADA_ROL: Record<Role, VistaId[]> = {
   [Role.APRENDIZ]: ["mi-proceso"],
   [Role.CONSOLIDADOR]: ["operacion-72", "registro-interno", "eventos"],
   [Role.LIDER_ALPHA]: ["eventos"],
-  [Role.MENTOR]: ["mi-red", "grupos", "escuela", "eventos"],
+  [Role.MENTOR]: ["mi-red", "gi", "grupos", "escuela", "eventos"],
   [Role.PASTOR]: [
     "mi-red",
+    "gi",
     "registro-interno",
     "grupos",
     "escuela",
@@ -45,6 +53,7 @@ const LO_QUE_VEIA_CADA_ROL: Record<Role, VistaId[]> = {
   ],
   [Role.ADMIN]: [
     "mi-red",
+    "gi",
     "operacion-72",
     "registro-interno",
     "grupos",
@@ -154,5 +163,29 @@ test("apagarlo todo deja la barra vacía, sin reventar", () => {
       porCuenta: [],
     }),
     [],
+  );
+});
+
+test("⚠️ GI la abre el permiso, no el rol: su líder es una joven con cuenta de Alpha", () => {
+  // El caso real: Mariana Valentina Narváez, 14 años, líder de GI y con cuenta
+  // de LÍDER DE ALPHA. Si GI dependiera del rol, la persona que marca el
+  // devocional de cinco jóvenes no vería la pantalla donde se marca.
+  assert.equal(porDefecto("gi", perfil(Role.LIDER_ALPHA)), false);
+  assert.equal(porDefecto("gi", perfil(Role.LIDER_ALPHA, { llevaGi: true })), true);
+  assert.equal(
+    porDefecto("gi", perfil(Role.CONSOLIDADOR, { coordinaGi: true })),
+    true,
+  );
+});
+
+test("GI se puede apagar desde el configurador aunque lleve el permiso", () => {
+  // Es la regla de siempre: en cuanto hay una fila configurada, manda la fila.
+  // Si el permiso la abriera igual, el interruptor estaría mintiendo.
+  assert.equal(
+    vistaHabilitada("gi", perfil(Role.LIDER_ALPHA, { llevaGi: true }), {
+      porRol: [{ view: "gi", role: Role.LIDER_ALPHA, enabled: false }],
+      porCuenta: [],
+    }),
+    false,
   );
 });

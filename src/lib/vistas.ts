@@ -24,6 +24,8 @@ export type PerfilParaVistas = {
   canMentor: boolean;
   coordinaConsolidacion: boolean;
   veTodosLosGrupos: boolean;
+  llevaGi: boolean;
+  coordinaGi: boolean;
 };
 
 export type FilaDeVistaPorRol = { view: string; role: Role; enabled: boolean };

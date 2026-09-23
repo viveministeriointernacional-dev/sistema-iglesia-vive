@@ -28,6 +28,28 @@ export type IndicadoresDeRed = {
   nuevas: number;
 };
 
+/// **Un grupo que alguien lleva**, para el renglón del árbol. Con cuánta gente
+/// reúne: es el dato que convierte «Hárold, discípulo de Juan Felipe» en
+/// «Hárold, que además reúne a dos personas cada semana».
+export type GrupoQueReune = {
+  tipo: "alpha" | "casa-de-fe";
+  id: string;
+  nombre: string;
+  personas: number;
+};
+
+/// **Un grupo al que alguien ASISTE**, llevado por otra persona.
+export type GrupoAlQueVa = {
+  tipo: "alpha" | "casa-de-fe";
+  id: string;
+  nombre: string;
+  lider: string;
+  /// La CUENTA de quien lo lleva. Hace falta en id y no solo en nombre para
+  /// poder responder «¿lo reúne su propio mentor, o alguien de otra línea?»
+  /// sin comparar cadenas de texto.
+  liderId: string;
+};
+
 export type NodoDeRed = {
   /// `learnerId` cuando la persona tiene expediente; nulo para un líder que
   /// nunca fue registrado como aprendiz (el pastor fundador, por ejemplo).
@@ -43,6 +65,21 @@ export type NodoDeRed = {
   /// Todo lo que cuelga de esta persona, sin contarla a ella.
   enLaRed: number;
   indicadores: IndicadoresDeRed;
+  /// Los Alpha y Casas de Fe que lleva —como líder o como encargada—, con
+  /// cuánta gente reúne en cada uno.
+  ///
+  /// ⚠️ **Esto NO cambia de quién cuelga nadie**, y esa fue la decisión del
+  /// usuario (23-sep-2026): cada persona sigue colgando de su mentor y el
+  /// grupo se ve como un dato en su renglón. Un árbol donde los miembros de
+  /// una Casa de Fe colgaran de su líder rompería la pregunta que el árbol
+  /// contesta —quién acompaña a quién— y dejaría a la misma persona en dos
+  /// sitios cuando su mentor y su líder de grupo son distintos, que hoy es el
+  /// caso de 9 de los 20 miembros de Casa de Fe.
+  reune: GrupoQueReune[];
+  /// Los grupos a los que va, llevados por otra persona.
+  enElGrupoDe: GrupoAlQueVa[];
+  /// Cuántos jóvenes acompaña en GI.
+  giACargo: number;
   hijos: NodoDeRed[];
 };
 
@@ -132,6 +169,89 @@ export async function cargarArbol(usuario: UsuarioSesion, ahora = new Date()) {
     }),
     prisma.operation72.findMany({ select: { id: true, learnerId: true } }),
   ]);
+
+  // **Quién reúne a quién.** Los tres van en UN solo `$transaction`, que es un
+  // solo viaje al pooler: con `PrismaPg max: 1` tres consultas sueltas serían
+  // tres latencias en fila (la regla del 7-sep-2026).
+  const [casas, alphas, giPorLider] = await prisma.$transaction([
+    prisma.faithHouseGroup.findMany({
+      where: { closedAt: null },
+      select: {
+        id: true,
+        name: true,
+        leaderId: true,
+        coLeaders: { select: { userId: true } },
+        members: { select: { learnerId: true } },
+      },
+    }),
+    prisma.alphaProgram.findMany({
+      where: { closedAt: null },
+      select: {
+        id: true,
+        name: true,
+        leaderId: true,
+        coLeaders: { select: { userId: true } },
+        enrollments: { select: { learnerId: true } },
+      },
+    }),
+    // Se cuentan en memoria y no con un `groupBy`: son unas decenas de filas,
+    // y así cabe en el mismo `$transaction` sin pelear con los tipos.
+    prisma.giAssignment.findMany({
+      where: { endedAt: null },
+      select: { leaderId: true },
+    }),
+  ]);
+
+  const nombrePorCuenta = new Map(usuarios.map((u) => [u.id, u.fullName]));
+  const giACargoPorCuenta = new Map<string, number>();
+  for (const fila of giPorLider) {
+    giACargoPorCuenta.set(
+      fila.leaderId,
+      (giACargoPorCuenta.get(fila.leaderId) ?? 0) + 1,
+    );
+  }
+
+  /// Los grupos que lleva cada cuenta: **el líder y sus encargados**, porque
+  /// desde el 21-sep-2026 un grupo lo puede llevar más de uno y el que no
+  /// figura como `leaderId` lo reúne igual.
+  const reunePorCuenta = new Map<string, GrupoQueReune[]>();
+  /// Y a la inversa: en qué grupo está cada expediente, con quién lo lleva.
+  const vaAlGrupoPorAprendiz = new Map<string, GrupoAlQueVa[]>();
+
+  function anotarGrupo(
+    tipo: "alpha" | "casa-de-fe",
+    grupo: {
+      id: string;
+      name: string;
+      leaderId: string;
+      coLeaders: { userId: string }[];
+    },
+    miembros: string[],
+  ) {
+    const dato: GrupoQueReune = {
+      tipo,
+      id: grupo.id,
+      nombre: grupo.name,
+      personas: miembros.length,
+    };
+    for (const cuenta of [grupo.leaderId, ...grupo.coLeaders.map((c) => c.userId)]) {
+      reunePorCuenta.set(cuenta, [...(reunePorCuenta.get(cuenta) ?? []), dato]);
+    }
+    const lider = nombrePorCuenta.get(grupo.leaderId) ?? "alguien";
+    for (const learnerId of miembros) {
+      vaAlGrupoPorAprendiz.set(learnerId, [
+        ...(vaAlGrupoPorAprendiz.get(learnerId) ?? []),
+        { tipo, id: grupo.id, nombre: grupo.name, lider, liderId: grupo.leaderId },
+      ]);
+    }
+  }
+
+  for (const casa of casas) {
+    anotarGrupo("casa-de-fe", casa, casa.members.map((m) => m.learnerId));
+  }
+  for (const alpha of alphas) {
+    anotarGrupo("alpha", alpha, alpha.enrollments.map((e) => e.learnerId));
+  }
 
   const op72PorAprendiz = new Map(operaciones.map((o) => [o.learnerId, o.id]));
   const ultimoIntento = new Map(contactos.map((c) => [c.operation72Id, c._max.occurredAt]));
@@ -247,6 +367,13 @@ export async function cargarArbol(usuario: UsuarioSesion, ahora = new Date()) {
         fase: aprendiz?.phase ?? null,
         estado: aprendiz?.status ?? null,
         alertas: aprendiz ? alertasDe(aprendiz) : [],
+        reune: reunePorCuenta.get(usuarioId) ?? [],
+        // Los grupos a los que VA cuelgan del expediente, no de la cuenta: un
+        // líder puede estar inscrito en la Casa de Fe de otro.
+        enElGrupoDe: aprendiz
+          ? (vaAlGrupoPorAprendiz.get(aprendiz.id) ?? [])
+          : [],
+        giACargo: giACargoPorCuenta.get(usuarioId) ?? 0,
       },
       aprendiz ? propios(aprendiz) : indicadoresVacios(),
       hijos,
@@ -277,6 +404,11 @@ export async function cargarArbol(usuario: UsuarioSesion, ahora = new Date()) {
         fase: aprendiz.phase,
         estado: aprendiz.status,
         alertas: alertasDe(aprendiz),
+        // Sin cuenta no se puede llevar ningún grupo: los grupos se asignan a
+        // cuentas, no a expedientes.
+        reune: [],
+        enElGrupoDe: vaAlGrupoPorAprendiz.get(aprendiz.id) ?? [],
+        giACargo: 0,
       },
       propios(aprendiz),
       [],
