@@ -49,6 +49,31 @@ const cliente = new pg.Client({
 });
 await cliente.connect();
 
+// ⚠️ **Un `ALTER TABLE` sobre una tabla viva puede quedarse esperando para
+// siempre.** `app_user` se lee en CADA petición del sitio, así que añadirle una
+// columna —que pide un candado exclusivo— se queda en la cola detrás de
+// cualquier consulta en curso, y detrás de ese ALTER se encola todo lo demás.
+// Fue lo que tumbó el despliegue del 23-sep-2026: la migración se fusionó a las
+// 3 de la tarde, con el equipo trabajando.
+//
+// Con `lock_timeout` la migración **falla rápido en vez de colgarse**, y el
+// reintento de abajo la vuelve a probar cuando el momento esté libre. Sin esto,
+// el build se queda pegado y de paso frena al resto del sitio.
+await cliente.query("SET lock_timeout = '15s'");
+// Una migración de este proyecto son milisegundos de trabajo real; si una pasa
+// de dos minutos es que está esperando algo, no trabajando.
+await cliente.query("SET statement_timeout = '120s'");
+
+/// Errores que NO son culpa del SQL: el candado estaba ocupado. Se reintentan.
+const REINTENTABLES = new Set([
+  "55P03", // lock_not_available
+  "40P01", // deadlock_detected
+  "40001", // serialization_failure
+  "57014", // query_canceled (statement_timeout)
+]);
+
+const espera = (ms) => new Promise((r) => setTimeout(r, ms));
+
 try {
   await cliente.query(`
     CREATE TABLE IF NOT EXISTS app_migration (
@@ -68,23 +93,62 @@ try {
     );
   }
 
+  const INTENTOS = 4;
   let ejecutadas = 0;
+
   for (const nombre of nuevas) {
     if (aplicadas.has(nombre)) continue;
     const sql = await readFile(join(CARPETA, nombre, "migration.sql"), "utf8");
-    console.log(`[migrar] Aplicando ${nombre}…`);
-    await cliente.query("BEGIN");
-    try {
-      await cliente.query(sql);
-      await cliente.query("INSERT INTO app_migration (name) VALUES ($1)", [nombre]);
-      await cliente.query("COMMIT");
-      ejecutadas += 1;
-    } catch (error) {
-      await cliente.query("ROLLBACK");
-      console.error(`[migrar] FALLÓ ${nombre}:`, error instanceof Error ? error.message : error);
-      process.exitCode = 1;
-      break;
+
+    let aplicada = false;
+    for (let intento = 1; intento <= INTENTOS && !aplicada; intento += 1) {
+      console.log(
+        `[migrar] Aplicando ${nombre}…${intento > 1 ? ` (intento ${intento} de ${INTENTOS})` : ""}`,
+      );
+      await cliente.query("BEGIN");
+      try {
+        await cliente.query(sql);
+        await cliente.query("INSERT INTO app_migration (name) VALUES ($1)", [nombre]);
+        await cliente.query("COMMIT");
+        ejecutadas += 1;
+        aplicada = true;
+      } catch (error) {
+        await cliente.query("ROLLBACK");
+
+        // ⚠️ **El mensaje solo NO alcanza para diagnosticar.** El 23-sep-2026
+        // el log dijo «FALLÓ …:» y ahí se acabó: sin código, sin detalle, sin
+        // la instrucción culpable. Costó una noche. El código SQLSTATE dice de
+        // un vistazo si fue el SQL (42601 sintaxis), los permisos (42501) o un
+        // candado ocupado (55P03), que son problemas muy distintos.
+        const codigo = error?.code ? ` [${error.code}]` : "";
+        const mensaje = error instanceof Error ? error.message : String(error);
+        console.error(`[migrar] FALLÓ ${nombre}${codigo}: ${mensaje}`);
+        for (const [rotulo, valor] of [
+          ["detalle", error?.detail],
+          ["pista", error?.hint],
+          ["dónde", error?.where],
+          ["instrucción", error?.internalQuery],
+        ]) {
+          if (valor) console.error(`[migrar]   ${rotulo}: ${valor}`);
+        }
+
+        if (REINTENTABLES.has(error?.code) && intento < INTENTOS) {
+          // La tabla estaba ocupada. Se espera cada vez un poco más: si hay una
+          // consulta larga en curso, insistir al instante solo la vuelve a
+          // encontrar ocupada.
+          const pausa = intento * 20_000;
+          console.error(
+            `[migrar]   La tabla estaba ocupada. Reintento en ${pausa / 1000} s.`,
+          );
+          await espera(pausa);
+          continue;
+        }
+
+        process.exitCode = 1;
+        break;
+      }
     }
+    if (process.exitCode) break;
   }
   if (!process.exitCode) {
     console.log(

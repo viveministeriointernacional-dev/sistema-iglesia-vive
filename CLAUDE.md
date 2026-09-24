@@ -287,6 +287,56 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-24** — **⚠️ EL BUILD DEL PR #94 FALLÓ EN LA MIGRACIÓN Y TUVO EL SITIO
+  SIN ACTUALIZAR 9 HORAS. La causa es un CANDADO, no el SQL — y la lección es
+  que el log no lo decía.**
+  El usuario fusionó a las **3:01 p. m.** y a las 3:06 no había entrado nada.
+  Comprobado con la receta de siempre: `git log --oneline origin/main..origin/<rama>`
+  **vacío** (el merge sí entró completo), pero **0 tablas de GI en la base** y
+  producción sirviendo todavía `10b5oaxhj-3n_.css`, el archivo del PR #93.
+  A las **4 horas** el estado era idéntico. El log de Cloudflare decía:
+  `[migrar] FALLÓ 20260923150000_generacion_imparable:` **y nada más**.
+  **⚠️ LO PRIMERO QUE HAY QUE SABER: LOS REGISTROS DE POSTGRES DE ESTE PROYECTO
+  NO SIRVEN PARA ESTO.** Se consultaron con `query_logs` las 10 h alrededor del
+  fallo: **63 filas en `postgres_logs` y las 63 son puntos de control**
+  (checkpoints). **Cero ERROR, cero FATAL.** El pooler (`supavisor_logs`, 6 153
+  filas) solo tiene «Terminate received from client», que es lo normal. O sea:
+  **cuando una migración falla, el error NO queda en la base. Vive únicamente
+  en el log del build de Cloudflare.**
+  **La causa, y encaja con todo lo medido: `ALTER TABLE "app_user" ADD COLUMN`
+  pide un candado EXCLUSIVO sobre la tabla que el sistema lee en CADA
+  petición** (`obtenerUsuarioActual`, §7). A las 3 de la tarde, con el equipo
+  trabajando, ese ALTER se encola detrás de las consultas vivas y muere
+  esperando. **Mi prueba con `BEGIN … ROLLBACK` había pasado dos veces** — pero
+  la corrí en un rato tranquilo, así que **probar la migración NO prueba que
+  vaya a poder tomar el candado el día del merge**.
+  **Arreglado en dos partes:**
+  1. **La migración se aplicó a mano a las 00:27 hora Colombia**, con el sitio
+     en silencio: 3 tablas, 2 columnas, 8 índices y 7 claves foráneas, y el
+     renglón metido en `app_migration` **en la misma transacción**, para que el
+     próximo build la vea hecha y pase de largo.
+  2. **`scripts/migrar.mjs` endurecido** (PR #95): `SET lock_timeout = '15s'` y
+     `statement_timeout = '120s'` para que **falle rápido en vez de colgarse**
+     —colgado, el ALTER frena además al resto del sitio—, **4 intentos con
+     espera creciente** (20 s, 40 s, 60 s) cuando el error es de candado
+     (`55P03`, `40P01`, `40001`, `57014`), y sobre todo **el log ahora imprime
+     el SQLSTATE y el detalle**: `[migrar] FALLÓ <nombre> [55P03]: …` más
+     detalle, pista, dónde e instrucción. Un `42601` es sintaxis, un `42501` es
+     permisos y un `55P03` es la tabla ocupada — tres problemas que no se
+     parecen en nada y que el log de ayer no distinguía.
+  **REGLAS NUEVAS, y son tres:**
+  - **Una migración que toca una tabla caliente (`app_user`, `person`,
+    `learner_profile`) conviene fusionarla de noche.** No es superstición: es
+    la diferencia entre tomar el candado y morir esperando.
+  - **Probar la migración con `BEGIN … ROLLBACK` sigue siendo obligatorio, pero
+    NO garantiza el despliegue.** Comprueba el SQL, no la disponibilidad de la
+    tabla.
+  - **Si una migración falla, el único sitio donde está el error es el log del
+    build.** No perder tiempo buscándolo en Supabase: ahí no está.
+  **Y una que ya estaba escrita y volvió a valer:** que `main` avance no
+  significa que el despliegue entró. La huella del despliegue es el archivo CSS
+  que sirve el worker (regla del 21-sep).
+
 - **2026-09-23** — **GI · Generación Imparable, y la red que enseña quién
   reúne** (pedido del usuario, dos cosas en un mismo mensaje; mockup aprobado:
   claude.ai/artifact/JvvTDBFb1a3zVMFqCH429c).
