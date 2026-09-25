@@ -11,6 +11,7 @@ import {
 import { HITOS_EDITABLES } from "@/lib/administracion";
 import { auditar } from "@/lib/audit";
 import { darDeBajaAprendiz, resolverSolicitudDeBaja } from "@/lib/baja";
+import { devolverAProceso, marcarComoAsistente } from "@/lib/asistente";
 import { guardarLlaveMaestra, revocarLlaveMaestra } from "@/lib/llave-maestra";
 import { resolverDeclaracion } from "@/lib/liderazgo";
 import {
@@ -603,6 +604,67 @@ export async function darDeBaja(
     revalidatePath(`/administracion/${resultado.personId}`);
     revalidatePath("/administracion");
     revalidatePath("/administracion/bajas");
+    revalidatePath("/operacion-72");
+    return { ok: true };
+  });
+}
+
+/// **Deja a una persona como asistente de la iglesia**: viene, pero hoy no
+/// quiere entrar a ningún proceso.
+///
+/// ⚠️ **No es una baja, y la diferencia es la que hay que conservar.** La baja
+/// la saca del sistema y le apaga el acceso; esto no hace ninguna de las dos.
+/// Conserva expediente, acceso y todo lo que alcanzó. Lo único que cambia es
+/// que **sale del tablero y deja de contarle carga a su consolidador**: si
+/// siguiera contando, el equipo cargaría para siempre con gente a la que ya no
+/// hay que llamar.
+///
+/// Es el mismo camino que ya existía en el tablero de Operación 72 desde el
+/// 9-sep-2026 — aquí solo se abre la misma puerta desde la ficha, para la
+/// persona que ya salió del tablero y a la que nadie podía marcar.
+export async function marcarAsistente(
+  learnerId: string,
+  motivo: string,
+  nota: string,
+): Promise<ResultadoAdmin> {
+  return conAdmin(async (usuario) => {
+    const prisma = await getPrisma();
+    const resultado = await marcarComoAsistente(prisma, {
+      learnerId,
+      motivo,
+      nota,
+      actorId: usuario.id,
+    });
+    if (!resultado.ok) return resultado;
+
+    revalidatePath(`/administracion/${resultado.personId}`);
+    revalidatePath("/administracion");
+    revalidatePath("/administracion/asistentes");
+    revalidatePath("/operacion-72");
+    return { ok: true };
+  });
+}
+
+/// **La devuelve al proceso.** Es a «asistente» lo que «Reactivar» es a la
+/// baja: vuelve a estar activa y, si está en fase Ganar, vuelve al tablero con
+/// 72 horas nuevas contadas desde hoy — no desde su registro original, que
+/// venció hace meses.
+export async function volverAProceso(
+  learnerId: string,
+  nota: string,
+): Promise<ResultadoAdmin> {
+  return conAdmin(async (usuario) => {
+    const prisma = await getPrisma();
+    const resultado = await devolverAProceso(prisma, {
+      learnerId,
+      nota: nota.trim() || null,
+      actorId: usuario.id,
+    });
+    if (!resultado.ok) return resultado;
+
+    revalidatePath(`/administracion/${resultado.personId}`);
+    revalidatePath("/administracion");
+    revalidatePath("/administracion/asistentes");
     revalidatePath("/operacion-72");
     return { ok: true };
   });

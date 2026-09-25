@@ -6,6 +6,7 @@ import type { MilestoneKind, Phase, Role } from "@iglesia/prisma-client";
 import { FormularioDatosPersona } from "@/components/formulario-datos-persona";
 import type { DatosPersona } from "@/lib/persona";
 import { generarContrasena, LARGO_MINIMO_CONTRASENA } from "@/lib/contrasena";
+import { MOTIVOS_DE_ASISTENTE } from "@/lib/op72";
 import { GeneradorDeClave } from "@/components/generador-de-clave";
 import {
   alternarHito,
@@ -13,9 +14,11 @@ import {
   cambiarFase,
   crearAcceso,
   darDeBaja,
+  marcarAsistente,
   guardarDatosPersona,
   guardarRolYPermisos,
   reactivar,
+  volverAProceso,
   restablecerContrasena,
 } from "../acciones";
 
@@ -76,6 +79,14 @@ type Cuenta = {
 
 export type BajaInfo = { motivo: string | null; fecha: string; por: string };
 
+/// Lo que la persona dijo el día que se marcó como asistente. Nulo mientras no
+/// lo esté.
+export type AsistenteInfo = {
+  motivo: string | null;
+  nota: string | null;
+  desde: string | null;
+};
+
 export function EditorPersona({
   personId,
   learnerId,
@@ -87,6 +98,7 @@ export function EditorPersona({
   mentorActualId,
   estado,
   baja,
+  asistente,
 }: {
   personId: string;
   learnerId: string | null;
@@ -98,6 +110,7 @@ export function EditorPersona({
   mentorActualId: string | null;
   estado: string | null;
   baja: BajaInfo | null;
+  asistente: AsistenteInfo | null;
 }) {
   return (
     <div className="mt-6 flex flex-col gap-4">
@@ -124,6 +137,16 @@ export function EditorPersona({
           completados={hitosCompletados}
         />
       ) : null}
+      {/* ⚠️ Va ANTES de la baja a propósito: es la salida menos drástica de
+          las dos, y quien abre la ficha para «sacar» a alguien debe tropezarse
+          primero con la que conserva su acceso y su expediente. */}
+      {learnerId && estado !== "RETIRADO" ? (
+        <SeccionAsistente
+          learnerId={learnerId}
+          esAsistente={estado === "ASISTENTE"}
+          asistente={asistente}
+        />
+      ) : null}
       {learnerId ? (
         <SeccionBaja
           learnerId={learnerId}
@@ -132,6 +155,153 @@ export function EditorPersona({
         />
       ) : null}
     </div>
+  );
+}
+
+/// **Dejar a alguien como asistente de la iglesia**, y devolverlo al proceso.
+///
+/// Es el mismo camino que ya tenía el tablero de Operación 72 desde el
+/// 9-sep-2026, abierto ahora desde la ficha. Hacía falta por un caso concreto:
+/// **la persona que ya salió del tablero** —porque avanzó de fase o porque su
+/// Operación 72 se cerró— a la que nadie podía marcar desde ninguna parte.
+///
+/// ⚠️ No se muestra cuando la persona está **dada de baja**: primero hay que
+/// reactivarla. El núcleo lo rechaza igual, pero enseñar un botón que siempre
+/// va a fallar es peor que no enseñarlo.
+function SeccionAsistente({
+  learnerId,
+  esAsistente,
+  asistente,
+}: {
+  learnerId: string;
+  esAsistente: boolean;
+  asistente: AsistenteInfo | null;
+}) {
+  const router = useRouter();
+  const [motivo, setMotivo] = useState<string>(MOTIVOS_DE_ASISTENTE[0]);
+  const [nota, setNota] = useState("");
+  const [vuelta, setVuelta] = useState("");
+  const [estado, setEstado] = useState<null | EstadoAviso>(null);
+  const [ocupado, iniciar] = useTransition();
+
+  function ejecutarMarcar() {
+    iniciar(async () => {
+      const r = await marcarAsistente(learnerId, motivo, nota);
+      if (r.ok) {
+        setNota("");
+        setEstado(null);
+        router.refresh();
+      } else {
+        setEstado({ ok: false, texto: r.mensaje });
+      }
+    });
+  }
+
+  function ejecutarVolver() {
+    iniciar(async () => {
+      const r = await volverAProceso(learnerId, vuelta);
+      if (r.ok) {
+        setVuelta("");
+        setEstado(null);
+        router.refresh();
+      } else {
+        setEstado({ ok: false, texto: r.mensaje });
+      }
+    });
+  }
+
+  if (esAsistente) {
+    return (
+      <Tarjeta titulo="ASISTENTE DE LA IGLESIA">
+        <p className="text-[12.5px] leading-[1.5] font-medium text-[rgba(19,28,36,.7)]">
+          Asiste, pero hoy no quiere entrar a un proceso. Conserva su expediente
+          y su acceso; lo único que no aparece es en el tablero de Operación 72.
+        </p>
+        {asistente ? (
+          <div className="mt-3 rounded-[10px] bg-papel p-3 text-[12px] leading-[1.5] text-[rgba(19,28,36,.7)]">
+            {asistente.motivo ? (
+              <p>
+                <strong>Motivo:</strong> {asistente.motivo}
+              </p>
+            ) : null}
+            {asistente.nota ? <p className="mt-1">«{asistente.nota}»</p> : null}
+            {asistente.desde ? (
+              <p className="mt-1 text-[11.5px] text-[rgba(19,28,36,.5)]">
+                Desde el {asistente.desde}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+        <label className="mt-4 block">
+          <span className="etiqueta-campo">
+            ¿Qué la hizo volver al proceso? (opcional)
+          </span>
+          <textarea
+            className="campo campo-opcional"
+            rows={2}
+            value={vuelta}
+            onChange={(e) => setVuelta(e.target.value)}
+            placeholder="Qué cambió, con quién habló, por dónde retomar."
+          />
+          <span className="mt-[7px] block text-[11px] leading-[1.45] font-medium text-[rgba(19,28,36,.5)]">
+            Si está en fase Ganar, vuelve al tablero con 72 horas nuevas
+            contadas desde hoy.
+          </span>
+        </label>
+        <Aviso estado={estado} />
+        <button
+          type="button"
+          onClick={ejecutarVolver}
+          disabled={ocupado}
+          className="mt-4 cursor-pointer rounded-[9px] bg-azul-900 px-[15px] py-[11px] text-[12.5px] leading-none font-semibold text-white disabled:opacity-60"
+        >
+          {ocupado ? "Devolviendo…" : "Volver a proceso"}
+        </button>
+      </Tarjeta>
+    );
+  }
+
+  return (
+    <Tarjeta titulo="DEJAR COMO ASISTENTE">
+      <p className="mb-3 text-[12px] leading-[1.5] font-medium text-[rgba(19,28,36,.55)]">
+        Para quien viene a las reuniones pero hoy no quiere Alpha, ni Casa de
+        Fe, ni discipulado. <strong>No es una baja</strong>: conserva su
+        expediente, su acceso y todo lo que alcanzó. Sale del tablero y deja de
+        contarle carga a su consolidador, y se puede devolver al proceso cuando
+        quiera.
+      </p>
+      <Campo etiqueta="¿Por qué no quiere entrar a un proceso?">
+        <select
+          className="campo"
+          value={motivo}
+          onChange={(e) => setMotivo(e.target.value)}
+        >
+          {MOTIVOS_DE_ASISTENTE.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+        </select>
+      </Campo>
+      <Campo etiqueta="¿Qué te dijo?">
+        <textarea
+          className="campo"
+          rows={2}
+          value={nota}
+          onChange={(e) => setNota(e.target.value)}
+          placeholder="Con tus palabras: es lo que va a leer quien la busque dentro de un año."
+        />
+      </Campo>
+      <Aviso estado={estado} />
+      <button
+        type="button"
+        onClick={ejecutarMarcar}
+        disabled={ocupado}
+        className="mt-4 cursor-pointer rounded-[9px] border border-[rgba(19,28,36,.2)] bg-white px-[15px] py-[11px] text-[12.5px] leading-none font-semibold text-tinta disabled:opacity-60"
+      >
+        {ocupado ? "Guardando…" : "Dejar como asistente"}
+      </button>
+    </Tarjeta>
   );
 }
 
