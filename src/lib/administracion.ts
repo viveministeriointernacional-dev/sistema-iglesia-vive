@@ -524,6 +524,11 @@ export async function cargarPersonaAdmin(personId: string) {
           id: true,
           phase: true,
           status: true,
+          // Lo que la persona dijo el día que se marcó como asistente. Solo
+          // tiene valor mientras ese sea su estado.
+          attendeeSince: true,
+          attendeeReason: true,
+          attendeeNote: true,
           milestones: { select: { kind: true, status: true } },
           mentorRelationships: {
             where: { endedAt: null },
@@ -581,6 +586,14 @@ export async function cargarPersonaAdmin(personId: string) {
           por: ultimoCambioEstado.decidedBy.fullName,
         }
       : null,
+    asistente:
+      persona.learnerProfile?.status === LearnerStatus.ASISTENTE
+        ? {
+            motivo: persona.learnerProfile.attendeeReason,
+            nota: persona.learnerProfile.attendeeNote,
+            desde: persona.learnerProfile.attendeeSince,
+          }
+        : null,
     mentorActual:
       persona.learnerProfile?.mentorRelationships[0]?.mentor.fullName ?? null,
     mentorActualId:

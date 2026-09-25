@@ -287,6 +287,53 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-25** — **«Dejar como asistente» desde la ficha de Administración**
+  (pedido del usuario: «agregar la opción de dejar como asistente a una persona
+  desde administración así como está dar de baja»). Ajuste sobre una pantalla
+  que ya existe, así que **fue directo, sin mockup** (§2).
+  **⚠️ EL AGUJERO QUE TAPA, Y ESTÁ MEDIDO: había 131 personas a las que NADIE
+  podía marcar como asistente desde ninguna parte.** Marcar asistente solo
+  existía en la tarjeta del tablero de Operación 72 (9-sep-2026), así que en
+  cuanto alguien **salía del tablero** —porque avanzó de fase o porque su Op72
+  se cerró— la opción desaparecía. De **301 personas activas, 170 siguen en el
+  tablero y 131 ya no**: para esas 131, la única salida que ofrecía la ficha era
+  **darlas de baja**, que es otra cosa y apaga su acceso.
+  **Dato de paso: el estado ya se usa — hay 27 asistentes hoy.**
+  - **No se reescribió nada del núcleo.** `marcarComoAsistente` y
+    `devolverAProceso` (`src/lib/asistente.ts`) ya existían con sus reglas y su
+    auditoría; lo único nuevo son **dos acciones** en
+    `administracion/acciones.ts` (`marcarAsistente`, `volverAProceso`) con
+    `conAdmin` y sus `revalidatePath`, y **una sección** en la ficha.
+  - **⚠️ LA SECCIÓN VA ANTES DE «DAR DE BAJA», no después.** Es la salida menos
+    drástica de las dos, y quien abre la ficha para «sacar» a alguien tiene que
+    tropezarse primero con la que **conserva expediente y acceso**. El orden en
+    esa columna es la única forma de decirlo sin un cartel.
+  - **⚠️ NO SE MUESTRA SI LA PERSONA ESTÁ DADA DE BAJA.** El núcleo lo rechaza
+    igual —con el mensaje de «reactívala primero»— pero enseñar un botón que
+    siempre va a fallar es peor que no enseñarlo. Es la regla del 16-sep al
+    derecho: si se enseña, tiene que funcionar.
+  - **El motivo es la lista cerrada `MOTIVOS_DE_ASISTENTE`** (5 opciones, en
+    `op72.ts`), **no texto libre como el de la baja**. A propósito: el motivo
+    sirve para contar en el listado de asistentes, y si cada quien lo escribe a
+    su manera deja de poderse agrupar. La **nota sigue siendo obligatoria**
+    (mín. 10 caracteres): el motivo cuenta, la nota explica.
+  - **Se añade también «Volver a proceso»**, que es a «asistente» lo que
+    «Reactivar» es a la baja. Sin eso la ficha sabría meter pero no sacar, y
+    habría que ir hasta `/administracion/asistentes` para deshacerlo.
+  - `cargarPersonaAdmin` trae ahora `attendee_since/reason/note` y la ficha
+    **enseña lo que la persona dijo** cuando se la marcó — sin eso el estado
+    sería un rótulo sin explicación.
+  - **Arreglado de paso, en la misma pantalla:** la fecha de la baja se pintaba
+    con `toLocaleDateString` **sin zona horaria**, así que toda baja registrada
+    después de las 7 de la noche salía con la fecha del día siguiente. Ahora usa
+    `momentoCorto` (la regla del 8-sep-2026).
+  - **Sin migraciones**: el estado `ASISTENTE` y sus tres columnas existen desde
+    el 9-sep. `tsc`, eslint, **103/103 pruebas** y `npm run cf:build` en verde.
+  - **Ojo al leer la bitácora:** la auditoría sigue llamándose
+    `operacion72.marcado_asistente` aunque ahora se dispare desde
+    Administración. Es la misma decisión, y renombrarla partiría en dos el
+    historial de los 27 que ya están marcados.
+
 - **2026-09-24** — **⚠️ EL BUILD DEL PR #94 FALLÓ EN LA MIGRACIÓN Y TUVO EL SITIO
   SIN ACTUALIZAR 9 HORAS. La causa es un CANDADO, no el SQL — y la lección es
   que el log no lo decía.**

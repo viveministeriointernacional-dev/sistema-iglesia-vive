@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requerirRol, ROLES_ADMIN } from "@/lib/auth";
 import { cargarPersonaAdmin } from "@/lib/administracion";
-import { nombreCompleto } from "@/lib/dominio";
+import { momentoCorto, nombreCompleto } from "@/lib/dominio";
 import { mentoresElegibles } from "@/lib/equipo";
 import { getPrisma } from "@/lib/prisma";
 import { cargarDeclaracionPendiente } from "@/lib/liderazgo";
@@ -185,12 +185,23 @@ export default async function PaginaPersonaAdmin({
             persona.baja
               ? {
                   motivo: persona.baja.motivo,
-                  fecha: persona.baja.fecha.toLocaleDateString("es-CO", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  }),
+                  // `momentoCorto` y no `toLocaleDateString` a secas: es una
+                  // marca de tiempo real, y sin la zona de Colombia todo lo
+                  // registrado después de las 7 de la noche se pinta con la
+                  // fecha del día siguiente (la regla del 8-sep-2026).
+                  fecha: momentoCorto(persona.baja.fecha),
                   por: persona.baja.por,
+                }
+              : null
+          }
+          asistente={
+            persona.asistente
+              ? {
+                  motivo: persona.asistente.motivo,
+                  nota: persona.asistente.nota,
+                  desde: persona.asistente.desde
+                    ? momentoCorto(persona.asistente.desde)
+                    : null,
                 }
               : null
           }
