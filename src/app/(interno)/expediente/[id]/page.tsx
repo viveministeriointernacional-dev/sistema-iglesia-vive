@@ -15,6 +15,7 @@ import {
   momentoCorto,
 } from "@/lib/dominio";
 import { edadDesde } from "@/lib/op72";
+import { estadoDelTaller } from "@/lib/taller-catalogo";
 import {
   accesoAExpediente,
   calcularAlertas,
@@ -127,6 +128,29 @@ export default async function PaginaExpediente({
 
   // La evaluación y las notas del tema son privadas: solo viajan al navegador
   // de quien puede verlas.
+  const tallerDe = (topicId: string) => {
+    const w = expediente.faithHouseWorkshops.find((t) => t.topicId === topicId);
+    if (!w) return null;
+    const estado = estadoDelTaller(w.submittedAt, w.reviews);
+    return {
+      estado,
+      enviadoEl: w.submittedAt ? momentoCorto(w.submittedAt) : null,
+      notaDeLaRevision: w.reviews[0]?.note ?? null,
+      respuestas: [...w.answers]
+        .sort((a, b) => a.question.number - b.question.number)
+        .map((a) => ({
+          numero: a.question.number,
+          tipo: a.question.kind,
+          enunciado: a.question.prompt,
+          texto: a.text,
+          elegida:
+            a.question.kind === "OPCION" && a.choice !== null
+              ? (a.question.options[a.choice] ?? null)
+              : null,
+        })),
+    };
+  };
+
   const temasCasaDeFe: TemaCasaDeFe[] = expediente.temas.map((tema) => {
     const avance = expediente.faithHouseProgress.find(
       (a) => a.topic.number === tema.number,
@@ -144,6 +168,7 @@ export default async function PaginaExpediente({
       registradoPor: acceso.puedeVerNotas
         ? (avance?.recordedBy?.fullName ?? null)
         : null,
+      taller: tallerDe(tema.id),
     };
   });
 

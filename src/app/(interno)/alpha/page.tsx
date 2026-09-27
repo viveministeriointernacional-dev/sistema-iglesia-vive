@@ -18,6 +18,8 @@ import {
 } from "@/lib/casa-de-fe";
 import { diaISO, semanaDe } from "@/lib/reunion-catalogo";
 import { CalendarioSemanal, type GrupoDelCalendario } from "./calendario-semanal";
+import { PestanasDeGrupos } from "./pestanas";
+import { cargarPorRevisar } from "@/lib/taller";
 import { MiCalendario } from "./mi-calendario";
 import { NuevoGrupo } from "./nuevo-grupo";
 import { NuevaCasaDeFe } from "../casa-de-fe/nuevo-grupo";
@@ -141,6 +143,12 @@ export default async function PaginaAlpha({
       })),
   ];
 
+  // El contador de la pestaña. Sin él, un taller enviado se queda esperando
+  // sin que nadie sepa que llegó — y el equipo no vive dentro de la
+  // plataforma. Para quien administra o pastorea no cuesta ninguna consulta
+  // extra (ver el atajo de `puedeRevisarTaller`).
+  const porRevisar = (await cargarPorRevisar(usuario)).length;
+
   return (
     <main className="px-5 py-7 pb-16 sm:px-[26px]">
       <div className="mx-auto max-w-[1240px]">
@@ -156,31 +164,10 @@ export default async function PaginaAlpha({
             </p>
           </div>
 
-          {/* Mismo interruptor que «Mi red»: la vista viaja por la URL. */}
-          <div className="flex overflow-hidden rounded-[10px] border border-[rgba(19,28,36,.18)]">
-            <Link
-              href="/alpha"
-              aria-current={enCalendario ? undefined : "page"}
-              className={`px-4 py-[10px] text-[12.5px] leading-none ${
-                enCalendario
-                  ? "bg-white font-semibold text-[rgba(19,28,36,.55)]"
-                  : "bg-azul-900 font-bold text-white"
-              }`}
-            >
-              Listas
-            </Link>
-            <Link
-              href={conVista({})}
-              aria-current={enCalendario ? "page" : undefined}
-              className={`px-4 py-[10px] text-[12.5px] leading-none ${
-                enCalendario
-                  ? "bg-azul-900 font-bold text-white"
-                  : "bg-white font-semibold text-[rgba(19,28,36,.55)]"
-              }`}
-            >
-              Calendario
-            </Link>
-          </div>
+          <PestanasDeGrupos
+            activa={enCalendario ? "calendario" : "listas"}
+            porRevisar={porRevisar}
+          />
         </header>
 
         {enCalendario ? (

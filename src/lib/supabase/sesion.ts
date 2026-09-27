@@ -16,6 +16,11 @@ const RUTAS_PUBLICAS = [
   // El feed de calendario: los calendarios no saben iniciar sesión, así que el
   // token de la URL es lo único que autoriza (ver `calendario/[token]`).
   "/calendario",
+  // El taller de Casa de Fe: lo abre un QR pegado en una casa, y quien lo
+  // escanea NO tiene cuenta (el equipo de consolidacion y los miembros no
+  // entran a la plataforma, §6). El codigo de la URL es lo unico que autoriza,
+  // como el token del calendario.
+  "/taller",
 ];
 
 export function esRutaPublica(pathname: string) {

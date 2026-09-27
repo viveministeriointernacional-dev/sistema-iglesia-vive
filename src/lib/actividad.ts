@@ -830,6 +830,29 @@ export async function cargarActividad(
         tipo = "grupos"; etiqueta = "GRUPOS"; tono = "verde";
         frase = [A(), t(" actualizó el tema "), b(`${texto(m.tema) ?? ""} ${texto(m.nombre) ?? ""}`.trim()), t(" de "), P(), t(texto(m.estado) ? ` · ${texto(m.estado)}` : "")];
         break;
+      case "casa_de_fe.taller_enviado":
+        // ⚠️ Sin actor: lo envió la persona desde el QR, sin cuenta. Poner a
+        // alguien en `A()` diría que un líder lo registró.
+        tipo = "grupos"; etiqueta = "GRUPOS"; tono = "verde";
+        frase = [P(), t(" envió el taller del tema "), b(`${texto(m.tema) ?? ""} ${texto(m.nombre) ?? ""}`.trim())];
+        break;
+      case "casa_de_fe.taller_aprobado":
+        tipo = "grupos"; etiqueta = "GRUPOS"; tono = "verde";
+        frase = [A(), t(" aprobó el taller del tema "), b(`${texto(m.tema) ?? ""} ${texto(m.nombre) ?? ""}`.trim()), t(" de "), P()];
+        break;
+      case "casa_de_fe.taller_devuelto":
+        // En ámbar: no es retroceder, es pedir una corrección.
+        tipo = "grupos"; etiqueta = "GRUPOS"; tono = "ambar";
+        frase = [A(), t(" devolvió el taller del tema "), b(`${texto(m.tema) ?? ""} ${texto(m.nombre) ?? ""}`.trim()), t(" a "), P()];
+        break;
+      case "casa_de_fe.recorrido_terminado":
+        tipo = "grupos"; etiqueta = "GRUPOS"; tono = "verde";
+        frase = [P(), t(" terminó los 12 temas de Casa de Fe · el sistema le marcó el hito")];
+        break;
+      case "casa_de_fe.tema_renombrado":
+        tipo = "grupos"; etiqueta = "GRUPOS"; tono = "ambar";
+        frase = [A(), t(" cambió el tema "), b(String(texto(m.tema) ?? "")), t(texto(m.qr) ? " · rehizo su código de QR" : ` · «${texto(m.antes) ?? ""}» ahora es «${texto(m.ahora) ?? ""}»`)];
+        break;
       case "alpha.reunion_actualizada":
       case "casa_de_fe.reunion_actualizada": {
         tipo = "grupos"; etiqueta = "GRUPOS"; tono = "ambar";
