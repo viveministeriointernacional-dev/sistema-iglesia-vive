@@ -137,6 +137,7 @@ model AppUser {
   auditoria             AuditLog[]
   llamadas              CallLog[]
   declaracionesRevisadas LeadershipDeclaration[] @relation("RevisoDeclaracion")
+  talleresRevisados      FaithHouseWorkshopReview[] @relation("RevisoTaller")
   itemsDeclaracionResueltos LeadershipDeclarationItem[] @relation("ResolvioItemDeclaracion")
   bajasPedidas           BajaRequest[]           @relation("PidioLaBaja")
   bajasResueltas         BajaRequest[]           @relation("ResolvioLaBaja")
@@ -390,6 +391,8 @@ model LearnerProfile {
   giAssignments       GiAssignment[]
   giDevotionals       GiDevotional[]
   giNotes             GiNote[]
+  faithHouseWorkshops FaithHouseWorkshop[]
+  faithHouseTallerToken FaithHouseTallerToken?
 
   @@index([phase, status])
   /// El alcance «solo mis personas» del tablero y el cálculo de carga.
@@ -708,10 +711,140 @@ model FaithHouseTopic {
   id     String @id @default(uuid())
   number Int    @unique
   name   String
+  /// El renglon en versalitas bajo el titulo en el libro. Nulo a proposito
+  /// cuando el libro no le puso ninguno (el tema 7 no lo tiene).
+  subtitle String? @map("subtitle")
+  /// «Vive la Palabra»: el versiculo para memorizar esa semana.
+  memoryVerse String? @map("memory_verse")
+  /// **El codigo del QR de este tema, y es una CREDENCIAL, no un
+  /// identificador.** Es lo unico que autoriza a abrir su taller desde la
+  /// calle, asi que NO es el numero del tema: con `/taller/3` cualquiera
+  /// adivinaria los otros once y se marcaria temas que nadie le dio. Sale de
+  /// `crypto.getRandomValues`, nunca de `Math.random`, y se puede rehacer.
+  qrCode String? @unique @map("qr_code")
 
-  progress FaithHouseProgress[]
+  progress  FaithHouseProgress[]
+  days      FaithHouseTopicDay[]
+  questions FaithHouseTopicQuestion[]
+  workshops FaithHouseWorkshop[]
 
   @@map("faith_house_topic")
+}
+
+/// Un dia de «Vive la leccion». **Son guia: NO se marcan** (decision del
+/// usuario, 27-sep-2026), asi que no hay nada por persona colgando de aqui.
+model FaithHouseTopicDay {
+  id      String @id @default(uuid())
+  topicId String @map("topic_id")
+  number  Int
+  action  String
+
+  topic FaithHouseTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([topicId, number])
+  @@map("faith_house_topic_day")
+}
+
+/// Una pregunta del taller.
+model FaithHouseTopicQuestion {
+  id      String   @id @default(uuid())
+  topicId String   @map("topic_id")
+  number  Int
+  /// ABIERTA (se escribe) · OPCION (se marca una) · DIBUJO.
+  ///
+  /// ⚠️ DIBUJO existe por el punto 7 del tema 2, que pide dibujar dentro de un
+  /// recuadro. **Eso no se puede hacer virtualmente hoy**, y marcarlo como tal
+  /// permite que la pantalla lo DIGA en vez de fingir que se puede.
+  kind    String   @default("ABIERTA")
+  prompt  String
+  /// Solo en las de OPCION. El indice de la opcion elegida es la respuesta.
+  options String[]
+
+  topic   FaithHouseTopic      @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  answers FaithHouseAnswer[]
+
+  @@unique([topicId, number])
+  @@map("faith_house_topic_question")
+}
+
+/// El taller que llena una persona, uno por tema.
+///
+/// ⚠️ **NO TIENE COLUMNA DE ESTADO, y es a proposito.** El estado se DERIVA de
+/// `submittedAt` y de la ultima revision (`estadoDelTaller`, en
+/// `taller-catalogo.ts`). Una columna aparte se desincroniza del historial en
+/// cuanto alguien reenvia un taller devuelto.
+model FaithHouseWorkshop {
+  id          String    @id @default(uuid())
+  learnerId   String    @map("learner_id")
+  topicId     String    @map("topic_id")
+  startedAt   DateTime  @default(now()) @map("started_at")
+  submittedAt DateTime? @map("submitted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  learner LearnerProfile             @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  topic   FaithHouseTopic            @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  answers FaithHouseAnswer[]
+  reviews FaithHouseWorkshopReview[]
+
+  @@unique([learnerId, topicId])
+  @@index([submittedAt])
+  @@map("faith_house_workshop")
+}
+
+/// Una respuesta. `text` en las abiertas, `choice` (indice de la opcion) en
+/// las de marcar. Se guarda sola mientras la persona escribe.
+model FaithHouseAnswer {
+  id         String   @id @default(uuid())
+  workshopId String   @map("workshop_id")
+  questionId String   @map("question_id")
+  text       String?
+  choice     Int?
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  workshop FaithHouseWorkshop      @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  question FaithHouseTopicQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([workshopId, questionId])
+  @@map("faith_house_answer")
+}
+
+/// Una revision del lider. **SE APILAN, NO SE PISAN** (la regla del 10-sep-2026
+/// con las visitas reprogramadas): cuantas veces le devolvieron un taller a
+/// alguien es justo la señal de que algo no va bien, y sobrescribir la
+/// revision anterior la borraria.
+model FaithHouseWorkshopReview {
+  id           String   @id @default(uuid())
+  workshopId   String   @map("workshop_id")
+  approved     Boolean
+  note         String?
+  reviewedById String?  @map("reviewed_by_id")
+  reviewedAt   DateTime @default(now()) @map("reviewed_at")
+
+  workshop   FaithHouseWorkshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  reviewedBy AppUser?           @relation("RevisoTaller", fields: [reviewedById], references: [id])
+
+  @@index([workshopId, reviewedAt])
+  @@map("faith_house_workshop_review")
+}
+
+/// El token con el que la persona vuelve a su taller sin cuenta ni contraseña.
+///
+/// ⚠️ **ES UNA CREDENCIAL**, como el token del calendario: nace de
+/// `crypto.getRandomValues`, **nunca se escribe en la auditoria**, y vive en
+/// tabla propia a proposito — ponerlo en `learner_profile` habria pedido un
+/// candado EXCLUSIVO sobre una tabla que el sistema lee en cada peticion, que
+/// es lo que tumbo el despliegue del 24-sep-2026.
+model FaithHouseTallerToken {
+  id        String    @id @default(uuid())
+  learnerId String    @unique @map("learner_id")
+  token     String    @unique
+  createdAt DateTime  @default(now()) @map("created_at")
+  usedAt    DateTime? @map("used_at")
+
+  learner LearnerProfile @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+
+  @@map("faith_house_taller_token")
 }
 
 /// Avance de un tema. Guarda lo que pide el §6.2: fecha, mentor, estado,

@@ -287,6 +287,127 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-09-27** — **Taller virtual de Casa de Fe, con un QR por tema** (pedido
+  del usuario: «quiero poder editar los nombres de las casas de fe… son 12
+  temas… que me genere el QR por cada taller que cada persona que esté haciendo
+  una casa de fe suba o realice el taller virtual»; mockup aprobado:
+  claude.ai/artifact/AbCsL9hQnj8QzFcDe4yrjU).
+  **⚠️ LO PRIMERO, PORQUE CAMBIÓ EL TRABAJO: EL MODELO DE LOS 12 TEMAS YA
+  EXISTÍA.** `faith_house_topic` (12 filas) y `faith_house_progress` con
+  estado, evaluación, nota, tarea y evidencia estaban desde siempre, y el
+  mentor los marca desde el expediente. **Y el equipo lo estrenó el mismo día
+  del pedido: Lucero Artunduaga le marcó los 12 temas a tres personas entre las
+  3:25 y las 4:00 de la tarde**, una por una. El pedido le nació de ver lo que
+  cuesta. Así que esto **no reescribió nada del núcleo**: le puso encima el
+  taller, el QR y la revisión.
+  - **Los 12 nombres del libro se pusieron el 26-sep por SQL** (dato, no
+    interfaz): Regalo de Dios · ¿Quién es Dios? · La oración · Dios moldea mi
+    carácter · Obediencia y sujeción · La palabra de Dios · La fe en el Reino
+    de Dios · El bautismo · El Espíritu Santo · Finanzas en el Reino · El
+    perdón · El propósito eterno de Dios. Los anteriores, por si hacen falta:
+    Identidad · Oración · Palabra · Familia · Carácter · Libertad · Comunidad ·
+    Mayordomía · Perdón · Servicio · Visión · Multiplicar.
+  - **⚠️ RENOMBRAR UN TEMA REASIGNA LO YA MARCADO, y esta vez no hizo daño POR
+    POCO.** El avance apunta al **número** del tema, no al nombre, y los
+    nombres viejos **no estaban en el mismo orden que el libro** («Oración» era
+    el 2 y «La oración» es el 3; «Perdón» era el 9 y «El perdón» es el 11). Se
+    comprobó uno por uno antes de tocar nada: **tres personas tenían los 12**
+    —les da igual el orden— y la única con avance parcial, Jhonatan, tenía **el
+    tema 1**, que sigue siendo el primero del libro. **Hecho dentro de un mes,
+    con gente a medio camino, habría reetiquetado temas en silencio.** Por eso
+    la pantalla de edición **avisa cuando hay avance** y la auditoría guarda el
+    nombre anterior.
+  - **El libro son 4 cosas, no preguntas:** versículo para memorizar, **plan de
+    7 días**, preguntas abiertas y de «Marca con una X». Transcritos del PDF:
+    **83 preguntas (66 abiertas, 16 de opción, 1 de dibujo) y 84 acciones
+    diarias**, semilla idempotente en la migración.
+  - **⚠️ EL LIBRO NO TRAE LAS RESPUESTAS CORRECTAS**, comprobado a fondo: no
+    hay negrita, ni color, ni marca — las 4 opciones son tipográficamente
+    idénticas. Por eso **el líder evalúa todo** (decisión del usuario) y el
+    sistema no califica nada.
+  - **⚠️ HAY UNA PREGUNTA QUE NO SE PUEDE HACER VIRTUALMENTE: el punto 7 del
+    tema 2 es un DIBUJO.** Se guarda con `kind = DIBUJO` para que la pantalla
+    lo **diga** («hazla en tu cuaderno; aquí descríbela en palabras») en vez de
+    fingir que se puede. **Cuenta como respondida con texto**: si no, ese taller
+    no se podría enviar nunca. Tiene prueba propia.
+  - **Ocho decisiones del usuario, con `AskUserQuestion`:** (1) **un QR por
+    tema**, los 12; (2) enviado deja el tema en **EN PROCESO**, sin estado
+    nuevo; (3) aprueban **quien escribe en su expediente MÁS el líder o
+    encargado de su Casa de Fe**; (4) al llegar a 12, **el hito CASA DE FE se
+    pone solo, sin mover la fase**; (5) **la foto queda para una segunda
+    vuelta**; (6) los **7 días son solo guía**, no se marcan; (7) el líder
+    evalúa también las de opción múltiple; (8) **se guarda y se vuelve** durante
+    la semana.
+  - **⚠️ EL HITO AUTOMÁTICO CIERRA UN AGUJERO MEDIDO: Luis Carlos tenía 12 de
+    12 y el hito CASA DE FE en blanco.** Completar los temas no lo ponía;
+    alguien tenía que acordarse de ir a Administración. **La FASE no se mueve**:
+    pasar de Fortalecer a Entrenar pide además bautismo y encuentro, y es una
+    decisión pastoral. Y si el hito ya estaba conseguido **no se pisa**: su
+    fecha original vale más que la de hoy (la regla de las fusiones, §8).
+  - **⚠️ EL TALLER NO EXIGE ESTAR INSCRITO EN UNA CASA DE FE, y está medido: de
+    las 4 personas con avance, 3 no lo están.** Exigirlo dejaría fuera a
+    quienes ya lo usan. Por lo mismo, **aprobar necesita las DOS mitades**: solo
+    con el líder del grupo, esos 3 se quedarían sin nadie que los apruebe.
+  - **Se identifica por celular, o correo + nacimiento**, el camino ya probado
+    del formulario de liderazgo (7-sep). **Sin cuenta ni contraseña**: el equipo
+    y los miembros no entran a la plataforma (§6), y pedir sesión habría dejado
+    el taller sin llenar.
+  - **⚠️ EL ESTADO DEL TALLER SE DERIVA, NO SE GUARDA**, y el caso que lo
+    obliga es el reenvío: un taller devuelto y vuelto a enviar tiene una
+    revisión con `approved: false` y un `submittedAt` POSTERIOR. Una
+    comprobación ingenua («¿tiene revisión?») lo dejaría en DEVUELTO para
+    siempre y **el líder no volvería a verlo nunca**. Prueba propia.
+  - **Las revisiones SE APILAN, NO SE PISAN** (la regla del 10-sep con las
+    visitas): cuántas veces le devolvieron un taller a alguien es la señal de
+    que algo no va bien.
+  - **⚠️ LA MIGRACIÓN NO TOCA NINGUNA TABLA CALIENTE**, aprendido del 24-sep:
+    el token de regreso vive en **tabla propia** (`faith_house_taller_token`) y
+    no en `learner_profile`, justamente para no pedir un candado EXCLUSIVO
+    sobre algo que se lee en cada petición. El único ALTER es sobre
+    `faith_house_topic`, que tiene 12 filas.
+  - **Probada con `BEGIN … ROLLBACK` en la misma llamada**, con 10
+    comprobaciones. La que más valió: **el tema 7 quedó con subtítulo `null`, no
+    vacío** (el libro no le puso ninguno), y **los 12 QR salieron distintos**.
+    Producción quedó en 5 tablas y 3 columnas, intacta.
+  - **⚠️ LAS PESTAÑAS VIVEN BAJO `/alpha`, y eso es lo que las hace heredar el
+    permiso.** «Los 12 temas» y «Por revisar» como entradas propias del menú
+    habrían obligado a crear dos vistas nuevas en el configurador y a
+    encendérselas a mano a las 29 cuentas que llevan un grupo.
+  - **El QR se dibuja con UN solo `<path>`, no un `<rect>` por celda**: 841
+    celdas dan ~11 kB con rectángulos y ~1,5 kB con un camino, y se imprimen
+    doce en una hoja. Corrección **M**, que aguanta los dobleces de una hoja que
+    va a vivir en una casa. **Comprobado que `qrcode-generator` queda SOLO en el
+    servidor: 0 bytes en el paquete del navegador.**
+  - **El dominio del QR sale de la petición, no de una constante**: si fuera
+    fijo, los QR impresos desde la vista previa de una rama llevarían a otro
+    sitio.
+  - **Se guarda 1,5 s después de la última tecla, no en cada letra**: con
+    `PrismaPg max:1` una petición por letra sería una latencia por letra.
+  - **⚠️ ATAJO EN EL PERMISO DE REVISAR, y no es cosmético:** administración,
+    pastor y quien coordina pasan **sin tocar la base**. Sin ese corte, la cola
+    haría una consulta por taller para gente que iba a pasar igual, y con
+    `max:1` veinte talleres serían veinte latencias EN FILA.
+  - **Probado al revés:** se rompió la comparación del reenvío y se dejó el
+    DIBUJO como no respondible; **fallaron exactamente las dos pruebas que
+    debían**, y al restaurar, verde.
+  - **⚠️ `npm install qrcode-generator` SE LLEVÓ EL CLIENTE DE PRISMA otra vez**
+    (la trampa del 18-sep): 20 errores de «Cannot find module» sin relación con
+    el trabajo. Se arregla con `npx prisma generate`.
+  - Auditoría: `casa_de_fe.taller_enviado` (**sin actor a propósito**: lo envió
+    la persona desde la calle), `…taller_aprobado`, `…taller_devuelto` (ámbar),
+    `…recorrido_terminado` y `…tema_renombrado`, las cinco con su `case` en
+    `actividad.ts`. **El código del QR NO se escribe en la auditoría**: es un
+    secreto, como el token del calendario.
+  - `tsc`, eslint, **117/117 pruebas** (103 + 14) y `npm run cf:build` en verde.
+  - **⚠️ PENDIENTE DEL USUARIO, y no es menor: el versículo del tema 7.** El
+    libro le puso **Hebreos 4:12**, que es **el mismo del tema 6** y habla de la
+    Palabra, no de la fe. Se dejó **tal como está en el libro**: corregir un
+    versículo es doctrina, no código. Lo natural sería Hebreos 11:1 o Romanos
+    10:17 (que ya está en el día 2 de ese mismo taller).
+  - **Lo que NO se hizo, y es la segunda vuelta que el usuario aplazó:** subir
+    fotos del taller hecho a mano. Hoy **no hay almacenamiento montado** —ni
+    bucket de R2 ni uso de Supabase Storage— aunque los dos planes lo incluyen.
+
 - **2026-09-25** — **«Dejar como asistente» desde la ficha de Administración**
   (pedido del usuario: «agregar la opción de dejar como asistente a una persona
   desde administración así como está dar de baja»). Ajuste sobre una pantalla

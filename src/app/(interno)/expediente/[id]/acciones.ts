@@ -249,6 +249,22 @@ export type TemaCasaDeFe = {
   task: string | null;
   evidence: string | null;
   registradoPor: string | null;
+  /// Lo que la persona envió desde el QR, si lo hizo. Es público para quien
+  /// abre el expediente: lo escribió ella misma, no es una nota pastoral.
+  taller: TallerDelTema | null;
+};
+
+export type TallerDelTema = {
+  estado: "BORRADOR" | "ENVIADO" | "APROBADO" | "DEVUELTO";
+  enviadoEl: string | null;
+  notaDeLaRevision: string | null;
+  respuestas: {
+    numero: number;
+    tipo: string;
+    enunciado: string;
+    texto: string | null;
+    elegida: string | null;
+  }[];
 };
 
 /// Actualiza un tema de Casa de Fe. El orden lo decide el mentor, así que

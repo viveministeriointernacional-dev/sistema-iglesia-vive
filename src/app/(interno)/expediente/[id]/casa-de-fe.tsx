@@ -117,6 +117,55 @@ export function CasaDeFe({
             ))}
           </div>
 
+          {tema.taller && tema.taller.respuestas.length > 0 ? (
+            <section className="mt-4 rounded-[9px] border border-[rgba(19,28,36,.14)] bg-[rgba(19,28,36,.025)] p-3.5">
+              <div className="flex flex-wrap items-baseline gap-2">
+                <span className="text-[10.5px] font-bold tracking-[0.12em] text-[rgba(19,28,36,.45)] uppercase">
+                  Lo que respondió en el taller
+                </span>
+                {tema.taller.enviadoEl ? (
+                  <span className="text-[11.5px] text-[rgba(19,28,36,.5)]">
+                    lo envió desde el QR el {tema.taller.enviadoEl}
+                  </span>
+                ) : (
+                  <span className="text-[11.5px] text-[#8a5a12]">
+                    lo está llenando, todavía no lo envía
+                  </span>
+                )}
+              </div>
+
+              {tema.taller.estado === "DEVUELTO" && tema.taller.notaDeLaRevision ? (
+                <p className="mt-2 rounded border border-[#e0b4ac] bg-[#fdf1ee] px-2.5 py-2 text-[11.5px] leading-[1.45] text-[#8a3226]">
+                  Se lo devolvieron: {tema.taller.notaDeLaRevision}
+                </p>
+              ) : null}
+
+              <ol className="mt-3 space-y-2.5">
+                {tema.taller.respuestas.map((r) => (
+                  <li key={r.numero}>
+                    <p className="text-[11.5px] font-semibold text-[rgba(19,28,36,.45)]">
+                      {r.numero}) {r.enunciado}
+                    </p>
+                    {r.elegida ? (
+                      <p className="mt-1 text-[12.5px] font-semibold text-tinta">
+                        {r.elegida}
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-[12.5px] leading-[1.55] whitespace-pre-line text-[rgba(19,28,36,.8)]">
+                        {r.texto?.trim() || "—"}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ol>
+
+              <p className="mt-3 text-[11px] leading-[1.45] text-[rgba(19,28,36,.5)]">
+                Esto lo escribió la persona: no es una nota pastoral. Tu
+                evaluación y tus notas siguen siendo privadas.
+              </p>
+            </section>
+          ) : null}
+
           <label className="mt-4 block">
             <span className="etiqueta-campo">Evaluación breve</span>
             <input

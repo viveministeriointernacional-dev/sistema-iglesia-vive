@@ -247,6 +247,29 @@ export async function cargarExpediente(learnerId: string) {
           recordedBy: { select: { fullName: true } },
         },
       },
+      /// Lo que la persona respondió desde el QR. **No reemplaza el registro
+      /// del tema que llena el mentor: lo alimenta.** Sin esto, el expediente
+      /// enseñaría el estado del tema sin lo que la persona escribió, que es
+      /// justo lo que el líder necesita leer para evaluarlo.
+      faithHouseWorkshops: {
+        select: {
+          topicId: true,
+          submittedAt: true,
+          reviews: {
+            orderBy: { reviewedAt: "desc" as const },
+            select: { approved: true, reviewedAt: true, note: true },
+          },
+          answers: {
+            select: {
+              text: true,
+              choice: true,
+              question: {
+                select: { number: true, kind: true, prompt: true, options: true },
+              },
+            },
+          },
+        },
+      },
       faithHouseProgress: {
         select: {
           status: true,
