@@ -1,3 +1,4 @@
+import { codigoLegible } from "@/lib/taller-catalogo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requerirRol, ROLES_ADMIN } from "@/lib/auth";
@@ -140,6 +141,22 @@ export default async function PaginaPersonaAdmin({
               })),
             }}
           />
+        ) : null}
+
+        {persona.memberCode ? (
+          <section className="mt-5 rounded-[10px] border border-[rgba(19,28,36,.14)] bg-white p-4">
+            <p className="text-[10.5px] font-semibold tracking-[0.12em] text-[rgba(19,28,36,.45)] uppercase">
+              Su código para el taller
+            </p>
+            <p className="mt-1.5 font-mono text-[28px] leading-none tracking-[0.14em] tabular-nums text-tinta">
+              {codigoLegible(persona.memberCode.code)}
+            </p>
+            <p className="mt-2.5 text-[12px] leading-[1.5] text-[rgba(19,28,36,.55)]">
+              Con esto entra al taller de Casa de Fe desde el QR,{" "}
+              <strong className="font-semibold">sin celular ni correo</strong>.
+              Díctaselo para que lo anote. Es de ella y no cambia.
+            </p>
+          </section>
         ) : null}
 
         <EditorPersona

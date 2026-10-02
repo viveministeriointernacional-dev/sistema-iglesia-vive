@@ -519,6 +519,9 @@ export async function cargarPersonaAdmin(personId: string) {
       email: true,
       address: true,
       prayerRequest: true,
+      // Su codigo de miembro: es lo que el lider le dicta para que entre al
+      // taller desde el QR sin celular ni correo.
+      memberCode: { select: { code: true } },
       learnerProfile: {
         select: {
           id: true,

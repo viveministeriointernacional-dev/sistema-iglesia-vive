@@ -242,6 +242,7 @@ model Person {
   @@index([whatsappPhone])
   @@index([email])
   @@map("person")
+  memberCode MemberCode?
 }
 
 /// Vincula la identidad estable del contacto de HighLevel con la persona del
@@ -1532,4 +1533,36 @@ model GiNote {
 
   @@index([learnerId, day])
   @@map("gi_note")
+}
+
+
+/// El codigo unico de cada persona: su «carne» para entrar al taller de Casa
+/// de Fe sin celular ni correo.
+///
+/// Nace del caso de una menor sin telefono propio (2-oct-2026): si escribe el
+/// de su papa, el taller la confunde con el —y si los dos estan registrados
+/// con ese numero, el sistema se detiene y **los bloquea a los dos**. El
+/// codigo rompe el empate porque es de la PERSONA, no del telefono.
+///
+/// ⚠️ **NO ES UN SECRETO, y eso es deliberado.** Se dicta en voz alta y se
+/// escribe en el cuaderno del muchacho. Lo que de verdad autoriza es que el
+/// lider revise y apruebe el taller; el codigo solo dice quien lo esta
+/// llenando. Por eso NO se trata como el token del calendario: ese si abre
+/// datos de la persona, este solo abre un formulario en blanco.
+///
+/// ⚠️ **Vive en tabla propia, no como columna de `person`**, para no pedir un
+/// candado EXCLUSIVO sobre una tabla que el sistema lee en cada peticion — que
+/// es lo que tumbo el despliegue del 24-sep-2026.
+model MemberCode {
+  id        String    @id @default(uuid())
+  personId  String    @unique @map("person_id")
+  /// Seis digitos, aleatorios y sin empezar por 0. El CHECK de la base lo
+  /// vigila: un cero a la izquierda se pierde al pegarlo en Excel.
+  code      String    @unique
+  createdAt DateTime  @default(now()) @map("created_at")
+  usedAt    DateTime? @map("used_at")
+
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@map("member_code")
 }

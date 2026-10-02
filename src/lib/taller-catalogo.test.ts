@@ -3,6 +3,9 @@ import { test } from "node:test";
 
 import {
   LARGO_MINIMO_RESPUESTA,
+  codigoLegible,
+  generarCodigoDeMiembro,
+  normalizarCodigo,
   avanceDelTaller,
   colaDelCelular,
   estadoDelTaller,
@@ -201,4 +204,43 @@ test("el celular se reduce a sus 10 dígitos, y lo corto no sirve", () => {
   assert.equal(colaDelCelular("+57 320 473 2415"), "3204732415");
   assert.equal(colaDelCelular("3204732415"), "3204732415");
   assert.equal(colaDelCelular("320 473"), null);
+});
+
+// ------------------------------------------------- el código de miembro
+
+test("el código acepta lo que la gente escribe: con espacios o con guión", () => {
+  // Se lo dictaron «418 203» y lo copió tal cual. Rechazarlo sería castigar a
+  // quien copió bien.
+  assert.equal(normalizarCodigo("418203"), "418203");
+  assert.equal(normalizarCodigo("418 203"), "418203");
+  assert.equal(normalizarCodigo("418-203"), "418203");
+  assert.equal(normalizarCodigo("  418203  "), "418203");
+});
+
+test("⚠️ el código rechaza lo que no lo es, incluido el que empieza por cero", () => {
+  assert.equal(normalizarCodigo("41820"), null); // corto
+  assert.equal(normalizarCodigo("4182030"), null); // largo
+  assert.equal(normalizarCodigo("41820a"), null); // letras
+  assert.equal(normalizarCodigo(""), null);
+  // Un cero a la izquierda se pierde al pegarlo en Excel, así que no existe.
+  assert.equal(normalizarCodigo("018203"), null);
+});
+
+test("el código generado tiene 6 dígitos, nunca empieza por 0, y no se repite", () => {
+  const vistos = new Set<string>();
+  for (let i = 0; i < 500; i += 1) {
+    const codigo = generarCodigoDeMiembro();
+    assert.match(codigo, /^[1-9][0-9]{5}$/);
+    // Y lo que genera tiene que pasar su propio validador: si no, se repartiría
+    // un código que después el formulario rechaza.
+    assert.equal(normalizarCodigo(codigo), codigo);
+    vistos.add(codigo);
+  }
+  // 500 sorteos sobre 900 000: repetir más de un puñado delataría un generador
+  // sesgado, no mala suerte.
+  assert.ok(vistos.size > 490, `demasiados repetidos: ${vistos.size} de 500`);
+});
+
+test("el código se enseña en dos bloques para poder dictarlo", () => {
+  assert.equal(codigoLegible("418203"), "418 203");
 });

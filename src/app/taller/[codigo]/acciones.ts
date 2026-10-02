@@ -32,9 +32,20 @@ async function learnerDeLaCookie(): Promise<string | null> {
 
 export async function identificarme(
   codigo: string,
-  datos: { celular: string; correo?: string; nacimiento?: string },
+  datos: {
+    celular?: string;
+    correo?: string;
+    nacimiento?: string;
+    /// Su código de miembro. Es el camino que manda (ver `identificarParaTaller`).
+    codigoDeMiembro?: string;
+  },
 ): Promise<ResultadoPublico> {
-  const encontrada = await identificarParaTaller(datos);
+  const encontrada = await identificarParaTaller({
+    celular: datos.celular,
+    correo: datos.correo,
+    nacimiento: datos.nacimiento,
+    codigo: datos.codigoDeMiembro,
+  });
   if (!encontrada.ok) return encontrada;
 
   (await cookies()).set(COOKIE, encontrada.datos.token, {
