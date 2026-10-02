@@ -312,3 +312,79 @@ export async function correoRecuperarContrasena(datos: {
     `),
   });
 }
+
+/// Correo con el que una persona recibe su código y sus 12 talleres al entrar
+/// a una Casa de Fe.
+///
+/// ⚠️ **No lleva los QR dibujados, y es una limitación del correo, no una
+/// decisión de producto.** Gmail descarta los `<svg>` incrustados y bloquea las
+/// imágenes en `data:`, así que doce QR dentro del mensaje llegarían como doce
+/// recuadros vacíos. Un QR no es más que la forma de llevar un enlace al papel:
+/// en un teléfono el enlace **es** el QR, así que aquí van los doce enlaces,
+/// que es lo que de verdad se puede pulsar. La hoja impresa con los doce QR
+/// sigue existiendo para la casa, y se saca desde «Los 12 temas».
+export async function correoTalleresDeCasaDeFe(datos: {
+  to: string;
+  nombre: string;
+  codigo: string;
+  casa: string | null;
+  /// El enlace a «Mis talleres», con su token.
+  enlace: string;
+  temas: { number: number; name: string; enlace: string | null }[];
+  registro?: RegistroDeCorreo;
+}): Promise<ResultadoCorreo> {
+  const nombreDePila = datos.nombre.split(" ")[0] ?? datos.nombre;
+
+  const renglones = datos.temas
+    .map((tema) => {
+      const titulo = `${tema.number}. ${escapar(tema.name)}`;
+      const celda = tema.enlace
+        ? `<a href="${tema.enlace}" style="color:#0e2a4e;text-decoration:none;font-weight:bold">${titulo}</a>`
+        : `<span style="color:#8a929a">${titulo}</span>`;
+      return `<tr><td style="padding:7px 0;border-bottom:1px solid #e7e3d8;font-size:13.5px">${celda}</td></tr>`;
+    })
+    .join("");
+
+  return enviarCorreo({
+    to: datos.to,
+    subject: `${nombreDePila}, aquí están tus 12 talleres de Casa de Fe`,
+    registro: datos.registro,
+    html: MARCO(`
+      <p>Hola ${escapar(nombreDePila)}, ya entraste a ${
+        datos.casa ? `<strong>${escapar(datos.casa)}</strong>` : "una Casa de Fe"
+      }.</p>
+      <p>Los 12 temas del libro los puedes hacer desde tu celular. Este enlace es tuyo: <strong>guárdalo</strong>.</p>
+
+      <p style="margin:20px 0">
+        <a href="${datos.enlace}"
+           style="background:#0e2a4e;color:#fff;text-decoration:none;padding:14px 22px;border-radius:10px;font-weight:bold;display:inline-block">
+          Abrir mis talleres
+        </a>
+      </p>
+
+      <div style="margin:18px 0;border:1px solid #c9ccd1;border-radius:12px;padding:14px 16px;background:#f7f5ee">
+        <p style="font-size:11px;font-weight:bold;letter-spacing:.1em;color:#8a929a;margin:0">TU CÓDIGO</p>
+        <p style="font-size:30px;letter-spacing:.14em;margin:6px 0 0;font-weight:bold">${escapar(
+          `${datos.codigo.slice(0, 3)} ${datos.codigo.slice(3)}`,
+        )}</p>
+        <p style="font-size:12.5px;color:#4a5560;margin:8px 0 0">
+          Son solo tuyos. Te sirven para entrar a tu taller desde cualquier
+          teléfono, o si escaneas uno de los QR que están en tu casa de fe.
+          <strong>No lo compartas</strong>: con él se escribe en tu expediente.
+        </p>
+      </div>
+
+      <p style="font-size:11px;font-weight:bold;letter-spacing:.1em;color:#8a929a;margin-top:22px">LOS 12 TEMAS</p>
+      <table style="width:100%;border-collapse:collapse;margin-top:6px">${renglones}</table>
+
+      <p style="font-size:12.5px;color:#4a5560;margin-top:20px">
+        Cada taller se guarda mientras lo llenas, así que puedes hacerlo en
+        varios días. Cuando lo envíes, tu líder lo revisa y te dice si quedó
+        listo o si hay que corregir algo.
+      </p>
+      <p style="font-size:12.5px;color:#8a929a">
+        No necesitas contraseña ni crear una cuenta.
+      </p>
+    `),
+  });
+}

@@ -17,6 +17,21 @@ export const LARGO_MINIMO_NOTA = 10;
 /// Los 12 temas del libro. El recorrido no se termina con menos.
 export const TOTAL_DE_TEMAS = 12;
 
+/// La cookie con la que la persona vuelve durante la semana sin volver a
+/// identificarse. Vive en el catálogo —y no en `acciones.ts`— porque la leen
+/// tres sitios distintos y un archivo `"use server"` solo puede exportar
+/// funciones `async` (la regla del 12-sep-2026).
+export const COOKIE_TALLER = "taller_vive";
+
+/// Cuántos días dura. Lo que tarda alguien en hacer varios temas, y no más: un
+/// celular se presta, y una sesión eterna en un teléfono compartido dejaría a
+/// la siguiente persona escribiendo en el taller de la primera.
+export const DIAS_DE_COOKIE = 30;
+
+/// Dónde vale la cookie. Acota también a qué rutas se manda, así que el token
+/// no viaja en ninguna petición fuera del taller.
+export const RUTA_DE_COOKIE = "/taller";
+
 export type TipoDePregunta = "ABIERTA" | "OPCION" | "DIBUJO";
 
 export type PreguntaDelTaller = {
@@ -211,4 +226,77 @@ export function generarCodigoDeMiembro(): string {
 /// Como se enseña en pantalla y se dicta: «418 203».
 export function codigoLegible(codigo: string): string {
   return `${codigo.slice(0, 3)} ${codigo.slice(3)}`;
+}
+
+// ---------------------------------------------------------------------------
+// «Mis talleres»: el tablero de los 12 temas de una persona
+// ---------------------------------------------------------------------------
+
+/// Lo que la persona ve en cada renglón de «Mis talleres».
+export type EstadoDelTema =
+  | "APROBADO"
+  | "ESPERANDO"
+  | "DEVUELTO"
+  | "EMPEZADO"
+  | "SIN_EMPEZAR";
+
+export const ETIQUETA_TEMA: Record<EstadoDelTema, string> = {
+  APROBADO: "Aprobado",
+  ESPERANDO: "Esperando revisión",
+  DEVUELTO: "Devuelto para corregir",
+  EMPEZADO: "Empezado, sin enviar",
+  SIN_EMPEZAR: "Sin empezar",
+};
+
+/// ¿Este renglón va arriba, separado de los demás?
+///
+/// ⚠️ **Solo lo devuelto, y nada más.** Un taller devuelto es lo único que le
+/// pide algo ahora mismo; dejarlo en su sitio del libro —el 2, el 9— lo
+/// esconde entre once renglones y la persona no vuelve a saber que tenía que
+/// corregirlo. Lo demás conserva el orden del libro, **incluido lo aprobado**,
+/// porque los temas se hacen en ese orden y mover los hechos al final
+/// desarmaría el recorrido que la pantalla está contando.
+export function pideAtencion(estado: EstadoDelTema): boolean {
+  return estado === "DEVUELTO";
+}
+
+/// ⚠️ **UN TEMA YA MARCADO POR SU MENTOR CUENTA COMO APROBADO, aunque no
+/// exista taller.** No es un caso raro: el modelo de los 12 temas existe desde
+/// siempre y el mentor los marca desde el expediente — el 27-sep-2026 había
+/// **cuatro personas con avance, tres de ellas con los 12 completos**, puestos
+/// a mano. Si el estado saliera solo del taller virtual, esas tres abrirían
+/// «Mis talleres» y verían los 12 «sin empezar», con lo que volverían a hacer
+/// un recorrido que su líder ya les firmó.
+///
+/// Por eso el avance marcado MANDA sobre el taller: lo ya conseguido no se
+/// pisa, que es la regla de las fusiones (CLAUDE.md §8).
+export function estadoDelTema(datos: {
+  /// `true` si `faith_house_progress` lo tiene en COMPLETADO.
+  completado: boolean;
+  /// Nulo si todavía no ha abierto el taller de ese tema.
+  taller: {
+    submittedAt: Date | null;
+    revisiones: readonly RevisionParaEstado[];
+    respondidas: number;
+  } | null;
+}): EstadoDelTema {
+  if (datos.completado) return "APROBADO";
+  if (!datos.taller) return "SIN_EMPEZAR";
+
+  const estado = estadoDelTaller(datos.taller.submittedAt, datos.taller.revisiones);
+  if (estado === "APROBADO") return "APROBADO";
+  if (estado === "ENVIADO") return "ESPERANDO";
+  if (estado === "DEVUELTO") return "DEVUELTO";
+
+  // Abrió el taller pero no lo ha enviado. Se distingue de «sin empezar» solo
+  // si de verdad escribió algo: abrir un tema para mirarlo —que es lo que hace
+  // cualquiera al recibir el enlace— no es haberlo empezado.
+  return datos.taller.respondidas > 0 ? "EMPEZADO" : "SIN_EMPEZAR";
+}
+
+/// Cuántos de los 12 lleva aprobados. Es el único número del encabezado, y
+/// cuenta **lo aprobado**, no lo enviado: decir «3 de 12» con dos esperando
+/// revisión le prometería un avance que su líder todavía no ha firmado.
+export function temasAprobados(estados: readonly EstadoDelTema[]): number {
+  return estados.filter((e) => e === "APROBADO").length;
 }

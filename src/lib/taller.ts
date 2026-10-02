@@ -17,11 +17,16 @@ import {
   avanceDelTaller,
   colaDelCelular,
   estadoDelTaller,
+  estadoDelTema,
+  generarCodigoDeMiembro,
   normalizarCodigo,
   generarCodigo,
   puedeEnviarse,
+  temasAprobados,
   terminoLosDoce,
+  ultimaRevision,
   type EstadoDelTaller,
+  type EstadoDelTema,
   type PreguntaDelTaller,
   type RespuestaDelTaller,
 } from "@/lib/taller-catalogo";
@@ -188,7 +193,7 @@ export async function identificarParaTaller(datos: {
 /// El token con el que vuelve durante la semana. Se reusa el que ya tenga: uno
 /// nuevo en cada visita dejaría la cookie anterior muerta y la persona tendría
 /// que identificarse otra vez cada vez.
-async function tokenDeRegreso(learnerId: string): Promise<string> {
+export async function tokenDeRegreso(learnerId: string): Promise<string> {
   const prisma = await getPrisma();
   const existente = await prisma.faithHouseTallerToken.findUnique({
     where: { learnerId },
@@ -783,4 +788,205 @@ export async function cargarPorRevisar(
   }
 
   return cola;
+}
+
+// ---------------------------------------------------------------------------
+// «Mis talleres»: el tablero de los 12 temas de una persona
+// ---------------------------------------------------------------------------
+
+/// El código de miembro de una persona, creándolo si todavía no lo tiene.
+///
+/// ⚠️ **No se da por sentado que exista.** La migración del 2-oct-2026 le puso
+/// código a las 463 fichas de entonces y `registro.ts` se lo pone a cada
+/// persona nueva, pero este camino es el que REPARTE el código: si llegara a
+/// faltar, el correo saldría sin lo único que le sirve a la persona para
+/// volver a entrar. Más vale crearlo aquí que enviar un mensaje a medias.
+///
+/// El bucle existe por la carrera del índice único: dos inscripciones a la vez
+/// pueden sortear el mismo número. Solo se reintenta en P2002 — cualquier otro
+/// error se propaga en vez de dar diez vueltas en balde.
+export async function codigoDeMiembro(personId: string): Promise<string> {
+  const prisma = await getPrisma();
+
+  const existente = await prisma.memberCode.findUnique({
+    where: { personId },
+    select: { code: true },
+  });
+  if (existente) return existente.code;
+
+  for (let intento = 0; intento < 10; intento += 1) {
+    try {
+      const creado = await prisma.memberCode.create({
+        data: { personId, code: generarCodigoDeMiembro() },
+        select: { code: true },
+      });
+      return creado.code;
+    } catch (error) {
+      const codigo = (error as { code?: string }).code;
+      // P2002: el número sorteado ya era de alguien, o la ficha ya tiene uno
+      // (otra petición se lo acaba de poner). En el segundo caso hay que leer
+      // el que quedó, no sortear otro.
+      if (codigo !== "P2002") throw error;
+      const ahora = await prisma.memberCode.findUnique({
+        where: { personId },
+        select: { code: true },
+      });
+      if (ahora) return ahora.code;
+    }
+  }
+
+  throw new Error(`No se pudo asignar un código de miembro a ${personId}`);
+}
+
+export type TemaEnMisTalleres = {
+  number: number;
+  name: string;
+  subtitle: string | null;
+  /// Nulo si al tema le falta el código del QR: entonces el renglón se enseña
+  /// pero no abre (ver abajo).
+  qrCode: string | null;
+  estado: EstadoDelTema;
+  /// Cuándo quedó aprobado. Solo en los aprobados.
+  aprobadoEl: Date | null;
+  quienAprobo: string | null;
+  /// Lo que el líder escribió al devolverlo. Sin esto, «devuelto» no le dice
+  /// qué corregir.
+  notaDeLaRevision: string | null;
+  devueltoEl: Date | null;
+  /// Cuántas veces le han devuelto este taller. Es la señal de que algo no va
+  /// bien, la misma que se guarda apilando las revisiones.
+  vecesDevuelto: number;
+};
+
+export type MisTalleres = {
+  learnerId: string;
+  nombre: string;
+  codigo: string;
+  /// Las Casas de Fe abiertas en las que está. Puede estar en ninguna: el
+  /// taller no lo exige (ver `identificarParaTaller`).
+  casas: string[];
+  temas: TemaEnMisTalleres[];
+  aprobados: number;
+  total: number;
+};
+
+/// Todo lo que enseña «Mis talleres», en **un solo viaje** al pooler.
+///
+/// ⚠️ **Un `$transaction` y no tres consultas sueltas.** Con `PrismaPg max:1`
+/// (CLAUDE.md §7) las consultas de una petición se serializan sobre la única
+/// conexión, así que tres sueltas son tres latencias en fila. Es la misma
+/// decisión que `NodoDeRed` el 23-sep-2026.
+export async function cargarMisTalleres(
+  learnerId: string,
+): Promise<MisTalleres | null> {
+  const prisma = await getPrisma();
+
+  const [aprendiz, temas, talleres, avance] = await prisma.$transaction([
+    prisma.learnerProfile.findUnique({
+      where: { id: learnerId },
+      select: {
+        personId: true,
+        person: { select: { firstName: true, lastName: true } },
+        faithHouseGroups: {
+          where: { group: { closedAt: null } },
+          orderBy: { joinedAt: "asc" },
+          select: { group: { select: { name: true } } },
+        },
+      },
+    }),
+    prisma.faithHouseTopic.findMany({
+      orderBy: { number: "asc" },
+      select: { id: true, number: true, name: true, subtitle: true, qrCode: true },
+    }),
+    prisma.faithHouseWorkshop.findMany({
+      where: { learnerId },
+      select: {
+        topicId: true,
+        submittedAt: true,
+        answers: { select: { questionId: true, text: true, choice: true } },
+        topic: {
+          select: {
+            questions: {
+              orderBy: { number: "asc" },
+              select: { id: true, number: true, kind: true, prompt: true, options: true },
+            },
+          },
+        },
+        reviews: {
+          orderBy: { reviewedAt: "desc" },
+          select: {
+            approved: true,
+            reviewedAt: true,
+            note: true,
+            reviewedBy: { select: { fullName: true } },
+          },
+        },
+      },
+    }),
+    prisma.faithHouseProgress.findMany({
+      where: { learnerId },
+      select: { topicId: true, status: true, completedAt: true },
+    }),
+  ]);
+
+  if (!aprendiz) return null;
+
+  const porTema = new Map(talleres.map((t) => [t.topicId, t]));
+  const avancePorTema = new Map(avance.map((a) => [a.topicId, a]));
+
+  const renglones: TemaEnMisTalleres[] = temas.map((tema) => {
+    const taller = porTema.get(tema.id);
+    const marcado = avancePorTema.get(tema.id);
+    const completado = marcado?.status === FaithHouseStatus.COMPLETADO;
+
+    const estado = estadoDelTema({
+      completado,
+      taller: taller
+        ? {
+            submittedAt: taller.submittedAt,
+            revisiones: taller.reviews,
+            respondidas: avanceDelTaller(taller.topic.questions, taller.answers)
+              .respondidas,
+          }
+        : null,
+    });
+
+    const ultima = taller ? ultimaRevision(taller.reviews) : null;
+    const aprobacion = taller?.reviews.find((r) => r.approved) ?? null;
+
+    return {
+      number: tema.number,
+      name: tema.name,
+      subtitle: tema.subtitle,
+      qrCode: tema.qrCode,
+      estado,
+      // La fecha del taller aprobado si la hay; si no, la del avance que marcó
+      // su mentor a mano. El orden importa: la revisión es el dato más
+      // preciso, y `completedAt` puede ser de un marcaje viejo.
+      aprobadoEl:
+        estado === "APROBADO"
+          ? (aprobacion?.reviewedAt ?? marcado?.completedAt ?? null)
+          : null,
+      quienAprobo:
+        estado === "APROBADO" ? (aprobacion?.reviewedBy?.fullName ?? null) : null,
+      // ⚠️ La nota sale de `faith_house_workshop_review`, **nunca** de
+      // `faith_house_progress.assessment`: esa es la evaluación privada del
+      // mentor y no se le muestra al aprendiz (ver el modelo).
+      notaDeLaRevision: estado === "DEVUELTO" ? (ultima?.note ?? null) : null,
+      devueltoEl: estado === "DEVUELTO" ? (ultima?.reviewedAt ?? null) : null,
+      vecesDevuelto: taller ? taller.reviews.filter((r) => !r.approved).length : 0,
+    };
+  });
+
+  const p = aprendiz.person;
+
+  return {
+    learnerId,
+    nombre: `${p.firstName} ${p.lastName ?? ""}`.trim(),
+    codigo: await codigoDeMiembro(aprendiz.personId),
+    casas: aprendiz.faithHouseGroups.map((g) => g.group.name),
+    temas: renglones,
+    aprobados: temasAprobados(renglones.map((r) => r.estado)),
+    total: renglones.length,
+  };
 }

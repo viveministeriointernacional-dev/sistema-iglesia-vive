@@ -287,6 +287,121 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-10-02** — **«Mis talleres»: al entrar a una Casa de Fe, el código y los
+  12 talleres le llegan por correo y por WhatsApp** (pedido del usuario: «me
+  gustaría que cuando una persona se registre dentro de una casa de fe, el
+  sistema le envíe un WhatsApp, como un correo electrónico con el código único
+  y los QR para cada taller o tema»; mockup aprobado:
+  claude.ai/artifact/T4Y3f4HCcM8kGSbpa5zkFk).
+  - **⚠️ SON DOS CAMINOS PORQUE EL DATO LO EXIGE, y está medido: de los 21
+    miembros de Casa de Fe, los 21 tienen celular Y contacto en HighLevel, y
+    solo 11 tienen correo.** Con correo solo, **la mitad del grupo no recibiría
+    nada**. Y al revés: el WhatsApp **no lo manda este sistema** —el número de
+    la iglesia está conectado en HighLevel (§6)—, así que aquí se le escriben el
+    código y el enlace al contacto y se le pone la etiqueta
+    **`casa-de-fe-taller`**, que es la que dispara su workflow.
+  - **⚠️ LOS IDS DE LOS DOS CAMPOS NUEVOS NO SE PIDEN: EL SISTEMA LOS BUSCA POR
+    NOMBRE.** Es la lección del 6-sep-2026 aplicada antes de que vuelva a doler:
+    aquel día el id de HighLevel de Nora Bonilla quedó mal **por dos caracteres**
+    (una `I` por una `l`) y una consolidadora entera se cayó del sistema sin que
+    nada avisara. `camposDelTaller` consulta
+    `GET /locations/<id>/customFields` y los encuentra por `name` o por
+    `fieldKey`, sin tildes y sin mayúsculas. **Ventaja de paso: no hace falta un
+    despliegue nuevo cuando el usuario los cree.** Si falta uno, la etiqueta se
+    pone igual y la pantalla **avisa en ámbar** que el WhatsApp va a salir sin
+    ese dato.
+  - **⚠️ LA ETIQUETA VA DESPUÉS DE LOS CAMPOS, SIEMPRE.** Es lo que dispara el
+    mensaje: puesta primero, el WhatsApp saldría con los campos todavía vacíos y
+    la persona recibiría un mensaje sin su código ni su enlace.
+  - **⚠️ EL ENLACE CANJEA EL TOKEN Y REDIRIGE (`/taller/mis/<token>` → ruta, no
+    pantalla).** El token es una **credencial** (la regla del calendario,
+    17-sep): al cambiarlo por la cookie **desaparece de la barra de
+    direcciones**, así que no queda en el historial, ni en el título de una
+    captura, ni en lo que se reenvía. El mensaje de WhatsApp sigue siendo donde
+    vive, que es su sitio. Y es lo que hace que desde «Mis talleres» se entre a
+    **cualquier tema sin volver a identificarse**: la cookie la pone esa ruta
+    una sola vez.
+  - **⚠️ UN TEMA YA MARCADO POR SU MENTOR CUENTA COMO APROBADO, aunque no exista
+    taller, y sin esa regla esto era una regresión visible el primer día:
+    Claudia Lorena Salazar, Jeison Manuel Sánchez y Luis Carlos tienen los 12
+    puestos a mano** (los marcó Lucero el 27-sep). Si el estado saliera solo del
+    taller virtual, esos tres abrirían «Mis talleres» y verían **los 12 «sin
+    empezar»**, con lo que repetirían un recorrido que su líder ya les firmó. Lo
+    marcado **manda** sobre el taller: es la regla de las fusiones (§8).
+    Comprobado con la réplica en SQL: 12·12·12 y Jhonatan 1 de 12.
+  - **⚠️ ABRIR UN TEMA PARA MIRARLO NO ES HABERLO EMPEZADO, y también está
+    medido: de los 4 talleres abiertos en toda la base, 3 no tienen ni una sola
+    respuesta.** Al recibir el enlace cualquiera abre un par de temas a
+    curiosear, y eso crea el taller. Si contara, el tablero nacería con
+    renglones «empezados» que nadie empezó.
+  - **⚠️ UN TEMA APROBADO NO ABRE SU TALLER** (es `<div>`, no `<a>`, y sin
+    flecha): lo que el líder ya firmó no se vuelve a cambiar. Y un tema **sin
+    `qrCode` tampoco** — la regla del 16-sep al revés: lo que no abre no se
+    enseña como enlace, porque daría 404. (Hoy los 12 tienen código.)
+  - **El contador cuenta lo APROBADO, no lo enviado.** Decir «3 de 12» con dos
+    esperando revisión le prometería un avance que su líder no ha firmado.
+  - **Lo devuelto sale de primero, aparte, con la nota del líder textual**, y
+    **lo aprobado se queda en su sitio del libro**. Un taller devuelto es lo
+    único que le pide algo ahora mismo; dejarlo en el renglón 2 lo esconde entre
+    once. Mover los hechos al final desarmaría el recorrido que la pantalla
+    cuenta.
+  - **⚠️ LO QUE SÍ SE NARROWEÓ, y conviene decirlo: el correo NO lleva los QR
+    dibujados.** Gmail **descarta los `<svg>` incrustados y bloquea las imágenes
+    en `data:`**, así que doce QR dentro del mensaje llegarían como doce
+    recuadros vacíos. Un QR no es más que la forma de llevar un enlace al papel:
+    en un teléfono **el enlace es el QR**, así que van los doce enlaces, que es
+    lo que se puede pulsar. **La hoja impresa con los doce QR sigue existiendo**
+    para la casa, y se saca desde «Los 12 temas».
+  - **⚠️ AQUÍ EL DOMINIO SÍ ES LA CONSTANTE DE PRODUCCIÓN**, al contrario que en
+    el QR impreso (`enlaceDelTaller` lo saca de la petición, regla del 27-sep).
+    Un enlace que viaja por WhatsApp sobrevive meses y se abre desde otro
+    teléfono: con el dominio de la vista previa de una rama, dejaría de
+    funcionar en cuanto esa rama se fusione.
+  - **⚠️ «MANDARLE SU CÓDIGO» EN CADA RENGLÓN, porque sin eso el envío
+    automático tenía un callejón sin salida.** Un correo rebotado o un campo que
+    todavía no existía en HighLevel dejarían a la persona inscrita y sin forma
+    de entrar, y la única salida sería **retirarla de la casa y volver a
+    inscribirla** — que ensucia la bitácora con un movimiento que no ocurrió.
+    **No rehace el token**: el enlace que llegó la primera vez sigue sirviendo.
+  - **⚠️ EL AVISO SOLO SALE CUANDO HAY ALGO QUE HACER.** Si los dos caminos
+    funcionaron, no se dice nada: un aviso en cada inscripción se vuelve ruido y
+    se deja de leer, justo cuando importa. Y si **ninguno** salió, el aviso trae
+    **el código escrito**, que es lo único que le permite al líder dictarlo por
+    teléfono sin ir a buscarlo a Administración.
+  - **El mensaje se manda FUERA de la transacción y nunca deshace la
+    inscripción**: es red, y sostener la transacción esperando a Resend y a
+    HighLevel dejaría ocupada la única conexión de la petición (`max:1`, §7). Es
+    la decisión del 5-sep con el formulario de liderazgo.
+  - **`cargarMisTalleres` hace UN solo `$transaction`** con las cuatro
+    consultas: con `max:1` cuatro sueltas serían cuatro latencias en fila (la
+    decisión de `NodoDeRed`, 23-sep).
+  - **⚠️ LA NOTA QUE VE LA PERSONA SALE DE `faith_house_workshop_review`, NUNCA
+    DE `faith_house_progress.assessment`**: esa segunda es la evaluación
+    **privada** del mentor y el modelo dice que no se le muestra al aprendiz.
+  - **Dato encontrado de paso: 6 fichas no tenían código de miembro** — las 6
+    del sembrado del 15-ago, **ninguna con expediente**, así que no pueden hacer
+    un taller. Los 457 códigos son exactamente las 457 fichas con expediente.
+    Aun así `codigoDeMiembro` lo crea si falta: el correo no puede salir sin lo
+    único que le sirve a la persona.
+  - **El código y el enlace NO se escriben en la auditoría** (son credenciales,
+    como el token del calendario y el código del QR). Se audita
+    `casa_de_fe.acceso_enviado` con **por dónde salió**, y sale **en ámbar
+    cuando no salió por ningún lado**.
+  - **Probado al revés:** se quitó la rama de «ya marcado» y se subió también lo
+    que espera revisión; **fallaron exactamente las tres pruebas que debían**
+    (la 19, la 20 y la 25), y al restaurar, verde.
+  - `tsc`, eslint, **129/129 pruebas** (121 + 8) y `npm run cf:build` en verde.
+    **Sin migraciones.**
+  - **⚠️ ACCIÓN DEL USUARIO en HighLevel, y son tres cosas:**
+    1. Crear **dos campos personalizados del CONTACTO**: **«Código de miembro»**
+       y **«Enlace de talleres»**, los dos de texto. **No hay que mandarme
+       ningún id**: el sistema los busca por ese nombre.
+    2. Crear el **workflow del WhatsApp**: trigger **«Contact Tag»** → etiqueta
+       **`casa-de-fe-taller`** → acción de WhatsApp con
+       `{{contact.codigo_de_miembro}}` y `{{contact.enlace_de_talleres}}`.
+    3. Confirmar que **WhatsApp está conectado** en ese sub-cuenta. Si no lo
+       está, el correo sigue saliendo y el aviso ámbar lo dirá.
+
 - **2026-09-27** — **Taller virtual de Casa de Fe, con un QR por tema** (pedido
   del usuario: «quiero poder editar los nombres de las casas de fe… son 12
   temas… que me genere el QR por cada taller que cada persona que esté haciendo

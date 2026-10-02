@@ -391,3 +391,179 @@ export async function consultarDuenoDelContacto(
   const dueno = cuerpo.contact?.assignedTo;
   return typeof dueno === "string" && dueno.trim() ? dueno.trim() : null;
 }
+
+// ---------------------------------------------------------------------------
+// El acceso al taller de Casa de Fe, en el CRM
+// ---------------------------------------------------------------------------
+
+/// La etiqueta que se le pone al contacto al entrar a una Casa de Fe. **Es el
+/// disparador del WhatsApp**: el workflow de HighLevel escucha «se añadió esta
+/// etiqueta» y manda el mensaje con los dos campos de abajo.
+///
+/// Las etiquetas van **por nombre, no por id**, así que esto funciona sin que
+/// nadie tenga que copiar ningún identificador.
+export const ETIQUETA_TALLER = "casa-de-fe-taller";
+
+/// Los dos campos personalizados que el mensaje necesita, **buscados por
+/// nombre**.
+///
+/// ⚠️ **A propósito NO se guarda aquí su id, y esa es la decisión que vale la
+/// pena conservar.** Los demás campos de este archivo llevan el id a mano
+/// porque ya existían; estos dos los crea el usuario en HighLevel ahora, y
+/// pedirle que copie dos identificadores de 20 caracteres es **exactamente** el
+/// error del 6-sep-2026 — el id de Nora Bonilla quedó mal por dos caracteres
+/// (una `I` por una `l`) y una consolidadora entera se cayó del sistema sin que
+/// nada avisara. El sistema los busca él mismo con la API, que es la respuesta
+/// autorizada, y así tampoco hace falta un despliegue nuevo cuando se creen.
+const NOMBRES_DE_CAMPO = {
+  codigo: ["codigo de miembro", "código de miembro"],
+  enlace: ["enlace de talleres", "enlace de los talleres"],
+} as const;
+
+/// Sin tildes, sin mayúsculas y sin espacios de sobra: así «Código de Miembro»
+/// y «codigo de miembro» son lo mismo. Es la misma tolerancia que el buscador
+/// de personas (`normalizarBusqueda`).
+function plano(texto: string): string {
+  return texto
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+/// Pregunta a HighLevel los ids de los dos campos del taller.
+///
+/// Devuelve lo que encuentre: si el usuario solo creó uno, se escribe ese. Un
+/// campo que no existe no es un error — es que todavía no lo han creado.
+async function camposDelTaller(
+  cred: Credenciales,
+): Promise<{ codigo: string | null; enlace: string | null }> {
+  const respuesta = await fetch(
+    `${BASE}/locations/${cred.locationId}/customFields`,
+    {
+      headers: {
+        Authorization: `Bearer ${cred.token}`,
+        Version: VERSION,
+        Accept: "application/json",
+      },
+    },
+  );
+  if (!respuesta.ok) {
+    throw new Error(
+      `HighLevel GET /locations/${cred.locationId}/customFields → ${respuesta.status}`,
+    );
+  }
+
+  const cuerpo = (await respuesta.json()) as {
+    customFields?: { id?: unknown; name?: unknown; fieldKey?: unknown }[];
+  };
+
+  const buscar = (nombres: readonly string[]) => {
+    for (const campo of cuerpo.customFields ?? []) {
+      if (typeof campo.id !== "string") continue;
+      const nombre = typeof campo.name === "string" ? plano(campo.name) : "";
+      // `fieldKey` llega como «contact.codigo_de_miembro»: se compara también
+      // con los guiones bajos convertidos en espacios, porque es lo que ve el
+      // usuario cuando nombra el campo.
+      const clave =
+        typeof campo.fieldKey === "string"
+          ? plano(campo.fieldKey.replace(/^contact\./, "").replace(/_/g, " "))
+          : "";
+      if (nombres.some((n) => n === nombre || n === clave)) return campo.id;
+    }
+    return null;
+  };
+
+  return {
+    codigo: buscar(NOMBRES_DE_CAMPO.codigo),
+    enlace: buscar(NOMBRES_DE_CAMPO.enlace),
+  };
+}
+
+/// Escribe en el CRM el código de miembro y el enlace a «Mis talleres», y le
+/// pone la etiqueta que dispara el WhatsApp.
+///
+/// ⚠️ **Es best-effort, como todo este archivo**: la persona ya quedó inscrita
+/// en la Casa de Fe y eso no se deshace porque el CRM falle. Pero devuelve qué
+/// pasó, para que la pantalla que lo pidió pueda **decirlo** en vez de dar por
+/// hecho que el mensaje salió — es la lección del 3-sep-2026 con los correos
+/// que nunca se enviaron y nadie supo.
+export async function exportarAccesoAlTaller(
+  learnerId: string,
+  datos: { codigo: string; enlace: string },
+): Promise<{ ok: boolean; motivo?: string }> {
+  const cred = await credenciales();
+  if (!cred) {
+    return {
+      ok: false,
+      motivo:
+        "HighLevel no está configurado en el Worker (falta HIGHLEVEL_API_TOKEN o HIGHLEVEL_LOCATION_ID).",
+    };
+  }
+
+  try {
+    const aprendiz = await enlaceExistente(learnerId);
+    if (!aprendiz) return { ok: false, motivo: "No se encontró la ficha." };
+
+    const contactId =
+      aprendiz.person.highLevelContacts[0]?.contactId ??
+      (await exportarContactoNuevo(learnerId));
+    if (!contactId) {
+      return { ok: false, motivo: "No se pudo crear el contacto en HighLevel." };
+    }
+
+    const campos = await camposDelTaller(cred);
+    const aEscribir = [
+      ...(campos.codigo ? [{ id: campos.codigo, valor: datos.codigo }] : []),
+      ...(campos.enlace ? [{ id: campos.enlace, valor: datos.enlace }] : []),
+    ];
+
+    if (aEscribir.length > 0) {
+      await pedir(
+        `/contacts/${contactId}`,
+        "PUT",
+        {
+          customFields: aEscribir.map((campo) => ({
+            id: campo.id,
+            field_value: campo.valor,
+            value: campo.valor,
+          })),
+        },
+        cred.token,
+      );
+    }
+
+    // ⚠️ **La etiqueta va DESPUÉS de los campos, siempre.** Es lo que dispara
+    // el mensaje: si fuera primero, el WhatsApp saldría con los campos todavía
+    // vacíos y la persona recibiría un mensaje sin su código ni su enlace.
+    await pedir(
+      `/contacts/${contactId}/tags`,
+      "POST",
+      { tags: [ETIQUETA_TALLER] },
+      cred.token,
+    );
+
+    // Faltan los campos: la etiqueta ya está puesta y el workflow va a
+    // disparar, así que hay que decir que el mensaje va a salir incompleto.
+    if (aEscribir.length < 2) {
+      const faltan = [
+        campos.codigo ? null : "«Código de miembro»",
+        campos.enlace ? null : "«Enlace de talleres»",
+      ]
+        .filter(Boolean)
+        .join(" y ");
+      return {
+        ok: false,
+        motivo: `en HighLevel todavía no existe el campo ${faltan}, así que el WhatsApp va a salir sin ese dato.`,
+      };
+    }
+
+    return { ok: true };
+  } catch (error) {
+    console.error("No se pudo exportar el acceso al taller a HighLevel", error);
+    return {
+      ok: false,
+      motivo: "HighLevel rechazó la escritura. Revisa el registro del Worker.",
+    };
+  }
+}
