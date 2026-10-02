@@ -10,6 +10,11 @@ import {
   identificarParaTaller,
   learnerPorToken,
 } from "@/lib/taller";
+import {
+  COOKIE_TALLER,
+  DIAS_DE_COOKIE,
+  RUTA_DE_COOKIE,
+} from "@/lib/taller-catalogo";
 
 /// La cookie con la que la persona vuelve durante la semana.
 ///
@@ -18,8 +23,8 @@ import {
 /// otro sitio. Dura 30 días — lo que tarda alguien en hacer varios temas — y no
 /// más: un celular se presta, y una sesión eterna en un teléfono compartido
 /// dejaría a la siguiente persona escribiendo en el taller de la primera.
-const COOKIE = "taller_vive";
-const DIAS = 30;
+const COOKIE = COOKIE_TALLER;
+const DIAS = DIAS_DE_COOKIE;
 
 export type ResultadoPublico = { ok: true } | { ok: false; mensaje: string };
 
@@ -30,8 +35,12 @@ async function learnerDeLaCookie(): Promise<string | null> {
   return persona?.learnerId ?? null;
 }
 
+/// `codigo` es el tema del QR por el que entró. **Puede venir nulo**: desde
+/// «Mis talleres» la persona se identifica sin estar en ningún tema (perdió el
+/// enlace del WhatsApp y entra con su código). En ese caso no hay taller que
+/// abrir, solo sesión que dejar puesta.
 export async function identificarme(
-  codigo: string,
+  codigo: string | null,
   datos: {
     celular?: string;
     correo?: string;
@@ -52,18 +61,22 @@ export async function identificarme(
     httpOnly: true,
     sameSite: "lax",
     secure: true,
-    path: "/taller",
+    path: RUTA_DE_COOKIE,
     maxAge: DIAS * 24 * 60 * 60,
   });
 
-  // Se abre ya el taller para que al repintar la pantalla esté listo.
-  await abrirTaller(codigo, encontrada.datos.learnerId);
-  revalidatePath(`/taller/${codigo}`);
+  if (codigo) {
+    // Se abre ya el taller para que al repintar la pantalla esté listo.
+    await abrirTaller(codigo, encontrada.datos.learnerId);
+    revalidatePath(`/taller/${codigo}`);
+  } else {
+    revalidatePath("/taller/mis");
+  }
   return { ok: true };
 }
 
 export async function salirDelTaller(codigo: string): Promise<ResultadoPublico> {
-  (await cookies()).delete({ name: COOKIE, path: "/taller" });
+  (await cookies()).delete({ name: COOKIE, path: RUTA_DE_COOKIE });
   revalidatePath(`/taller/${codigo}`);
   return { ok: true };
 }

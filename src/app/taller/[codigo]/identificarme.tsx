@@ -17,7 +17,14 @@ import { identificarme } from "./acciones";
 /// su mamá acabaría llenando el taller a nombre de ella, y si las dos están
 /// registradas con ese número el sistema las bloquea a las dos. El código es
 /// de la persona, así que resuelve los dos casos de una.
-export function Identificarme({ codigo }: { codigo: string }) {
+export function Identificarme({
+  codigo,
+  titulo,
+}: {
+  /// El tema por el que entró, o `null` si viene a «Mis talleres».
+  codigo: string | null;
+  titulo?: string;
+}) {
   const router = useRouter();
   const [pendiente, arrancar] = useTransition();
   const [modo, setModo] = useState<"codigo" | "celular">("codigo");
@@ -60,7 +67,7 @@ export function Identificarme({ codigo }: { codigo: string }) {
             Iglesia Vive · Casa de Fe
           </p>
           <h1 className="mt-4 font-serif text-[27px] leading-[1.12]">
-            El taller de tu casa de fe
+            {titulo ?? "El taller de tu casa de fe"}
           </h1>
         </header>
 

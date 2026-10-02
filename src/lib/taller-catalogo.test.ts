@@ -9,9 +9,12 @@ import {
   avanceDelTaller,
   colaDelCelular,
   estadoDelTaller,
+  estadoDelTema,
   generarCodigo,
+  pideAtencion,
   preguntaRespondida,
   puedeEnviarse,
+  temasAprobados,
   terminoLosDoce,
   ultimaRevision,
   type PreguntaDelTaller,
@@ -243,4 +246,106 @@ test("el código generado tiene 6 dígitos, nunca empieza por 0, y no se repite"
 
 test("el código se enseña en dos bloques para poder dictarlo", () => {
   assert.equal(codigoLegible("418203"), "418 203");
+});
+
+// ---------------------------------------------------------------------------
+// «Mis talleres»: el estado de cada uno de los 12 temas
+// ---------------------------------------------------------------------------
+
+test("⚠️ un tema que su mentor ya marcó cuenta como APROBADO, aunque no exista taller", () => {
+  // Es el caso de las tres personas que el 27-sep-2026 ya tenían los 12
+  // marcados a mano. Sin esto verían los 12 «sin empezar» y volverían a hacer
+  // un recorrido que su líder ya les firmó.
+  assert.equal(estadoDelTema({ completado: true, taller: null }), "APROBADO");
+});
+
+test("⚠️ lo marcado MANDA sobre el taller: un borrador no degrada un tema ya completado", () => {
+  assert.equal(
+    estadoDelTema({
+      completado: true,
+      taller: { submittedAt: null, revisiones: [], respondidas: 3 },
+    }),
+    "APROBADO",
+  );
+});
+
+test("sin taller y sin marcar, el tema está sin empezar", () => {
+  assert.equal(estadoDelTema({ completado: false, taller: null }), "SIN_EMPEZAR");
+});
+
+test("⚠️ abrir un tema para mirarlo NO es haberlo empezado", () => {
+  // Al recibir el enlace cualquiera abre un par de temas a curiosear, y eso
+  // crea el taller. Si contara como «empezado», el tablero se llenaría de
+  // renglones a medias que nadie empezó.
+  assert.equal(
+    estadoDelTema({
+      completado: false,
+      taller: { submittedAt: null, revisiones: [], respondidas: 0 },
+    }),
+    "SIN_EMPEZAR",
+  );
+  assert.equal(
+    estadoDelTema({
+      completado: false,
+      taller: { submittedAt: null, revisiones: [], respondidas: 1 },
+    }),
+    "EMPEZADO",
+  );
+});
+
+test("enviado y sin revisar queda esperando; devuelto queda devuelto", () => {
+  const enviado = new Date("2026-10-01T15:00:00Z");
+  assert.equal(
+    estadoDelTema({
+      completado: false,
+      taller: { submittedAt: enviado, revisiones: [], respondidas: 7 },
+    }),
+    "ESPERANDO",
+  );
+  assert.equal(
+    estadoDelTema({
+      completado: false,
+      taller: {
+        submittedAt: enviado,
+        revisiones: [{ approved: false, reviewedAt: new Date("2026-10-02T15:00:00Z") }],
+        respondidas: 7,
+      },
+    }),
+    "DEVUELTO",
+  );
+});
+
+test("⚠️ un taller devuelto y vuelto a enviar sale de DEVUELTO y vuelve a la cola", () => {
+  // La misma trampa que `estadoDelTaller`: si se mirara solo «¿tiene
+  // revisión?», este renglón se quedaría en rojo para siempre y la persona
+  // creería que no lo recibieron.
+  assert.equal(
+    estadoDelTema({
+      completado: false,
+      taller: {
+        submittedAt: new Date("2026-10-03T10:00:00Z"),
+        revisiones: [{ approved: false, reviewedAt: new Date("2026-10-02T15:00:00Z") }],
+        respondidas: 7,
+      },
+    }),
+    "ESPERANDO",
+  );
+});
+
+test("solo lo devuelto se sube arriba; lo aprobado se queda en su sitio del libro", () => {
+  assert.equal(pideAtencion("DEVUELTO"), true);
+  assert.equal(pideAtencion("ESPERANDO"), false);
+  assert.equal(pideAtencion("APROBADO"), false);
+  assert.equal(pideAtencion("EMPEZADO"), false);
+  assert.equal(pideAtencion("SIN_EMPEZAR"), false);
+});
+
+test("⚠️ el contador cuenta lo APROBADO, no lo enviado", () => {
+  // Decir «3 de 12» con dos esperando revisión le prometería un avance que su
+  // líder todavía no ha firmado.
+  assert.equal(
+    temasAprobados(["APROBADO", "ESPERANDO", "ESPERANDO", "SIN_EMPEZAR"]),
+    1,
+  );
+  assert.equal(temasAprobados([]), 0);
 });

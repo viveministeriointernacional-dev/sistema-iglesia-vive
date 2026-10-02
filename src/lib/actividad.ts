@@ -830,6 +830,25 @@ export async function cargarActividad(
         tipo = "grupos"; etiqueta = "GRUPOS"; tono = "verde";
         frase = [A(), t(" actualizó el tema "), b(`${texto(m.tema) ?? ""} ${texto(m.nombre) ?? ""}`.trim()), t(" de "), P(), t(texto(m.estado) ? ` · ${texto(m.estado)}` : "")];
         break;
+      case "casa_de_fe.acceso_enviado": {
+        // Por dónde salió el acceso. En ámbar cuando NINGUNO de los dos
+        // caminos funcionó: la persona quedó inscrita y no tiene cómo entrar a
+        // su taller, así que alguien tiene que dictarle el código a mano.
+        const porCorreo = m.porCorreo === true;
+        const porWhatsapp = m.porWhatsapp === true;
+        const vias = [porCorreo ? "correo" : null, porWhatsapp ? "WhatsApp" : null]
+          .filter(Boolean)
+          .join(" y ");
+        tipo = "grupos"; etiqueta = "GRUPOS";
+        tono = porCorreo || porWhatsapp ? "verde" : "ambar";
+        frase = [
+          A(),
+          t(" le mandó a "),
+          P(),
+          t(vias ? ` su código y sus talleres por ${vias}` : " su código y sus talleres, y NO salió por ningún lado"),
+        ];
+        break;
+      }
       case "casa_de_fe.taller_enviado":
         // ⚠️ Sin actor: lo envió la persona desde el QR, sin cuenta. Poner a
         // alguien en `A()` diría que un líder lo registró.

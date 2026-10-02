@@ -55,6 +55,7 @@ export type AccionAuditada =
   | "gi.joven_asignado"
   | "gi.joven_quitado"
   | "casa_de_fe.encargado_quitado"
+  | "casa_de_fe.acceso_enviado"
   | "casa_de_fe.taller_enviado"
   | "casa_de_fe.taller_aprobado"
   | "casa_de_fe.taller_devuelto"

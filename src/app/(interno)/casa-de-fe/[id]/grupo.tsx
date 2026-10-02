@@ -7,6 +7,7 @@ import {
   alternarCierreCasaDeFe,
   buscarCandidatosCasaDeFe,
   inscribirEnCasaDeFe,
+  reenviarAccesoAlTaller,
   retirarDeCasaDeFe,
   type CandidatoCasaDeFe,
 } from "../acciones";
@@ -32,14 +33,24 @@ export function CasaDeFe({
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
   const [enCurso, iniciar] = useTransition();
 
-  function ejecutar(accion: () => Promise<{ ok: boolean; mensaje?: string }>) {
+  function ejecutar(
+    accion: () => Promise<{ ok: boolean; mensaje?: string; aviso?: string }>,
+  ) {
     setError(null);
+    setAviso(null);
     iniciar(async () => {
       const resultado = await accion();
-      if (!resultado.ok) setError(resultado.mensaje ?? "No se pudo guardar.");
-      else router.refresh();
+      if (!resultado.ok) {
+        setError(resultado.mensaje ?? "No se pudo guardar.");
+        return;
+      }
+      // El aviso no es un error: la acción sí se hizo. Se enseña en ámbar y se
+      // repinta igual.
+      if (resultado.aviso) setAviso(resultado.aviso);
+      router.refresh();
     });
   }
 
@@ -92,6 +103,20 @@ export function CasaDeFe({
                   disabled={enCurso}
                   onClick={() =>
                     ejecutar(() =>
+                      reenviarAccesoAlTaller(groupId, miembro.learnerId),
+                    )
+                  }
+                  className="cursor-pointer border-0 bg-transparent p-0 text-[11.5px] leading-none font-semibold text-azul-700 underline"
+                >
+                  Mandarle su código
+                </button>
+              ) : null}
+              {puedeEditar ? (
+                <button
+                  type="button"
+                  disabled={enCurso}
+                  onClick={() =>
+                    ejecutar(() =>
                       retirarDeCasaDeFe(groupId, miembro.membershipId),
                     )
                   }
@@ -116,11 +141,22 @@ export function CasaDeFe({
             {error}
           </p>
         ) : null}
+
+        {aviso ? (
+          <p
+            role="status"
+            className="mt-3 rounded-[8px] border border-[rgba(138,90,18,.3)] bg-[#fbf4dc] px-3 py-2.5 text-[11.5px] leading-[1.45] font-medium text-[#8a5a12]"
+          >
+            {aviso}
+          </p>
+        ) : null}
       </section>
 
       <p className="text-[11.5px] leading-[1.6] font-medium text-[rgba(19,28,36,.45)]">
-        El avance de los 12 temas de Casa de Fe se registra en el expediente de
-        cada persona. Este grupo solo reúne quién la lleva y con quiénes.
+        Al inscribir a alguien, el sistema le manda por correo y por WhatsApp su
+        código y el enlace a sus 12 talleres. El avance se registra en el
+        expediente de cada persona, y los talleres enviados se revisan en «Por
+        revisar».
       </p>
     </div>
   );
@@ -131,6 +167,7 @@ function Inscribir({ groupId }: { groupId: string }) {
   const [consulta, setConsulta] = useState("");
   const [candidatos, setCandidatos] = useState<CandidatoCasaDeFe[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
   const [enCurso, iniciar] = useTransition();
 
   return (
@@ -177,6 +214,11 @@ function Inscribir({ groupId }: { groupId: string }) {
                         setError(resultado.mensaje);
                         return;
                       }
+                      // ⚠️ El aviso se queda en pantalla aunque la lista de
+                      // candidatos se limpie: si el WhatsApp no salió, ese
+                      // texto es lo único que le dice al líder que tiene que
+                      // dictarle el código, y vaciarlo lo escondería.
+                      setAviso(resultado.aviso ?? null);
                       setCandidatos(null);
                       setConsulta("");
                       router.refresh();
@@ -203,6 +245,15 @@ function Inscribir({ groupId }: { groupId: string }) {
       {error ? (
         <p role="alert" className="mt-2 text-[11.5px] leading-[1.4] font-medium text-rojo">
           {error}
+        </p>
+      ) : null}
+
+      {aviso ? (
+        <p
+          role="status"
+          className="mt-2 rounded-[8px] border border-[rgba(138,90,18,.3)] bg-[#fbf4dc] px-3 py-2.5 text-[11.5px] leading-[1.45] font-medium text-[#8a5a12]"
+        >
+          {aviso}
         </p>
       ) : null}
     </div>
