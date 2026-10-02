@@ -11,6 +11,7 @@ import { asignarConsolidador } from "@/lib/asignacion";
 import { auditar, encolarEventoIntegracion } from "@/lib/audit";
 import { colaDeTelefono, nombreCompleto, ZONA_HORARIA } from "@/lib/dominio";
 import { DURACION_OPERACION_72_HORAS, ETIQUETA_LLAMADA } from "@/lib/op72";
+import { generarCodigoDeMiembro } from "@/lib/taller-catalogo";
 import type { VisitaDesdeCrm } from "@/lib/highlevel";
 import type { DatosRegistroValidados } from "@/lib/validacion-registro";
 
@@ -380,6 +381,31 @@ export async function crearRegistroEnTransaccion(
     },
     select: { id: true, gender: true },
   });
+
+  // **Su código de miembro, desde el primer día.**
+  //
+  // ⚠️ Va aquí y no en un proceso aparte porque si naciera sin código, la
+  // persona que se acaba de registrar sería justo la que no puede entrar al
+  // taller — y es la que más probablemente lo necesite: una menor sin celular
+  // propio se registra hoy y empieza su Casa de Fe esta semana.
+  //
+  // El reintento existe porque dos sorteos pueden coincidir; el índice único
+  // de la base rechaza el repetido y se vuelve a sortear. Con 463 personas
+  // sobre 900 000 combinaciones es rarísimo, pero «rarísimo» no es «imposible».
+  for (let intento = 0; intento < 10; intento += 1) {
+    try {
+      await db.memberCode.create({
+        data: { personId: persona.id, code: generarCodigoDeMiembro() },
+      });
+      break;
+    } catch (error) {
+      // Solo se reintenta la colisión de código (P2002). Cualquier otro fallo
+      // sube: tragárselo dejaría a la persona sin código y sin que nadie se
+      // entere.
+      const codigoPrisma = (error as { code?: string }).code;
+      if (codigoPrisma !== "P2002" || intento === 9) throw error;
+    }
+  }
 
   const elegido = soloFicha
     ? null

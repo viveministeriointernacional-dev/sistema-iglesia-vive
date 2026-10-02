@@ -172,3 +172,43 @@ export function colaDelCelular(valor: string): string | null {
   if (digitos.length < 10) return null;
   return digitos.slice(-10);
 }
+
+// ---------------------------------------------------------------------------
+// El código de miembro: el «carné» con el que se entra sin celular
+// ---------------------------------------------------------------------------
+
+/// Seis dígitos. Alcanza para 900 000 personas —la iglesia tiene 463— y se
+/// dicta por teléfono sin equivocarse. Con cuatro se repetiría pronto y sería
+/// adivinable; con ocho ya es incómodo de leer en voz alta.
+export const LARGO_DEL_CODIGO = 6;
+
+/// ¿Esto que escribieron parece un código?
+///
+/// ⚠️ **Se limpian los espacios y los guiones antes de mirar**, porque la
+/// gente escribe «418 203» o «418-203» tal como se lo dictaron. Rechazar eso
+/// sería castigar a quien copió bien.
+export function normalizarCodigo(valor: string): string | null {
+  const limpio = valor.replace(/[\s.\-]/g, "");
+  if (!/^[1-9][0-9]{5}$/.test(limpio)) return null;
+  return limpio;
+}
+
+/// Un código nuevo: seis dígitos aleatorios que nunca empiezan por 0.
+///
+/// ⚠️ **`crypto.getRandomValues`, no `Math.random`.** No es un secreto, pero
+/// `Math.random` en un bucle produce rachas predecibles, y dos personas con el
+/// mismo código verían el taller la una de la otra.
+///
+/// ⚠️ **Nunca correlativo.** Con 1, 2, 3… cualquiera abriría el taller del
+/// vecino escribiendo el número siguiente.
+export function generarCodigoDeMiembro(): string {
+  const crudo = new Uint32Array(1);
+  crypto.getRandomValues(crudo);
+  // 100000–999999: el primer dígito nunca es 0.
+  return String(100000 + (crudo[0] % 900000));
+}
+
+/// Como se enseña en pantalla y se dicta: «418 203».
+export function codigoLegible(codigo: string): string {
+  return `${codigo.slice(0, 3)} ${codigo.slice(3)}`;
+}

@@ -17,6 +17,7 @@ import {
   avanceDelTaller,
   colaDelCelular,
   estadoDelTaller,
+  normalizarCodigo,
   generarCodigo,
   puedeEnviarse,
   terminoLosDoce,
@@ -46,12 +47,69 @@ export type ResultadoTaller<T = undefined> =
 /// las 4 personas con avance en los temas, **3 no están inscritas en ninguna**.
 /// Exigirlo dejaría fuera a quienes ya lo están usando.
 export async function identificarParaTaller(datos: {
-  celular: string;
+  celular?: string;
   correo?: string;
   nacimiento?: string;
+  /// Su código de miembro, si lo trae. **Es el camino que mandan**: ver abajo.
+  codigo?: string;
 }): Promise<ResultadoTaller<{ learnerId: string; nombre: string; token: string }>> {
   const prisma = await getPrisma();
-  const cola = colaDelCelular(datos.celular);
+
+  // ⚠️ **EL CÓDIGO VA PRIMERO Y CORTA, y esa precedencia es el punto de todo.**
+  // Es lo único que identifica a UNA persona y no a un teléfono. Si se buscara
+  // primero por celular, una menor que escribe el de su mamá acabaría
+  // llenando el taller a nombre de ella —o, si las dos están registradas con
+  // ese número, el sistema las bloquearía a las dos.
+  const codigo = normalizarCodigo(datos.codigo ?? "");
+  if (codigo) {
+    const fila = await prisma.memberCode.findUnique({
+      where: { code: codigo },
+      select: {
+        personId: true,
+        person: {
+          select: {
+            firstName: true,
+            lastName: true,
+            learnerProfile: { select: { id: true } },
+          },
+        },
+      },
+    });
+
+    if (!fila?.person.learnerProfile) {
+      return {
+        ok: false,
+        mensaje: "Ese código no lo reconocemos. Revísalo con tu líder.",
+      };
+    }
+
+    await prisma.memberCode.update({
+      where: { code: codigo },
+      data: { usedAt: new Date() },
+    });
+
+    const learnerId = fila.person.learnerProfile.id;
+    return {
+      ok: true,
+      datos: {
+        learnerId,
+        nombre: `${fila.person.firstName} ${fila.person.lastName ?? ""}`.trim(),
+        token: await tokenDeRegreso(learnerId),
+      },
+    };
+  }
+
+  // Si escribió algo en el campo del código pero no es un código válido, se le
+  // dice — y NO se cae al celular por detrás. Caer en silencio al otro camino
+  // es lo que haría que terminara identificada como su papá sin enterarse.
+  if ((datos.codigo ?? "").trim()) {
+    return {
+      ok: false,
+      mensaje: "El código son 6 números. Revísalo con tu líder.",
+    };
+  }
+
+  const cola = colaDelCelular(datos.celular ?? "");
   const correo = (datos.correo ?? "").trim().toLowerCase();
 
   const CAMPOS = {
