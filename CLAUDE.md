@@ -287,13 +287,55 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-10-03** — **El PR #101 entró COMPLETO, y el equipo estrenó el
+  prematrimonial a los 41 MINUTOS de quedar vivo.**
+  `git log --oneline origin/main..origin/<rama>` **vacío** y los padres del
+  merge son `e69b309 edf9f4a`, o sea **la cabeza de la rama**: esta vez sí
+  entró todo (las dos mitades de la receta del 22-sep).
+  **⚠️ LA MEJOR PRUEBA NO LA PUSE YO, como el 22-sep: a las 21:35 —41 minutos
+  después de que el PR #100 quedara vivo— JUAN FELIPE CARVAJAL abrió el primer
+  prematrimonial real: Jhonatan Trujillos & Annie Cuaran Silva**, acompañados
+  por él mismo. 1 pareja viva, 0 talleres enviados todavía.
+  **⚠️ Y LO QUE HAY QUE DECIR CON HONESTIDAD: del PR #101 no tengo huella que
+  pruebe el despliegue, y mi primer intento fue un FALSO POSITIVO.** Dije que
+  producción servía `3b5jd348mxaua.css` (62 969 bytes) «exactamente el que
+  produjo este build» — y es cierto, **pero se compiló el commit del #100 y
+  sale EL MISMO ARCHIVO**: meter el prematrimonial dentro de Escuela solo
+  reusó clases de Tailwind que ya existían, así que la hoja de estilos salió
+  byte a byte idéntica.
+  **REGLA NUEVA, que completa la del 21-sep: la huella del CSS solo vale si se
+  comprueba que el build ANTERIOR produce un CSS DISTINTO.** Si los dos
+  coinciden, no prueba nada — igual que la trampa del chunk de JS del 11-sep.
+  **Y las rutas tampoco sirven aquí**: se comprobó que el middleware devuelve
+  **307 a todo lo que no sea público, exista o no** (`/no-existe-nada-xyz`
+  también da 307), así que `/prematrimonial` y `/escuela/prematrimonial` dan lo
+  mismo antes y después. **Para una pantalla INTERNA, sin sesión, no hay huella
+  posible desde fuera**: o produce CSS nuevo, o la comprueba el usuario abriendo
+  la pantalla.
+  **Estado de arranque medido: 12 cuentas pueden llevarlo** (pastores +
+  administración) y **3 cuentas de MENTOR ven «Escuela»** — que son justo las
+  que NO deben ver la pestaña, y es lo que vigila el guardia propio.
+  **Dato bueno: 0 filas huérfanas en el configurador.** Nadie había configurado
+  a mano la vista `prematrimonial` (0 en `view_role_access` y 0 en
+  `view_user_access`), así que quitar ese renglón del catálogo **no dejó
+  basura** apuntando a una vista que ya no existe.
+  **Sigue faltando el material de los temas 2 a 12**: solo el 1 tiene preguntas.
+
 - **2026-10-03** — **El prematrimonial quedó VIVO (PR #100 fusionado), PERO ⚠️
   EL MERGE SE LLEVÓ SOLO PARTE DEL TRABAJO. TERCERA VEZ.**
   Verificado en la base: **7 tablas `premarital%`**, **12 temas**, **21
   preguntas**, el valor **`PREMATRIMONIAL`** del enum `MilestoneKind` creado, y
   `20261003150000_prematrimonial` registrada como **la última aplicada**
-  (06:54 hora Colombia). La migración corrió sin pelearse con ningún candado,
-  que era el objetivo de no tocar ninguna tabla caliente.
+  (**20:54 hora Colombia del 2-oct**). La migración corrió sin pelearse con
+  ningún candado, que era el objetivo de no tocar ninguna tabla caliente.
+  **⚠️ CORRECCIÓN, y es la trampa del 8-sep otra vez: `app_migration.applied_at`
+  es `timestamptz`, NO `timestamp` sin zona como las tablas del modelo.** Le
+  apliqué `at time zone 'UTC' at time zone 'America/Bogota'` y **me sumó 5 h**
+  (dije 06:54 y eran las 20:54). Es el mismo matiz que ya estaba escrito para
+  `auth.users` el 16-sep: **ahí basta UN solo `at time zone 'America/Bogota'`**.
+  Se vio porque la pareja real salía creada *antes* que su propia tabla, que es
+  imposible — **cuando dos fechas de la misma base se contradicen, sospechar
+  del tipo de la columna antes que de los datos.**
   **Despliegue comprobado con huella positiva**, que es la variante buena de la
   receta del 18-sep: `GET /taller/pre/abcdef0123456789` → **200 con «Tu taller
   del prematrimonial»** dentro, y `GET /taller/pre/NO-ES-HEX` → **404**. O sea
