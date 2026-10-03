@@ -287,6 +287,41 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-10-03** — **El prematrimonial quedó VIVO (PR #100 fusionado), PERO ⚠️
+  EL MERGE SE LLEVÓ SOLO PARTE DEL TRABAJO. TERCERA VEZ.**
+  Verificado en la base: **7 tablas `premarital%`**, **12 temas**, **21
+  preguntas**, el valor **`PREMATRIMONIAL`** del enum `MilestoneKind` creado, y
+  `20261003150000_prematrimonial` registrada como **la última aplicada**
+  (06:54 hora Colombia). La migración corrió sin pelearse con ningún candado,
+  que era el objetivo de no tocar ninguna tabla caliente.
+  **Despliegue comprobado con huella positiva**, que es la variante buena de la
+  receta del 18-sep: `GET /taller/pre/abcdef0123456789` → **200 con «Tu taller
+  del prematrimonial»** dentro, y `GET /taller/pre/NO-ES-HEX` → **404**. O sea
+  que la ruta está en el bundle **y además valida el formato del código**, que
+  es código que solo existe en este PR. (Ojo: **un 404 a secas NO prueba nada
+  aquí** — `/taller` es prefijo público, así que una ruta inexistente también
+  da 404. Hay que pedir algo que solo el build nuevo sepa contestar con 200.)
+  **⚠️ LO QUE SE QUEDÓ FUERA: el commit que mete el prematrimonial DENTRO de
+  «Escuela».** El merge tomó como cabeza `972b904` y el commit `e1b97eb` —
+  empujado antes del merge— **no entró**. Comprobado con las dos mitades de la
+  receta del 22-sep: `git log --oneline origin/main..origin/<rama>` devolvió
+  **un commit**, y los padres del merge (`git log --format='%h %p'`) son
+  `023c2a4 972b904`, o sea que GitHub fusionó una cabeza vieja.
+  **Consecuencia mientras no se fusione otra vez:** en producción el
+  prematrimonial sigue en **`/prematrimonial`, con su propia entrada en el
+  menú** y su renglón en el configurador de vistas. Funciona — no hay nada
+  roto—, pero es justo lo que el usuario pidió cambiar.
+  **Arreglado con §5:** rama reiniciada desde `main` y el commit por encima
+  (`cherry-pick`), **cero duplicados** (el diff contra `main` es ese único
+  commit), `tsc`, eslint, **152/152** y `npm run cf:build` en verde, con las
+  rutas `/escuela/prematrimonial`, `/…/[id]` y `/…/[id]/[topicId]`.
+  **ES LA TERCERA VEZ (11-sep el PR #77, 11-sep el PR #80, hoy el #100), así
+  que la regla del 11-sep hay que reforzarla:** no basta con «no abrir el PR
+  hasta que todo esté empujado» — **después de empujar algo a una rama que ya
+  tiene PR abierto, hay que decirle explícitamente al usuario que vuelva a
+  mirar el PR antes de fusionar**, porque la página que él tiene abierta puede
+  estar mostrando la cabeza vieja.
+
 - **2026-10-03** — **Prematrimonial: los 12 temas que una pareja responde POR
   SEPARADO y que su pastor compara lado a lado** (pedido del usuario: «viene
   acompañado con 12 temas… quiero que ese taller lo puedan llenar en pareja,
