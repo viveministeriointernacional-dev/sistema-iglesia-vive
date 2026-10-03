@@ -830,6 +830,44 @@ export async function cargarActividad(
         tipo = "grupos"; etiqueta = "GRUPOS"; tono = "verde";
         frase = [A(), t(" actualizó el tema "), b(`${texto(m.tema) ?? ""} ${texto(m.nombre) ?? ""}`.trim()), t(" de "), P(), t(texto(m.estado) ? ` · ${texto(m.estado)}` : "")];
         break;
+      case "prematrimonial.pareja_abierta":
+        tipo = "grupos"; etiqueta = "GRUPOS"; tono = "verde";
+        frase = [A(), t(" abrió un prematrimonial")];
+        break;
+      case "prematrimonial.pareja_cerrada":
+        tipo = "grupos"; etiqueta = "GRUPOS"; tono = "ambar";
+        frase = [A(), t(" cerró un prematrimonial")];
+        break;
+      case "prematrimonial.pareja_reabierta":
+        tipo = "grupos"; etiqueta = "GRUPOS"; tono = "ambar";
+        frase = [A(), t(" reabrió un prematrimonial")];
+        break;
+      case "prematrimonial.taller_enviado":
+        // ⚠️ Sin actor a propósito: lo envió la persona desde su celular, sin
+        // cuenta. Poner a alguien en `A()` diría que un pastor lo registró.
+        tipo = "grupos"; etiqueta = "GRUPOS"; tono = "verde";
+        frase = [P(), t(" envió su taller del prematrimonial, tema "), b(`${texto(m.tema) ?? ""} ${texto(m.nombre) ?? ""}`.trim())];
+        break;
+      case "prematrimonial.tema_aprobado":
+        tipo = "grupos"; etiqueta = "GRUPOS"; tono = "verde";
+        frase = [A(), t(" aprobó un tema del prematrimonial")];
+        break;
+      case "prematrimonial.tema_devuelto":
+        // En ámbar: no es retroceder, es pedir una corrección.
+        tipo = "grupos"; etiqueta = "GRUPOS"; tono = "ambar";
+        frase = [A(), t(" devolvió un tema del prematrimonial para corregir")];
+        break;
+      case "prematrimonial.comparacion_destapada":
+        // ⚠️ El momento en que la pareja puede ver lo que respondió el otro.
+        // Queda a la vista porque es irreversible: lo visto no se puede
+        // volver a tapar.
+        tipo = "grupos"; etiqueta = "GRUPOS"; tono = "ambar";
+        frase = [A(), t(" le destapó a una pareja la comparación de un tema")];
+        break;
+      case "prematrimonial.recorrido_terminado":
+        tipo = "grupos"; etiqueta = "GRUPOS"; tono = "verde";
+        frase = [A(), t(" cerró el prematrimonial: la pareja terminó los 12 temas")];
+        break;
       case "casa_de_fe.acceso_enviado": {
         // Por dónde salió el acceso. En ámbar cuando NINGUNO de los dos
         // caminos funcionó: la persona quedó inscrita y no tiene cómo entrar a
