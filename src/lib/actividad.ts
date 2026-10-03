@@ -1016,6 +1016,19 @@ export async function cargarActividad(
           : fila.action === "servicio.registrado" ? ` registró el servicio ${texto(m.ministerio) ? `«${texto(m.ministerio)}» ` : ""}de `
           : ` cambió el estado del servicio de `), P()];
         break;
+      // Sin actor: lo hizo la persona desde su celular con el QR del
+      // entrenamiento, así que la frase arranca por ella y no por quien la metió.
+      case "escuela.inscripcion_por_qr":
+        tipo = "eventos"; etiqueta = "ESCUELA"; tono = "verde";
+        frase = [P(), t(" se inscribió en la Escuela desde el QR")];
+        observacion = texto(m.escuela);
+        break;
+      // En ámbar: sacar a alguien de la escuela no es avanzar, es corregir.
+      case "escuela.retirado":
+        tipo = "eventos"; etiqueta = "ESCUELA"; tono = "ambar";
+        frase = [A(), t(" retiró de la Escuela a "), P()];
+        observacion = texto(m.motivo);
+        break;
       case "evento.creado":
       case "evento.publicado":
       case "evento.despublicado":

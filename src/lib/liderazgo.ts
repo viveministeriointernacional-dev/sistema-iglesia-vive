@@ -17,6 +17,10 @@ import {
 } from "@/lib/liderazgo-catalogo";
 import { auditar } from "@/lib/audit";
 import { exportarDatosPersona } from "@/lib/highlevel-salida";
+import {
+  inscribirPorFormulario,
+  type InscripcionAutomatica,
+} from "@/lib/escuela-automatica";
 import { colaDeTelefono, nombreCompleto } from "@/lib/dominio";
 import type { ClientePrisma } from "@/lib/prisma";
 
@@ -49,6 +53,10 @@ export type ResultadoLiderazgo =
       rolesDeclarados: string[];
       etapaPendiente: string | null;
       etapaAplicada: string | null;
+      /// La Escuela Ser Líder en la que quedó inscrita, cuando el formulario
+      /// llegó por el QR del entrenamiento. `null` si el enlace no lo pedía o
+      /// si no hay ninguna escuela abierta.
+      escuela: InscripcionAutomatica | null;
     }
   | { ok: false; mensaje: string };
 
@@ -375,6 +383,13 @@ export async function guardarActualizacionDeLiderazgo(
         },
       });
 
+      // La inscripción a la Escuela va DENTRO de la transacción: quien escanea
+      // el QR del entrenamiento se está registrando Y entrando a la escuela en
+      // el mismo acto, así que no puede quedar una cosa sin la otra.
+      const escuela = datos.inscribirEnEscuela
+        ? await inscribirPorFormulario(tx, learnerId)
+        : null;
+
       return {
         ok: true as const,
         creada: !existente,
@@ -384,6 +399,7 @@ export async function guardarActualizacionDeLiderazgo(
         rolesDeclarados: roles.map((rol) => ETIQUETA_ROL[rol] ?? rol),
         etapaPendiente,
         etapaAplicada,
+        escuela,
         learnerId,
       };
     },
