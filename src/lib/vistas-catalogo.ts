@@ -42,6 +42,7 @@ export const ETIQUETA_ALCANCE: Record<AlcanceDeVista, string> = {
 export type VistaId =
   | "mi-red"
   | "gi"
+  | "prematrimonial"
   | "operacion-72"
   | "registro-interno"
   | "grupos"
@@ -107,6 +108,15 @@ export const VISTAS: readonly DefinicionDeVista[] = [
     ruta: "/alpha",
     alcance: "rama",
     alcanceDetalle: "Los que lleva y los de su rama",
+    grupo: "menu",
+  },
+  {
+    id: "prematrimonial",
+    nombre: "Prematrimonial",
+    ruta: "/prematrimonial",
+    alcance: "rama",
+    alcanceDetalle:
+      "Las parejas que acompaña o abrió · todas si administra o coordina",
     grupo: "menu",
   },
   {
@@ -216,6 +226,13 @@ export const POR_DEFECTO_SEGUN_ROL: Record<VistaId, readonly Role[]> = {
   "operacion-72": [Role.ADMIN, Role.CONSOLIDADOR],
   "registro-interno": [Role.CONSOLIDADOR, Role.PASTOR, Role.ADMIN],
   grupos: [Role.MENTOR, Role.PASTOR, Role.ADMIN],
+  // ⚠️ Como GI, el prematrimonial NO reconstruye nada: no existía antes del
+  // 3-oct-2026, así que este renglón es una DECISIÓN y no una foto de lo que
+  // alguien veía. El usuario la tomó explícitamente: **solo pastores y
+  // administración**. Lo que se lee aquí es lo más íntimo que guarda el
+  // sistema —deudas que no se han contado, temores, motivaciones para
+  // casarse—, y por eso no hay ningún permiso acumulable que lo abra.
+  prematrimonial: [Role.PASTOR, Role.ADMIN],
   escuela: [Role.MENTOR, Role.PASTOR, Role.ADMIN],
   eventos: [
     Role.CONSOLIDADOR,

@@ -149,6 +149,10 @@ model AppUser {
   giQueAsigno            GiAssignment[]          @relation("AsignoAGi")
   devocionalesMarcados   GiDevotional[]          @relation("MarcoDevocional")
   observacionesDeGi      GiNote[]                @relation("EscribioObservacionGi")
+  prematrimonialesQueLleva PremaritalCouple[]    @relation("PastorDelPrematrimonial")
+  prematrimonialesQueAbrio PremaritalCouple[]    @relation("AbrioPrematrimonial")
+  prematrimonialRevisiones PremaritalReview[]    @relation("RevisoPrematrimonial")
+  prematrimonialDestapes   PremaritalReveal[]    @relation("DestapoPrematrimonial")
 
   @@index([role, active])
   @@map("app_user")
@@ -394,6 +398,9 @@ model LearnerProfile {
   giNotes             GiNote[]
   faithHouseWorkshops FaithHouseWorkshop[]
   faithHouseTallerToken FaithHouseTallerToken?
+  prematrimonialComoA PremaritalCouple[]    @relation("NovioA")
+  prematrimonialComoB PremaritalCouple[]    @relation("NoviaB")
+  prematrimonialTalleres PremaritalWorkshop[]
 
   @@index([phase, status])
   /// El alcance «solo mis personas» del tablero y el cálculo de carga.
@@ -647,6 +654,7 @@ enum MilestoneKind {
   ALPHA
   FOCUS_DAY
   CASA_DE_FE
+  PREMATRIMONIAL
   BAUTISMO
   ENCUENTRO
   EVALUACION_CIERRE
@@ -1565,4 +1573,171 @@ model MemberCode {
   person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
 
   @@map("member_code")
+}
+
+
+// ---------------------------------------------------------------------------
+// Prematrimonial
+// ---------------------------------------------------------------------------
+
+/// Un tema del curso prematrimonial. Son 12; el contenido de cada uno llega
+/// del libro y se siembra por migracion.
+model PremaritalTopic {
+  id     String @id @default(uuid())
+  number Int    @unique
+  name   String
+  /// ⚠️ **El codigo del enlace, y es una CREDENCIAL, no el numero del tema.**
+  /// Con `/prematrimonial/3` cualquiera adivinaria los otros once.
+  code      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  questions PremaritalQuestion[]
+  workshops PremaritalWorkshop[]
+  reviews   PremaritalReview[]
+  reveals   PremaritalReveal[]
+
+  @@map("premarital_topic")
+}
+
+/// Una pregunta del taller.
+model PremaritalQuestion {
+  id      String @id @default(uuid())
+  topicId String @map("topic_id")
+  number  Int
+  /// ABIERTA · SI_NO · OPCION · MULTIPLE · ORDEN.
+  ///
+  /// ⚠️ MULTIPLE y ORDEN no existen en Casa de Fe, y son los que hacen
+  /// comparable el taller **sin que nadie tenga que juzgar**: en ellas el
+  /// sistema dice si los dos respondieron lo mismo. En las ABIERTAS calla a
+  /// proposito — medir si dos parrafos dicen lo mismo es el juicio pastoral
+  /// para el que existe la pantalla de comparacion.
+  kind    String   @default("ABIERTA")
+  prompt  String
+  options String[]
+
+  topic   PremaritalTopic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  answers PremaritalAnswer[]
+
+  @@unique([topicId, number])
+  @@map("premarital_question")
+}
+
+/// La pareja que esta haciendo el curso.
+model PremaritalCouple {
+  id          String    @id @default(uuid())
+  learnerAId  String    @map("learner_a_id")
+  learnerBId  String    @map("learner_b_id")
+  /// El pastor que los acompaña.
+  leaderId    String?   @map("leader_id")
+  startedAt   DateTime  @default(now()) @map("started_at")
+  closedAt    DateTime? @map("closed_at")
+  createdById String?   @map("created_by_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  learnerA  LearnerProfile @relation("NovioA", fields: [learnerAId], references: [id])
+  learnerB  LearnerProfile @relation("NoviaB", fields: [learnerBId], references: [id])
+  leader    AppUser?       @relation("PastorDelPrematrimonial", fields: [leaderId], references: [id])
+  createdBy AppUser?       @relation("AbrioPrematrimonial", fields: [createdById], references: [id])
+
+  workshops PremaritalWorkshop[]
+  reviews   PremaritalReview[]
+  reveals   PremaritalReveal[]
+
+  @@index([learnerAId])
+  @@index([learnerBId])
+  @@index([leaderId])
+  @@map("premarital_couple")
+}
+
+/// El taller de UNA persona en UN tema.
+///
+/// ⚠️ **NO tiene columna de estado**, igual que en Casa de Fe: se DERIVA de
+/// `submittedAt` y de la ultima revision. Una columna aparte se desincroniza en
+/// cuanto alguien reenvia un taller devuelto.
+model PremaritalWorkshop {
+  id          String    @id @default(uuid())
+  coupleId    String    @map("couple_id")
+  learnerId   String    @map("learner_id")
+  topicId     String    @map("topic_id")
+  submittedAt DateTime? @map("submitted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  couple  PremaritalCouple   @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  learner LearnerProfile     @relation(fields: [learnerId], references: [id])
+  topic   PremaritalTopic    @relation(fields: [topicId], references: [id])
+  answers PremaritalAnswer[]
+
+  @@unique([coupleId, learnerId, topicId])
+  @@index([learnerId])
+  @@map("premarital_workshop")
+}
+
+model PremaritalAnswer {
+  id         String @id @default(uuid())
+  workshopId String @map("workshop_id")
+  questionId String @map("question_id")
+  text       String?
+  /// OPCION y SI_NO.
+  choice     Int?
+  /// MULTIPLE. Vacio es una respuesta valida: no considerar correcta ninguna
+  /// opcion es responder, no dejar el campo en blanco.
+  choices    Int[]
+  /// ORDEN: las opciones en el orden que puso la persona. La primera es su 1.
+  ordering   Int[]
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  workshop PremaritalWorkshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  question PremaritalQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([workshopId, questionId])
+  @@map("premarital_answer")
+}
+
+/// La revision del pastor sobre un tema de la pareja.
+///
+/// ⚠️ **SE APILAN, NO SE PISAN** (la regla del 10-sep con las visitas): cuantas
+/// veces le devolvieron un tema a una pareja es la señal de que algo no va bien.
+model PremaritalReview {
+  id       String @id @default(uuid())
+  coupleId String @map("couple_id")
+  topicId  String @map("topic_id")
+  approved Boolean
+  note     String?
+  /// ⚠️ A quien se le devolvio. **Nulo al aprobar**: aprobar es del TEMA, o sea
+  /// de los dos; devolver es de UNO, porque el otro pudo responder bien y no se
+  /// le puede obligar a rehacer lo que hizo bien.
+  returnedToLearnerId String?  @map("returned_to_learner_id")
+  reviewedById        String?  @map("reviewed_by_id")
+  reviewedAt          DateTime @default(now()) @map("reviewed_at")
+
+  couple     PremaritalCouple @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  topic      PremaritalTopic  @relation(fields: [topicId], references: [id])
+  reviewedBy AppUser?         @relation("RevisoPrematrimonial", fields: [reviewedById], references: [id])
+
+  @@index([coupleId, topicId, reviewedAt])
+  @@map("premarital_review")
+}
+
+/// Destapar = mostrarle la comparacion A LA PAREJA.
+///
+/// El pastor la ve en cuanto los dos envian; esto es el permiso para que ellos
+/// la vean, y lo da el pastor cuando van a conversarlo con el (decision del
+/// usuario, 3-oct-2026).
+model PremaritalReveal {
+  id           String   @id @default(uuid())
+  coupleId     String   @map("couple_id")
+  topicId      String   @map("topic_id")
+  revealedAt   DateTime @default(now()) @map("revealed_at")
+  revealedById String?  @map("revealed_by_id")
+
+  couple     PremaritalCouple @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  topic      PremaritalTopic  @relation(fields: [topicId], references: [id])
+  revealedBy AppUser?         @relation("DestapoPrematrimonial", fields: [revealedById], references: [id])
+
+  @@unique([coupleId, topicId])
+  @@map("premarital_reveal")
 }

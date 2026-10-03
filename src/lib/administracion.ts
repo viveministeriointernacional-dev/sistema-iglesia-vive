@@ -32,6 +32,7 @@ export const ETIQUETA_HITO: Record<MilestoneKind, string> = {
   ALPHA: "Alpha",
   FOCUS_DAY: "Focus Day",
   CASA_DE_FE: "Casa de Fe",
+  PREMATRIMONIAL: "Prematrimonial",
   ENCUENTRO: "Encuentro",
   BAUTISMO: "Bautismo",
   EVALUACION_CIERRE: "Evaluación de cierre",

@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 
 import { momentoCorto } from "@/lib/dominio";
 import { cargarMisTalleres, learnerPorToken, type TemaEnMisTalleres } from "@/lib/taller";
+import { cargarMiPrematrimonial, type MiTemaPre } from "@/lib/prematrimonial";
 import {
   COOKIE_TALLER,
   ETIQUETA_TEMA,
@@ -37,7 +38,14 @@ export default async function MisTalleres() {
     return <Identificarme codigo={null} titulo="Tus talleres de casa de fe" />;
   }
 
-  const mis = await cargarMisTalleres(persona.learnerId);
+  // ⚠️ **Un solo enlace y un solo código para TODO lo que la persona llena.**
+  // El prematrimonial y la Casa de Fe son recorridos distintos, pero desde su
+  // celular son «mis talleres»: dos enlaces y dos códigos serían dos cosas que
+  // perder. Los dos viajes salen en paralelo.
+  const [mis, pre] = await Promise.all([
+    cargarMisTalleres(persona.learnerId),
+    cargarMiPrematrimonial(persona.learnerId),
+  ]);
   if (!mis) {
     return <Identificarme codigo={null} titulo="Tus talleres de casa de fe" />;
   }
@@ -103,6 +111,8 @@ export default async function MisTalleres() {
             ))}
           </div>
         </section>
+
+        {pre ? <BloquePrematrimonial pre={pre} /> : null}
 
         {porCorregir.length > 0 ? (
           <section className="px-5 pt-6">
@@ -247,4 +257,109 @@ function rotulo(tema: TemaEnMisTalleres): string {
     return `${ETIQUETA_TEMA.DEVUELTO}${tema.devueltoEl ? ` · ${momentoCorto(tema.devueltoEl)}` : ""}`;
   }
   return ETIQUETA_TEMA[tema.estado];
+}
+
+/// El bloque del prematrimonial dentro de «Mis talleres».
+///
+/// ⚠️ **Dice si el otro ya envió, pero NUNCA qué respondió.** Saber que la
+/// pareja va adelantada empuja a terminar; saber qué contestó arruinaría el
+/// ejercicio — por eso lo segundo solo aparece cuando el pastor lo destapa, y
+/// aun así se ve con él, no aquí.
+function BloquePrematrimonial({ pre }: { pre: MiPrematrimonialVista }) {
+  const disponibles = pre.temas.filter((t) => t.disponible);
+  const pendientes = disponibles.filter(
+    (t) => t.mio === "DEVUELTO" || (!t.yoEnvie && t.dePareja !== "APROBADO"),
+  );
+
+  return (
+    <section className="px-5 pt-6">
+      <h2 className="mb-2.5 text-[10px] font-bold tracking-[0.14em] text-[#7a3b5c] uppercase">
+        Tu prematrimonial · con {pre.nombreDelOtro.split(" ")[0]}
+      </h2>
+
+      <div className="mb-2.5 rounded-xl border border-[#c9a3b6] bg-[#f7eef2] px-3.5 py-3">
+        <p className="text-[12.5px] leading-[1.5] font-semibold text-[#7a3b5c]">
+          {pre.aprobados} de {pre.total} temas aprobados
+        </p>
+        <p className="mt-1 text-[11.5px] leading-[1.45] text-[#5c5648]">
+          Responde tú solo. {pre.nombreDelOtro.split(" ")[0]} no ve lo que
+          escribes hasta que su pastor lo destape.
+        </p>
+      </div>
+
+      {disponibles.length === 0 ? (
+        <p className="text-[11.5px] leading-[1.5] text-[#5c5648]">
+          Todavía no está el material de ningún tema. Tu pastor te avisa.
+        </p>
+      ) : (
+        (pendientes.length > 0 ? pendientes : disponibles).map((tema) => (
+          <RenglonPre key={tema.topicId} tema={tema} nombreDelOtro={pre.nombreDelOtro} />
+        ))
+      )}
+    </section>
+  );
+}
+
+type MiPrematrimonialVista = NonNullable<
+  Awaited<ReturnType<typeof cargarMiPrematrimonial>>
+>;
+
+function RenglonPre({
+  tema,
+  nombreDelOtro,
+}: {
+  tema: MiTemaPre;
+  nombreDelOtro: string;
+}) {
+  const estado =
+    tema.mio === "DEVUELTO"
+      ? { texto: "Te lo devolvieron · corrige y vuelve a enviar", tono: "font-bold text-[#a63d2f]", marco: "border-[1.5px] border-[#e0b4ac] bg-[#fdf1ee]" }
+      : tema.dePareja === "APROBADO"
+        ? { texto: "✓ Aprobado", tono: "font-semibold text-[#2f6f53]", marco: "border-[#cfe3d8] bg-[#edf5f0]" }
+        : tema.yoEnvie && !tema.elOtroEnvio
+          ? { texto: `Ya lo enviaste · falta ${nombreDelOtro.split(" ")[0]}`, tono: "font-semibold text-[#8a5a12]", marco: "border-[#e8d7a8] bg-[#fbf4dc]" }
+          : tema.yoEnvie
+            ? { texto: "Los dos lo enviaron · lo verán con su pastor", tono: "font-semibold text-[#7a3b5c]", marco: "border-[#c9a3b6] bg-[#f7eef2]" }
+            : { texto: "Sin empezar", tono: "text-[#5c5648]", marco: "border-[#e3ddcd] bg-white" };
+
+  // ⚠️ Lo aprobado y lo que ya envió no abre: no se vuelve a cambiar.
+  const abre = tema.mio !== "APROBADO" && !tema.yoEnvie;
+  const clases = `mb-2.5 block rounded-xl border p-[13px_14px] ${estado.marco}`;
+
+  const cuerpo = (
+    <>
+      <div className="flex items-start gap-[11px]">
+        <span className="grid h-[26px] w-[26px] flex-none place-items-center rounded-full bg-[#7a3b5c] text-[12px] font-bold text-white tabular-nums">
+          {tema.number}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="mt-0.5 text-[15px] leading-[1.25] font-semibold">{tema.name}</p>
+          <p className={`mt-[5px] text-[11.5px] leading-[1.45] ${estado.tono}`}>
+            {estado.texto}
+          </p>
+        </div>
+        {abre ? (
+          <span aria-hidden className="flex-none text-[17px] leading-[1.5] text-[#b6ac95]">
+            ›
+          </span>
+        ) : null}
+      </div>
+
+      {tema.mio === "DEVUELTO" && tema.notaDelPastor ? (
+        <div className="mt-2.5 ml-[37px] rounded-r-lg border-l-[3px] border-[#a63d2f] bg-white px-[11px] py-2.5">
+          <p className="mb-1 text-[9.5px] font-bold tracking-[0.12em] text-[#a63d2f] uppercase">
+            Tu pastor te escribió
+          </p>
+          <p className="text-[12.5px] leading-[1.5]">{tema.notaDelPastor}</p>
+        </div>
+      ) : null}
+    </>
+  );
+
+  if (!abre) return <div className={clases}>{cuerpo}</div>;
+  return (
+    <Link href={`/taller/pre/${tema.code}`} className={clases}>
+      {cuerpo}
+    </Link>
+  );
 }
