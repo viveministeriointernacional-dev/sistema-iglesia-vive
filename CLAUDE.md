@@ -358,10 +358,31 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   - **Nadie en dos prematrimoniales abiertos a la vez**: dos índices únicos
     parciales, uno por lado. Se comprueba además en el código para poder decir
     **quién** está repetido — un error del índice no le dice nada a nadie.
-  - **La vista entra en el configurador** y es, como GI, **de las dos que no
-    reconstruyen nada**: no existía antes, así que su renglón en
-    `LO_QUE_VEIA_CADA_ROL` es una decisión y no una foto. El guardián de vistas
-    lo cazó solo al añadirla.
+  - **⚠️ NO TIENE VISTA PROPIA: VIVE COMO PESTAÑA DENTRO DE «ESCUELA»** (el
+    usuario lo corrigió el mismo día: «me gustaría que el prematrimonial
+    quedara dentro de la sesión donde dice escuela, para no crear otro menú
+    aparte»). Es lo mismo que «Los 12 temas» y «Por revisar» bajo `/alpha`: la
+    pestaña hereda la vista, así que **no hubo que crear ninguna vista nueva en
+    el configurador ni encendérsela a mano a nadie**. Las rutas son
+    `/escuela/prematrimonial`, `/…/[id]` y `/…/[id]/[topicId]`.
+  - **⚠️ PERO EL PERMISO NO SE HEREDA DEL TODO, y sin esto habría sido una
+    fuga:** la vista «Escuela» la ve también el rol **MENTOR**, y el
+    prematrimonial es de **pastores y administración**. Las tres páginas repiten
+    el guardia (`requerirVista("escuela")` **más**
+    `puedeLlevarPrematrimonial` → `notFound()`) y **la pestaña solo se pinta a
+    quien pasa esa segunda comprobación** — enseñar una pestaña que da «no
+    tienes permiso» es peor que no enseñarla (regla del 16-sep). El renglón
+    `prematrimonial` salió de `VistaId`, de `VISTAS`, de
+    `POR_DEFECTO_SEGUN_ROL` y de `LO_QUE_VEIA_CADA_ROL`.
+  - **Arreglado de paso, y era visible: las tres pantallas no tenían `<main>`.**
+    Devolvían un `<div>` pelado y el layout interno no envuelve a sus hijos, así
+    que el contenido salía **pegado al borde de la pantalla**. Ahora llevan
+    `px-5 py-7 pb-16 sm:px-[26px]` y `max-w-[1240px]`, como el resto.
+  - **El distintivo de la pestaña cuenta lo que espera al pastor** (temas por
+    revisar + parejas listas para destapar) y sale de **un solo viaje**:
+    `pendientesDelPrematrimonial` reaprovecha lo que `cargarParejas` ya cuenta
+    por pareja. **Y solo se consulta si la cuenta puede llevarlo**: a los demás
+    no se les pinta la pestaña, así que sería una latencia para nada.
   - **Los 12 temas nacen, pero solo el 1 con contenido.** Un tema sin preguntas
     no se puede llenar y la pantalla lo **dice** («todavía no está el material»)
     en vez de dar 404. Los otros once se siembran cuando llegue el libro, sin

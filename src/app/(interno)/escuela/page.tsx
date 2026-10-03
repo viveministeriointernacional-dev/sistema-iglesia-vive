@@ -5,8 +5,13 @@ import {
   cargarEscuelas,
   esVistaCompletaDeEscuela,
 } from "@/lib/entrenar";
+import {
+  pendientesDelPrematrimonial,
+  puedeLlevarPrematrimonial,
+} from "@/lib/prematrimonial";
 import { BuscadorPersonas } from "@/components/buscador-personas";
 import { NuevaEscuela } from "./nueva-escuela";
+import { PestanasDeEscuela } from "./pestanas";
 
 export const metadata = { title: "Escuela Ser Líder · Iglesia Vive" };
 export const dynamic = "force-dynamic";
@@ -16,19 +21,34 @@ export default async function PaginaEscuela() {
   const usuario = await requerirVista("escuela");
   const escuelas = await cargarEscuelas(usuario);
 
+  // Solo se cuenta para quien puede llevar el prematrimonial: a los demás no se
+  // les pinta la pestaña, así que sería un viaje a la base para nada.
+  const llevaPrematrimonial = puedeLlevarPrematrimonial(usuario);
+  const pendientes = llevaPrematrimonial
+    ? await pendientesDelPrematrimonial(usuario)
+    : 0;
+
   return (
     <main className="px-5 py-7 pb-16 sm:px-[26px]">
       <div className="mx-auto max-w-[1240px]">
-        <header>
-          <h1 className="font-serif text-[30px] leading-[1.1] font-normal text-tinta">
-            Escuela Ser Líder
-          </h1>
-          <p className="mt-2 text-[13px] leading-none font-medium text-[rgba(19,28,36,.55)]">
-            {esVistaCompletaDeEscuela(usuario)
-              ? "Todas las escuelas de la iglesia"
-              : "Las escuelas que lideras"}{" "}
-            · presencial el primer sábado del mes, virtuales según programación
-          </p>
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="font-serif text-[30px] leading-[1.1] font-normal text-tinta">
+              Escuela Ser Líder
+            </h1>
+            <p className="mt-2 text-[13px] leading-none font-medium text-[rgba(19,28,36,.55)]">
+              {esVistaCompletaDeEscuela(usuario)
+                ? "Todas las escuelas de la iglesia"
+                : "Las escuelas que lideras"}{" "}
+              · presencial el primer sábado del mes, virtuales según programación
+            </p>
+          </div>
+
+          <PestanasDeEscuela
+            activa="escuelas"
+            conPrematrimonial={llevaPrematrimonial}
+            pendientes={pendientes}
+          />
         </header>
 
         {ROLES_BUSCADOR.includes(usuario.role) ? (

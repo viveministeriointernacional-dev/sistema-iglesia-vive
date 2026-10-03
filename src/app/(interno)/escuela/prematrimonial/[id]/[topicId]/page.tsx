@@ -3,7 +3,11 @@ import { notFound } from "next/navigation";
 
 import { requerirVista } from "@/lib/auth";
 import { momentoCorto } from "@/lib/dominio";
-import { cargarComparacion, type RenglonComparado } from "@/lib/prematrimonial";
+import {
+  cargarComparacion,
+  puedeLlevarPrematrimonial,
+  type RenglonComparado,
+} from "@/lib/prematrimonial";
 import type { RespuestaPre } from "@/lib/prematrimonial-catalogo";
 
 import { PanelDeRevision } from "./panel";
@@ -16,7 +20,12 @@ export default async function Comparar({
 }: {
   params: Promise<{ id: string; topicId: string }>;
 }) {
-  const usuario = await requerirVista("prematrimonial");
+  const usuario = await requerirVista("escuela");
+
+  // ⚠️ La vista «Escuela» no basta: la tiene también el rol MENTOR y el
+  // prematrimonial es de pastores y administración (decisión del usuario).
+  if (!puedeLlevarPrematrimonial(usuario)) notFound();
+
   const { id, topicId } = await params;
 
   const c = await cargarComparacion(usuario, id, topicId);
@@ -25,56 +34,58 @@ export default async function Comparar({
   if (!c) notFound();
 
   return (
-    <div className="flex flex-col gap-[14px]">
-      <div>
-        <Link
-          href={`/prematrimonial/${id}`}
-          className="text-[11.5px] font-semibold text-[rgba(19,28,36,.5)] underline"
-        >
-          ← {c.nombreA} &amp; {c.nombreB}
-        </Link>
-        <h1 className="mt-2 text-[22px] leading-tight font-semibold">
-          Tema {c.numero} · {c.nombreTema}
-        </h1>
-        <p className="mt-1 text-[12.5px] leading-[1.5] text-[rgba(19,28,36,.55)]">
-          {c.renglones.length} preguntas · el sistema puede comparar{" "}
-          <strong>{c.comparables}</strong>
-          {c.distintas > 0 ? (
-            <>
-              {" "}
-              · <strong className="text-[#a63d2f]">{c.distintas} con respuestas distintas</strong>
-            </>
-          ) : null}
-        </p>
+    <main className="px-5 py-7 pb-16 sm:px-[26px]">
+      <div className="mx-auto flex max-w-[1240px] flex-col gap-[14px]">
+        <div>
+          <Link
+            href={`/escuela/prematrimonial/${id}`}
+            className="text-[11.5px] font-semibold text-[rgba(19,28,36,.5)] underline"
+          >
+            ← {c.nombreA} &amp; {c.nombreB}
+          </Link>
+          <h1 className="mt-2 text-[22px] leading-tight font-semibold">
+            Tema {c.numero} · {c.nombreTema}
+          </h1>
+          <p className="mt-1 text-[12.5px] leading-[1.5] text-[rgba(19,28,36,.55)]">
+            {c.renglones.length} preguntas · el sistema puede comparar{" "}
+            <strong>{c.comparables}</strong>
+            {c.distintas > 0 ? (
+              <>
+                {" "}
+                · <strong className="text-[#a63d2f]">{c.distintas} con respuestas distintas</strong>
+              </>
+            ) : null}
+          </p>
+        </div>
+
+        <PanelDeRevision
+          coupleId={c.coupleId}
+          topicId={c.topicId}
+          nombreA={c.nombreA}
+          nombreB={c.nombreB}
+          learnerAId={c.learnerAId}
+          learnerBId={c.learnerBId}
+          estado={c.estado}
+          destapado={Boolean(c.destapadoEl)}
+          destapadoEl={c.destapadoEl ? momentoCorto(c.destapadoEl) : null}
+        />
+
+        {/* ⚠️ EL SISTEMA NO JUZGA LAS ABIERTAS, y eso se dice en pantalla. Medir
+            si dos párrafos dicen lo mismo es el juicio pastoral para el que
+            existe esta página; decir «coinciden» donde hay un desacuerdo de fondo
+            haría que se dejaran de leer. */}
+        <section className="tarjeta p-5">
+          <h2 className="etiqueta-seccion">LAS DOS RESPUESTAS, PREGUNTA POR PREGUNTA</h2>
+          <ul className="mt-3 flex flex-col gap-3">
+            {c.renglones.map((r) => (
+              <li key={r.questionId}>
+                <Renglon renglon={r} nombreA={c.nombreA} nombreB={c.nombreB} />
+              </li>
+            ))}
+          </ul>
+        </section>
       </div>
-
-      <PanelDeRevision
-        coupleId={c.coupleId}
-        topicId={c.topicId}
-        nombreA={c.nombreA}
-        nombreB={c.nombreB}
-        learnerAId={c.learnerAId}
-        learnerBId={c.learnerBId}
-        estado={c.estado}
-        destapado={Boolean(c.destapadoEl)}
-        destapadoEl={c.destapadoEl ? momentoCorto(c.destapadoEl) : null}
-      />
-
-      {/* ⚠️ EL SISTEMA NO JUZGA LAS ABIERTAS, y eso se dice en pantalla. Medir
-          si dos párrafos dicen lo mismo es el juicio pastoral para el que
-          existe esta página; decir «coinciden» donde hay un desacuerdo de fondo
-          haría que se dejaran de leer. */}
-      <section className="tarjeta p-5">
-        <h2 className="etiqueta-seccion">LAS DOS RESPUESTAS, PREGUNTA POR PREGUNTA</h2>
-        <ul className="mt-3 flex flex-col gap-3">
-          {c.renglones.map((r) => (
-            <li key={r.questionId}>
-              <Renglon renglon={r} nombreA={c.nombreA} nombreB={c.nombreB} />
-            </li>
-          ))}
-        </ul>
-      </section>
-    </div>
+    </main>
   );
 }
 
