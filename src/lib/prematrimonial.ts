@@ -270,6 +270,26 @@ export async function cargarParejas(usuario: UsuarioSesion): Promise<ParejaEnLis
   });
 }
 
+/// Cuántas cosas esperan al pastor en el prematrimonial: temas por revisar
+/// más temas listos para destapar, de las parejas ABIERTAS.
+///
+/// ⚠️ **Existe para el distintivo de la pestaña en «Escuela», y sale de UN solo
+/// viaje**: `cargarParejas` ya cuenta las dos cosas por pareja, así que sumarlas
+/// aquí no cuesta ninguna consulta de más. Con `PrismaPg max:1` cada viaje
+/// suelto sería una latencia en fila (§7).
+///
+/// Sin este número, una pareja termina su taller y se queda esperando una
+/// conversación que nadie recuerda agendar — destapar lo hace el pastor a mano.
+export async function pendientesDelPrematrimonial(
+  usuario: UsuarioSesion,
+): Promise<number> {
+  if (!puedeLlevarPrematrimonial(usuario)) return 0;
+  const parejas = await cargarParejas(usuario);
+  return parejas
+    .filter((p) => !p.cerrada)
+    .reduce((suma, p) => suma + p.porRevisar + p.porDestapar, 0);
+}
+
 export type TemaDeLaPareja = {
   topicId: string;
   number: number;

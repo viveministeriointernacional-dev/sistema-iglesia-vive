@@ -19,7 +19,7 @@ export type ResultadoPrematrimonial =
   | { ok: false; mensaje: string };
 
 async function usuarioDelPrematrimonial() {
-  await requerirVistaEnAccion("prematrimonial");
+  await requerirVistaEnAccion("escuela");
   const usuario = await obtenerUsuarioActual();
   if (!usuario) throw new ErrorDePermiso("Tu sesión expiró. Vuelve a entrar.");
   if (!puedeLlevarPrematrimonial(usuario)) throw new ErrorDePermiso();
@@ -98,7 +98,7 @@ export async function abrirPareja(
   const usuario = await usuarioDelPrematrimonial();
   const r = await crearPareja(usuario, { learnerAId, learnerBId, leaderId });
   if (!r.ok) return r;
-  revalidatePath("/prematrimonial");
+  revalidatePath("/escuela/prematrimonial");
   return { ok: true };
 }
 
@@ -109,8 +109,8 @@ export async function alternarCierre(
   const usuario = await usuarioDelPrematrimonial();
   const r = await cerrarPareja(usuario, coupleId, abrir);
   if (!r.ok) return r;
-  revalidatePath("/prematrimonial");
-  revalidatePath(`/prematrimonial/${coupleId}`);
+  revalidatePath("/escuela/prematrimonial");
+  revalidatePath(`/escuela/prematrimonial/${coupleId}`);
   return { ok: true };
 }
 
@@ -121,8 +121,8 @@ export async function destapar(
   const usuario = await usuarioDelPrematrimonial();
   const r = await destaparTema(usuario, coupleId, topicId);
   if (!r.ok) return r;
-  revalidatePath(`/prematrimonial/${coupleId}`);
-  revalidatePath(`/prematrimonial/${coupleId}/${topicId}`);
+  revalidatePath(`/escuela/prematrimonial/${coupleId}`);
+  revalidatePath(`/escuela/prematrimonial/${coupleId}/${topicId}`);
   return {
     ok: true,
     aviso:
@@ -146,9 +146,9 @@ export async function revisar(
     devueltoA,
   });
   if (!r.ok) return r;
-  revalidatePath("/prematrimonial");
-  revalidatePath(`/prematrimonial/${coupleId}`);
-  revalidatePath(`/prematrimonial/${coupleId}/${topicId}`);
+  revalidatePath("/escuela/prematrimonial");
+  revalidatePath(`/escuela/prematrimonial/${coupleId}`);
+  revalidatePath(`/escuela/prematrimonial/${coupleId}/${topicId}`);
   return {
     ok: true,
     aviso: r.datos.completoLosDoce

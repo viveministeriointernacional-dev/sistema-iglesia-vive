@@ -33,12 +33,14 @@ function perfil(role: Role, extra: Partial<PerfilParaVistas> = {}): PerfilParaVi
 /// `puedeVerAlpha`/`puedeVerCasaDeFe`, `ROLES_ENTRENAR`, `ROLES_OPERAN_EVENTOS`,
 /// `puedeVerProcesos` y `ROLES_ADMIN`.
 ///
-/// ⚠️ **«gi» y «prematrimonial» son las DOS excepciones, y hay que decirlo: no
-/// reconstruyen nada.** GI no existía antes del 23-sep-2026 y el
-/// prematrimonial no existía antes del 3-oct-2026, así que sus renglones son
-/// decisiones —quien acompaña una línea ve GI; solo pastores y administración
-/// ven el prematrimonial— y no fotos del pasado. Lo demás de esta tabla sí sale
-/// de leer los predicados viejos.
+/// ⚠️ **«gi» es la única excepción, y hay que decirlo: no reconstruye nada.**
+/// GI no existía antes del 23-sep-2026, así que su renglón es una decisión
+/// —quien acompaña una línea ve GI— y no una foto del pasado. Lo demás de esta
+/// tabla sí sale de leer los predicados viejos.
+///
+/// ⚠️ **El prematrimonial no aparece aquí a propósito**: no tiene vista propia,
+/// es una pestaña dentro de «Escuela» (3-oct-2026). Quién lo ve lo decide
+/// `puedeLlevarPrematrimonial`, no el configurador.
 const LO_QUE_VEIA_CADA_ROL: Record<Role, VistaId[]> = {
   [Role.APRENDIZ]: ["mi-proceso"],
   [Role.CONSOLIDADOR]: ["operacion-72", "registro-interno", "eventos"],
@@ -47,7 +49,6 @@ const LO_QUE_VEIA_CADA_ROL: Record<Role, VistaId[]> = {
   [Role.PASTOR]: [
     "mi-red",
     "gi",
-    "prematrimonial",
     "registro-interno",
     "grupos",
     "escuela",
@@ -57,7 +58,6 @@ const LO_QUE_VEIA_CADA_ROL: Record<Role, VistaId[]> = {
   [Role.ADMIN]: [
     "mi-red",
     "gi",
-    "prematrimonial",
     "operacion-72",
     "registro-interno",
     "grupos",
