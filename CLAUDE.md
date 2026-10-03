@@ -287,6 +287,103 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-10-03** — **El QR de «Actualizar datos» inscribe en la Escuela Ser
+  Líder, y por fin se puede RETIRAR a alguien** (pedido del usuario para el
+  lanzamiento de Casa de Fe: «crear un QR donde las personas que hacen parte de
+  la iglesia se registren, puedan actualizar datos… y una vez que se registren
+  queden automáticamente inscritos a la escuela Ser Líder… sería como
+  fusionarlo», con «la opción de poder desde el perfil administrador dar de baja
+  a una persona que se haya inscrito por error»). **Ajuste sobre pantallas que
+  ya existen, así que fue directo, sin mockup** (§2).
+  **⚠️ QUÉ ES SER LÍDER, que no estaba escrito en ninguna parte y hay que
+  guardarlo:** es el **discipulado MENSUAL de quienes YA SIRVEN** en un
+  ministerio — consolidación, comunicaciones/multimedia, alabanza, Iglesia de
+  Kids, prematrimonial, ujieres e intercesión—, con un **pensum de liderazgo,
+  visión y doctrinas básicas**. **No es para gente nueva.**
+  **⚠️ LA MITAD DEL CAMINO YA ESTABA CONSTRUIDA, y por eso esto fue corto:**
+  `/actualizar-datos` (el QR del liderazgo) **ya reconoce sola a la persona**
+  —celular, o correo + nacimiento (7-sep)—, ya pide todos sus datos, ya deja lo
+  declarado **esperando confirmación** y ya escribe en HighLevel. Y la escuela
+  ya tenía inscripciones, sesiones con **campo de tarea**, asistencia que marca
+  si entregó, y la regla del **75 % + 75 %**. **No había que crear otro QR: había
+  que ampliar ese.**
+  - **⚠️ LO DECIDE EL ENLACE, NO EL FORMULARIO, y esto evitó un daño real.**
+    Con **`?escuela=1`** inscribe; sin el parámetro, nada. **El enlace de
+    siempre YA CIRCULA** —por ahí entraron 26 declaraciones—, así que inscribir
+    a todo el que lo llena habría dejado inscrito a cualquiera que entrara a
+    corregir su celular, y habría tocado darle de baja a mano. Es «fusionado»
+    como pidió el usuario: mismo formulario, mismo código, **dos enlaces**.
+    El campo viaja **oculto en el `FormData`**, así que sigue funcionando sin
+    JavaScript.
+  - **⚠️ NO COMPRUEBA LA FASE, y es decisión del usuario con el dato delante.**
+    `inscribirEnEscuela` —el botón de a mano— exige **FORTALECER o ENTRENAR**
+    (`FASES_PARA_ESCUELA`). **Medido: de las 33 personas del equipo con cuenta,
+    13 quedan fuera de esas dos fases, y 11 de ellas por estar en MULTIPLICAR**,
+    que es la fase MÁS avanzada. O sea que el filtro excluye justo a los más
+    maduros, que es al revés de lo que Ser Líder necesita. Con el filtro puesto,
+    media sala habría escaneado y leído «la Escuela es para personas en
+    Fortalecer o Entrenar» — y el QR habría parecido roto. Se le ofrecieron tres
+    salidas y eligió **que entre cualquiera y corregir con la baja**.
+    (Reparto completo hoy: GANAR 182 · FORTALECER 8 · ENTRENAR 22 ·
+    MULTIPLICAR 12.)
+  - **La inscripción va DENTRO de la transacción del registro**: quien escanea
+    se registra **y** entra a la escuela en el mismo acto, así que no puede
+    quedar la ficha guardada y la inscripción a medias. Es lo contrario que el
+    correo y el WhatsApp del 2-oct, que van fuera porque son **red**.
+  - **A qué escuela: la ABIERTA más reciente** (`closedAt: null`, por
+    `startDate desc`). Si no hay ninguna abierta **no se inventa nada**: no
+    inscribe y la pantalla no promete nada. Hoy hay **una**, «Ser Lider Promo
+    2026» (Juan Felipe Carvajal, desde el 6-jun).
+  - **Idempotente, y las dos cosas que protege son distintas:** llenarlo dos
+    veces **no reinicia la fecha de entrada** y, sobre todo, **no borra el
+    cierre de quien ya se graduó**. Y el hito `ENTRADA_ESCUELA` **no se pisa si
+    ya estaba COMPLETADO** — la regla de las fusiones (§8), la misma que ya
+    aplicaba el botón de a mano.
+  - **⚠️ EL BLOQUE «QUEDASTE INSCRITO» VA ARRIBA DEL TODO en la pantalla de
+    gracias**, antes de «lo que cambiaste». La persona escaneó para entrar a la
+    Escuela: si queda debajo, en un celular se lee después de hacer scroll. Y
+    **distingue «ya estabas»**: decirle «quedaste inscrito» a quien lleva meses
+    sonaría a que algo se reinició.
+  - **⚠️ RETIRAR DE LA ESCUELA NO EXISTÍA. La escuela sabía meter gente y no
+    sabía sacarla.** `retirarDeEscuela` en `escuela/acciones.ts`, con el mismo
+    permiso que lo demás del grupo y **motivo obligatorio** (mín. 10
+    caracteres): el motivo es lo único que explica después por qué esa persona
+    salió. Confirmación en dos pasos.
+  - **Borra la inscripción, no la persona.** Comprobado **en la base real**, no
+    en el esquema de Prisma: `training_attendance.enrollment_id` es
+    **`ON DELETE CASCADE`** (se lleva su asistencia de esa escuela, que sin
+    inscripción no significa nada) y `training_enrollment.learner_id` es
+    **`RESTRICT`** (la ficha no se toca). El hito vive en otra tabla sin FK a la
+    inscripción, así que **no se roza**.
+  - **⚠️ A QUIEN YA CERRÓ LA ESCUELA NO SE LE OFRECE EL BOTÓN**, y el núcleo lo
+    rechaza igual con su mensaje: retirarlo le **borraría la graduación** de un
+    clic. Es la regla del 16-sep al derecho — si se enseña, tiene que funcionar.
+  - Auditoría: **`escuela.inscripcion_por_qr`** (**sin actor a propósito**: no
+    lo inscribió nadie del equipo, lo hizo la persona desde su celular — la
+    regla del taller) y **`escuela.retirado`** (**en ámbar**: no es avanzar, es
+    corregir), las dos con su `case` en `actividad.ts`.
+  - **⚠️ DOS COSAS QUE CUELGAN `execute_sql` DEL MCP Y CUESTAN 60 s CADA UNA:**
+    un bloque **`do $$ … raise notice`** y **`create temp table … on commit
+    drop`**. Las dos se agotaron por tiempo. **Y lo importante: no dejaron nada
+    escrito ni ningún candado** — se comprobó en el acto con `pg_stat_activity`
+    (`idle in transaction`) y `pg_locks` (`not granted`): **0 y 0**, y la base
+    en 2 inscripciones / 3 asistencias / 40 hitos, igual que antes. Para probar
+    escrituras por MCP: **CTEs de escritura con un `select` final**, y lo que
+    necesite ver varias sentencias se parte en varias llamadas.
+  - **Probado contra la base con `BEGIN … ROLLBACK`**: elige «Ser Lider Promo
+    2026» e **inscribe a alguien de MULTIPLICAR**, que es justo a quien el botón
+    de hoy rechaza. Producción quedó intacta.
+  - **Dato encontrado de paso: hay 40 hitos `ENTRADA_ESCUELA` y solo 2
+    inscritos.** O sea que 40 personas tienen la entrada a la Escuela en su
+    expediente (del formulario de liderazgo y las declaraciones) pero **no están
+    inscritas en la escuela del sistema**. No se tocó nada: es dato histórico,
+    pero conviene saberlo antes de sacar cuentas de la Escuela.
+  - `tsc`, eslint, **152/152 pruebas** y `npm run cf:build` en verde. **Sin
+    migraciones**, así que se puede fusionar a cualquier hora.
+  - **⚠️ EL ENLACE QUE VA EN EL QR DEL LANZAMIENTO:**
+    `…workers.dev/actualizar-datos?escuela=1` — **con el `?escuela=1`, o no
+    inscribe a nadie.**
+
 - **2026-10-03** — **El PR #101 entró COMPLETO, y el equipo estrenó el
   prematrimonial a los 41 MINUTOS de quedar vivo.**
   `git log --oneline origin/main..origin/<rama>` **vacío** y los padres del
