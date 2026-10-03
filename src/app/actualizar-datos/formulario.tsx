@@ -175,7 +175,14 @@ function Hito({
   );
 }
 
-export function FormularioLiderazgo() {
+export function FormularioLiderazgo({
+  paraEscuela = false,
+}: {
+  /// Lo trae el enlace del QR del entrenamiento (`?escuela=1`). Viaja al
+  /// servidor en un campo oculto, no en el estado: la Server Action lee el
+  /// `FormData`, así que sigue funcionando sin JavaScript.
+  paraEscuela?: boolean;
+}) {
   const [estado, enviar, enCurso] = useActionState(
     guardarDatosDeLiderazgo,
     INICIAL,
@@ -190,6 +197,10 @@ export function FormularioLiderazgo() {
 
   return (
     <form action={enviar} className="mt-6 flex flex-col gap-[14px]">
+      {paraEscuela ? (
+        <input type="hidden" name="inscribirEnEscuela" value="1" />
+      ) : null}
+
       {/* 1 · QUIÉN ERES */}
       <section className="tarjeta p-[18px] sm:p-5">
         <Rotulo numero={1}>QUIÉN ERES</Rotulo>
@@ -459,6 +470,28 @@ function Confirmacion({
           ? "No te encontramos con ese celular, así que te creamos tu expediente con todo lo que nos contaste."
           : "Actualizamos tu ficha con lo que nos contaste."}
       </p>
+
+      {/* ⚠️ VA ANTES QUE TODO LO DEMÁS, y no es decoración: la persona escaneó el
+          QR para entrar a la Escuela, así que lo primero que necesita saber es
+          si quedó dentro. Si lo dejáramos debajo de «lo que cambiaste», en un
+          celular se lee después de hacer scroll. */}
+      {resultado.escuela ? (
+        <div className="mt-[18px] rounded-[11px] border border-[#cfe3d8] bg-[#edf5f0] px-[15px] py-[14px] text-left">
+          <p className="text-[11px] leading-none font-bold tracking-[.1em] text-[#2f6f53]">
+            {resultado.escuela.yaEstaba
+              ? "YA ESTABAS EN LA ESCUELA"
+              : "QUEDASTE INSCRITO EN LA ESCUELA"}
+          </p>
+          <p className="mt-[7px] text-[13.5px] leading-[1.35] font-semibold">
+            {resultado.escuela.nombre}
+          </p>
+          <p className="mt-[7px] text-[12px] leading-[1.5] font-medium text-tinta-55">
+            {resultado.escuela.yaEstaba
+              ? "No te inscribimos de nuevo: tu avance y tus asistencias quedan como estaban."
+              : "Nos vemos en el entrenamiento. Allí te contamos cómo sigue."}
+          </p>
+        </div>
+      ) : null}
 
       {resultado.cambios.length ? (
         <div className="mt-[18px] overflow-hidden rounded-[11px] bg-[rgba(19,28,36,.09)]">

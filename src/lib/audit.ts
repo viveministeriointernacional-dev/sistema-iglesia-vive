@@ -73,6 +73,8 @@ export type AccionAuditada =
   | "alpha.validado"
   | "alpha.desvalidado"
   | "escuela.inscripcion"
+  | "escuela.inscripcion_por_qr"
+  | "escuela.retirado"
   | "escuela.cerrada"
   | "servicio.registrado"
   | "servicio.estado_cambiado"

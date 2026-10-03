@@ -164,4 +164,9 @@ export type DatosLiderazgo = {
   phase: Phase | "";
   roles: string[];
   hitos: HitoDeclarado[];
+  /// Lo pide el enlace del QR del entrenamiento (`?escuela=1`), NO el
+  /// formulario en sí. Así el QR viejo —que ya circula y por el que entraron 26
+  /// declaraciones— sigue sirviendo solo para actualizar datos y no inscribe a
+  /// nadie sin querer.
+  inscribirEnEscuela?: boolean;
 };

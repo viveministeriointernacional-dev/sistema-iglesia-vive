@@ -9,6 +9,7 @@ import {
   cerrarEscuela,
   crearSesion,
   inscribirEnEscuela,
+  retirarDeEscuela,
   registrarAsistenciaEscuela,
   type CandidatoEscuela,
 } from "../acciones";
@@ -269,6 +270,18 @@ export function Escuela({
                     Falta: {persona.faltaParaCerrar.join(" y ")}
                   </p>
                 ) : null}
+
+                {/* ⚠️ Solo a quien NO ha cerrado la escuela: retirar a un
+                    graduado le borraría el cierre, así que el núcleo lo rechaza
+                    y enseñar el botón sería prometer algo que va a fallar (la
+                    regla del 16-sep). */}
+                {puedeEditar && !persona.completado ? (
+                  <Retirar
+                    programId={programId}
+                    learnerId={persona.learnerId}
+                    nombre={persona.nombre}
+                  />
+                ) : null}
               </li>
             ))}
           </ul>
@@ -282,6 +295,96 @@ export function Escuela({
           cumpliéndose, lo cierra el líder. La fase no cambia: pasar a
           Multiplicar es decisión pastoral.
         </p>
+      </div>
+    </div>
+  );
+}
+
+/// Saca a una persona de la Escuela, con su motivo.
+///
+/// ⚠️ **Pide confirmación en dos pasos y la nota es obligatoria.** El QR del
+/// entrenamiento inscribe sin filtro, así que esta es la única salida — y borra
+/// la asistencia que esa persona llevara en esta escuela, que no se puede
+/// deshacer con un clic de vuelta.
+function Retirar({
+  programId,
+  learnerId,
+  nombre,
+}: {
+  programId: string;
+  learnerId: string;
+  nombre: string;
+}) {
+  const router = useRouter();
+  const [abierto, setAbierto] = useState(false);
+  const [motivo, setMotivo] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [enCurso, iniciar] = useTransition();
+
+  if (!abierto) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAbierto(true)}
+        className="mt-2 cursor-pointer border-0 bg-transparent p-0 text-[11px] font-semibold text-[rgba(19,28,36,.5)] underline"
+      >
+        Retirar de la escuela
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-2 rounded-[9px] border border-[rgba(19,28,36,.16)] bg-white p-3">
+      <p className="text-[11.5px] leading-[1.45] font-semibold">
+        Retirar a {nombre.split(" ")[0]} de la escuela
+      </p>
+      <p className="mt-1 text-[11px] leading-[1.45] font-medium text-[rgba(19,28,36,.5)]">
+        Se va con su asistencia de esta escuela. Su expediente y lo que ya haya
+        logrado antes no se tocan.
+      </p>
+      <textarea
+        rows={2}
+        value={motivo}
+        onChange={(e) => setMotivo(e.target.value)}
+        placeholder="¿Por qué la retiras? Se inscribió por error, no sirve todavía…"
+        className="mt-2 w-full resize-y rounded-[7px] border border-[rgba(19,28,36,.16)] bg-white px-2.5 py-2 text-[12px] leading-[1.45]"
+      />
+      {error ? (
+        <p role="alert" className="mt-1.5 text-[11px] leading-[1.4] font-medium text-rojo">
+          {error}
+        </p>
+      ) : null}
+      <div className="mt-2 flex gap-2">
+        <button
+          type="button"
+          disabled={enCurso || motivo.trim().length < 10}
+          onClick={() => {
+            setError(null);
+            iniciar(async () => {
+              const r = await retirarDeEscuela(programId, learnerId, motivo);
+              if (!r.ok) {
+                setError(r.mensaje);
+                return;
+              }
+              setAbierto(false);
+              setMotivo("");
+              router.refresh();
+            });
+          }}
+          className="cursor-pointer rounded-[7px] border border-[rgba(19,28,36,.16)] bg-white px-3 py-1.5 text-[11.5px] font-semibold text-rojo disabled:opacity-45"
+        >
+          {enCurso ? "Retirando…" : "Sí, retirar"}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setAbierto(false);
+            setError(null);
+          }}
+          className="cursor-pointer rounded-[7px] border border-[rgba(19,28,36,.16)] bg-white px-3 py-1.5 text-[11.5px] font-semibold"
+        >
+          Cancelar
+        </button>
       </div>
     </div>
   );

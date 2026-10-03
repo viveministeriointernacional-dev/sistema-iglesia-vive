@@ -46,6 +46,10 @@ export async function guardarDatosDeLiderazgo(
       phase: etapa in Phase ? (etapa as Phase) : "",
       roles: formulario.getAll("roles").map(String),
       hitos,
+      // Lo decide el ENLACE, no la persona: el QR del entrenamiento lleva
+      // `?escuela=1` y la página lo pasa en este campo oculto. El enlace de
+      // siempre no lo trae, así que sigue sirviendo solo para actualizar datos.
+      inscribirEnEscuela: formulario.get("inscribirEnEscuela") === "1",
     });
 
     if (!resultado.ok) return { fase: "error", mensaje: resultado.mensaje };

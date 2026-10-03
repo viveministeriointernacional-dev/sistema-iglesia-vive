@@ -525,3 +525,66 @@ export async function cambiarEstadoDeServicio(
   revalidatePath(`/expediente/${servicio.learnerId}`);
   return { ok: true };
 }
+
+/// Saca a una persona de la Escuela.
+///
+/// ⚠️ **Existe porque el QR inscribe sin filtro** (decisión del usuario,
+/// 3-oct-2026): quien escanea el enlace del entrenamiento queda dentro, así que
+/// hace falta una salida para quien se inscribió por error o no está apto. Antes
+/// de hoy la escuela sabía meter gente y **no sabía sacarla**.
+///
+/// **Borra la inscripción, no la persona.** Se lleva con ella su asistencia de
+/// esta escuela (la FK es `onDelete: Cascade`), porque una asistencia sin
+/// inscripción no significa nada. Y **no toca el hito**: si la persona ya había
+/// entrado antes a una escuela y la completó, ese logro es suyo — es la regla de
+/// las fusiones (§8).
+export async function retirarDeEscuela(
+  programId: string,
+  learnerId: string,
+  motivo: string,
+): Promise<Resultado> {
+  const { usuario, escuela } = await escuelaPropia(programId);
+  if (!escuela) return { ok: false, mensaje: "Esa escuela no existe." };
+  if (escuela.closedAt) return { ok: false, mensaje: "La escuela está cerrada." };
+
+  // Nota obligatoria, como en los demás paneles del sistema: el motivo es lo
+  // único que le explica después a alguien por qué esta persona salió.
+  const nota = motivo.trim();
+  if (nota.length < 10) {
+    return { ok: false, mensaje: "Cuéntanos en una frase por qué la retiras." };
+  }
+
+  const prisma = await getPrisma();
+  const inscripcion = await prisma.trainingEnrollment.findUnique({
+    where: { programId_learnerId: { programId, learnerId } },
+    select: { id: true, completedAt: true },
+  });
+  if (!inscripcion) {
+    return { ok: false, mensaje: "Esa persona no está inscrita en esta escuela." };
+  }
+  // ⚠️ A quien ya cerró la escuela NO se le retira: eso le borraría la
+  // graduación de un clic. Si de verdad hay que deshacerla, se hace desde su
+  // expediente, que es donde consta.
+  if (inscripcion.completedAt) {
+    return {
+      ok: false,
+      mensaje:
+        "Esta persona ya cerró la Escuela. Retirarla le borraría el cierre: si hay que corregirlo, hazlo desde su expediente.",
+    };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.trainingEnrollment.delete({ where: { id: inscripcion.id } });
+    await auditar(tx, {
+      actorId: usuario.id,
+      action: "escuela.retirado",
+      entityType: "learner_profile",
+      entityId: learnerId,
+      metadata: { programId, motivo: nota },
+    });
+  });
+
+  revalidatePath(`/escuela/${programId}`);
+  revalidatePath(`/expediente/${learnerId}`);
+  return { ok: true };
+}
