@@ -287,6 +287,113 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-10-03** — **Prematrimonial: los 12 temas que una pareja responde POR
+  SEPARADO y que su pastor compara lado a lado** (pedido del usuario: «viene
+  acompañado con 12 temas… quiero que ese taller lo puedan llenar en pareja,
+  pero cada uno lo resuelve individualmente. Lo que quiero al final es poder
+  comparar cada taller la respuesta por pareja»; mockup aprobado:
+  claude.ai/artifact/CisGUJ85Kw3mq18HrVVKRG).
+  - **Medido antes de diseñar: no existía NADA.** Ni grupo, ni proceso, ni hito,
+    ni concepto de pareja — las menciones de «pareja» en el código eran
+    comentarios sobre las casas que llevan dos encargados. Se construyó desde
+    cero, **pero casi nada hubo que inventarlo**: el código de miembro, el
+    enlace por correo y SMS, el guardar-y-volver sin cuenta y la cola de
+    revisión salieron tal cual de Casa de Fe.
+  - **⚠️ LA ANATOMÍA DEL LIBRO NO ES LA DE CASA DE FE, y por eso se esperó a
+    verlo antes de programar.** No hay versículo para memorizar ni plan de 7
+    días: es enseñanza larga en prosa (páginas 3-12) y al final el **«TALLER 1»
+    con 21 preguntas numeradas** (13-16). Material del **«Curso Prematrimonial ·
+    El Lugar de Su Presencia»**, otra iglesia.
+  - **⚠️ DOS TIPOS DE PREGUNTA NUEVOS, y son los que hacen valioso el trabajo:
+    MARCAR VARIAS** (la 14, «unidad en el matrimonio», 8 opciones) **y ORDENAR
+    del 1 al 6** (la 21, las prioridades: Esposo · Hijos · Dios · Familia
+    extendida · Iglesia · Trabajo). Son los únicos, con sí/no, donde el sistema
+    puede decir **sin juzgar** si los dos respondieron lo mismo. **Y la 21 el
+    libro mismo la remata con «Comparen sus respuestas»** — o sea que el curso
+    ya pedía a mano lo que ahora hace la pantalla.
+  - **⚠️ EL SISTEMA NO JUZGA LAS ABIERTAS, Y ESO ES UNA DECISIÓN, NO UNA
+    LIMITACIÓN QUE SE DISIMULE.** De las 21, **18 son abiertas**: ahí se ponen
+    las dos respuestas lado a lado y se calla. Decir «coinciden» donde hay un
+    desacuerdo de fondo haría que el pastor dejara de leerlas, que es justo lo
+    contrario de para lo que existe la pantalla. La pantalla lo dice en el
+    encabezado: «21 preguntas · el sistema puede comparar 3».
+  - **⚠️ ORDENAR SE COMPARA POR EL PUESTO DE CADA OPCIÓN, NO POR LA LISTA EN
+    CRUDO.** Lo que importa es que para él «Dios» va primero y para ella
+    tercero, no en qué casilla de la lista quedó. Tiene prueba propia y se
+    comprobó al revés.
+  - **Cuatro decisiones del usuario, con `AskUserQuestion`:** (1) **el pastor
+    decide cuándo destapar** la comparación a la pareja; (2) **aprueba o
+    devuelve**, igual que Casa de Fe; (3) **las dos personas con ficha** en el
+    sistema; (4) **solo pastores y administración**.
+  - **⚠️ «DESTAPAR» ES MOSTRÁRSELA A LA PAREJA, NO AL PASTOR** — él la ve en
+    cuanto los dos envían. Y como destapar es a mano y **eso se olvida**, el
+    bloque **«Listas para destapar» va ARRIBA DEL TODO** en la pantalla: si
+    quedara mezclado en la lista, una pareja termina y se queda esperando una
+    conversación que nadie recuerda agendar. El botón **pide confirmación**:
+    destapar no se puede deshacer.
+  - **⚠️ APROBAR ES DEL TEMA (de los dos) Y DEVOLVER ES DE UNO.** Si la
+    devolución fuera de la pareja, a quien respondió bien se le obligaría a
+    rehacer su taller. Por eso la revisión guarda `returned_to_learner_id` y
+    `estadoTallerPre` compara contra él: al otro le queda en ENVIADO. Prueba
+    propia.
+  - **⚠️ MARCAR VARIAS ADMITE CERO MARCAS COMO RESPUESTA VÁLIDA.** En la 14 es
+    perfectamente posible no considerar correcta ninguna de las ocho, y exigir
+    al menos una obligaría a mentir para poder enviar. Se distingue de «no la
+    tocó» por la existencia de la fila. Dos pruebas.
+  - **⚠️ ORDENAR EXIGE EL ORDEN COMPLETO, sin repetir ni dejar fuera**: a medias
+    no se puede comparar puesto por puesto, que es para lo único que sirve.
+  - **Se ordena con un número por renglón, no arrastrando**: arrastrar con el
+    dedo es lo que peor funciona en un celular, y el libro lo pide así
+    literalmente («Escriba del 1 a 6 según el orden que considere»).
+  - **⚠️ UN SOLO ENLACE Y UN SOLO CÓDIGO PARA TODO.** El bloque del
+    prematrimonial vive dentro de **«Mis talleres»**, junto al de Casa de Fe:
+    desde el celular de la persona son «mis talleres», y dos enlaces serían dos
+    cosas que perder. Dice **si el otro ya envió, pero nunca qué respondió**.
+  - **⚠️ LA MIGRACIÓN NO TOCA NINGUNA TABLA CALIENTE** (la lección del 24-sep):
+    ni un ALTER sobre `app_user`, `person` ni `learner_profile`. Como quien lo
+    lleva se decide por ROL, no hizo falta ninguna columna de permiso — **se
+    puede fusionar a cualquier hora**. Lo único fuera de tablas nuevas es
+    `ALTER TYPE MilestoneKind ADD VALUE 'PREMATRIMONIAL'`, que corre dentro de
+    la transacción porque **no se USA en ella** (comprobado el 9-sep).
+  - **Nadie en dos prematrimoniales abiertos a la vez**: dos índices únicos
+    parciales, uno por lado. Se comprueba además en el código para poder decir
+    **quién** está repetido — un error del índice no le dice nada a nadie.
+  - **La vista entra en el configurador** y es, como GI, **de las dos que no
+    reconstruyen nada**: no existía antes, así que su renglón en
+    `LO_QUE_VEIA_CADA_ROL` es una decisión y no una foto. El guardián de vistas
+    lo cazó solo al añadirla.
+  - **Los 12 temas nacen, pero solo el 1 con contenido.** Un tema sin preguntas
+    no se puede llenar y la pantalla lo **dice** («todavía no está el material»)
+    en vez de dar 404. Los otros once se siembran cuando llegue el libro, sin
+    tocar nada de lo respondido.
+  - **⚠️ EL PDF NO TENÍA CAPA DE TEXTO** (14 caracteres en 14 páginas: es un
+    escaneo). Se renderizó con `pypdfium2` y se leyó como imagen. **Y el margen
+    derecho está cortado en las páginas de ENSEÑANZA** («que Dios establ…»,
+    «baja autoestim…»), pero **no en el taller**: las 21 preguntas se leen
+    enteras. Si algún día se quiere la enseñanza dentro de la plataforma, hace
+    falta otro escaneo.
+  - **⚠️ `pdftoppm`, `pypdf` y `pdfminer` fallan en este entorno**: el paquete
+    `cryptography` de Debian está roto (`ModuleNotFoundError: _cffi_backend`) y
+    envenena a todo lo que lo importe. Se arregla con
+    `pip install --upgrade cffi`, y para renderizar páginas sirve
+    `pypdfium2` + `pillow`. **Anotarlo porque cuesta media hora encontrarlo.**
+  - Auditoría: `prematrimonial.pareja_abierta`, `…pareja_cerrada`,
+    `…pareja_reabierta`, `…taller_enviado` (**sin actor**: lo envió la persona
+    desde la calle), `…tema_aprobado`, `…tema_devuelto`,
+    `…comparacion_destapada` (**en ámbar**: es irreversible) y
+    `…recorrido_terminado`, las ocho con su `case` en `actividad.ts`.
+  - **Probado al revés:** se hizo comparable la ABIERTA, se comparó ORDENAR por
+    la lista en crudo y se exigió al menos una marca en MULTIPLE; **fallaron
+    exactamente las cinco pruebas que debían**, y al restaurar, verde.
+  - Migración probada con `BEGIN … ROLLBACK` en la misma llamada, **con la
+    segunda pasada dentro**: 12 temas, 21 preguntas (18 abiertas · 1 múltiple
+    de 8 opciones · 1 de ordenar de 6 · 1 sí/no), 12 códigos distintos, y nada
+    duplicado. Producción quedó en **0 tablas**.
+  - `tsc`, eslint, **152/152 pruebas** (129 + 23) y `npm run cf:build` en verde.
+  - **⚠️ PENDIENTE DEL USUARIO: faltan los temas 2 a 12.** Que los vaya mandando
+    como mandó el 1. Y **el hito `PREMATRIMONIAL` no existe hasta que el build
+    corra la migración**, así que no se puede marcar a mano antes.
+
 - **2026-10-02** — **«Mis talleres»: al entrar a una Casa de Fe, el código y los
   12 talleres le llegan por correo y por WhatsApp** (pedido del usuario: «me
   gustaría que cuando una persona se registre dentro de una casa de fe, el
