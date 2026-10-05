@@ -384,8 +384,14 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
     enviar doce puntos suspensivos.
   - **⚠️ EL NÚMERO DE LA PREGUNTA PUEDE TENER HUECOS Y SE CONSERVA: el tema 2
     salta de la 4 a la 6** en el documento. Renumerar dejaría al líder buscando
-    «la 5» en un papel donde no existe. **Sigue pendiente del usuario** decir
-    si falta una pregunta o si hay que renumerar.
+    «la 5» en un papel donde no existe. **RESUELTO por el usuario (5-oct):
+    FALTA la pregunta 5, la manda después — NO se renumera.** Cuando llegue,
+    entra con una migración nueva que la inserte como la 5 del tema 2; el
+    `@@unique([topic_id, number])` y el `NOT EXISTS` del sembrado hacen que no
+    choque con nada. **Y conviene que llegue antes de que alguien responda ese
+    tema**: a quien ya lo haya enviado le quedaría esa pregunta en blanco (al
+    aprobado no le pasa nada, el núcleo no lo deja reabrir). Hoy hay 0
+    respuestas en toda la base, así que no hay riesgo.
   - **Un tema aprobado SÍ abre, al contrario que en Casa de Fe**: es ahí donde
     el líder ve por fin qué acertó y qué falló **con la explicación doctrinal
     de cada respuesta**. No puede cambiar nada (el núcleo lo rechaza), pero es
