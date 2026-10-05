@@ -9,6 +9,10 @@ import {
   pendientesDelPrematrimonial,
   puedeLlevarPrematrimonial,
 } from "@/lib/prematrimonial";
+import {
+  pendientesDelCuestionario,
+  puedeRevisarCuestionario,
+} from "@/lib/cuestionario";
 import { BuscadorPersonas } from "@/components/buscador-personas";
 import { NuevaEscuela } from "./nueva-escuela";
 import { PestanasDeEscuela } from "./pestanas";
@@ -23,10 +27,16 @@ export default async function PaginaEscuela() {
 
   // Solo se cuenta para quien puede llevar el prematrimonial: a los demás no se
   // les pinta la pestaña, así que sería un viaje a la base para nada.
+  // Los dos distintivos se cuentan **solo para quien puede verlos**: a los
+  // demás no se les pinta la pestaña, así que sería un viaje a la base para
+  // nada. Y los dos salen en paralelo, que con `max:1` es un viaje tras otro
+  // igual, pero sin esperar a que el primero vuelva para pedir el segundo.
   const llevaPrematrimonial = puedeLlevarPrematrimonial(usuario);
-  const pendientes = llevaPrematrimonial
-    ? await pendientesDelPrematrimonial(usuario)
-    : 0;
+  const revisaCuestionario = puedeRevisarCuestionario(usuario);
+  const [pendientes, pendientesQuiz] = await Promise.all([
+    llevaPrematrimonial ? pendientesDelPrematrimonial(usuario) : 0,
+    revisaCuestionario ? pendientesDelCuestionario() : 0,
+  ]);
 
   return (
     <main className="px-5 py-7 pb-16 sm:px-[26px]">
@@ -47,7 +57,9 @@ export default async function PaginaEscuela() {
           <PestanasDeEscuela
             activa="escuelas"
             conPrematrimonial={llevaPrematrimonial}
+            conCuestionario={revisaCuestionario}
             pendientes={pendientes}
+            pendientesCuestionario={pendientesQuiz}
           />
         </header>
 

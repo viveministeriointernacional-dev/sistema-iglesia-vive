@@ -287,6 +287,165 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-10-05** — **Cuestionario de Dominio para Líderes: los 12 temas que
+  resuelve quien va a DICTAR una Casa de Fe** (pedido del usuario: «crear el
+  taller virtual para que cada persona que hace parte de la Escuela Ser Líder
+  por medio del QR, entre a desarrollar los talleres. Y así poder evaluar si
+  las personas que están en ser líder están aptas para dar casa de fe»).
+  **⚠️ FUE DIRECTO, SIN MOCKUP, Y LO AUTORIZÓ EL USUARIO EXPRESAMENTE**: no
+  puedo invocar el skill `design` (está reservado a que él escriba `/design`),
+  se le ofreció pasarle el brief para que lo lanzara él, y respondió «ve
+  directo, sin mockup». **Anotarlo porque es la excepción al §2**, no un
+  olvido.
+  - **⚠️ LO PRIMERO, PORQUE ES EL ERROR GRAVE QUE HAY QUE NO COMETER: ESTO NO
+    ES EL TALLER DE CASA DE FE.** El documento lo dice en su primera línea
+    («Este cuestionario NO es el mismo que aparece dentro del libro para los
+    nuevos creyentes»). Sobre **los mismos 12 temas** hay dos ejercicios
+    opuestos: `faith_house_topic_question` lo llena el **discípulo** para
+    aplicar lo aprendido a su vida; esto lo llena el **líder** para demostrar
+    que puede enseñarlo. **Una misma persona puede tener los dos**, y por eso
+    son tablas propias (`leader_quiz%`) y no columnas nuevas en las de Casa de
+    Fe.
+  - **El documento, medido: 12 temas · 63 preguntas = 38 abiertas + 25 de
+    opción**, las 25 con su respuesta marcada (☑) **y su explicación
+    doctrinal**, más una **«Nota para el líder»** por tema. Reparto: T1 4/0 ·
+    T2 4/1 · T3 3/2 · T4 3/3 · T5 3/2 · T6 3/3 · T7 3/2 · T8 3/2 · T9 3/3 ·
+    T10 3/3 · T11 3/2 · T12 3/2. Todo sembrado en la migración.
+  - **⚠️ LA REGLA QUE SOSTIENE QUE ESTO MIDA ALGO: LA CALIFICACIÓN SOLO SE VE
+    AL QUEDAR APROBADO** (decisión del usuario: «cuando el coordinador lo
+    aprueba»). Y no es presentación: los intentos **se apilan**, así que si se
+    enseñara al enviar —o al devolverlo— el líder leería «fallaste la 5, la
+    correcta es la b» y le bastaría reenviar con la respuesta copiada. El
+    cuestionario pasaría a medir quién lo intentó dos veces. **Un devuelto trae
+    la nota del coordinador y NADA MÁS**, que es justo lo que le dice qué
+    repasar.
+  - **⚠️ Y NO VIAJA «OCULTA» AL NAVEGADOR: el servidor BORRA `correctChoice` y
+    `explanation` antes de enviar los datos** mientras el tema no esté
+    aprobado. Mandarlas y no pintarlas habría sido inútil: con abrir el
+    inspector del navegador se copian. Es la misma línea que el código del QR
+    (27-sep) y el token del calendario (17-sep): lo que es secreto no sale del
+    servidor.
+  - **⚠️ EL SISTEMA NO JUZGA LAS 38 ABIERTAS, y se dice en pantalla en vez de
+    disimularlo.** El documento es explícito: ahí «no hay una única correcta,
+    pero sí deben reflejar comprensión real y capacidad de explicarlo a otros».
+    La pantalla de revisión encabeza con «N preguntas · **las abiertas las lees
+    tú** (el sistema no las califica)», y el denominador de las de marcar es
+    solo las calificables: «acertó 1 de 2», nunca «1 de 3» metiendo la abierta.
+    Prueba propia para eso.
+  - **⚠️ VIVE COMO PESTAÑA DENTRO DE «ESCUELA», como el prematrimonial**, así
+    que **no hubo que crear ninguna vista nueva en el configurador ni
+    encendérsela a mano a nadie**. Rutas: `/escuela/cuestionario` y
+    `/escuela/cuestionario/[quizId]`. **Pero el permiso no se hereda del todo**
+    (la fuga del 3-oct): «Escuela» la ve también el rol **MENTOR**, y revisar
+    es de **pastores y administración** (decisión del usuario), así que las dos
+    páginas repiten el guardia (`requerirVista("escuela")` **más**
+    `puedeRevisarCuestionario` → `notFound()`), la acción lleva los dos
+    también, y **la pestaña solo se pinta a quien pasa la segunda**.
+  - **⚠️ EL QR NO NECESITÓ RUTA NUEVA EN `RUTAS_PUBLICAS`, y eso no es
+    casualidad: vive bajo `/taller`**, que ya es prefijo público, y reusa **la
+    misma cookie y el MISMO código de miembro** del taller de Casa de Fe. Es la
+    decisión del 2-oct —«un solo enlace y un solo código para TODO lo que la
+    persona llena»—: desde el celular de un líder esto son «sus talleres», y
+    dos códigos serían dos cosas que perder. **El enlace del QR es
+    `…/taller/lider`.**
+  - **El renglón entra en «Mis talleres», y se le esconde a quien no es de Ser
+    Líder.** `resumenDelCuestionario` devuelve `null` si no está inscrito en la
+    escuela abierta **y** no ha empezado ningún tema: Ser Líder es el
+    discipulado de quienes YA SIRVEN, no es para los miembros de las casas.
+  - **⚠️ NO EXIGE ESTAR INSCRITO EN LA ESCUELA para llenarlo** (la misma línea
+    del taller del 27-sep, donde se midió que 3 de 4 con avance no estaban
+    inscritos): exigirlo dejaría fuera a quien todavía no ha escaneado el QR de
+    inscripción. **Pero el panel lo DICE** con un distintivo ámbar «NO INSCRITO
+    EN LA ESCUELA», que es lo que le permite al coordinador inscribirlo o
+    preguntarle — si no, estaría llenando el cuestionario y nadie lo vería.
+  - **La lista del panel son los inscritos MÁS cualquiera que haya
+    respondido**, y la unión importa en los dos sentidos: un inscrito que no ha
+    empezado hay que verlo (es a quien hay que recordarle) y quien respondió
+    sin estar inscrito también.
+  - **⚠️ «ESPERANDO TU REVISIÓN» VA ARRIBA DEL TODO.** Hasta que alguien
+    revise, ese líder **no puede dictar su tema**: mezclado en la lista se
+    queda esperando una revisión que nadie recuerda hacer. Y el renglón dice
+    **cuántas abiertas hay que leer** antes de entrar, que es lo que de verdad
+    cuesta tiempo.
+  - **⚠️ QUE SEA UN REENVÍO SE DICE ARRIBA, EN ROJO**: «es la vuelta 3, ya se le
+    devolvió 2 veces». Sin eso el coordinador podría estar devolviéndoselo por
+    cuarta vez sin enterarse de que **el problema ya no es el cuestionario**.
+    Las revisiones **se apilan, no se pisan** (decisión del usuario: «se apila,
+    queda cada vuelta»).
+  - **El estado se DERIVA, no se guarda**, y se **reutiliza `estadoDelTaller`**
+    de `taller-catalogo.ts` en vez de copiarlo: la regla difícil es la misma
+    —comparar el envío contra la ÚLTIMA revisión, para que un reenvío no se
+    quede en «devuelto» para siempre— y dos copias se desincronizarían en
+    cuanto alguien arreglara una sola.
+  - **⚠️ EL MÍNIMO DE UNA RESPUESTA ABIERTA ES 20 CARACTERES, el doble que en
+    Casa de Fe (10), y es a propósito**: allí responde un nuevo creyente y una
+    frase corta puede ser honesta; aquí responde quien va a pararse a enseñar.
+    El mínimo no juzga la calidad —eso lo hace el coordinador—, solo evita
+    enviar doce puntos suspensivos.
+  - **⚠️ EL NÚMERO DE LA PREGUNTA PUEDE TENER HUECOS Y SE CONSERVA: el tema 2
+    salta de la 4 a la 6** en el documento. Renumerar dejaría al líder buscando
+    «la 5» en un papel donde no existe. **RESUELTO por el usuario (5-oct):
+    FALTA la pregunta 5, la manda después — NO se renumera.** Cuando llegue,
+    entra con una migración nueva que la inserte como la 5 del tema 2; el
+    `@@unique([topic_id, number])` y el `NOT EXISTS` del sembrado hacen que no
+    choque con nada. **Y conviene que llegue antes de que alguien responda ese
+    tema**: a quien ya lo haya enviado le quedaría esa pregunta en blanco (al
+    aprobado no le pasa nada, el núcleo no lo deja reabrir). Hoy hay 0
+    respuestas en toda la base, así que no hay riesgo.
+  - **Un tema aprobado SÍ abre, al contrario que en Casa de Fe**: es ahí donde
+    el líder ve por fin qué acertó y qué falló **con la explicación doctrinal
+    de cada respuesta**. No puede cambiar nada (el núcleo lo rechaza), pero es
+    lo que convierte el examen en enseñanza, que es para lo que el documento
+    trae una explicación en cada una.
+  - **La «Nota para el líder» se enseña SIEMPRE y va ARRIBA**, antes de las
+    preguntas. No es la solución del examen: es material de enseñanza, y el
+    propio documento pide leerla y conversarla en equipo **antes** de dictar.
+    Al final quedaría sin leer.
+  - **⚠️ NO SE MARCA NINGÚN HITO al dominar los 12, y es decisión razonada:** no
+    existe un hito para esto y crear un valor del enum obligaría a un
+    `ALTER TYPE`; además **dominar el cuestionario no es un paso del recorrido
+    del discípulo** —es una habilitación para enseñar—, así que no tiene sitio
+    en la línea de tiempo de su expediente. Queda en la bitácora
+    (`cuestionario.libro_dominado`) y en el panel.
+  - **⚠️ LA MIGRACIÓN NO TOCA NINGUNA TABLA CALIENTE** (la lección del 24-sep):
+    ni un ALTER sobre `app_user`, `person` ni `learner_profile`, y **ningún
+    `ALTER TYPE`**. Como quien revisa se decide por ROL, no hizo falta columna
+    de permiso. **Se puede fusionar a cualquier hora.**
+  - **⚠️ HALLAZGO DE ENTORNO QUE CAMBIA CÓMO SE PRUEBAN LAS MIGRACIONES: HAY UN
+    POSTGRES 16 INSTALADO EN ESTE CONTENEDOR** (`/usr/lib/postgresql/16/bin`).
+    Se levantó un clúster de usar y tirar y se aplicó la migración **entera,
+    dos veces**, más 7 sondas — sin tocar producción y sin gastar una sola
+    llamada del MCP. **Dos trampas**: `initdb` **no corre como root** (hay que
+    usar `su -s /bin/bash nobody`) y el scratchpad es **`root 700`**, así que el
+    clúster tiene que vivir fuera de él. Es **más completo que un
+    `BEGIN … ROLLBACK`** por MCP, que no puede repetir la migración ni sondear
+    los CHECK uno por uno. Lo que sí hay que comprobar contra producción es lo
+    propio de allí: **0 tablas que choquen, `gen_random_uuid` disponible y los
+    id en `text`** — las tres comprobadas.
+  - **Las 7 sondas, todas al revés:** rechaza una abierta con respuesta
+    correcta, rechaza una de opción sin respuesta, rechaza una correcta fuera
+    de rango, acepta una bien puesta, rechaza dos cuestionarios de la misma
+    persona en el mismo tema, apila dos revisiones, y al borrar un cuestionario
+    el CASCADE se lleva respuestas y revisiones **sin tocar la ficha**.
+  - **Probado al revés el catálogo**, que es lo que hace valer una prueba: se
+    enseñó la calificación también al devolverlo, se metieron las abiertas en
+    el denominador y se contó «abrir» como «empezado»; **fallaron exactamente
+    las 4 pruebas que debían**, y al restaurar, verde.
+  - **⚠️ COMPROBADO QUE `cf:build` NO TOCÓ PRODUCCIÓN**: encadena
+    `scripts/migrar.mjs`, y aquí no hay `DATABASE_URL`, así que avisó
+    («Sin DATABASE_URL del entorno: no se aplican migraciones aquí») y no hizo
+    nada. Verificado después en la base: **0 tablas `leader_quiz%`** y la última
+    migración sigue siendo la del prematrimonial.
+  - Auditoría: `cuestionario.enviado` (**sin actor**: lo envió el líder desde su
+    celular), `…aprobado`, `…devuelto` (**en ámbar**: no es retroceder, es
+    pedirle que repase) y `…libro_dominado`, las cuatro con su `case` en
+    `actividad.ts`.
+  - `tsc`, eslint, **171/171 pruebas** (152 + 19) y `npm run cf:build` en
+    verde, con las 4 rutas nuevas en el manifiesto.
+  - **⚠️ EL ENLACE QUE VA EN EL QR DEL CUESTIONARIO:**
+    `…workers.dev/taller/lider` — se entra con **el código de miembro de 6
+    dígitos**, el mismo de Casa de Fe.
+
 - **2026-10-03** — **El QR de «Actualizar datos» inscribe en la Escuela Ser
   Líder, y por fin se puede RETIRAR a alguien** (pedido del usuario para el
   lanzamiento de Casa de Fe: «crear un QR donde las personas que hacen parte de

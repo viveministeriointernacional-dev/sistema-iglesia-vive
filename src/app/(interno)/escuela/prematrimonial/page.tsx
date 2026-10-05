@@ -10,6 +10,10 @@ import {
 } from "@/lib/prematrimonial";
 import { TOTAL_DE_TEMAS_PRE } from "@/lib/prematrimonial-catalogo";
 
+import {
+  pendientesDelCuestionario,
+  puedeRevisarCuestionario,
+} from "@/lib/cuestionario";
 import { PestanasDeEscuela } from "../pestanas";
 import { AbrirPrematrimonial } from "./abrir";
 import { pastoresPosibles } from "./acciones";
@@ -27,10 +31,14 @@ export default async function PaginaPrematrimonial() {
   // dejar la ruta abierta sería cosmético (la lección del 11-sep-2026).
   if (!puedeLlevarPrematrimonial(usuario)) notFound();
 
-  const [parejas, cola, pastores] = await Promise.all([
+  // El distintivo del cuestionario de líderes se cuenta solo si esta cuenta
+  // puede revisarlo: si no, no se le pinta la pestaña y sería un viaje de más.
+  const revisaCuestionario = puedeRevisarCuestionario(usuario);
+  const [parejas, cola, pastores, pendientesQuiz] = await Promise.all([
     cargarParejas(usuario),
     cargarPorRevisarPre(usuario),
     pastoresPosibles(),
+    revisaCuestionario ? pendientesDelCuestionario() : 0,
   ]);
 
   const abiertas = parejas.filter((p) => !p.cerrada);
@@ -59,7 +67,9 @@ export default async function PaginaPrematrimonial() {
           <PestanasDeEscuela
             activa="prematrimonial"
             conPrematrimonial
+            conCuestionario={revisaCuestionario}
             pendientes={pendientes}
+            pendientesCuestionario={pendientesQuiz}
           />
         </header>
 
