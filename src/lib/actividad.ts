@@ -1029,6 +1029,30 @@ export async function cargarActividad(
         frase = [A(), t(" retiró de la Escuela a "), P()];
         observacion = texto(m.motivo);
         break;
+      // ---------------------------------------------------------------------
+      // Cuestionario de Dominio para Líderes (Escuela Ser Líder)
+      // ---------------------------------------------------------------------
+      case "cuestionario.enviado":
+        // ⚠️ Sin actor: lo envió el líder desde su celular con su código, sin
+        // cuenta. Poner a alguien en `A()` diría que un pastor lo registró.
+        tipo = "eventos"; etiqueta = "SER LÍDER"; tono = "verde";
+        frase = [P(), t(" envió su cuestionario del tema "), b(`${texto(m.tema) ?? ""} ${texto(m.temaNombre) ?? ""}`.trim())];
+        observacion = Number(m.vuelta) > 1 ? `Vuelta ${texto(m.vuelta) ?? ""}` : null;
+        break;
+      case "cuestionario.aprobado":
+        tipo = "eventos"; etiqueta = "SER LÍDER"; tono = "verde";
+        frase = [A(), t(" aprobó el cuestionario del tema "), b(`${texto(m.tema) ?? ""} ${texto(m.temaNombre) ?? ""}`.trim()), t(" de "), P(), t(" · ya puede dictarlo")];
+        break;
+      // En ámbar: no es retroceder, es pedirle que repase antes de dictarlo.
+      case "cuestionario.devuelto":
+        tipo = "eventos"; etiqueta = "SER LÍDER"; tono = "ambar";
+        frase = [A(), t(" devolvió el cuestionario del tema "), b(`${texto(m.tema) ?? ""} ${texto(m.temaNombre) ?? ""}`.trim()), t(" a "), P()];
+        observacion = Number(m.vuelta) > 1 ? `Es la vuelta ${texto(m.vuelta) ?? ""}` : null;
+        break;
+      case "cuestionario.libro_dominado":
+        tipo = "eventos"; etiqueta = "SER LÍDER"; tono = "verde";
+        frase = [P(), t(" aprobó los 12 temas del cuestionario · puede dictar todo el libro")];
+        break;
       case "evento.creado":
       case "evento.publicado":
       case "evento.despublicado":

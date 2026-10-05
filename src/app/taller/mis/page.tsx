@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { momentoCorto } from "@/lib/dominio";
 import { cargarMisTalleres, learnerPorToken, type TemaEnMisTalleres } from "@/lib/taller";
 import { cargarMiPrematrimonial, type MiTemaPre } from "@/lib/prematrimonial";
+import { resumenDelCuestionario, type ResumenDelCuestionario } from "@/lib/cuestionario";
 import {
   COOKIE_TALLER,
   ETIQUETA_TEMA,
@@ -42,9 +43,10 @@ export default async function MisTalleres() {
   // El prematrimonial y la Casa de Fe son recorridos distintos, pero desde su
   // celular son «mis talleres»: dos enlaces y dos códigos serían dos cosas que
   // perder. Los dos viajes salen en paralelo.
-  const [mis, pre] = await Promise.all([
+  const [mis, pre, quiz] = await Promise.all([
     cargarMisTalleres(persona.learnerId),
     cargarMiPrematrimonial(persona.learnerId),
+    resumenDelCuestionario(persona.learnerId),
   ]);
   if (!mis) {
     return <Identificarme codigo={null} titulo="Tus talleres de casa de fe" />;
@@ -112,6 +114,8 @@ export default async function MisTalleres() {
           </div>
         </section>
 
+        {quiz ? <BloqueCuestionario quiz={quiz} /> : null}
+
         {pre ? <BloquePrematrimonial pre={pre} /> : null}
 
         {porCorregir.length > 0 ? (
@@ -146,6 +150,46 @@ export default async function MisTalleres() {
         </footer>
       </div>
     </main>
+  );
+}
+
+/// El renglón de la Escuela Ser Líder. **Un solo enlace y un solo código para
+/// todo lo que la persona llena** (2-oct-2026): desde su celular, el
+/// cuestionario de líder y los talleres de casa son «mis talleres».
+///
+/// ⚠️ **Lo devuelto va en el texto, no escondido en un número.** Si solo
+/// dijera «2 de 12», un tema que su coordinador le devolvió para repasar se
+/// perdería: es lo único que le pide algo ahora mismo.
+function BloqueCuestionario({ quiz }: { quiz: ResumenDelCuestionario }) {
+  return (
+    <section className="px-5 pt-6">
+      <h2 className="mb-2.5 text-[10px] font-bold tracking-[0.14em] text-[#5c5648] uppercase">
+        Escuela Ser Líder
+      </h2>
+      <Link
+        href="/taller/lider"
+        className="block rounded-xl border border-[#cfc6ae] bg-white px-3.5 py-3"
+      >
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-[15px] leading-[1.25] font-semibold">
+              Cuestionario de líderes
+            </p>
+            <p className="mt-[5px] text-[11.5px] leading-[1.45] text-[#5c5648]">
+              {quiz.aprobados} de {quiz.total} temas aprobados
+              {quiz.porCorregir > 0
+                ? ` · ${quiz.porCorregir} para repasar`
+                : quiz.esperando > 0
+                  ? ` · ${quiz.esperando} esperando revisión`
+                  : ""}
+            </p>
+          </div>
+          <span aria-hidden className="flex-none text-[17px] leading-[1.5] text-[#b6ac95]">
+            ›
+          </span>
+        </div>
+      </Link>
+    </section>
   );
 }
 

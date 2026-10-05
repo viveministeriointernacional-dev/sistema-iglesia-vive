@@ -20,10 +20,19 @@ import { identificarme } from "./acciones";
 export function Identificarme({
   codigo,
   titulo,
+  rotulo,
+  ayuda,
 }: {
   /// El tema por el que entró, o `null` si viene a «Mis talleres».
   codigo: string | null;
   titulo?: string;
+  /// El renglón de arriba. El Cuestionario de Dominio entra por el mismo sitio
+  /// pero no es Casa de Fe: a un líder que escanea el QR de la Escuela Ser
+  /// Líder decirle «Casa de Fe» le haría dudar de si se equivocó de QR.
+  rotulo?: string;
+  /// A quién pedirle el código. En Casa de Fe lo tiene su líder de casa; en la
+  /// Escuela, su coordinador.
+  ayuda?: string;
 }) {
   const router = useRouter();
   const [pendiente, arrancar] = useTransition();
@@ -64,7 +73,7 @@ export function Identificarme({
       <div className="mx-auto max-w-[520px]">
         <header className="bg-[#1a1917] px-6 py-6 text-[#faf8f1]">
           <p className="text-[10.5px] font-semibold tracking-[0.16em] text-[#c8c0ac] uppercase">
-            Iglesia Vive · Casa de Fe
+            {rotulo ?? "Iglesia Vive · Casa de Fe"}
           </p>
           <h1 className="mt-4 font-serif text-[27px] leading-[1.12]">
             {titulo ?? "El taller de tu casa de fe"}
@@ -129,7 +138,7 @@ export function Identificarme({
                   <strong className="font-semibold text-[#1a1917]">
                     ¿No tienes tu código?
                   </strong>{" "}
-                  Pídeselo a tu líder de casa de fe: él lo tiene.
+                  {ayuda ?? "Pídeselo a tu líder de casa de fe: él lo tiene."}
                 </p>
                 <button
                   type="button"

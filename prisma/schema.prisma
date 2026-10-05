@@ -153,6 +153,7 @@ model AppUser {
   prematrimonialesQueAbrio PremaritalCouple[]    @relation("AbrioPrematrimonial")
   prematrimonialRevisiones PremaritalReview[]    @relation("RevisoPrematrimonial")
   prematrimonialDestapes   PremaritalReveal[]    @relation("DestapoPrematrimonial")
+  cuestionarioRevisiones   LeaderQuizReview[]    @relation("RevisoCuestionario")
 
   @@index([role, active])
   @@map("app_user")
@@ -401,6 +402,7 @@ model LearnerProfile {
   prematrimonialComoA PremaritalCouple[]    @relation("NovioA")
   prematrimonialComoB PremaritalCouple[]    @relation("NoviaB")
   prematrimonialTalleres PremaritalWorkshop[]
+  cuestionariosDeLider   LeaderQuiz[]
 
   @@index([phase, status])
   /// El alcance «solo mis personas» del tablero y el cálculo de carga.
@@ -1740,4 +1742,145 @@ model PremaritalReveal {
 
   @@unique([coupleId, topicId])
   @@map("premarital_reveal")
+}
+
+// ---------------------------------------------------------------------------
+// Cuestionario de Dominio para Líderes (Escuela Ser Líder)
+// ---------------------------------------------------------------------------
+
+/// Un tema del **Cuestionario de Dominio para Líderes**.
+///
+/// ⚠️ **NO es el taller de Casa de Fe, y confundirlos sería el error grave de
+/// este modelo.** El documento lo dice en su primera línea: «Este cuestionario
+/// NO es el mismo que aparece dentro del libro para los nuevos creyentes». Son
+/// dos ejercicios con dos propósitos opuestos sobre los mismos 12 temas:
+///
+/// - `faith_house_topic_question` → lo llena **el nuevo creyente** para
+///   reflexionar y aplicar lo aprendido a su vida.
+/// - esto → lo llena **el líder que va a DICTAR** ese tema, para verificar que
+///   lo domina lo suficiente como para enseñarlo, responder preguntas y
+///   corregir errores comunes.
+///
+/// Por eso tiene tablas propias y no columnas nuevas en las de Casa de Fe: una
+/// misma persona puede tener los dos, y mezclarlos dejaría a un líder viendo
+/// su propio taller de discípulo donde espera su examen.
+model LeaderQuizTopic {
+  id       String @id @default(uuid())
+  /// El mismo número y el mismo nombre que el tema de Casa de Fe que enseña.
+  /// Se guarda aparte **a propósito**: el cuestionario del líder sobrevive a
+  /// que alguien renombre un tema del libro (27-sep-2026), y el renombre no
+  /// debe reetiquetar un examen ya respondido.
+  number   Int    @unique
+  name     String
+  subtitle String?
+  /// La «Nota para el líder» del documento: alertas sobre errores comunes de
+  /// enseñanza y precisiones pastorales al dictar ese tema.
+  ///
+  /// ⚠️ **Esta SÍ se le muestra al líder mientras responde**, al contrario que
+  /// la respuesta correcta. No es la solución del examen: es material de
+  /// enseñanza, y el propio documento pide que se lea y se converse en equipo
+  /// **antes** de iniciar el ciclo.
+  leaderNote String? @map("leader_note")
+  /// ⚠️ **El código del enlace, y es una CREDENCIAL, no el número del tema.**
+  /// Con `/taller/lider/3` cualquiera adivinaría los otros once. Sale de
+  /// `crypto.getRandomValues`, nunca de `Math.random`.
+  code      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  questions LeaderQuizQuestion[]
+  quizzes   LeaderQuiz[]
+
+  @@map("leader_quiz_topic")
+}
+
+/// Una pregunta del cuestionario del líder.
+model LeaderQuizQuestion {
+  id      String @id @default(uuid())
+  topicId String @map("topic_id")
+  /// ⚠️ **El número es el del documento, y puede tener huecos.** El tema 2
+  /// salta de la 4 a la 6 en el original. Renumerar aquí dejaría al líder
+  /// buscando «la 5» en un papel donde no existe, así que se conserva el
+  /// número impreso y la pantalla no promete que sean consecutivos.
+  number  Int
+  /// ABIERTA (se explica con sus palabras) · OPCION (se marca una de cuatro).
+  kind    String @default("ABIERTA")
+  prompt  String
+  options String[]
+  /// ⚠️ **La respuesta correcta, SOLO en las de OPCION.** De las 63 preguntas,
+  /// 25 la tienen; las otras 38 son abiertas y **el sistema no las juzga** —
+  /// eso es trabajo del coordinador, y el documento es explícito: «no hay una
+  /// única correcta, pero sí deben reflejar comprensión real».
+  correctChoice Int? @map("correct_choice")
+  /// La explicación doctrinal que trae el documento para cada respuesta
+  /// marcada. Es lo que convierte la calificación en enseñanza en vez de en
+  /// un simple «mal».
+  explanation String?
+
+  topic   LeaderQuizTopic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  answers LeaderQuizAnswer[]
+
+  @@unique([topicId, number])
+  @@map("leader_quiz_question")
+}
+
+/// El cuestionario de UNA persona en UN tema.
+///
+/// ⚠️ **NO tiene columna de estado**, igual que en Casa de Fe y en el
+/// prematrimonial: se DERIVA de `submittedAt` y de la última revisión. Una
+/// columna aparte se desincroniza en cuanto alguien reenvía uno devuelto.
+model LeaderQuiz {
+  id          String    @id @default(uuid())
+  learnerId   String    @map("learner_id")
+  topicId     String    @map("topic_id")
+  startedAt   DateTime  @default(now()) @map("started_at")
+  submittedAt DateTime? @map("submitted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  learner LearnerProfile     @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  topic   LeaderQuizTopic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  answers LeaderQuizAnswer[]
+  reviews LeaderQuizReview[]
+
+  @@unique([learnerId, topicId])
+  @@index([submittedAt])
+  @@map("leader_quiz")
+}
+
+model LeaderQuizAnswer {
+  id         String   @id @default(uuid())
+  quizId     String   @map("quiz_id")
+  questionId String   @map("question_id")
+  text       String?
+  /// El índice de la opción marcada, en las de OPCION.
+  choice     Int?
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  quiz     LeaderQuiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  question LeaderQuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([quizId, questionId])
+  @@map("leader_quiz_answer")
+}
+
+/// La revisión del coordinador sobre el cuestionario de un tema.
+///
+/// **SE APILAN, NO SE PISAN** (la regla del 10-sep-2026 con las visitas
+/// reprogramadas, y decisión del usuario para esto: «se apila, queda cada
+/// vuelta»): cuántas veces le devolvieron un tema a un líder es justo la señal
+/// de que todavía no está listo para dictarlo.
+model LeaderQuizReview {
+  id           String   @id @default(uuid())
+  quizId       String   @map("quiz_id")
+  approved     Boolean
+  note         String?
+  reviewedById String?  @map("reviewed_by_id")
+  reviewedAt   DateTime @default(now()) @map("reviewed_at")
+
+  quiz       LeaderQuiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  reviewedBy AppUser?   @relation("RevisoCuestionario", fields: [reviewedById], references: [id])
+
+  @@index([quizId, reviewedAt])
+  @@map("leader_quiz_review")
 }
