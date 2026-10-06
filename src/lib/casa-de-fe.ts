@@ -112,6 +112,7 @@ export async function cargarCasasDeFe(usuario: UsuarioSesion) {
       longitude: true,
       address: true,
       closedAt: true,
+      leaderId: true,
       leader: { select: { fullName: true } },
       _count: { select: { members: true } },
     },

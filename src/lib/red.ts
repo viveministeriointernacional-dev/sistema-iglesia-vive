@@ -1,4 +1,5 @@
 import {
+  Prisma,
   FaithHouseStatus,
   LearnerStatus,
   Operation72Status,
@@ -112,6 +113,59 @@ export async function lideresDeMiRama(mentorId: string): Promise<string[]> {
     WHERE u.active
   `;
   return filas.map((f) => f.id);
+}
+
+/// **Para cada cuenta que lleva un grupo, quién tiene por encima en la
+/// mentoría**, de la más cercana a la más lejana.
+///
+/// Es `lideresDeMiRama` AL REVÉS, y se sube en vez de bajar por la misma razón
+/// que `nivelEnLaRamaDe`: la cadena hacia arriba tiene tantos pasos como
+/// niveles tenga la iglesia (hoy 4), mientras que bajar desde las 33 cuentas
+/// del equipo recorrería la red entera para quedarse con una docena de
+/// nombres. Con `PrismaPg max: 1` cada viaje cuenta, así que esto es **una
+/// sola consulta** para todos los líderes de un golpe.
+///
+/// `UNION` y no `UNION ALL`: corta cualquier ciclo si por un error de datos A
+/// acompaña a B y B a A, igual que en el resto de los recorridos de la red.
+export async function mentoresDeCadaLider(
+  liderIds: string[],
+): Promise<Record<string, { id: string; nombre: string }[]>> {
+  if (liderIds.length === 0) return {};
+  const prisma = await getPrisma();
+
+  // ⚠️ `IN (${ids.join(",")})` dentro de un `$queryRaw` se parametriza como UN
+  // solo valor y no filtra nada (la trampa del 7-sep-2026). `Prisma.join` es lo
+  // que lo convierte en una lista de verdad.
+  const filas = await prisma.$queryRaw<
+    { lider: string; mentor: string; nombre: string; nivel: number }[]
+  >`
+    WITH RECURSIVE cadena AS (
+      SELECT u.id AS lider, mr.mentor_id AS mentor, 1 AS nivel
+      FROM app_user u
+      JOIN learner_profile lp ON lp.person_id = u.person_id
+      JOIN mentor_relationship mr
+        ON mr.learner_id = lp.id AND mr.ended_at IS NULL
+      WHERE u.id IN (${Prisma.join(liderIds)})
+      UNION
+      SELECT c.lider, mr.mentor_id, c.nivel + 1
+      FROM cadena c
+      JOIN app_user u2 ON u2.id = c.mentor
+      JOIN learner_profile lp2 ON lp2.person_id = u2.person_id
+      JOIN mentor_relationship mr
+        ON mr.learner_id = lp2.id AND mr.ended_at IS NULL
+    )
+    SELECT c.lider, c.mentor, m.full_name AS nombre, c.nivel
+    FROM cadena c
+    JOIN app_user m ON m.id = c.mentor
+    WHERE m.active
+    ORDER BY c.lider, c.nivel
+  `;
+
+  const porLider: Record<string, { id: string; nombre: string }[]> = {};
+  for (const fila of filas) {
+    (porLider[fila.lider] ??= []).push({ id: fila.mentor, nombre: fila.nombre });
+  }
+  return porLider;
 }
 
 /// **A qué profundidad está un expediente bajo un líder** (nulo si no cuelga

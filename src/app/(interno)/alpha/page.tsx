@@ -20,6 +20,9 @@ import { diaISO, semanaDe } from "@/lib/reunion-catalogo";
 import { CalendarioSemanal, type GrupoDelCalendario } from "./calendario-semanal";
 import { PestanasDeGrupos } from "./pestanas";
 import { cargarPorRevisar } from "@/lib/taller";
+import { mentoresDeCadaLider } from "@/lib/red";
+import { enLaLinea, opcionesDeLinea } from "@/lib/lineas-catalogo";
+import { FiltroDeLinea } from "./filtro-de-linea";
 import { MiCalendario } from "./mi-calendario";
 import { NuevoGrupo } from "./nuevo-grupo";
 import { NuevaCasaDeFe } from "../casa-de-fe/nuevo-grupo";
@@ -36,6 +39,7 @@ export default async function PaginaAlpha({
     semana?: string;
     dia?: string;
     tipo?: string;
+    mentor?: string;
   }>;
 }) {
   const usuario = await requerirVista("grupos");
@@ -63,8 +67,13 @@ export default async function PaginaAlpha({
         ? hoy
         : semana.inicio;
 
+  const mentorPedido = (parametros.mentor ?? "").trim();
+
   const conVista = (cambios: Record<string, string>) => {
     const p = new URLSearchParams({ vista: "calendario", ...cambios });
+    // El filtro de línea se conserva al moverse: sin esto, pasar a la semana
+    // siguiente devolvería a toda la iglesia sin que nadie lo pidiera.
+    if (mentorElegido) p.set("mentor", mentorElegido);
     return `/alpha?${p.toString()}`;
   };
 
@@ -103,6 +112,58 @@ export default async function PaginaAlpha({
       : Promise.resolve([]),
   ]);
 
+  // ------------------------------------------------ el filtro por línea
+  // ⚠️ **Las opciones salen de los grupos QUE YA SE CARGARON, y eso es lo que
+  // hace que el filtro respete el alcance de cada cuenta sin una sola
+  // comprobación de permiso.** `cargarGrupos` y `cargarCasasDeFe` ya traen lo
+  // que esta cuenta puede ver (la regla del 12-sep-2026); derivar de ahí
+  // significa que a un líder solo se le ofrecen las líneas de su propia rama.
+  // Pedir «todos los mentores» habría enseñado nombres de media iglesia en el
+  // desplegable de alguien que lleva una casa.
+  const abiertos = [
+    ...grupos.filter((g) => !g.closedAt).map((g) => ({
+      tipo: "alpha" as const,
+      liderId: g.leaderId,
+    })),
+    ...casas.filter((c) => !c.closedAt).map((c) => ({
+      tipo: "casa-de-fe" as const,
+      liderId: c.leaderId,
+    })),
+  ];
+
+  // Los cerrados entran en el mapa de líneas aunque no cuenten para el
+  // desplegable: si no, al filtrar se escaparían de la lista por no tener
+  // línea conocida, en vez de quedarse con su mentor.
+  const idsDeLideres = [
+    ...new Set([
+      ...grupos.map((g) => g.leaderId),
+      ...casas.map((c) => c.leaderId),
+    ]),
+  ];
+  const cadenas = await mentoresDeCadaLider(idsDeLideres);
+
+  const lineas: Record<string, string[]> = {};
+  const nombres: Record<string, string> = {};
+  for (const [lider, arriba] of Object.entries(cadenas)) {
+    lineas[lider] = arriba.map((m) => m.id);
+    for (const m of arriba) nombres[m.id] = m.nombre;
+  }
+  for (const g of grupos) nombres[g.leaderId] ??= g.leader.fullName;
+  for (const c of casas) nombres[c.leaderId] ??= c.leader.fullName;
+
+  const opciones = opcionesDeLinea(abiertos, lineas, nombres);
+  // Una línea que no está en la lista se descarta en vez de dejar la pantalla
+  // vacía: un id inventado en la URL no puede hacer creer que no hay grupos.
+  const mentorElegido = opciones.some((o) => o.id === mentorPedido)
+    ? mentorPedido
+    : null;
+
+  const deLaLinea = (liderId: string) =>
+    !mentorElegido || enLaLinea(mentorElegido, liderId, lineas);
+
+  const gruposVisibles = grupos.filter((g) => deLaLinea(g.leaderId));
+  const casasVisibles = casas.filter((c) => deLaLinea(c.leaderId));
+
   // ⚠️ El calendario NO hace ni una consulta nueva: se arma con lo que la
   // página ya trajo para las listas, que además ya viene con el alcance
   // aplicado —cada líder los suyos y los de su rama, administración todos—.
@@ -111,7 +172,7 @@ export default async function PaginaAlpha({
   // Los cerrados se quedan fuera: un calendario es lo que va a pasar, y un
   // grupo cerrado ya no se reúne.
   const gruposDelCalendario: GrupoDelCalendario[] = [
-    ...grupos
+    ...gruposVisibles
       .filter((g) => !g.closedAt)
       .map((g) => ({
         id: g.id,
@@ -126,7 +187,7 @@ export default async function PaginaAlpha({
         inicio: diaISO(g.startDate),
         tienePunto: g.latitude !== null && g.longitude !== null,
       })),
-    ...casas
+    ...casasVisibles
       .filter((c) => !c.closedAt)
       .map((c) => ({
         id: c.id,
@@ -170,6 +231,21 @@ export default async function PaginaAlpha({
           />
         </header>
 
+        {/* El filtro vale para las dos pestañas, por eso vive aquí y no dentro
+            del calendario: la pregunta «¿qué hay en mi línea?» es la misma se
+            mire como rejilla o como lista. */}
+        <div className="mt-5">
+          <FiltroDeLinea
+            opciones={opciones}
+            elegido={mentorElegido}
+            ocultos={{
+              ...(enCalendario ? { vista: "calendario" } : {}),
+              ...(enCalendario ? { semana: semana.inicio, dia: diaElegido } : {}),
+              ...(tipo === "todos" ? {} : { tipo }),
+            }}
+          />
+        </div>
+
         {enCalendario ? (
           <CalendarioSemanal
             grupos={gruposDelCalendario}
@@ -201,9 +277,11 @@ export default async function PaginaAlpha({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="etiqueta-seccion">ALPHA</h2>
               <p className="text-[11.5px] leading-none font-medium text-[rgba(19,28,36,.5)]">
-                {esVistaCompletaDeAlpha(usuario)
-                  ? "Todos los grupos de la iglesia"
-                  : "Los que llevas y los de tu red"}{" "}
+                {mentorElegido
+                  ? `Solo la línea de ${nombres[mentorElegido]}`
+                  : esVistaCompletaDeAlpha(usuario)
+                    ? "Todos los grupos de la iglesia"
+                    : "Los que llevas y los de tu red"}{" "}
                 · {SESIONES_DE_ALPHA} sesiones de referencia
               </p>
             </div>
@@ -214,16 +292,18 @@ export default async function PaginaAlpha({
               </div>
             ) : null}
 
-            {grupos.length === 0 ? (
+            {gruposVisibles.length === 0 ? (
               <p className="mt-4 rounded-[13px] border border-dashed border-[rgba(19,28,36,.16)] p-6 text-[12.5px] leading-[1.6] font-medium text-[rgba(19,28,36,.5)]">
-                Todavía no hay grupos de Alpha.{" "}
-                {puedeCrearAlpha(usuario)
+                {mentorElegido
+                  ? "En esta línea no hay ningún Alpha. Cambia de línea o elige «Toda la iglesia»."
+                  : "Todavía no hay grupos de Alpha."}{" "}
+                {!mentorElegido && puedeCrearAlpha(usuario)
                   ? "Crea el primero y elige quién lo lleva."
                   : "Cuando te asignen uno, aparecerá aquí."}
               </p>
             ) : (
               <ul className="mt-4 flex flex-col gap-[10px]">
-                {grupos.map((grupo) => (
+                {gruposVisibles.map((grupo) => (
                   <li key={grupo.id} className="tarjeta p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
@@ -266,9 +346,11 @@ export default async function PaginaAlpha({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="etiqueta-seccion">CASA DE FE</h2>
               <p className="text-[11.5px] leading-none font-medium text-[rgba(19,28,36,.5)]">
-                {esVistaCompletaDeCasaDeFe(usuario)
-                  ? "Todas las Casas de Fe de la iglesia"
-                  : "Las que llevas y las de tu red"}{" "}
+                {mentorElegido
+                  ? `Solo la línea de ${nombres[mentorElegido]}`
+                  : esVistaCompletaDeCasaDeFe(usuario)
+                    ? "Todas las Casas de Fe de la iglesia"
+                    : "Las que llevas y las de tu red"}{" "}
                 · 12 temas de referencia
               </p>
             </div>
@@ -279,16 +361,18 @@ export default async function PaginaAlpha({
               </div>
             ) : null}
 
-            {casas.length === 0 ? (
+            {casasVisibles.length === 0 ? (
               <p className="mt-4 rounded-[13px] border border-dashed border-[rgba(19,28,36,.16)] p-6 text-[12.5px] leading-[1.6] font-medium text-[rgba(19,28,36,.5)]">
-                Todavía no hay Casas de Fe.{" "}
-                {puedeCrearCasaDeFe(usuario)
+                {mentorElegido
+                  ? "En esta línea no hay ninguna Casa de Fe. Cambia de línea o elige «Toda la iglesia»."
+                  : "Todavía no hay Casas de Fe."}{" "}
+                {!mentorElegido && puedeCrearCasaDeFe(usuario)
                   ? "Abre la primera y elige quién la lleva."
                   : "Cuando te asignen una, aparecerá aquí."}
               </p>
             ) : (
               <ul className="mt-4 flex flex-col gap-[10px]">
-                {casas.map((casa) => (
+                {casasVisibles.map((casa) => (
                   <li key={casa.id} className="tarjeta p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
@@ -329,6 +413,9 @@ export default async function PaginaAlpha({
           <MiCalendario
             enlaceInicial={enlaceDeCalendario}
             cuantasReuniones={
+              // Sin filtrar a propósito: es SU enlace de calendario, y lo que
+              // cuenta es cuántas de sus reuniones tienen día y hora, no
+              // cuántas quedan tras el filtro de la pantalla.
               [...grupos, ...casas].filter(
                 (g) => g.weekday !== null && g.meetingTime !== null,
               ).length
