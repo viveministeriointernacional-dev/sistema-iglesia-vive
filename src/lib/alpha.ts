@@ -138,6 +138,7 @@ export async function cargarGrupos(usuario: UsuarioSesion) {
       address: true,
       endDate: true,
       closedAt: true,
+      leaderId: true,
       leader: { select: { fullName: true } },
       _count: { select: { sessions: true, enrollments: true } },
     },

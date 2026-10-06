@@ -29,12 +29,32 @@ async function cadenaDeConexion(): Promise<string> {
       contexto.env as unknown as { HYPERDRIVE?: { connectionString?: string } }
     ).HYPERDRIVE;
     if (hyperdrive?.connectionString) return hyperdrive.connectionString;
+
+    // ⚠️ **Aquí el worker SIGUE FUNCIONANDO, y por eso hay que gritarlo.**
+    // Sin el binding se cae a DATABASE_URL y todo responde igual, solo que
+    // lento: cada petición vuelve a abrir su conexión contra Supabase. Un
+    // despliegue que se deje el binding fuera no rompe nada — deshace la mejora
+    // en silencio, que es la forma más cara de perderla. El aviso sale una vez
+    // por arranque en frío y queda en el registro del worker (observability).
+    avisarSinHyperdrive();
   }
 
   if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
 
   throw new Error(
     "Falta la conexión a Postgres: define DATABASE_URL o el binding HYPERDRIVE.",
+  );
+}
+
+let yaSeAviso = false;
+
+function avisarSinHyperdrive() {
+  if (yaSeAviso) return;
+  yaSeAviso = true;
+  console.warn(
+    "[prisma] SIN Hyperdrive: no hay binding HYPERDRIVE, así que cada petición " +
+      "abre su propia conexión contra Supabase y se paga la latencia completa. " +
+      "Revisa el bloque \"hyperdrive\" de wrangler.jsonc.",
   );
 }
 
@@ -47,6 +67,13 @@ async function crearCliente(): Promise<PrismaClient> {
   // Una conexión por petición es suficiente —Prisma serializa las consultas de
   // esa petición— y mantiene el uso de conexiones bajo control. Los tiempos de
   // espera cortos liberan la conexión pronto en vez de dejarla colgada.
+  //
+  // ⚠️ **Con Hyperdrive `max: 1` SIGUE SIENDO LO CORRECTO, y no se tocó a
+  // propósito.** Hyperdrive mantiene su propio pool del lado de Cloudflare, así
+  // que lo que abarata es *abrir* la conexión, no tener varias. Subirlo dejaría
+  // correr en paralelo las consultas sueltas de un `Promise.all` —que hoy van en
+  // fila— pero es un cambio de concurrencia aparte: medir primero Hyperdrive
+  // solo, o no se sabría cuál de los dos movió el número.
   return new PrismaClient({
     adapter: new PrismaPg({
       connectionString: await cadenaDeConexion(),

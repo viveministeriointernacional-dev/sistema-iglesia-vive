@@ -287,6 +287,56 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-10-05** — **El cuestionario de líderes quedó VIVO (PR #103 fusionado),
+  y entró COMPLETO.**
+  Las dos mitades de la receta del 22-sep: `git log --oneline
+  origin/main..origin/<rama>` **vacío**, y los padres del merge son
+  `0fa2951 e2ef519`, o sea **la cabeza de la rama**. El PR cerró como
+  `merged: true` a las **17:42 hora Colombia**.
+  **La base, verificada:** **5 tablas `leader_quiz%`**, **12 temas**, **63
+  preguntas** (38 abiertas + 25 de opción), **12 códigos distintos**, **12
+  notas para el líder**, **0 preguntas de opción sin respuesta o sin
+  explicación**, y el reparto exacto del documento (1:4 · 2:5 · 3:5 · 4:6 ·
+  5:5 · 6:6 · 7:5 · 8:5 · 9:6 · 10:6 · 11:5 · 12:5).
+  `20261005150000_cuestionario_de_lideres` registrada como **la última
+  aplicada, a las 17:44**, dos minutos después del merge. **Corrió sin pelearse
+  con ningún candado**, que era el objetivo de no tocar tablas calientes.
+  (Ojo: `app_migration.applied_at` es `timestamptz`, así que va **UN solo**
+  `at time zone 'America/Bogota'` — la trampa del 3-oct.)
+  **⚠️ DESPLIEGUE COMPROBADO CON HUELLA POSITIVA *Y SU CONTROL*, que es lo que
+  le faltaba a la receta del 18-sep.** Tres peticiones, no una:
+  1. `GET /taller/lider` → **200** con «Cuestionario de líderes · Escuela Ser
+     Líder» dentro. Es una ruta que **solo existe en este build**.
+  2. `GET /taller/no-existe-nada-xyz` → **404**. **Este es el control, y sin él
+     el 200 de arriba no probaría nada**: `/taller` es prefijo público, así que
+     había que demostrar que una ruta inventada **sí** da 404 y por tanto el
+     200 no es un comodín.
+  3. `GET /taller/lider/NO-ES-HEX` → **404** y
+     `GET /taller/lider/abcdef0123456789` → **200** con la pantalla de
+     identificación. O sea que la ruta del tema **además valida el formato del
+     código**, que es lógica que solo trae este PR.
+  **REGLA, como remate: una huella positiva necesita su control.** Un 200 solo
+  dice «esto responde»; el par 200/404 sobre rutas hermanas dice «esto
+  responde PORQUE el código nuevo está». Es la vuelta buena a los dos falsos
+  positivos (el chunk de JS del 11-sep y el CSS idéntico del 3-oct).
+  **Estado de arranque medido:** **12 cuentas pueden revisar** (pastores +
+  administración) y **3 cuentas de MENTOR ven «Escuela»** — que son justo las
+  que NO deben ver la pestaña, y es lo que vigila el guardia propio.
+  **467 personas tienen código de miembro**, así que el QR tiene con qué.
+  **0 cuestionarios empezados** (es de hace minutos) y **2 inscritos** en «Ser
+  Lider Promo 2026» — o sea que hoy el panel lista 2 renglones, y el resto del
+  equipo aparecerá en cuanto escanee el QR de inscripción o el del
+  cuestionario.
+  **⚠️ Y ESO DESTAPA LO QUE HAY QUE DECIRLE AL EQUIPO: son DOS QR distintos y
+  hacen cosas distintas.**
+  - `…/actualizar-datos?escuela=1` → **inscribe en la Escuela Ser Líder**
+    (3-oct).
+  - `…/taller/lider` → **el cuestionario de los 12 temas**, se entra con el
+    código de miembro de 6 dígitos.
+  El cuestionario **no exige estar inscrito**, así que el segundo funciona
+  aunque no se haya pasado por el primero; el panel marca en ámbar a quien
+  responda sin estar inscrito.
+
 - **2026-10-05** — **Cuestionario de Dominio para Líderes: los 12 temas que
   resuelve quien va a DICTAR una Casa de Fe** (pedido del usuario: «crear el
   taller virtual para que cada persona que hace parte de la Escuela Ser Líder
