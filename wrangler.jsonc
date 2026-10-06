@@ -32,16 +32,46 @@
     "EMAIL_FROM": "Iglesia Vive <no-responder@send.micasavive.com>"
   }
 
-  // Conexión a Postgres. Hyperdrive mantiene el pool del lado de Cloudflare;
-  // sin él, cada invocación abre una conexión nueva contra Supabase y el pooler
-  // se agota. Crea la configuración con:
+  // Conexión a Postgres. **Hyperdrive mantiene el pool del lado de
+  // Cloudflare**: sin él, cada invocación del worker abre una conexión nueva
+  // contra Supabase y se paga la latencia del saludo TCP + TLS + Postgres en
+  // CADA petición. Con `PrismaPg max: 1` (ver `src/lib/prisma.ts`) las
+  // consultas de una petición van en fila sobre esa única conexión, así que esa
+  // latencia se multiplica por el número de viajes de la pantalla.
+  //
+  // ⚠️ **DOS COSAS QUE LA DOCUMENTACIÓN GENÉRICA DICE AL REVÉS PARA ESTE
+  // PROYECTO, y las dos están medidas:**
+  //
+  // 1. **Va contra el SESSION POOLER, no contra la conexión directa.**
+  //    Cloudflare recomienda la directa, pero `db.<proyecto>.supabase.co` **no
+  //    resuelve a IPv4** en el plan FREE de Supabase (comprobado: sin A y sin
+  //    AAAA desde fuera), así que Hyperdrive no la alcanza. El session pooler
+  //    (`aws-N-ca-central-1.pooler.supabase.com`, puerto **5432**) sí resuelve
+  //    a IPv4, y es además el que el proyecto ya usa. Copia la cadena tal cual
+  //    de Supabase → Connect → **Session pooler**.
+  //
+  // 2. **La caché de consultas VA APAGADA, a propósito.** Hyperdrive cachea por
+  //    defecto las lecturas durante **60 s**, y aquí eso sería una regresión
+  //    conocida: el equipo guarda y vuelve a leer en el acto (registrar una
+  //    llamada y ver moverse la tarjeta, marcar un devocional, aprobar un
+  //    taller). Con la caché puesta, la pantalla enseñaría el dato viejo hasta
+  //    un minuto — exactamente el fallo del 11-sep-2026 que ya costó entender
+  //    una vez. Lo que se quiere de Hyperdrive es **el pool, no la caché**.
+  //
+  // Se crea una sola vez, desde una máquina con sesión de Cloudflare:
   //
   //   npx wrangler hyperdrive create iglesia-vive-db \
-  //     --connection-string="postgresql://postgres.PROYECTO:CONTRASENA@aws-0-REGION.pooler.supabase.com:5432/postgres"
+  //     --connection-string="<la cadena del Session pooler, con la contraseña>" \
+  //     --caching-disabled
   //
-  // y pega el id devuelto aquí:
+  // ⚠️ La contraseña va SOLO en ese comando: **nunca a este archivo ni al
+  // repositorio** (§10). Lo que devuelve el comando es un **id**, que no es un
+  // secreto, y es lo único que se pega aquí:
   //
   // "hyperdrive": [
   //   { "binding": "HYPERDRIVE", "id": "<id-de-hyperdrive>" }
   // ]
+  //
+  // `scripts/migrar.mjs` NO pasa por aquí: corre en el build, fuera del worker,
+  // y sigue usando el secreto de build DATABASE_URL (§5).
 }
