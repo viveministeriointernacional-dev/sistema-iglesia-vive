@@ -14,7 +14,7 @@ import {
 } from "@/lib/prematrimonial-catalogo";
 import type { TallerPreAbierto } from "@/lib/prematrimonial";
 
-import { enviarPre, responderPre } from "./acciones";
+import { enviarPre, responderPre, salirDelTallerPre } from "./acciones";
 
 /// El taller del prematrimonial, tal como lo llena UNA de las dos personas.
 ///
@@ -164,6 +164,17 @@ export function FormularioPre({
             </li>
           ))}
         </ol>
+
+        {/* ⚠️ La salida va DENTRO del taller y no solo en «Mis talleres»: aquí
+            es donde la persona se da cuenta de que está en la pantalla de su
+            pareja, porque lee un nombre que no es el suyo. */}
+        <button
+          type="button"
+          onClick={() => salirDelTallerPre(codigo).then(() => router.refresh())}
+          className="mx-5 mt-6 mb-2 block text-[12px] text-[#5c5648] underline underline-offset-2"
+        >
+          No soy {nombre} · salir
+        </button>
 
         {error ? (
           <p

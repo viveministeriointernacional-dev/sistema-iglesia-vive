@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 
 import { learnerPorToken } from "@/lib/taller";
-import { COOKIE_TALLER } from "@/lib/taller-catalogo";
+import { COOKIE_TALLER, RUTA_DE_COOKIE } from "@/lib/taller-catalogo";
 import {
   abrirTallerPre,
   enviarTallerPre,
@@ -53,6 +53,25 @@ export async function enviarPre(
 }
 
 /// Se usa al entrar: abre (o retoma) el taller de este tema.
+/// Soltar la identificación desde el propio taller.
+///
+/// ⚠️ **Aquí hace más falta que en ningún otro taller, y es la razón de que
+/// exista:** el prematrimonial es el único que llenan DOS personas que viven
+/// juntas, así que es el único donde de verdad se van a pasar el mismo
+/// teléfono. La cookie dura 30 días (`DIAS_DE_COOKIE`), de modo que sin esta
+/// salida el segundo quedaría escribiendo en el taller del primero — y lo
+/// único que el ejercicio mide es que cada uno responda por separado.
+///
+/// No se reusa `salirDelTaller` de Casa de Fe porque aquella revalida
+/// `/taller/<codigo>`, que es otra ruta: dejaría esta pantalla sin repintar.
+export async function salirDelTallerPre(
+  codigo: string,
+): Promise<ResultadoPublicoPre> {
+  (await cookies()).delete({ name: COOKIE_TALLER, path: RUTA_DE_COOKIE });
+  revalidatePath(`/taller/pre/${codigo}`);
+  return { ok: true };
+}
+
 export async function abrirPre(codigo: string): Promise<ResultadoPublicoPre> {
   const learnerId = await learnerDeLaCookie();
   if (!learnerId) {
