@@ -8,6 +8,7 @@ import {
   LARGO_MINIMO_RESPUESTA_PRE,
   avancePre,
   esOrdenCompleto,
+  preguntasQueFaltan,
   respondidaPre,
   type PreguntaPre,
   type RespuestaPre,
@@ -48,6 +49,14 @@ export function FormularioPre({
     [taller.preguntas, respuestas],
   );
 
+  // ⚠️ **Los NÚMEROS de las que faltan, no solo cuántas.** El 9-oct Paola
+  // tenía las 21 respondidas y la pantalla solo decía «Te faltan 8»: sin
+  // saber cuáles, no había forma de arreglarlo salvo adivinando.
+  const faltan = useMemo(
+    () => preguntasQueFaltan(taller.preguntas, respuestas),
+    [taller.preguntas, respuestas],
+  );
+
   function actualizar(questionId: string, cambio: Partial<RespuestaPre>) {
     setRespuestas((antes) => {
       const resto = antes.filter((r) => r.questionId !== questionId);
@@ -57,6 +66,7 @@ export function FormularioPre({
         choice: null,
         choices: [],
         ordering: [],
+        texts: [],
       };
       return [...resto, { ...actual, ...cambio }];
     });
@@ -199,6 +209,13 @@ export function FormularioPre({
                   ? "Enviar a mi pastor"
                   : `Te faltan ${avance.faltan}`}
             </button>
+            {faltan.length > 0 ? (
+              <p className="mt-3 rounded-lg bg-[#f7eef2] px-3 py-2.5 text-[12px] leading-[1.5] font-semibold text-[#7a3b5c]">
+                {faltan.length === 1
+                  ? `Falta la pregunta ${faltan[0]}.`
+                  : `Faltan estas preguntas: ${faltan.join(", ")}.`}
+              </p>
+            ) : null}
             <p className="mt-3 text-[11.5px] leading-[1.5] text-[#5c5648]">
               Puedes irte y volver: lo que escribas queda guardado. Solo se envía
               cuando estén las {avance.total} respondidas.
@@ -230,7 +247,13 @@ function Pregunta({
   soloLectura: boolean;
   onCambio: (
     cambio: Partial<RespuestaPre>,
-    valor: { text?: string; choice?: number; choices?: number[]; ordering?: number[] },
+    valor: {
+      text?: string;
+      choice?: number;
+      choices?: number[];
+      ordering?: number[];
+      texts?: string[];
+    },
     conEspera?: boolean,
   ) => void;
 }) {
@@ -240,6 +263,7 @@ function Pregunta({
     choice: null,
     choices: [],
     ordering: [],
+    texts: [],
   };
   const hecha = respondidaPre(pregunta, respuesta);
 
@@ -290,6 +314,15 @@ function Pregunta({
             </label>
           ))}
         </fieldset>
+      ) : null}
+
+      {pregunta.kind === "SUBCAMPOS" ? (
+        <Casillas
+          pregunta={pregunta}
+          valores={lista.texts}
+          soloLectura={soloLectura}
+          onCambio={onCambio}
+        />
       ) : null}
 
       {pregunta.kind === "MULTIPLE" ? (
@@ -405,6 +438,70 @@ function OrdenarOpciones({
           Te faltan {total - orden.length} por numerar.
         </p>
       ) : null}
+    </div>
+  );
+}
+
+/// **Una pregunta con casillas rotuladas** (SUBCAMPOS).
+///
+/// La 1 del taller 2 es una tabla de 7 áreas × 2 columnas en el libro. Aquí
+/// **no se dibuja la rejilla**: en un celular catorce celdas de tabla son
+/// ilegibles. Se apilan como catorce campos con su rótulo, que es la misma
+/// información y se llena con el pulgar.
+///
+/// ⚠️ **Dice cuántas van («3 de 7») pero NO bloquea el envío.** Es la lección
+/// del 9-oct: una validación estricta deja a alguien con el taller entero
+/// contestado sin poder enviarlo. El hueco se avisa; quien decide si alcanza
+/// es el pastor al leerlo.
+function Casillas({
+  pregunta,
+  valores,
+  soloLectura,
+  onCambio,
+}: {
+  pregunta: PreguntaPre;
+  valores: string[];
+  soloLectura: boolean;
+  onCambio: (
+    cambio: Partial<RespuestaPre>,
+    valor: { texts?: string[] },
+    conEspera?: boolean,
+  ) => void;
+}) {
+  // Siempre una casilla por rótulo: el servidor rechaza un arreglo de otro
+  // largo, porque guardarlo así metería el texto de un área en otra.
+  const actuales = pregunta.fields.map((_, i) => valores[i] ?? "");
+  const escritas = actuales.filter((t) => t.trim().length > 0).length;
+
+  return (
+    <div className="mt-2.5">
+      <p className="text-[11.5px] leading-[1.45] text-[#5c5648]">
+        {escritas} de {pregunta.fields.length} escritas
+        {escritas < pregunta.fields.length ? " · puedes enviar aunque falten" : ""}
+      </p>
+
+      {pregunta.fields.map((rotulo, i) => (
+        <div key={i} className="mt-2">
+          <label
+            htmlFor={`c-${pregunta.id}-${i}`}
+            className="text-[12px] leading-[1.35] font-semibold text-[#5c5648]"
+          >
+            {rotulo}
+          </label>
+          <textarea
+            id={`c-${pregunta.id}-${i}`}
+            rows={2}
+            disabled={soloLectura}
+            defaultValue={actuales[i]}
+            onChange={(e) => {
+              const siguiente = [...actuales];
+              siguiente[i] = e.target.value;
+              onCambio({ texts: siguiente }, { texts: siguiente }, true);
+            }}
+            className="mt-1 w-full resize-y rounded-lg border border-[#cfc6ae] bg-[#faf8f1] px-3 py-2 text-[14px] leading-[1.5] disabled:opacity-70"
+          />
+        </div>
+      ))}
     </div>
   );
 }

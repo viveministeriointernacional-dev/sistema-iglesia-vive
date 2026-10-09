@@ -10,6 +10,8 @@ import {
   estadoTemaPareja,
   listoParaDestapar,
   puestoPorOpcion,
+  casillasEscritas,
+  preguntasQueFaltan,
   respondidaPre,
   sePuedeComparar,
   terminoElPrematrimonial,
@@ -23,6 +25,7 @@ const abierta = (id: string, n = 1): PreguntaPre => ({
   kind: "ABIERTA",
   prompt: "¿Qué es el matrimonio para usted?",
   options: [],
+  fields: [],
 });
 
 const siNo = (id: string, n = 19): PreguntaPre => ({
@@ -31,6 +34,7 @@ const siNo = (id: string, n = 19): PreguntaPre => ({
   kind: "SI_NO",
   prompt: "Encuentra un versículo que diga que el matrimonio es para ser feliz.",
   options: ["Sí", "No"],
+  fields: [],
 });
 
 /// La 14 del taller 1, con sus ocho opciones reales.
@@ -49,6 +53,7 @@ const multiple = (id: string, n = 14): PreguntaPre => ({
     "Cada uno maneja su dinero.",
     "Cada uno tiene su espacio.",
   ],
+  fields: [],
 });
 
 /// La 21 del taller 1: las seis prioridades.
@@ -65,6 +70,7 @@ const orden = (id: string, n = 21): PreguntaPre => ({
     "Iglesia.",
     "Trabajo.",
   ],
+  fields: [],
 });
 
 const r = (questionId: string, extra: Partial<RespuestaPre> = {}): RespuestaPre => ({
@@ -73,6 +79,7 @@ const r = (questionId: string, extra: Partial<RespuestaPre> = {}): RespuestaPre 
   choice: null,
   choices: [],
   ordering: [],
+  texts: [],
   ...extra,
 });
 
@@ -80,10 +87,14 @@ const r = (questionId: string, extra: Partial<RespuestaPre> = {}): RespuestaPre 
 // ¿Está respondida?
 // ---------------------------------------------------------------------------
 
-test("una abierta necesita algo escrito de verdad", () => {
+test("una abierta necesita algo escrito, aunque sea corto", () => {
   const p = abierta("a");
   assert.equal(respondidaPre(p, undefined), false);
-  assert.equal(respondidaPre(p, r("a", { text: "no sé" })), false);
+  // ⚠️ Esta prueba afirmaba lo contrario hasta el 9-oct-2026: con el mínimo de
+  // 10 caracteres, «no sé» no valía. Y eso bloqueó a alguien con el taller
+  // entero contestado — ver la prueba de «Dios» más abajo. Una respuesta corta
+  // la juzga el pastor al leerla; el sistema solo impide enviar en blanco.
+  assert.equal(respondidaPre(p, r("a", { text: "no sé" })), true);
   assert.equal(
     respondidaPre(p, r("a", { text: "Es un pacto para toda la vida." })),
     true,
@@ -358,4 +369,85 @@ test("«listo para destapar» es tener los dos envíos y no haberlo destapado", 
 test("el recorrido se termina con los 12", () => {
   assert.equal(terminoElPrematrimonial(11), false);
   assert.equal(terminoElPrematrimonial(12), true);
+});
+
+
+// ---------------------------------------------------------------------------
+// Preguntas con casillas (SUBCAMPOS) · el taller 2
+// ---------------------------------------------------------------------------
+
+/// La 1 del taller 2: 7 áreas × 2 columnas = 14 casillas bajo UN número.
+const casillas = (id: string, n = 1): PreguntaPre => ({
+  id,
+  number: n,
+  kind: "SUBCAMPOS",
+  prompt: "Escriba las diferencias y similitudes con su novio(a).",
+  options: [],
+  fields: [
+    "Espiritual · Similitudes",
+    "Espiritual · Diferencias",
+    "Física · Similitudes",
+    "Física · Diferencias",
+  ],
+});
+
+test("una pregunta con casillas no está respondida si están todas en blanco", () => {
+  assert.equal(respondidaPre(casillas("q"), r("q", { texts: ["", "", "", ""] })), false);
+  assert.equal(respondidaPre(casillas("q"), undefined), false);
+});
+
+test("basta UNA casilla escrita para poder enviar", () => {
+  assert.equal(
+    respondidaPre(casillas("q"), r("q", { texts: ["Oramos juntos", "", "", ""] })),
+    true,
+  );
+});
+
+test("los espacios en blanco no cuentan como casilla escrita", () => {
+  assert.equal(respondidaPre(casillas("q"), r("q", { texts: ["   ", "", "", ""] })), false);
+});
+
+test("cuenta cuántas casillas van, para poder decir «2 de 4»", () => {
+  assert.equal(casillasEscritas(r("q", { texts: ["a", "", "b", " "] })), 2);
+  assert.equal(casillasEscritas(undefined), 0);
+});
+
+test("una pregunta con casillas NO la compara el sistema: es texto", () => {
+  const dos = ["Oramos juntos", "", "", ""];
+  assert.equal(
+    compararRespuestas(casillas("q"), r("q", { texts: dos }), r("q", { texts: dos }))
+      .veredicto,
+    "NO_COMPARABLE",
+  );
+});
+
+test("las casillas no entran en el conteo de comparables", () => {
+  assert.equal(cuantasComparables([abierta("a"), casillas("b"), siNo("c")]), 1);
+});
+
+// ---------------------------------------------------------------------------
+// Lo que bloqueó a Paola el 9-oct-2026
+// ---------------------------------------------------------------------------
+
+test("«Dios» es una respuesta válida a «¿Quién creó el matrimonio?»", () => {
+  // Cuatro caracteres. Con el mínimo viejo de 10 esto no dejaba enviar el
+  // taller entero, y es la respuesta correcta y completa.
+  assert.equal(respondidaPre(abierta("q8", 8), r("q8", { text: "Dios" })), true);
+});
+
+test("una respuesta en blanco sigue sin valer", () => {
+  assert.equal(respondidaPre(abierta("q"), r("q", { text: "   " })), false);
+  assert.equal(respondidaPre(abierta("q"), r("q", { text: null })), false);
+});
+
+test("dice QUÉ preguntas faltan, no solo cuántas", () => {
+  const preguntas = [abierta("a", 1), abierta("b", 2), siNo("c", 3)];
+  const respuestas = [r("a", { text: "algo" })];
+  assert.deepEqual(preguntasQueFaltan(preguntas, respuestas), [2, 3]);
+});
+
+test("sin preguntas que falten, la lista viene vacía", () => {
+  const preguntas = [abierta("a", 1), siNo("c", 3)];
+  const respuestas = [r("a", { text: "algo" }), r("c", { choice: 0 })];
+  assert.deepEqual(preguntasQueFaltan(preguntas, respuestas), []);
 });
