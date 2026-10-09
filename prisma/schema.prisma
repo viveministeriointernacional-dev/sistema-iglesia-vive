@@ -41,38 +41,38 @@ enum Gender {
 /// guardamos el rol y el vínculo con la persona. `authUserId` se enlaza en el
 /// primer inicio de sesión a partir del correo pre-aprovisionado.
 model AppUser {
-  id         String   @id @default(uuid())
-  authUserId String?  @unique @map("auth_user_id") @db.Uuid
-  email      String   @unique
-  fullName   String   @map("full_name")
-  role       Role
-  active     Boolean  @default(true)
+  id                       String   @id @default(uuid())
+  authUserId               String?  @unique @map("auth_user_id") @db.Uuid
+  email                    String   @unique
+  fullName                 String   @map("full_name")
+  role                     Role
+  active                   Boolean  @default(true)
   /// Capacidad máxima de acompañamiento simultáneo (consolidador / mentor).
-  capacity   Int      @default(24)
+  capacity                 Int      @default(24)
   /// Liderar Alpha es un permiso, no un rol: un mentor, un consolidador o
   /// cualquiera del equipo puede llevar un grupo sin cambiar lo que es dentro
   /// de la iglesia. Quien lo tiene administra los grupos que le asignen; crear
   /// y cerrar grupos sigue siendo del pastor o de un mentor.
-  canLeadAlpha Boolean @default(false) @map("can_lead_alpha")
+  canLeadAlpha             Boolean  @default(false) @map("can_lead_alpha")
   /// Liderar Casa de Fe es también un permiso, no un rol: habilita a la persona
   /// para llevar Casa de Fe, sin cambiar lo que es dentro de la iglesia.
-  canLeadFaithHouse Boolean @default(false) @map("can_lead_faith_house")
+  canLeadFaithHouse        Boolean  @default(false) @map("can_lead_faith_house")
   /// Acompañar como mentor es también un permiso: un consolidador (o quien sea)
   /// puede tener discípulos sin dejar de ser lo que es. El rol MENTOR/PASTOR/
   /// ADMIN ya lo habilita por sí solo; esta casilla suma a los demás.
-  canMentor Boolean @default(false) @map("can_mentor")
+  canMentor                Boolean  @default(false) @map("can_mentor")
   /// Coordina la consolidación: un consolidador que revisa el trabajo de todos.
   /// Con este permiso ve y opera Operación 72 y los expedientes de todos los
   /// consolidadores, no solo los que tiene asignados. No cambia su rol ni le da
   /// poderes de pastor (red, cambios de fase, etc.).
-  coordinatesConsolidation Boolean @default(false) @map("coordinates_consolidation")
+  coordinatesConsolidation Boolean  @default(false) @map("coordinates_consolidation")
   /// Ve TODAS las Casas de Fe y todos los Alpha de la iglesia, aunque no lleve
   /// ninguno ni cuelgue nadie de su rama. Es el permiso del liderazgo
   /// transversal — intercesión, por ejemplo: gente que necesita saber dónde se
   /// reúne cada grupo sin acompañar a nadie en particular.
   /// **Solo mirar**: administrar un grupo sigue siendo de su líder, de quien lo
   /// abrió, de la administración o de su rama.
-  canSeeAllGroups Boolean @default(false) @map("can_see_all_groups")
+  canSeeAllGroups          Boolean  @default(false) @map("can_see_all_groups")
   /// **Lleva GI**: acompaña a un grupo de jóvenes dentro de Generación
   /// Imparable, les marca el devocional diario y escribe las observaciones.
   ///
@@ -80,80 +80,80 @@ model AppUser {
   /// **no cambia la línea de mentoría de nadie**: Mariana Valentina Narváez es
   /// líder de GI y sigue siendo discípula de Paola Viveros. GI y la mentoría
   /// son dos estructuras que conviven.
-  canLeadGi Boolean @default(false) @map("can_lead_gi")
+  canLeadGi                Boolean  @default(false) @map("can_lead_gi")
   /// **Coordina GI**: los pastores del movimiento juvenil. Ven a todos los
   /// líderes de GI y a todos los jóvenes, lleven o no un grupo ellos mismos.
   /// Es a GI lo que `coordinatesConsolidation` es a la consolidación.
-  coordinatesGi Boolean @default(false) @map("coordinates_gi")
+  coordinatesGi            Boolean  @default(false) @map("coordinates_gi")
   /// El código secreto de su enlace de calendario (`/calendario/<token>.ics`).
   ///
   /// ⚠️ **Es una credencial, no un identificador.** Los calendarios no piden
   /// usuario ni contraseña, así que la URL es lo único que autoriza: quien la
   /// tenga ve esas reuniones. Nace nulo (nadie tiene enlace hasta que lo pide)
   /// y se puede rehacer, lo que invalida el anterior al instante.
-  calendarToken String? @unique @map("calendar_token")
+  calendarToken            String?  @unique @map("calendar_token")
   /// Identificador de este usuario en HighLevel. Sirve para que, cuando llega
   /// un registro del CRM, el propietario del contacto se convierta en su
   /// consolidador. Nulo para quien no tiene cuenta en HighLevel.
-  highlevelUserId String? @unique @map("highlevel_user_id")
-  personId   String?  @unique @map("person_id")
-  teamId     String?  @map("team_id")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  highlevelUserId          String?  @unique @map("highlevel_user_id")
+  personId                 String?  @unique @map("person_id")
+  teamId                   String?  @map("team_id")
+  createdAt                DateTime @default(now()) @map("created_at")
+  updatedAt                DateTime @updatedAt @map("updated_at")
 
   person Person? @relation(fields: [personId], references: [id])
   team   Team?   @relation(fields: [teamId], references: [id])
 
-  consolidadorDe        LearnerProfile[]     @relation("ConsolidadorAsignado")
-  relacionesComoMentor  MentorRelationship[] @relation("MentorDeRelacion")
-  relacionesAutorizadas MentorRelationship[] @relation("AutorizadaPor")
-  op72Propuestas        Operation72[]        @relation("MentorPropuesto")
-  contactosRegistrados  ContactAttempt[]     @relation("RegistradoPor")
-  visitasAnuladas       ContactAttempt[]     @relation("AnuladaPor")
-  notasEscritas         PrivateNote[]
-  hitosRegistrados      Milestone[]
-  temasRegistrados      FaithHouseProgress[]
-  gruposAlphaLiderados  AlphaProgram[]       @relation("LiderDeAlpha")
-  gruposAlphaAbiertos   AlphaProgram[]       @relation("AbrioAlpha")
-  casasDeFeLideradas    FaithHouseGroup[]    @relation("LiderCasaFe")
-  casasDeFeAbiertas     FaithHouseGroup[]    @relation("AbrioCasaFe")
-  alphaQueEncarga       AlphaCoLeader[]      @relation("EncargadoDeAlpha")
-  alphaQueEncargo       AlphaCoLeader[]      @relation("PusoEncargadoDeAlpha")
-  casasQueEncarga       FaithHouseCoLeader[] @relation("EncargadoDeCasaFe")
-  casasQueEncargo       FaithHouseCoLeader[] @relation("PusoEncargadoDeCasaFe")
-  validacionesAlpha     AlphaEnrollment[]    @relation("ValidacionAlpha")
-  asistenciasAlpha      AlphaAttendance[]
-  registrosCreados      LearnerProfile[]     @relation("RegistradaPor")
-  escuelasLideradas     TrainingProgram[]    @relation("LiderDeEscuela")
-  cierresDeEscuela      TrainingEnrollment[] @relation("CerroEscuela")
-  asistenciasEscuela    TrainingAttendance[]
-  serviciosResponsable  ServiceAssignment[]  @relation("ResponsableDeServicio")
-  serviciosRegistrados  ServiceAssignment[]  @relation("RegistroServicio")
-  cambiosDeFase         PhaseChange[]        @relation("DecidioCambioDeFase")
-  cambiosDeEstado       LearnerStatusChange[] @relation("DecidioCambioDeEstado")
-  eventosCreados        Event[]              @relation("EventoCreadoPor")
-  inscripcionesEvento   EventRegistration[]  @relation("InscribioAEvento")
-  asistenciasEvento     EventRegistration[]  @relation("MarcoAsistenciaEvento")
-  auditoria             AuditLog[]
-  llamadas              CallLog[]
-  declaracionesRevisadas LeadershipDeclaration[] @relation("RevisoDeclaracion")
-  talleresRevisados      FaithHouseWorkshopReview[] @relation("RevisoTaller")
+  consolidadorDe            LearnerProfile[]            @relation("ConsolidadorAsignado")
+  relacionesComoMentor      MentorRelationship[]        @relation("MentorDeRelacion")
+  relacionesAutorizadas     MentorRelationship[]        @relation("AutorizadaPor")
+  op72Propuestas            Operation72[]               @relation("MentorPropuesto")
+  contactosRegistrados      ContactAttempt[]            @relation("RegistradoPor")
+  visitasAnuladas           ContactAttempt[]            @relation("AnuladaPor")
+  notasEscritas             PrivateNote[]
+  hitosRegistrados          Milestone[]
+  temasRegistrados          FaithHouseProgress[]
+  gruposAlphaLiderados      AlphaProgram[]              @relation("LiderDeAlpha")
+  gruposAlphaAbiertos       AlphaProgram[]              @relation("AbrioAlpha")
+  casasDeFeLideradas        FaithHouseGroup[]           @relation("LiderCasaFe")
+  casasDeFeAbiertas         FaithHouseGroup[]           @relation("AbrioCasaFe")
+  alphaQueEncarga           AlphaCoLeader[]             @relation("EncargadoDeAlpha")
+  alphaQueEncargo           AlphaCoLeader[]             @relation("PusoEncargadoDeAlpha")
+  casasQueEncarga           FaithHouseCoLeader[]        @relation("EncargadoDeCasaFe")
+  casasQueEncargo           FaithHouseCoLeader[]        @relation("PusoEncargadoDeCasaFe")
+  validacionesAlpha         AlphaEnrollment[]           @relation("ValidacionAlpha")
+  asistenciasAlpha          AlphaAttendance[]
+  registrosCreados          LearnerProfile[]            @relation("RegistradaPor")
+  escuelasLideradas         TrainingProgram[]           @relation("LiderDeEscuela")
+  cierresDeEscuela          TrainingEnrollment[]        @relation("CerroEscuela")
+  asistenciasEscuela        TrainingAttendance[]
+  serviciosResponsable      ServiceAssignment[]         @relation("ResponsableDeServicio")
+  serviciosRegistrados      ServiceAssignment[]         @relation("RegistroServicio")
+  cambiosDeFase             PhaseChange[]               @relation("DecidioCambioDeFase")
+  cambiosDeEstado           LearnerStatusChange[]       @relation("DecidioCambioDeEstado")
+  eventosCreados            Event[]                     @relation("EventoCreadoPor")
+  inscripcionesEvento       EventRegistration[]         @relation("InscribioAEvento")
+  asistenciasEvento         EventRegistration[]         @relation("MarcoAsistenciaEvento")
+  auditoria                 AuditLog[]
+  llamadas                  CallLog[]
+  declaracionesRevisadas    LeadershipDeclaration[]     @relation("RevisoDeclaracion")
+  talleresRevisados         FaithHouseWorkshopReview[]  @relation("RevisoTaller")
   itemsDeclaracionResueltos LeadershipDeclarationItem[] @relation("ResolvioItemDeclaracion")
-  bajasPedidas           BajaRequest[]           @relation("PidioLaBaja")
-  bajasResueltas         BajaRequest[]           @relation("ResolvioLaBaja")
-  llavesMaestras         MasterKey[]             @relation("CreoLlaveMaestra")
-  vistasPropias          ViewUserAccess[]        @relation("VistaDeLaCuenta")
-  vistasDeRolCambiadas   ViewRoleAccess[]        @relation("CambioVistaDeRol")
-  vistasDeCuentaCambiadas ViewUserAccess[]       @relation("CambioVistaDeCuenta")
-  giQueLleva             GiAssignment[]          @relation("LiderDeGi")
-  giQueAsigno            GiAssignment[]          @relation("AsignoAGi")
-  devocionalesMarcados   GiDevotional[]          @relation("MarcoDevocional")
-  observacionesDeGi      GiNote[]                @relation("EscribioObservacionGi")
-  prematrimonialesQueLleva PremaritalCouple[]    @relation("PastorDelPrematrimonial")
-  prematrimonialesQueAbrio PremaritalCouple[]    @relation("AbrioPrematrimonial")
-  prematrimonialRevisiones PremaritalReview[]    @relation("RevisoPrematrimonial")
-  prematrimonialDestapes   PremaritalReveal[]    @relation("DestapoPrematrimonial")
-  cuestionarioRevisiones   LeaderQuizReview[]    @relation("RevisoCuestionario")
+  bajasPedidas              BajaRequest[]               @relation("PidioLaBaja")
+  bajasResueltas            BajaRequest[]               @relation("ResolvioLaBaja")
+  llavesMaestras            MasterKey[]                 @relation("CreoLlaveMaestra")
+  vistasPropias             ViewUserAccess[]            @relation("VistaDeLaCuenta")
+  vistasDeRolCambiadas      ViewRoleAccess[]            @relation("CambioVistaDeRol")
+  vistasDeCuentaCambiadas   ViewUserAccess[]            @relation("CambioVistaDeCuenta")
+  giQueLleva                GiAssignment[]              @relation("LiderDeGi")
+  giQueAsigno               GiAssignment[]              @relation("AsignoAGi")
+  devocionalesMarcados      GiDevotional[]              @relation("MarcoDevocional")
+  observacionesDeGi         GiNote[]                    @relation("EscribioObservacionGi")
+  prematrimonialesQueLleva  PremaritalCouple[]          @relation("PastorDelPrematrimonial")
+  prematrimonialesQueAbrio  PremaritalCouple[]          @relation("AbrioPrematrimonial")
+  prematrimonialRevisiones  PremaritalReview[]          @relation("RevisoPrematrimonial")
+  prematrimonialDestapes    PremaritalReveal[]          @relation("DestapoPrematrimonial")
+  cuestionarioRevisiones    LeaderQuizReview[]          @relation("RevisoCuestionario")
 
   @@index([role, active])
   @@map("app_user")
@@ -210,44 +210,44 @@ enum ChurchAttendance {
 /// Identidad de una persona. Los teléfonos se conservan por tipo
 /// (ESPECIFICACION_PRODUCTO.md §20).
 model Person {
-  id        String  @id @default(uuid())
-  firstName String  @map("first_name")
+  id               String         @id @default(uuid())
+  firstName        String         @map("first_name")
   /// Opcional: a veces solo se sabe el nombre de pila.
-  lastName  String? @map("last_name")
+  lastName         String?        @map("last_name")
   /// Opcional: si no se conoce, la asignación de consolidador cae al criterio
   /// de menor carga en vez del mismo género (§5.4).
-  gender        Gender?
-  birthDate     DateTime?      @map("birth_date") @db.Date
-  callPhone     String?        @map("call_phone")
-  whatsappPhone String?        @map("whatsapp_phone")
-  email         String?
-  address       String?
-  prayerRequest String?        @map("prayer_request")
-  photoUrl      String?        @map("photo_url")
+  gender           Gender?
+  birthDate        DateTime?      @map("birth_date") @db.Date
+  callPhone        String?        @map("call_phone")
+  whatsappPhone    String?        @map("whatsapp_phone")
+  email            String?
+  address          String?
+  prayerRequest    String?        @map("prayer_request")
+  photoUrl         String?        @map("photo_url")
   /// Franjas en las que acepta llamadas. Varias a la vez: «mañana y noche» es
   /// una respuesta normal.
-  callSchedules CallSchedule[] @default([]) @map("call_schedules")
+  callSchedules    CallSchedule[] @default([]) @map("call_schedules")
   /// Horario escrito a mano cuando ninguna franja sirve («después de las 7»).
-  callScheduleNote String?     @map("call_schedule_note")
-  active        Boolean       @default(true)
+  callScheduleNote String?        @map("call_schedule_note")
+  active           Boolean        @default(true)
   /// Texto de búsqueda (nombre + correo + teléfonos) en minúsculas y sin
   /// tildes. Lo mantiene un trigger en la base de datos; no se escribe desde la
   /// app. Sirve para buscar sin importar mayúsculas, acentos ni exactitud.
-  searchText    String?       @map("search_text")
-  createdAt     DateTime      @default(now()) @map("created_at")
-  updatedAt     DateTime      @updatedAt @map("updated_at")
+  searchText       String?        @map("search_text")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
 
-  user           AppUser?
-  learnerProfile LearnerProfile?
-  invitados      LearnerProfile[] @relation("InvitadaPor")
-  highLevelContacts HighLevelContact[]
+  user                   AppUser?
+  learnerProfile         LearnerProfile?
+  invitados              LearnerProfile[]        @relation("InvitadaPor")
+  highLevelContacts      HighLevelContact[]
   declaracionesLiderazgo LeadershipDeclaration[]
+  memberCode             MemberCode?
 
   @@index([callPhone])
   @@index([whatsappPhone])
   @@index([email])
   @@map("person")
-  memberCode MemberCode?
 }
 
 /// Vincula la identidad estable del contacto de HighLevel con la persona del
@@ -277,41 +277,41 @@ model HighLevelContact {
 /// por `highlevel_user_id` de `app_user`; si no se puede mapear, `app_user_id`
 /// queda nulo pero la llamada igual se guarda con su id de HighLevel crudo.
 model CallLog {
-  id             String   @id @default(uuid())
+  id              String   @id @default(uuid())
   /// Origen del dato. Hoy siempre "highlevel"; deja la puerta abierta a otros.
-  provider       String   @default("highlevel")
+  provider        String   @default("highlevel")
   /// Id de la llamada en el proveedor. Con `provider` forma la clave para no
   /// duplicar si el webhook reintenta.
-  externalId     String   @map("external_id")
-  locationId     String?  @map("location_id")
+  externalId      String   @map("external_id")
+  locationId      String?  @map("location_id")
   /// Id del usuario de HighLevel que atendió/realizó la llamada, tal como llega.
-  highlevelUserId String? @map("highlevel_user_id")
+  highlevelUserId String?  @map("highlevel_user_id")
   /// Usuario del sistema resuelto a partir de `highlevel_user_id`. Nulo si el
   /// que llamó no tiene cuenta enlazada.
-  appUserId      String?  @map("app_user_id")
+  appUserId       String?  @map("app_user_id")
   /// Nombre de quien hizo/atendió la llamada, tal como lo manda HighLevel. Deja
   /// mostrar en el tablero a cualquiera que llame en el CRM aunque no esté
   /// enlazado como personal del sistema.
-  callerName     String?  @map("caller_name")
-  contactId      String?  @map("contact_id")
+  callerName      String?  @map("caller_name")
+  contactId       String?  @map("contact_id")
   /// Nombre del contacto llamado, tal como lo manda HighLevel. Respaldo para
   /// mostrar a quién se llamó cuando el contacto no está en el sistema (no se
   /// puede resolver el nombre por su id).
-  contactName    String?  @map("contact_name")
+  contactName     String?  @map("contact_name")
   /// "inbound" o "outbound" (normalizado en minúsculas).
-  direction      String?
+  direction       String?
   /// Estado de la llamada: completed, no-answer, busy, failed, voicemail…
-  status         String?
+  status          String?
   /// Si la llamada fue contestada (derivado del estado/duración).
-  answered       Boolean  @default(false)
-  durationSeconds Int     @default(0) @map("duration_seconds")
-  fromNumber     String?  @map("from_number")
-  toNumber       String?  @map("to_number")
-  recordingUrl   String?  @map("recording_url")
+  answered        Boolean  @default(false)
+  durationSeconds Int      @default(0) @map("duration_seconds")
+  fromNumber      String?  @map("from_number")
+  toNumber        String?  @map("to_number")
+  recordingUrl    String?  @map("recording_url")
   /// Momento de la llamada. Se usa para todos los filtros por fecha.
-  startedAt      DateTime @map("started_at")
-  metadata       Json?
-  createdAt      DateTime @default(now()) @map("created_at")
+  startedAt       DateTime @map("started_at")
+  metadata        Json?
+  createdAt       DateTime @default(now()) @map("created_at")
 
   appUser AppUser? @relation(fields: [appUserId], references: [id])
 
@@ -356,18 +356,18 @@ model LearnerProfile {
 
   // Origen. Todo opcional: en la puerta de un domingo no siempre se alcanza a
   // preguntar, y un dato en blanco es mejor que un dato inventado.
-  entryPoint        EntryPoint?     @map("entry_point")
+  entryPoint        EntryPoint?       @map("entry_point")
   /// Detalle cuando el punto de entrada es OTRO.
-  entryPointOther   String?         @map("entry_point_other")
+  entryPointOther   String?           @map("entry_point_other")
   churchAttendance  ChurchAttendance? @map("church_attendance")
-  churchName        String?         @map("church_name")
-  invitationKind    InvitationKind? @map("invitation_kind")
+  churchName        String?           @map("church_name")
+  invitationKind    InvitationKind?   @map("invitation_kind")
   /// Solo cuando la persona que invitó ya existe en la base.
-  invitedByPersonId String?         @map("invited_by_person_id")
+  invitedByPersonId String?           @map("invited_by_person_id")
   /// Nombre de quien invitó, exista o no en la base. Si se escribió a mano, un
   /// líder lo revisa después: no bloquear el registro por eso.
-  lineOfOrigin      String?         @map("line_of_origin")
-  originNotes       String?         @map("origin_notes")
+  lineOfOrigin      String?           @map("line_of_origin")
+  originNotes       String?           @map("origin_notes")
 
   consolidatorId String?  @map("consolidator_id")
   teamId         String?  @map("team_id")
@@ -381,26 +381,26 @@ model LearnerProfile {
   team         Team?    @relation(fields: [teamId], references: [id])
   registeredBy AppUser? @relation("RegistradaPor", fields: [registeredById], references: [id])
 
-  operation72         Operation72?
-  mentorRelationships MentorRelationship[]
-  milestones          Milestone[]
-  privateNotes        PrivateNote[]
-  faithHouseProgress  FaithHouseProgress[]
-  faithHouseGroups    FaithHouseGroupMember[]
-  alphaEnrollments    AlphaEnrollment[]
-  eventRegistrations  EventRegistration[]
-  trainingEnrollments TrainingEnrollment[]
-  serviceAssignments  ServiceAssignment[]
-  phaseChanges        PhaseChange[]
-  statusChanges       LearnerStatusChange[]
-  bajaRequests        BajaRequest[]
-  giAssignments       GiAssignment[]
-  giDevotionals       GiDevotional[]
-  giNotes             GiNote[]
-  faithHouseWorkshops FaithHouseWorkshop[]
-  faithHouseTallerToken FaithHouseTallerToken?
-  prematrimonialComoA PremaritalCouple[]    @relation("NovioA")
-  prematrimonialComoB PremaritalCouple[]    @relation("NoviaB")
+  operation72            Operation72?
+  mentorRelationships    MentorRelationship[]
+  milestones             Milestone[]
+  privateNotes           PrivateNote[]
+  faithHouseProgress     FaithHouseProgress[]
+  faithHouseGroups       FaithHouseGroupMember[]
+  alphaEnrollments       AlphaEnrollment[]
+  eventRegistrations     EventRegistration[]
+  trainingEnrollments    TrainingEnrollment[]
+  serviceAssignments     ServiceAssignment[]
+  phaseChanges           PhaseChange[]
+  statusChanges          LearnerStatusChange[]
+  bajaRequests           BajaRequest[]
+  giAssignments          GiAssignment[]
+  giDevotionals          GiDevotional[]
+  giNotes                GiNote[]
+  faithHouseWorkshops    FaithHouseWorkshop[]
+  faithHouseTallerToken  FaithHouseTallerToken?
+  prematrimonialComoA    PremaritalCouple[]      @relation("NovioA")
+  prematrimonialComoB    PremaritalCouple[]      @relation("NoviaB")
   prematrimonialTalleres PremaritalWorkshop[]
   cuestionariosDeLider   LeaderQuiz[]
 
@@ -506,7 +506,7 @@ model ContactAttempt {
   operation72Id String       @map("operation72_id")
   type          ContactType
   /// Solo en las llamadas: cómo salió.
-  outcome       CallOutcome? 
+  outcome       CallOutcome?
   result        String?
   note          String?
   nextAction    String?      @map("next_action")
@@ -542,10 +542,10 @@ model ContactAttempt {
 /// Grupo de Alpha. Referencia: 3 meses, 12 sesiones
 /// (ESPECIFICACION_PRODUCTO.md §5.7).
 model AlphaProgram {
-  id        String    @id @default(uuid())
-  name      String
-  startDate DateTime  @map("start_date") @db.Date
-  endDate   DateTime? @map("end_date") @db.Date
+  id              String    @id @default(uuid())
+  name            String
+  startDate       DateTime  @map("start_date") @db.Date
+  endDate         DateTime? @map("end_date") @db.Date
   /// **Cuándo se reúne**: el día de la semana, en la convención de JavaScript
   /// (0 = domingo … 6 = sábado), y la hora como **texto «HH:mm» en hora de
   /// Colombia**.
@@ -555,31 +555,31 @@ model AlphaProgram {
   /// las 7 p. m.» no es un momento en el tiempo: es una regla que se repite, y
   /// en Colombia son siempre las 7 p. m. Guardarla como `DateTime` obligaría a
   /// elegir una fecha cualquiera y a convertirla en cada lectura.
-  weekday         Int?    @map("weekday")
-  meetingTime     String? @map("meeting_time")
+  weekday         Int?      @map("weekday")
+  meetingTime     String?   @map("meeting_time")
   /// Cada cuántas semanas: 1 = cada semana, 2 = cada 15 días.
-  everyNWeeks     Int     @default(1) @map("every_n_weeks")
-  durationMinutes Int     @default(90) @map("duration_minutes")
+  everyNWeeks     Int       @default(1) @map("every_n_weeks")
+  durationMinutes Int       @default(90) @map("duration_minutes")
   /// La dirección tal como la escribe quien lleva el grupo. **No se valida
   /// contra Google**: muchas direcciones de barrio no existen en el mapa como
   /// se dicen, y un validador estricto rechazaría direcciones correctas. Si
   /// Maps no la encuentra, el texto sigue sirviendo para llamar y preguntar.
-  address         String? @map("address")
+  address         String?   @map("address")
   /// El punto exacto, marcado con el pin en el mapa. Es **un extra sobre la
   /// dirección, no su reemplazo**: la dirección es la que se dicta por
   /// teléfono, y el punto es lo que hace que «Cómo llegar» lleve a la casa y
   /// no a la mitad de la cuadra. Nulo mientras nadie lo haya marcado, y los
   /// dos van juntos o no van.
-  latitude        Float?  @map("latitude")
-  longitude       Float?  @map("longitude")
+  latitude        Float?    @map("latitude")
+  longitude       Float?    @map("longitude")
   /// Quien lleva el grupo: lo administra, pero no lo abre ni lo cierra.
-  leaderId  String    @map("leader_id")
+  leaderId        String    @map("leader_id")
   /// Quien lo abrió: pastor o mentor.
-  createdById String? @map("created_by_id")
-  teamId    String?   @map("team_id")
-  closedAt  DateTime? @map("closed_at")
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
+  createdById     String?   @map("created_by_id")
+  teamId          String?   @map("team_id")
+  closedAt        DateTime? @map("closed_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   leader      AppUser           @relation("LiderDeAlpha", fields: [leaderId], references: [id])
   createdBy   AppUser?          @relation("AbrioAlpha", fields: [createdById], references: [id])
@@ -719,12 +719,12 @@ enum FaithHouseStatus {
 
 /// 12 temas obligatorios, orden flexible decidido por el mentor.
 model FaithHouseTopic {
-  id     String @id @default(uuid())
-  number Int    @unique
-  name   String
+  id          String  @id @default(uuid())
+  number      Int     @unique
+  name        String
   /// El renglon en versalitas bajo el titulo en el libro. Nulo a proposito
   /// cuando el libro no le puso ninguno (el tema 7 no lo tiene).
-  subtitle String? @map("subtitle")
+  subtitle    String? @map("subtitle")
   /// «Vive la Palabra»: el versiculo para memorizar esa semana.
   memoryVerse String? @map("memory_verse")
   /// **El codigo del QR de este tema, y es una CREDENCIAL, no un
@@ -732,7 +732,7 @@ model FaithHouseTopic {
   /// calle, asi que NO es el numero del tema: con `/taller/3` cualquiera
   /// adivinaria los otros once y se marcaria temas que nadie le dio. Sale de
   /// `crypto.getRandomValues`, nunca de `Math.random`, y se puede rehacer.
-  qrCode String? @unique @map("qr_code")
+  qrCode      String? @unique @map("qr_code")
 
   progress  FaithHouseProgress[]
   days      FaithHouseTopicDay[]
@@ -771,7 +771,7 @@ model FaithHouseTopicQuestion {
   /// Solo en las de OPCION. El indice de la opcion elegida es la respuesta.
   options String[]
 
-  topic   FaithHouseTopic      @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  topic   FaithHouseTopic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
   answers FaithHouseAnswer[]
 
   @@unique([topicId, number])
@@ -892,9 +892,9 @@ model FaithHouseProgress {
 /// sigue viviendo en cada expediente (FaithHouseProgress); este modelo solo
 /// agrupa quién la lleva y con quiénes.
 model FaithHouseGroup {
-  id          String    @id @default(uuid())
-  name        String
-  startDate   DateTime  @map("start_date") @db.Date
+  id              String    @id @default(uuid())
+  name            String
+  startDate       DateTime  @map("start_date") @db.Date
   /// **Cuándo se reúne**: el día de la semana, en la convención de JavaScript
   /// (0 = domingo … 6 = sábado), y la hora como **texto «HH:mm» en hora de
   /// Colombia**.
@@ -904,29 +904,29 @@ model FaithHouseGroup {
   /// las 7 p. m.» no es un momento en el tiempo: es una regla que se repite, y
   /// en Colombia son siempre las 7 p. m. Guardarla como `DateTime` obligaría a
   /// elegir una fecha cualquiera y a convertirla en cada lectura.
-  weekday         Int?    @map("weekday")
-  meetingTime     String? @map("meeting_time")
+  weekday         Int?      @map("weekday")
+  meetingTime     String?   @map("meeting_time")
   /// Cada cuántas semanas: 1 = cada semana, 2 = cada 15 días.
-  everyNWeeks     Int     @default(1) @map("every_n_weeks")
-  durationMinutes Int     @default(90) @map("duration_minutes")
+  everyNWeeks     Int       @default(1) @map("every_n_weeks")
+  durationMinutes Int       @default(90) @map("duration_minutes")
   /// La dirección tal como la escribe quien lleva el grupo. **No se valida
   /// contra Google**: muchas direcciones de barrio no existen en el mapa como
   /// se dicen, y un validador estricto rechazaría direcciones correctas. Si
   /// Maps no la encuentra, el texto sigue sirviendo para llamar y preguntar.
-  address         String? @map("address")
+  address         String?   @map("address")
   /// El punto exacto, marcado con el pin en el mapa. Es **un extra sobre la
   /// dirección, no su reemplazo**: la dirección es la que se dicta por
   /// teléfono, y el punto es lo que hace que «Cómo llegar» lleve a la casa y
   /// no a la mitad de la cuadra. Nulo mientras nadie lo haya marcado, y los
   /// dos van juntos o no van.
-  latitude        Float?  @map("latitude")
-  longitude       Float?  @map("longitude")
-  leaderId    String    @map("leader_id")
-  createdById String?   @map("created_by_id")
-  teamId      String?   @map("team_id")
-  closedAt    DateTime? @map("closed_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  latitude        Float?    @map("latitude")
+  longitude       Float?    @map("longitude")
+  leaderId        String    @map("leader_id")
+  createdById     String?   @map("created_by_id")
+  teamId          String?   @map("team_id")
+  closedAt        DateTime? @map("closed_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   leader    AppUser                 @relation("LiderCasaFe", fields: [leaderId], references: [id])
   createdBy AppUser?                @relation("AbrioCasaFe", fields: [createdById], references: [id])
@@ -961,13 +961,13 @@ model FaithHouseGroupMember {
 /// nombre del grupo a falta de sitio: «Casa de Fe Joiner & Maria Isabel»,
 /// «Oscar & Dana», «Jaime & Geraldine».
 model AlphaCoLeader {
-  id         String   @id @default(uuid())
-  programId  String   @map("program_id")
-  userId     String   @map("user_id")
+  id        String   @id @default(uuid())
+  programId String   @map("program_id")
+  userId    String   @map("user_id")
   /// Quien lo puso de encargado. Nulo si esa cuenta desapareciera: el renglon
   /// sobrevive porque lo que importa es que esta persona lleva el grupo.
-  addedById  String?  @map("added_by_id")
-  addedAt    DateTime @default(now()) @map("added_at")
+  addedById String?  @map("added_by_id")
+  addedAt   DateTime @default(now()) @map("added_at")
 
   program AlphaProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
   user    AppUser      @relation("EncargadoDeAlpha", fields: [userId], references: [id], onDelete: Cascade)
@@ -1163,17 +1163,17 @@ model TrainingSession {
 }
 
 model TrainingEnrollment {
-  id          String    @id @default(uuid())
-  programId   String    @map("program_id")
-  learnerId   String    @map("learner_id")
-  joinedAt    DateTime  @default(now()) @map("joined_at")
+  id             String    @id @default(uuid())
+  programId      String    @map("program_id")
+  learnerId      String    @map("learner_id")
+  joinedAt       DateTime  @default(now()) @map("joined_at")
   /// Cierre de la escuela para esta persona. Como en Alpha, lo emite el líder:
   /// el sistema comprueba condiciones, no aprueba solo.
-  completedAt DateTime? @map("completed_at")
-  completedById String? @map("completed_by_id")
-  completionNote String? @map("completion_note")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  completedAt    DateTime? @map("completed_at")
+  completedById  String?   @map("completed_by_id")
+  completionNote String?   @map("completion_note")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   program     TrainingProgram      @relation(fields: [programId], references: [id], onDelete: Cascade)
   learner     LearnerProfile       @relation(fields: [learnerId], references: [id])
@@ -1213,20 +1213,20 @@ enum ServiceStatus {
 
 /// Servicio en un ministerio (§7.4).
 model ServiceAssignment {
-  id            String        @id @default(uuid())
-  learnerId     String        @map("learner_id")
-  ministry      String
-  status        ServiceStatus @default(PROPUESTO)
-  startedAt     DateTime      @map("started_at") @db.Date
-  endedAt       DateTime?     @map("ended_at") @db.Date
+  id             String        @id @default(uuid())
+  learnerId      String        @map("learner_id")
+  ministry       String
+  status         ServiceStatus @default(PROPUESTO)
+  startedAt      DateTime      @map("started_at") @db.Date
+  endedAt        DateTime?     @map("ended_at") @db.Date
   /// Quién responde por esa persona dentro del ministerio.
-  responsibleId String?       @map("responsible_id")
-  notes         String?
+  responsibleId  String?       @map("responsible_id")
+  notes          String?
   /// Evidencia de servicio: un enlace o una descripción de lo que se hizo.
-  evidence      String?
-  registeredById String?      @map("registered_by_id")
-  createdAt     DateTime      @default(now()) @map("created_at")
-  updatedAt     DateTime      @updatedAt @map("updated_at")
+  evidence       String?
+  registeredById String?       @map("registered_by_id")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
 
   learner      LearnerProfile @relation(fields: [learnerId], references: [id])
   responsible  AppUser?       @relation("ResponsableDeServicio", fields: [responsibleId], references: [id])
@@ -1240,15 +1240,15 @@ model ServiceAssignment {
 /// registro de la decisión, la fecha y el responsable: no es un campo que
 /// cambia sin dejar rastro.
 model PhaseChange {
-  id           String   @id @default(uuid())
-  learnerId    String   @map("learner_id")
-  fromPhase    Phase    @map("from_phase")
-  toPhase      Phase    @map("to_phase")
+  id          String   @id @default(uuid())
+  learnerId   String   @map("learner_id")
+  fromPhase   Phase    @map("from_phase")
+  toPhase     Phase    @map("to_phase")
   /// Quién aprobó: su mentor o el pastor de la línea.
-  decidedById  String   @map("decided_by_id")
-  decidedAt    DateTime @default(now()) @map("decided_at")
-  note         String?
-  createdAt    DateTime @default(now()) @map("created_at")
+  decidedById String   @map("decided_by_id")
+  decidedAt   DateTime @default(now()) @map("decided_at")
+  note        String?
+  createdAt   DateTime @default(now()) @map("created_at")
 
   learner   LearnerProfile @relation(fields: [learnerId], references: [id])
   decidedBy AppUser        @relation("DecidioCambioDeFase", fields: [decidedById], references: [id])
@@ -1309,26 +1309,26 @@ model IntegrationEvent {
 /// PENDIENTE hasta que un administrador lo confirme o lo descarte desde el
 /// expediente.
 model LeadershipDeclaration {
-  id           String    @id @default(uuid())
-  personId     String    @map("person_id")
+  id            String    @id @default(uuid())
+  personId      String    @map("person_id")
   /// Lo que marcó: consolidación, líder de Alpha, líder de Casa de Fe, mentor,
   /// ministerio. Texto libre controlado por `ROLES_DECLARABLES`.
-  roles        String[]  @default([])
+  roles         String[]  @default([])
   /// La etapa que la persona dice tener. En una ficha que ya existía NO se
   /// aplica sola: cambiar de fase deja rastro en `phase_change`, que exige un
   /// responsable humano, así que espera aquí hasta que un administrador la
   /// confirme. En una ficha nueva sí se usa como valor inicial y esto queda
   /// nulo.
-  declaredPhase Phase?   @map("declared_phase")
-  note         String?
+  declaredPhase Phase?    @map("declared_phase")
+  note          String?
   /// PENDIENTE · CONFIRMADA · DESCARTADA
-  status       String    @default("PENDIENTE")
-  reviewedById String?   @map("reviewed_by_id")
-  reviewedAt   DateTime? @map("reviewed_at")
-  createdAt    DateTime  @default(now()) @map("created_at")
+  status        String    @default("PENDIENTE")
+  reviewedById  String?   @map("reviewed_by_id")
+  reviewedAt    DateTime? @map("reviewed_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
 
-  person     Person   @relation(fields: [personId], references: [id])
-  reviewedBy AppUser? @relation("RevisoDeclaracion", fields: [reviewedById], references: [id])
+  person     Person                      @relation(fields: [personId], references: [id])
+  reviewedBy AppUser?                    @relation("RevisoDeclaracion", fields: [reviewedById], references: [id])
   items      LeadershipDeclarationItem[]
 
   @@index([status, createdAt])
@@ -1371,21 +1371,21 @@ model LeadershipDeclarationItem {
 /// no la autoriza, `resolutionNote` es lo que el consolidador va a leer en la
 /// tarjeta para saber qué hacer con esa persona.
 model BajaRequest {
-  id            String    @id @default(uuid())
-  learnerId     String    @map("learner_id")
+  id             String    @id @default(uuid())
+  learnerId      String    @map("learner_id")
   /// Motivo de la lista cerrada `MOTIVOS_DE_BAJA` (src/lib/op72.ts).
-  reason        String
+  reason         String
   /// Lo que el consolidador le cuenta al administrador.
-  note          String?
-  requestedById String    @map("requested_by_id")
+  note           String?
+  requestedById  String    @map("requested_by_id")
   /// PENDIENTE · AUTORIZADA · RECHAZADA · RETIRADA
-  status        String    @default("PENDIENTE")
-  resolvedById  String?   @map("resolved_by_id")
-  resolvedAt    DateTime? @map("resolved_at")
+  status         String    @default("PENDIENTE")
+  resolvedById   String?   @map("resolved_by_id")
+  resolvedAt     DateTime? @map("resolved_at")
   /// Obligatoria al no autorizar: qué hacer con la persona. Se muestra en la
   /// tarjeta del tablero y queda en el expediente.
-  resolutionNote String?  @map("resolution_note")
-  createdAt     DateTime  @default(now()) @map("created_at")
+  resolutionNote String?   @map("resolution_note")
+  createdAt      DateTime  @default(now()) @map("created_at")
 
   learner     LearnerProfile @relation(fields: [learnerId], references: [id])
   requestedBy AppUser        @relation("PidioLaBaja", fields: [requestedById], references: [id])
@@ -1404,15 +1404,15 @@ model BajaRequest {
 /// **Nunca se guarda el valor**, solo su huella PBKDF2 con sal propia. Cada uso
 /// queda auditado (`acceso.llave_maestra_usada`) diciendo a qué perfil entró.
 model MasterKey {
-  id           String    @id @default(uuid())
-  secretHash   String    @map("secret_hash")
-  salt         String
-  iterations   Int
-  createdById  String    @map("created_by_id")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  lastUsedAt   DateTime? @map("last_used_at")
+  id          String    @id @default(uuid())
+  secretHash  String    @map("secret_hash")
+  salt        String
+  iterations  Int
+  createdById String    @map("created_by_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  lastUsedAt  DateTime? @map("last_used_at")
   /// Nulo mientras es la llave viva. Rotarla marca aquí la anterior.
-  revokedAt    DateTime? @map("revoked_at")
+  revokedAt   DateTime? @map("revoked_at")
 
   createdBy AppUser @relation("CreoLlaveMaestra", fields: [createdById], references: [id])
 
@@ -1430,14 +1430,14 @@ model MasterKey {
 /// ⚠️ Administración y Llave maestra **no** se guardan aquí: no son
 /// configurables (ver `VISTAS_FUERA_DEL_CONFIGURADOR`).
 model ViewRoleAccess {
-  id        String   @id @default(uuid())
+  id          String   @id @default(uuid())
   /// El `VistaId` del catálogo. Texto y no enum: las vistas se añaden y se
   /// quitan con el código, no con una migración.
-  view      String
-  role      Role
-  enabled   Boolean
-  updatedAt DateTime @updatedAt @map("updated_at")
-  updatedById String @map("updated_by_id")
+  view        String
+  role        Role
+  enabled     Boolean
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  updatedById String   @map("updated_by_id")
 
   updatedBy AppUser @relation("CambioVistaDeRol", fields: [updatedById], references: [id])
 
@@ -1451,12 +1451,12 @@ model ViewRoleAccess {
 /// necesita una pantalla que a su rol no le toca, sin cambiársela a los otros
 /// seis pastores. Sin fila, la cuenta sigue a su rol.
 model ViewUserAccess {
-  id        String   @id @default(uuid())
-  view      String
-  userId    String   @map("user_id")
-  enabled   Boolean
-  updatedAt DateTime @updatedAt @map("updated_at")
-  updatedById String @map("updated_by_id")
+  id          String   @id @default(uuid())
+  view        String
+  userId      String   @map("user_id")
+  enabled     Boolean
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  updatedById String   @map("updated_by_id")
 
   user      AppUser @relation("VistaDeLaCuenta", fields: [userId], references: [id], onDelete: Cascade)
   updatedBy AppUser @relation("CambioVistaDeCuenta", fields: [updatedById], references: [id])
@@ -1545,7 +1545,6 @@ model GiNote {
   @@map("gi_note")
 }
 
-
 /// El codigo unico de cada persona: su «carne» para entrar al taller de Casa
 /// de Fe sin celular ni correo.
 ///
@@ -1577,7 +1576,6 @@ model MemberCode {
   @@map("member_code")
 }
 
-
 // ---------------------------------------------------------------------------
 // Prematrimonial
 // ---------------------------------------------------------------------------
@@ -1585,9 +1583,9 @@ model MemberCode {
 /// Un tema del curso prematrimonial. Son 12; el contenido de cada uno llega
 /// del libro y se siembra por migracion.
 model PremaritalTopic {
-  id     String @id @default(uuid())
-  number Int    @unique
-  name   String
+  id        String   @id @default(uuid())
+  number    Int      @unique
+  name      String
   /// ⚠️ **El codigo del enlace, y es una CREDENCIAL, no el numero del tema.**
   /// Con `/prematrimonial/3` cualquiera adivinaria los otros once.
   code      String   @unique
@@ -1604,10 +1602,10 @@ model PremaritalTopic {
 
 /// Una pregunta del taller.
 model PremaritalQuestion {
-  id      String @id @default(uuid())
-  topicId String @map("topic_id")
+  id      String   @id @default(uuid())
+  topicId String   @map("topic_id")
   number  Int
-  /// ABIERTA · SI_NO · OPCION · MULTIPLE · ORDEN.
+  /// ABIERTA · SI_NO · OPCION · MULTIPLE · ORDEN · SUBCAMPOS.
   ///
   /// ⚠️ MULTIPLE y ORDEN no existen en Casa de Fe, y son los que hacen
   /// comparable el taller **sin que nadie tenga que juzgar**: en ellas el
@@ -1617,6 +1615,14 @@ model PremaritalQuestion {
   kind    String   @default("ABIERTA")
   prompt  String
   options String[]
+  /// SUBCAMPOS: los rotulos de cada casilla, en orden.
+  ///
+  /// Una sola pregunta con N casillas rotuladas, en vez de N preguntas. El
+  /// taller 2 lo necesita tres veces: la 1 es una tabla de 7 areas x 2
+  /// columnas (14 casillas), la 2 tiene una por area y la 5 tres. Partirlas en
+  /// preguntas sueltas habria roto la numeracion del libro, y el pastor
+  /// buscaria «la 5» en un papel donde ya no existe.
+  fields  String[]
 
   topic   PremaritalTopic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
   answers PremaritalAnswer[]
@@ -1678,9 +1684,9 @@ model PremaritalWorkshop {
 }
 
 model PremaritalAnswer {
-  id         String @id @default(uuid())
-  workshopId String @map("workshop_id")
-  questionId String @map("question_id")
+  id         String   @id @default(uuid())
+  workshopId String   @map("workshop_id")
+  questionId String   @map("question_id")
   text       String?
   /// OPCION y SI_NO.
   choice     Int?
@@ -1689,6 +1695,8 @@ model PremaritalAnswer {
   choices    Int[]
   /// ORDEN: las opciones en el orden que puso la persona. La primera es su 1.
   ordering   Int[]
+  /// SUBCAMPOS: lo escrito en cada casilla, en el mismo orden que `fields`.
+  texts      String[]
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
@@ -1704,11 +1712,11 @@ model PremaritalAnswer {
 /// ⚠️ **SE APILAN, NO SE PISAN** (la regla del 10-sep con las visitas): cuantas
 /// veces le devolvieron un tema a una pareja es la señal de que algo no va bien.
 model PremaritalReview {
-  id       String @id @default(uuid())
-  coupleId String @map("couple_id")
-  topicId  String @map("topic_id")
-  approved Boolean
-  note     String?
+  id                  String   @id @default(uuid())
+  coupleId            String   @map("couple_id")
+  topicId             String   @map("topic_id")
+  approved            Boolean
+  note                String?
   /// ⚠️ A quien se le devolvio. **Nulo al aprobar**: aprobar es del TEMA, o sea
   /// de los dos; devolver es de UNO, porque el otro pudo responder bien y no se
   /// le puede obligar a rehacer lo que hizo bien.
@@ -1765,14 +1773,14 @@ model PremaritalReveal {
 /// misma persona puede tener los dos, y mezclarlos dejaría a un líder viendo
 /// su propio taller de discípulo donde espera su examen.
 model LeaderQuizTopic {
-  id       String @id @default(uuid())
+  id         String   @id @default(uuid())
   /// El mismo número y el mismo nombre que el tema de Casa de Fe que enseña.
   /// Se guarda aparte **a propósito**: el cuestionario del líder sobrevive a
   /// que alguien renombre un tema del libro (27-sep-2026), y el renombre no
   /// debe reetiquetar un examen ya respondido.
-  number   Int    @unique
-  name     String
-  subtitle String?
+  number     Int      @unique
+  name       String
+  subtitle   String?
   /// La «Nota para el líder» del documento: alertas sobre errores comunes de
   /// enseñanza y precisiones pastorales al dictar ese tema.
   ///
@@ -1780,13 +1788,13 @@ model LeaderQuizTopic {
   /// la respuesta correcta. No es la solución del examen: es material de
   /// enseñanza, y el propio documento pide que se lea y se converse en equipo
   /// **antes** de iniciar el ciclo.
-  leaderNote String? @map("leader_note")
+  leaderNote String?  @map("leader_note")
   /// ⚠️ **El código del enlace, y es una CREDENCIAL, no el número del tema.**
   /// Con `/taller/lider/3` cualquiera adivinaría los otros once. Sale de
   /// `crypto.getRandomValues`, nunca de `Math.random`.
-  code      String   @unique
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  code       String   @unique
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   questions LeaderQuizQuestion[]
   quizzes   LeaderQuiz[]
@@ -1796,26 +1804,26 @@ model LeaderQuizTopic {
 
 /// Una pregunta del cuestionario del líder.
 model LeaderQuizQuestion {
-  id      String @id @default(uuid())
-  topicId String @map("topic_id")
+  id            String   @id @default(uuid())
+  topicId       String   @map("topic_id")
   /// ⚠️ **El número es el del documento, y puede tener huecos.** El tema 2
   /// salta de la 4 a la 6 en el original. Renumerar aquí dejaría al líder
   /// buscando «la 5» en un papel donde no existe, así que se conserva el
   /// número impreso y la pantalla no promete que sean consecutivos.
-  number  Int
+  number        Int
   /// ABIERTA (se explica con sus palabras) · OPCION (se marca una de cuatro).
-  kind    String @default("ABIERTA")
-  prompt  String
-  options String[]
+  kind          String   @default("ABIERTA")
+  prompt        String
+  options       String[]
   /// ⚠️ **La respuesta correcta, SOLO en las de OPCION.** De las 63 preguntas,
   /// 25 la tienen; las otras 38 son abiertas y **el sistema no las juzga** —
   /// eso es trabajo del coordinador, y el documento es explícito: «no hay una
   /// única correcta, pero sí deben reflejar comprensión real».
-  correctChoice Int? @map("correct_choice")
+  correctChoice Int?     @map("correct_choice")
   /// La explicación doctrinal que trae el documento para cada respuesta
   /// marcada. Es lo que convierte la calificación en enseñanza en vez de en
   /// un simple «mal».
-  explanation String?
+  explanation   String?
 
   topic   LeaderQuizTopic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
   answers LeaderQuizAnswer[]

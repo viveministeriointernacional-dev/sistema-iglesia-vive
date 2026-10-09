@@ -8,9 +8,22 @@
 /// Los 12 temas del curso. El recorrido no se termina con menos.
 export const TOTAL_DE_TEMAS_PRE = 12;
 
-/// Mínimo de una respuesta abierta para contar como respondida. El mismo que
-/// en Casa de Fe: dos letras no son una respuesta.
-export const LARGO_MINIMO_RESPUESTA_PRE = 10;
+/// Mínimo de una respuesta abierta para contar como respondida: que no esté
+/// en blanco.
+///
+/// ⚠️ **ERA 10 CARACTERES Y HUBO QUE BAJARLO, porque bloqueó a alguien con el
+/// taller entero contestado.** El 9-oct-2026 Paola Viveros tenía sus 21
+/// respuestas guardadas y no podía enviar: ocho eran más cortas de 10. Entre
+/// ellas la 8, «¿Quién creó el matrimonio?» → **«Dios»**, que es la respuesta
+/// correcta y completa. El mínimo se copió de Casa de Fe sin ver que este
+/// cuestionario tiene preguntas de respuesta corta («¿Practica algún
+/// deporte?», «¿Qué temores tiene?»), y obligaba a estirar lo que ya estaba
+/// bien contestado.
+///
+/// Quien juzga si la respuesta alcanza es el pastor al leerla — que es la
+/// decisión de fondo de esta pantalla. El sistema solo impide enviar en
+/// blanco.
+export const LARGO_MINIMO_RESPUESTA_PRE = 1;
 
 /// La nota del pastor al devolver un taller. **Obligatoria**: devolver sin
 /// decir por qué deja a la persona sin saber qué corregir.
@@ -28,7 +41,8 @@ export type TipoDePreguntaPre =
   | "SI_NO"
   | "OPCION"
   | "MULTIPLE"
-  | "ORDEN";
+  | "ORDEN"
+  | "SUBCAMPOS";
 
 export type PreguntaPre = {
   id: string;
@@ -37,6 +51,13 @@ export type PreguntaPre = {
   prompt: string;
   /// Las opciones de SI_NO, OPCION, MULTIPLE y ORDEN. Vacío en las abiertas.
   options: string[];
+  /// SUBCAMPOS: los rótulos de cada casilla, en orden. Vacío en las demás.
+  ///
+  /// ⚠️ **Una pregunta con casillas sigue siendo UNA pregunta**, y eso es lo
+  /// que conserva la numeración del libro. La 1 del taller 2 es una tabla de 7
+  /// áreas × 2 columnas: catorce casillas bajo el número 1, no catorce
+  /// preguntas que empujarían la 2 hasta la 15.
+  fields: string[];
 };
 
 export type RespuestaPre = {
@@ -49,6 +70,8 @@ export type RespuestaPre = {
   /// ORDEN: las opciones en el orden que puso la persona, por índice. El
   /// primero de la lista es su número 1.
   ordering: number[];
+  /// SUBCAMPOS: lo escrito en cada casilla, en el mismo orden que `fields`.
+  texts: string[];
 };
 
 // ---------------------------------------------------------------------------
@@ -89,6 +112,15 @@ export function respondidaPre(
       // Tiene que haber ordenado TODAS: un orden a medias no se puede comparar
       // posición por posición, que es para lo único que sirve.
       return esOrdenCompleto(respuesta.ordering, pregunta.options.length);
+
+    case "SUBCAMPOS":
+      // ⚠️ **Basta UNA casilla escrita, no las catorce.** Es la lección del
+      // 9-oct: una validación estricta deja a alguien con el taller entero
+      // contestado sin poder enviarlo. Si deja áreas en blanco, el pastor lo
+      // ve lado a lado en la comparación y se lo devuelve — ese juicio es
+      // suyo, no del sistema. Lo que la pantalla SÍ hace es decir «3 de 7
+      // áreas», para que nadie deje huecos sin darse cuenta.
+      return respuesta.texts.some((t) => (t ?? "").trim().length > 0);
 
     default:
       return (respuesta.text ?? "").trim().length >= LARGO_MINIMO_RESPUESTA_PRE;
@@ -269,7 +301,10 @@ const SIN_DETALLE = { soloA: [], soloB: [], posicionesDistintas: [] };
 /// el pastor dejaría de leerlas.
 ///
 /// Por eso una abierta devuelve siempre `NO_COMPARABLE` — las dos respuestas se
-/// ponen lado a lado y quien decide es la persona.
+/// ponen lado a lado y quien decide es la persona. **SUBCAMPOS igual**: son
+/// casillas de texto, y comparar «Oramos juntos» con «La fe» no es trabajo de
+/// una máquina. Lo que gana el pastor ahí es que las casillas se enfrentan
+/// **área por área** en vez de en un solo bloque.
 export function compararRespuestas(
   pregunta: PreguntaPre,
   a: RespuestaPre | undefined,
@@ -336,7 +371,32 @@ export function puestoPorOpcion(orden: readonly number[]): Map<number, number> {
 /// que la pantalla dice arriba («21 preguntas · 3 comparables»), para que nadie
 /// espere un veredicto en las otras dieciocho.
 export function cuantasComparables(preguntas: readonly PreguntaPre[]): number {
-  return preguntas.filter((p) => p.kind !== "ABIERTA").length;
+  return preguntas.filter((p) => p.kind !== "ABIERTA" && p.kind !== "SUBCAMPOS")
+    .length;
+}
+
+/// **Cuántas casillas de una pregunta con subcampos están escritas.**
+///
+/// Es lo que deja decir «3 de 7 áreas» en la pantalla: avisa del hueco sin
+/// bloquear el envío.
+export function casillasEscritas(respuesta: RespuestaPre | undefined): number {
+  if (!respuesta) return 0;
+  return respuesta.texts.filter((t) => (t ?? "").trim().length > 0).length;
+}
+
+/// **Qué preguntas le faltan, por número de pregunta.**
+///
+/// ⚠️ Existe porque «Te faltan 8» a secas es imposible de resolver: el 9-oct
+/// Paola tenía las 21 guardadas y la pantalla no le decía CUÁLES no pasaban.
+/// Un número suelto obliga a adivinar; una lista se arregla en un minuto.
+export function preguntasQueFaltan(
+  preguntas: readonly PreguntaPre[],
+  respuestas: readonly RespuestaPre[],
+): number[] {
+  const porPregunta = new Map(respuestas.map((r) => [r.questionId, r]));
+  return preguntas
+    .filter((p) => !respondidaPre(p, porPregunta.get(p.id)))
+    .map((p) => p.number);
 }
 
 /// ¿Ya terminó los 12? Es lo que dispara el hito.
