@@ -12,6 +12,7 @@ import {
   estadoDelTema,
   generarCodigo,
   pideAtencion,
+  tieneCasaDeFe,
   preguntaRespondida,
   puedeEnviarse,
   temasAprobados,
@@ -348,4 +349,43 @@ test("⚠️ el contador cuenta lo APROBADO, no lo enviado", () => {
     1,
   );
   assert.equal(temasAprobados([]), 0);
+});
+
+// ---------------------------------------------------------------------------
+// Qué bloque ve cada persona en «Mis talleres»
+// ---------------------------------------------------------------------------
+
+test("quien está inscrito en una casa ve el bloque de Casa de Fe", () => {
+  assert.equal(
+    tieneCasaDeFe({ casas: ["Casa de Fe Norte"], temas: [{ estado: "SIN_EMPEZAR" }] }),
+    true,
+  );
+});
+
+test("quien NO está inscrito pero tiene avance también lo ve", () => {
+  // Los 8 del 11-oct-2026: con los temas marcados por su mentor y sin
+  // pertenecer a ninguna casa. Esconderles el bloque les quitaría su trabajo.
+  assert.equal(
+    tieneCasaDeFe({ casas: [], temas: [{ estado: "APROBADO" }, { estado: "SIN_EMPEZAR" }] }),
+    true,
+  );
+  assert.equal(tieneCasaDeFe({ casas: [], temas: [{ estado: "EMPEZADO" }] }), true);
+  assert.equal(tieneCasaDeFe({ casas: [], temas: [{ estado: "DEVUELTO" }] }), true);
+  assert.equal(tieneCasaDeFe({ casas: [], temas: [{ estado: "ESPERANDO" }] }), true);
+});
+
+test("quien no está inscrito ni ha empezado nada NO lo ve", () => {
+  // El caso que motivó esto: alguien que solo hace el prematrimonial no tiene
+  // por qué ver doce temas con un «0 de 12» encima.
+  assert.equal(
+    tieneCasaDeFe({
+      casas: [],
+      temas: [{ estado: "SIN_EMPEZAR" }, { estado: "SIN_EMPEZAR" }],
+    }),
+    false,
+  );
+});
+
+test("sin temas cargados tampoco lo ve", () => {
+  assert.equal(tieneCasaDeFe({ casas: [], temas: [] }), false);
 });

@@ -260,6 +260,27 @@ export function pideAtencion(estado: EstadoDelTema): boolean {
   return estado === "DEVUELTO";
 }
 
+/// **¿Le enseñamos a esta persona el bloque de Casa de Fe?**
+///
+/// Está inscrita en una casa, **o** ya tiene algo hecho en los talleres.
+///
+/// ⚠️ **No basta con la inscripción, y el dato lo exige: el 11-oct-2026, de
+/// las 12 personas con avance en los talleres, OCHO no eran miembros de
+/// ninguna casa** — entre ellas gente con los 12 temas marcados por su
+/// mentor. Esconder el bloque solo por no estar inscrito les quitaría el
+/// acceso a su propio trabajo. El taller nunca exigió la inscripción (la
+/// decisión del 27-sep), así que tampoco puede exigirla para dejar mirar.
+///
+/// Lo que sí se consigue es que quien solo hace el prematrimonial deje de ver
+/// doce temas que no le tocan, con su «0 de 12» encima.
+export function tieneCasaDeFe(datos: {
+  casas: readonly string[];
+  temas: readonly { estado: EstadoDelTema }[];
+}): boolean {
+  if (datos.casas.length > 0) return true;
+  return datos.temas.some((t) => t.estado !== "SIN_EMPEZAR");
+}
+
 /// ⚠️ **UN TEMA YA MARCADO POR SU MENTOR CUENTA COMO APROBADO, aunque no
 /// exista taller.** No es un caso raro: el modelo de los 12 temas existe desde
 /// siempre y el mentor los marca desde el expediente — el 27-sep-2026 había

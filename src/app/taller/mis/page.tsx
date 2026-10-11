@@ -9,6 +9,7 @@ import {
   COOKIE_TALLER,
   ETIQUETA_TEMA,
   pideAtencion,
+  tieneCasaDeFe,
   type EstadoDelTema,
 } from "@/lib/taller-catalogo";
 
@@ -36,7 +37,7 @@ export default async function MisTalleres() {
   // entrar con su código. Es el mismo formulario del QR, sin tema: así no se
   // queda fuera quien perdió el mensaje de WhatsApp.
   if (!persona) {
-    return <Identificarme codigo={null} titulo="Tus talleres de casa de fe" />;
+    return <Identificarme codigo={null} titulo="Mis talleres" />;
   }
 
   // ⚠️ **Un solo enlace y un solo código para TODO lo que la persona llena.**
@@ -49,11 +50,21 @@ export default async function MisTalleres() {
     resumenDelCuestionario(persona.learnerId),
   ]);
   if (!mis) {
-    return <Identificarme codigo={null} titulo="Tus talleres de casa de fe" />;
+    return <Identificarme codigo={null} titulo="Mis talleres" />;
   }
 
-  const porCorregir = mis.temas.filter((t) => pideAtencion(t.estado));
-  const resto = mis.temas.filter((t) => !pideAtencion(t.estado));
+  // ⚠️ **Quien solo hace el prematrimonial no ve los 12 temas de Casa de Fe**,
+  // ni su «0 de 12» encima. Pero la regla NO es «estar inscrito»: ver
+  // `tieneCasaDeFe` — el 11-oct, 8 de las 12 personas con avance no eran
+  // miembros de ninguna casa, y esconderles el bloque les quitaría su trabajo.
+  const conCasaDeFe = tieneCasaDeFe(mis);
+
+  const porCorregir = conCasaDeFe
+    ? mis.temas.filter((t) => pideAtencion(t.estado))
+    : [];
+  const resto = conCasaDeFe
+    ? mis.temas.filter((t) => !pideAtencion(t.estado))
+    : [];
   const nombreDePila = mis.nombre.split(" ")[0] ?? mis.nombre;
 
   return (
@@ -61,7 +72,7 @@ export default async function MisTalleres() {
       <div className="mx-auto max-w-[520px]">
         <header className="bg-[#1a1917] px-5 py-6 text-[#faf8f1]">
           <p className="text-[10px] font-semibold tracking-[0.16em] text-[#c8c0ac] uppercase">
-            Iglesia Vive · Casa de Fe
+            Iglesia Vive · Mis talleres
           </p>
           <h1 className="mt-3.5 font-serif text-[26px] leading-[1.12]">
             Mis talleres
@@ -89,6 +100,7 @@ export default async function MisTalleres() {
           </div>
         </header>
 
+        {conCasaDeFe ? (
         <section className="px-5 pt-5">
           <div className="flex items-baseline justify-between gap-3">
             <strong className="text-[19px] font-semibold">
@@ -113,6 +125,7 @@ export default async function MisTalleres() {
             ))}
           </div>
         </section>
+        ) : null}
 
         {quiz ? <BloqueCuestionario quiz={quiz} /> : null}
 
