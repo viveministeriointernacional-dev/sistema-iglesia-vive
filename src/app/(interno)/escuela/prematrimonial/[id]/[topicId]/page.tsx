@@ -157,6 +157,40 @@ function Respuesta({
     );
   }
 
+  // ⚠️ **Las casillas se enfrentan área por área, no en un bloque.** Es lo
+  // único que el pastor gana aquí frente a dos párrafos sueltos: ver qué puso
+  // cada uno en «Financiera» uno debajo del otro. El sistema no dice si
+  // coinciden — eso es texto, y juzgarlo es su trabajo.
+  if (renglon.kind === "SUBCAMPOS") {
+    const escritas = renglon.fields.filter(
+      (_, i) => (respuesta.texts[i] ?? "").trim().length > 0,
+    ).length;
+    return (
+      <div className="flex flex-col gap-2">
+        {escritas < renglon.fields.length ? (
+          <p className="text-[11.5px] leading-none font-semibold text-[#8a5a12]">
+            Dejó {renglon.fields.length - escritas} en blanco
+          </p>
+        ) : null}
+        {renglon.fields.map((rotulo, i) => {
+          const texto = (respuesta.texts[i] ?? "").trim();
+          return (
+            <div key={i}>
+              <p className="text-[10.5px] leading-none font-bold tracking-[.05em] text-[rgba(19,28,36,.45)] uppercase">
+                {rotulo}
+              </p>
+              <p
+                className={`mt-1 text-[13px] leading-[1.5] ${texto ? "" : "text-[rgba(19,28,36,.4)]"}`}
+              >
+                {texto || "—"}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
   if (renglon.kind === "SI_NO" || renglon.kind === "OPCION") {
     return (
       <p className="text-[13px] leading-[1.5] font-semibold">

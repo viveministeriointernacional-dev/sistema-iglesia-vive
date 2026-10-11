@@ -449,6 +449,8 @@ export type RenglonComparado = {
   kind: string;
   prompt: string;
   options: string[];
+  /// SUBCAMPOS: los rótulos, para enfrentar las casillas área por área.
+  fields: string[];
   respuestaA: RespuestaPre | null;
   respuestaB: RespuestaPre | null;
   comparacion: Comparacion;
@@ -504,7 +506,7 @@ export async function cargarComparacion(
         name: true,
         questions: {
           orderBy: { number: "asc" },
-          select: { id: true, number: true, kind: true, prompt: true, options: true },
+          select: { id: true, number: true, kind: true, prompt: true, options: true, fields: true },
         },
       },
     }),
@@ -520,6 +522,7 @@ export async function cargarComparacion(
             choice: true,
             choices: true,
             ordering: true,
+            texts: true,
           },
         },
       },
@@ -553,6 +556,7 @@ export async function cargarComparacion(
       kind: q.kind,
       prompt: q.prompt,
       options: q.options,
+      fields: q.fields,
       respuestaA: a,
       respuestaB: b,
       comparacion: compararRespuestas(q as PreguntaPre, a ?? undefined, b ?? undefined),
@@ -961,7 +965,7 @@ export async function abrirTallerPre(
       name: true,
       questions: {
         orderBy: { number: "asc" },
-        select: { id: true, number: true, kind: true, prompt: true, options: true },
+        select: { id: true, number: true, kind: true, prompt: true, options: true, fields: true },
       },
     },
   });
@@ -1001,6 +1005,7 @@ export async function abrirTallerPre(
           choice: true,
           choices: true,
           ordering: true,
+          texts: true,
         },
       },
     },
@@ -1075,7 +1080,7 @@ export async function guardarRespuestaPre(
 
   const pregunta = await prisma.premaritalQuestion.findUnique({
     where: { id: questionId },
-    select: { topicId: true, kind: true, options: true },
+    select: { topicId: true, kind: true, options: true, fields: true },
   });
   if (!pregunta || pregunta.topicId !== taller.topicId) {
     return { ok: false, mensaje: "Esa pregunta no es de este taller." };
@@ -1098,15 +1103,22 @@ export async function guardarRespuestaPre(
 /// ⚠️ **Se valida en el SERVIDOR aunque la pantalla solo ofrezca lo correcto**:
 /// un desplegable es una sugerencia del navegador, no una garantía.
 function normalizarRespuesta(
-  pregunta: { kind: string; options: string[] },
-  valor: { text?: string; choice?: number; choices?: number[]; ordering?: number[] },
+  pregunta: { kind: string; options: string[]; fields: string[] },
+  valor: {
+    text?: string;
+    choice?: number;
+    choices?: number[];
+    ordering?: number[];
+    texts?: string[];
+  },
 ): ResultadoPre<{
   text: string | null;
   choice: number | null;
   choices: number[];
   ordering: number[];
+  texts: string[];
 }> {
-  const vacio = { text: null, choice: null, choices: [], ordering: [] };
+  const vacio = { text: null, choice: null, choices: [], ordering: [], texts: [] };
 
   switch (pregunta.kind) {
     case "SI_NO":
@@ -1143,6 +1155,20 @@ function normalizarRespuesta(
       return { ok: true, datos: { ...vacio, ordering: orden } };
     }
 
+    case "SUBCAMPOS": {
+      // Llega una casilla por rótulo, siempre. Un arreglo más corto o más
+      // largo significa que la pantalla y el libro se desincronizaron, y
+      // guardarlo así metería el texto de un área en el renglón de otra.
+      const casillas = valor.texts ?? [];
+      if (casillas.length !== pregunta.fields.length) {
+        return { ok: false, mensaje: "Esa respuesta no corresponde a la pregunta." };
+      }
+      return {
+        ok: true,
+        datos: { ...vacio, texts: casillas.map((t) => (t ?? "").trim()) },
+      };
+    }
+
     default:
       return { ok: true, datos: { ...vacio, text: (valor.text ?? "").trim() || null } };
   }
@@ -1168,6 +1194,7 @@ export async function enviarTallerPre(
           choice: true,
           choices: true,
           ordering: true,
+          texts: true,
         },
       },
       topic: {
@@ -1176,7 +1203,7 @@ export async function enviarTallerPre(
           name: true,
           questions: {
             orderBy: { number: "asc" },
-            select: { id: true, number: true, kind: true, prompt: true, options: true },
+            select: { id: true, number: true, kind: true, prompt: true, options: true, fields: true },
           },
         },
       },
