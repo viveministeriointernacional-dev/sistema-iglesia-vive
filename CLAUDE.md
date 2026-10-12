@@ -331,6 +331,72 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-10-12** — **Taller 2 del prematrimonial: de 64 casillas a 34** (pedido
+  del usuario: «está muy largo, quiero que lo hagas más corto y mejore la
+  redacción de alguna de las preguntas»). Contenido, no interfaz → directo, sin
+  mockup (§2).
+  **⚠️ SE PUDO BORRAR PORQUE NO HABÍA NADA QUE PERDER, y se comprobó ANTES de
+  escribir una línea: 43 preguntas y CERO respuestas.** Había 3 talleres
+  abiertos sobre el tema 2, pero vacíos — **abrir no es empezar** (regla del
+  2-oct). **Si algún día hay respuestas, esta migración NO sirve tal cual**:
+  `premarital_answer` cuelga de `question_id` con CASCADE y se las llevaría.
+  **⚠️ LO LARGO NO ERAN LAS PREGUNTAS, ERAN LAS CASILLAS — y medirlo cambió el
+  trabajo.** Las 43 preguntas pedían **64 casillas**, y **24 estaban en solo
+  tres**: la 1 con 14 (7 áreas × Similitudes/Diferencias), la 2 con 7 y la 5 con
+  3. Las 21 que pidió borrar el usuario eran **todas sueltas**, así que dejaban
+  el taller en 44 casillas: **la mitad de preguntas y casi el mismo trabajo** —
+  y las dos más largas son justo lo primero que se encuentra quien lo abre. Con
+  el dato delante eligió bajar las áreas de **7 a 4** (Espiritual, Emocional,
+  Financiera, Familiar; salen Física, Temperamento e Intelectual).
+  **43 preguntas / 64 casillas → 22 preguntas / 34 casillas.**
+  **⚠️ SU LISTA TRAÍA EL 29 DOS VECES** y el segundo rompía el orden ascendente
+  (…33, 35, **29**, 41…). Preguntado: era **39** («¿En qué estrato le gustaría
+  vivir?»). Son **21** borradas, no 20. **Vale la pena preguntar cuando una
+  lista de números pierde el orden.**
+  **⚠️ SE RENUMERÓ DE 1 A 22, CONTRADICIENDO A PROPÓSITO LA REGLA DEL 5-OCT**
+  («la numeración no se toca, el pastor busca *la 5* en el papel»), que también
+  está en el comentario de `PremaritalQuestion.fields`. Por qué aquí no aplica:
+  aquella era por una pregunta que **faltaba y llegaría**; aquí se quitan 21
+  **a propósito y para siempre**, así que este taller **ya no es el del libro**.
+  Y el número **se pinta en pantalla** (`{pregunta.number}.`, comprobado en el
+  formulario de la pareja **y** en la comparación del pastor): con huecos se
+  leería «…5, 6, 11, 15, 18…» y parecería un error del sistema.
+  **El mapa viejo→nuevo, para que sea recuperable:**
+  1→1 · 2→2 · 3→3 · 4→4 · 5→5 · 6→6 · **11→7** · **15→8** · **18→9** ·
+  **19→10** · **20→11** · **21→12** · **22→13** · **23→14** · **25→15** ·
+  **28→16** · **30→17** · **34→18** · **36→19** · **37→20** · **38→21** ·
+  **40→22**.
+  Borradas: 7, 8, 9, 10, 12, 13, 14, 16, 17, 24, 26, 27, 29, 31, 32, 33, 35,
+  39, 41, 42, 43.
+  - **Redacción: 13 enunciados**, solo los que tenían un problema real — frases
+    enredadas, signos mal puestos (`?, ¿`), una tilde que faltaba («¿A **que**
+    le temía?») o una pregunta incompleta («cuando grande»). **Los otros nueve
+    se dejaron tal cual**: el usuario pidió mejorar «alguna», no reescribir.
+  - **⚠️ UNA CAMBIA DE ALCANCE Y NO ES UN DESCUIDO:** al borrar la 32 (dones
+    naturales) y la 33 (fortalezas), la 34 quedaba preguntando **solo por lo
+    malo**. Ahora pide «fortalezas y debilidades» en la misma casilla.
+  - **⚠️ LAS 13 CADENAS VIEJAS SE COMPROBARON CONTRA LA BASE, UNA POR UNA, ANTES
+    DE NADA.** Los enunciados se cambian **comparando el texto viejo** (que es
+    lo que hace la migración idempotente), así que **una tilde de más habría
+    dejado esa pregunta sin actualizar EN SILENCIO**. Las 13 coincidían exacto.
+  - **⚠️ EL INTENTO POR MCP SE AGOTÓ A LOS 60 s** — la trampa del 3-oct, ahora
+    con una causa nueva: **una transacción con 6 sentencias y un `select` final**
+    también la cuelga, no solo los `do $$` y las tablas temporales. **Verificado
+    en el acto que no dejó nada**: 43 preguntas, numeración intacta, **0
+    transacciones colgadas y 0 candados esperando**.
+  - **Probado en el CLÚSTER DE USAR Y TIRAR** (el Postgres 16 del contenedor,
+    5-oct), que para esto es mejor que `BEGIN … ROLLBACK`: **se puede repetir la
+    migración**. Réplica exacta (esquema mínimo + la migración de sembrado del
+    10-oct) → **43 preguntas y 64 casillas, igual que producción**. Primera
+    pasada: 22 · 34 · números 1..22 · 22 distintos. **Segunda pasada: idéntico.**
+    Y 4 sondas: **0 sobrevivientes** de las 21 que debían irse, **13 de 13**
+    enunciados nuevos, **0** textos con los problemas viejos, y la 1 en 8
+    casillas con la 2 en 4.
+  - No toca ninguna tabla caliente (`premarital_question` tiene 64 filas y solo
+    se lee en las pantallas del prematrimonial): **se puede fusionar a cualquier
+    hora**.
+  - `tsc`, eslint, **193/193 pruebas** y `npm run cf:build` en verde.
+
 - **2026-10-12** — **HYPERDRIVE VIVO (PR #110 + #111), y el viaje a la base pasó
   de 236 ms a 73 ms.** Costó **dos despliegues fallidos**, y los dos fallos
   enseñan algo distinto.
