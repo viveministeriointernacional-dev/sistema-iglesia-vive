@@ -264,8 +264,33 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 - **Lentitud**: Cloudflare está en Workers Paid, pero **Supabase está en FREE**
   (compute más pequeño y sin pooler dedicado). Palancas: subir Supabase a Pro, o
-  **Hyperdrive** (cachea el pool de conexiones a Supabase en el borde). Plantilla
-  comentada en `wrangler.jsonc`.
+  **Hyperdrive** (mantiene el pool de conexiones del lado de Cloudflare).
+  Plantilla comentada en `wrangler.jsonc`.
+- **⚠️ HYPERDRIVE: SOLO FALTA EL `id`, y es acción del usuario en dos páginas
+  web.** El código está listo (`src/lib/prisma.ts` ya lo lee del binding y
+  **avisa a gritos si falta**, para que un despliegue no deshaga la mejora en
+  silencio) y el bloque está escrito y comentado en `wrangler.jsonc`. Los pasos,
+  con **las dos correcciones medidas que la documentación genérica dice al
+  revés**:
+  1. Supabase → **Connect** → pestaña **Session pooler** ⚠️ **(NO «Direct
+     connection»: `db.<proyecto>.supabase.co` no resuelve a IPv4 en el plan FREE
+     y Hyperdrive no la alcanza)** → copiar la cadena y reemplazar
+     `[YOUR-PASSWORD]`.
+  2. Cloudflare → **Storage & Databases** → **Hyperdrive** → Create
+     configuration → pegar la cadena → ⚠️ **DESACTIVAR «Caching»** (cachea 60 s
+     por defecto, y aquí eso sería la regresión del 11-sep: guardar y leer el
+     dato viejo durante un minuto). **Lo que se quiere es el pool, no la caché.**
+  3. Pasarme **solo el `id`**. ⚠️ **La contraseña NO** (§10): va únicamente en
+     ese formulario.
+  **Está incluido en Workers Paid: no cuesta nada más.** Es lo único que ataca
+  la causa de la pantalla negra del 12-oct — las cuatro pantallas de error que
+  entraron ese día solo hacen que el tropiezo se pueda reintentar.
+- **Bajar los viajes a la base de `/taller/mis`**, que es la pantalla más lenta
+  del sitio: hoy hace **cuatro viajes EN FILA** (`learnerPorToken`, luego
+  `cargarMisTalleres`, `cargarMiPrematrimonial` y `resumenDelCuestionario`, que
+  con `PrismaPg max:1` no corren en paralelo aunque vayan en un `Promise.all`).
+  Se pueden bajar a dos. **Ofrecido y aplazado a propósito: primero medir
+  Hyperdrive solo**, o no se sabría cuál de los dos cambios movió el número.
 - **Registros de HighLevel**: si dejan de entrar, revisar que el workflow de
   registro esté activo y enviando; algunos llegan y se marcan «duplicado» (409).
 - **Tabla huérfana `inbound_registration`** en Supabase: ya no está en el modelo
@@ -286,6 +311,117 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 - Validar deploy sin credenciales: `npx wrangler deploy --dry-run --outdir /tmp/x`
 
 ## 12. Bitácora (añadir lo nuevo arriba)
+
+- **2026-10-12** — **Pantallas de error propias: la pantalla negra de Cloudflare
+  ya no se le enseña a nadie (PR #108, VIVO y comprobado).**
+  Lo destapó el usuario con un pantallazo: abrió **`/taller/mis` en incógnito** y
+  vio **«This page couldn't load · A server error occurred · ERROR
+  1850100685»**.
+  **⚠️ LO PRIMERO, Y ES EL HALLAZGO DE VERDAD: EL PROYECTO NO TENÍA NI UN SOLO
+  `error.tsx`.** Ni uno, en 14 meses. Así que **cualquier** tropiezo, en
+  **cualquier** pantalla, caía en la pantalla genérica de Cloudflare: en inglés,
+  sin un botón, sin decir nada y sin forma de rastrearla. El caso reportado era
+  un síntoma; el agujero era de todo el sitio.
+  **⚠️ EL ERROR NO SE PUDO REPRODUCIR, y eso es dato, no excusa:** 8 peticiones
+  seguidas a `/taller/mis` sin cookie → **200 las 8**, entre 0,24 s y 1,7 s, más
+  `/ingresar`, `/taller/lider`, `/actualizar-datos` y el enlace del
+  prematrimonial, todos 200. Es la misma clase intermitente del 6-oct, donde
+  también pasaron los 30 intentos mientras el usuario sí la había visto.
+  **`ERROR 1850100685` es un número de incidente de Cloudflare**, no del código,
+  y **el único sitio donde queda escrito qué falló es el log del worker** (la
+  lección del 24-sep: en Supabase no queda nada). **El conector de Cloudflare no
+  está autorizado en la sesión**, así que eso no lo puedo leer yo — hay que
+  decirlo en vez de teorizar.
+  **⚠️ DÓNDE DUELE DE VERDAD, Y ES LO QUE DECIDE EL DISEÑO: quien ve esa
+  pantalla NO es del equipo.** Es un miembro de una Casa de Fe con el celular en
+  la mano, en la calle, sin cuenta y sin nadie a quien preguntar (§6). Ante una
+  pantalla negra en inglés **abandona** y el taller se queda sin llenar; ante un
+  botón vuelve a pulsar, y como el fallo es intermitente **casi siempre entra**.
+  - **Cuatro pantallas, una por público, y la asimetría es a propósito:**
+    `taller/error.tsx` (la persona) · `(interno)/error.tsx` (el equipo) ·
+    `error.tsx` en la raíz (`/ingresar`, `/registro`, `/actualizar-datos`,
+    `/nueva-clave`, `/recuperar`, `/calendario`) · `global-error.tsx`.
+  - **⚠️ LO PRIMERO QUE DICE LA DEL TALLER ES «No perdiste nada de lo que
+    escribiste», y no es un consuelo vacío:** el taller se guarda solo 1,5 s
+    después de la última tecla (regla del 27-sep), así que lo escrito **está en
+    la base**. Sin esa frase, quien llevaba media hora escribiendo da su trabajo
+    por perdido, y **es entonces cuando de verdad no vuelve**.
+  - **⚠️ LA DEL TALLER NO ENSEÑA EL MENSAJE TÉCNICO Y LA INTERNA SÍ EL
+    `digest`.** A la persona no le dice nada y puede traer detalles de la
+    consulta; a quien es del equipo el `digest` es **lo único** con lo que se
+    puede rastrear el fallo en el log de Cloudflare. Un «me salió un error» sin
+    ese código no se puede buscar.
+  - **⚠️ LA DE LA RAÍZ VA EN LA RAÍZ PARA NO TENER QUE ACORDARSE.** Next busca
+    el `error.tsx` más cercano y, si el tramo no tiene uno propio, cae ahí: es
+    la diferencia entre arreglar esto **una vez** y arreglarlo **cada vez** que
+    se añada una pantalla.
+  - **⚠️ `global-error.tsx` LLEVA LOS ESTILOS EN LÍNEA**, y su propio
+    `html`/`body`: es el único que atrapa un fallo del **layout raíz**, y cuando
+    eso es lo que falló no se puede contar con que haya cargado la hoja de
+    estilos ni las tipografías. **Una pantalla de error que depende de lo que
+    acaba de romperse no sirve de nada.**
+  - **⚠️ LA MITAD QUE LE FALTABA, Y SIN ELLA LO DEMÁS ES COSMÉTICO:
+    `statement_timeout = 10 s` en la conexión del worker** (`src/lib/prisma.ts`).
+    **Una pantalla de error solo se puede pintar si el worker llega a
+    contestar.** Sin tope, una consulta colgada —un candado, o el pooler sin
+    responder— **se lleva por delante al worker entero**, y eso **no se puede
+    atrapar desde el código**: la pantalla negra sale igual. Con tope, Postgres
+    corta, Prisma lanza y el `error.tsx` pinta «Volver a intentar». Es la
+    decisión del **24-sep en `scripts/migrar.mjs`** —*fallar rápido en vez de
+    colgarse*— aplicada al worker.
+    **10 s son muchísimo margen y está medido:** la consulta más pesada del
+    proyecto (la de consolidadores del informe) tarda **20 ms**, y la pantalla
+    más lenta (`/taller/mis`) se midió entre **0,2 y 4,4 s ENTERA**, con sus
+    cuatro viajes. No corta nada que funcione. **`scripts/migrar.mjs` NO pasa
+    por ahí** (abre su propio cliente en el build, con sus propios topes).
+  - **⚠️ PROBADO AL DERECHO Y CON SU CONTROL, en un build de PRODUCCIÓN** (en
+    `next dev` **no se puede probar**: el modo desarrollo manda su propia capa de
+    error y el documento sale con `__next_error__` sin nuestro texto). Dos
+    páginas que fallan a propósito, ya retiradas:
+    una `/taller/…` que falla da **500** y su documento pide
+    `33yt6tugk_-3j.js`, que **contiene «La conexión se demoró»**, y **ningún**
+    chunk de ese documento trae el texto de la raíz; una `/actualizar-datos/…`
+    que falla pide `0fu1ng01zbynt.js`, que **contiene «Ir al inicio»**, y
+    **ninguno** trae el del taller. O sea que **cada tramo pinta SU pantalla y
+    no se cuelan entre sí** — sin los dos renglones de control, encontrar el
+    texto no probaría eso.
+  - **⚠️ TROPIEZO DEL MÉTODO, Y ENSEÑA DÓNDE PONER LA PÁGINA DE PRUEBA:** la
+    primera prueba de la raíz dio **«Internal Server Error» a secas, 21 bytes y
+    0 chunks**, y parecía que el `error.tsx` no servía. **No era eso: falló el
+    MIDDLEWARE**, porque la ruta de prueba no estaba en `RUTAS_PUBLICAS` y aquí
+    no hay variables de Supabase. Se movió la página bajo `/actualizar-datos`
+    —que sí es prefijo público— y entonces sí. **Para probar un `error.tsx` en
+    este entorno, la página tiene que vivir bajo un prefijo público.**
+  - **⚠️ Y DE AHÍ SALE EL HUECO QUE QUEDA, QUE HAY QUE TENER ESCRITO: UN FALLO
+    DEL MIDDLEWARE NO LO ATRAPA NINGÚN `error.tsx`.** Da «Internal Server Error»
+    a secas. **No afecta a `/taller/mis`** (es prefijo público y el middleware
+    pasa de largo), pero cualquier pantalla interna sí depende de que el
+    middleware no se caiga.
+  - **⚠️ OTRA LIMITACIÓN HONESTA: estas pantallas NECESITAN JavaScript.** En
+    producción Next manda un documento mínimo (`__next_error__`) y el `error.tsx`
+    lo pinta React al hidratar — **es diseño del framework, no una decisión
+    nuestra**. Por eso un `curl` **no las ve**: lo que se comprueba es el chunk,
+    no el HTML. El resto del taller sí es todo de servidor.
+  - **⚠️ DESPLIEGUE COMPROBADO, Y ESTA VEZ EL CSS SÍ VALE COMO HUELLA — con el
+    control que le faltaba al 3-oct.** El build de este código produce
+    **`3zeef08fj251e.css` (64 202 bytes)** y producción servía
+    **`3x-fms4wnkfou.css` (63 998 bytes)**: **son distintos**, y pedir el nuevo
+    daba **404** antes del despliegue. Los **204 bytes** de diferencia son las
+    clases nuevas de las cuatro pantallas. A las **20:16 hora Colombia** pasó a
+    **200 con 64 202 bytes exactos** y el viejo desapareció de `/ingresar`.
+    **REGLA, como remate de la del 3-oct: la huella del CSS vale cuando se
+    comprueba ANTES que el archivo nuevo NO existe (404) y que el viejo tiene
+    OTRO tamaño.** Si los dos coinciden, no prueba nada.
+    Comprobado además **chunk por chunk** que las tres pantallas están vivas
+    (`33yt6tugk_-3j.js`, `0fu1ng01zbynt.js`, `08uofyin_oz4y.js`, las tres 200 y
+    con su texto dentro) y que **un chunk inventado da 404**, que es el control.
+    Sitio sano: `/ingresar` 200 · `/taller/mis` 200 · `/taller/lider` 200 ·
+    `/actualizar-datos` 200 · webhook 401.
+  - **Lo que esto NO arregla, y hay que decirlo así: no evita que el tropiezo
+    ocurra.** Convierte «la persona abandona» en «vuelve a pulsar y entra». La
+    causa es **Hyperdrive**, que sigue esperando el `id` (§9).
+  - `tsc`, eslint, **193/193 pruebas** y `npm run cf:build` en verde. **Sin
+    migraciones**, así que se pudo fusionar a cualquier hora.
 
 - **2026-10-05** — **El cuestionario de líderes quedó VIVO (PR #103 fusionado),
   y entró COMPLETO.**
