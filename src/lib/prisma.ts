@@ -80,6 +80,29 @@ async function crearCliente(): Promise<PrismaClient> {
       max: 1,
       idleTimeoutMillis: 5_000,
       connectionTimeoutMillis: 10_000,
+      // ⚠️ **UNA CONSULTA COLGADA TIENE QUE FALLAR, NO COLGARSE** (12-oct-2026).
+      // Es la mitad que le faltaba a los `error.tsx`: una pantalla de error solo
+      // se puede pintar si el worker llega a contestar. Sin este tope, una
+      // consulta que se queda esperando —un candado, o el pooler de Supabase sin
+      // responder (plan FREE, §9)— se lleva por delante a todo el worker, y lo
+      // que ve la persona es la pantalla negra de Cloudflare, que no se puede
+      // atrapar desde el código. Con el tope, Postgres corta la consulta, Prisma
+      // lanza el error y el `error.tsx` pinta «Volver a intentar».
+      //
+      // Es la misma decisión del 24-sep-2026 en `scripts/migrar.mjs` —«fallar
+      // rápido en vez de colgarse»— aplicada ahora al worker.
+      //
+      // **10 s son muchísimo margen y está medido**: la consulta más pesada del
+      // proyecto (la de consolidadores del informe, con cinco `EXISTS`
+      // correlacionados) tarda **20 ms**, y la pantalla más lenta del sitio
+      // (`/taller/mis`) se midió entre 0,2 y 4,4 s **entera**, con sus cuatro
+      // viajes. O sea que esto no corta nada que funcione: solo lo que ya estaba
+      // perdido.
+      //
+      // `scripts/migrar.mjs` NO pasa por aquí (abre su propio cliente en el
+      // build, con sus propios topes), así que las migraciones no se ven
+      // afectadas.
+      statement_timeout: 10_000,
     }),
   });
 }
