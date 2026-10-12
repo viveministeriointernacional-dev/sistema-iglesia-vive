@@ -30,7 +30,7 @@
   // como Secret, que `wrangler deploy` sí conserva.
   "vars": {
     "EMAIL_FROM": "Iglesia Vive <no-responder@send.micasavive.com>"
-  }
+  },
 
   // Conexión a Postgres. **Hyperdrive mantiene el pool del lado de
   // Cloudflare**: sin él, cada invocación del worker abre una conexión nueva
@@ -66,12 +66,17 @@
   //
   // ⚠️ La contraseña va SOLO en ese comando: **nunca a este archivo ni al
   // repositorio** (§10). Lo que devuelve el comando es un **id**, que no es un
-  // secreto, y es lo único que se pega aquí:
-  //
-  // "hyperdrive": [
-  //   { "binding": "HYPERDRIVE", "id": "<id-de-hyperdrive>" }
-  // ]
+  // secreto, y es lo único que se pega aquí — lo de abajo.
   //
   // `scripts/migrar.mjs` NO pasa por aquí: corre en el build, fuera del worker,
   // y sigue usando el secreto de build DATABASE_URL (§5).
+  //
+  // ⚠️ **Si algún día hay que quitar este bloque, el worker NO se rompe: se cae
+  // a DATABASE_URL y todo responde igual, solo más lento.** Por eso
+  // `src/lib/prisma.ts` lo grita en el log (`[prisma] SIN Hyperdrive…`) — un
+  // despliegue que se deje el binding fuera desharía la mejora en silencio, que
+  // es la forma más cara de perderla.
+  "hyperdrive": [
+    { "binding": "HYPERDRIVE", "id": "67fbd6377dda4e9a81ad95471a6e4708" }
+  ]
 }
