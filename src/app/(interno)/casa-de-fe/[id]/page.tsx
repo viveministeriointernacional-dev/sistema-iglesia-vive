@@ -58,12 +58,19 @@ export default async function PaginaCasaDeFe({
   ]);
   if (!puedeEntrar) notFound();
 
+  // ⚠️ EL CÓDIGO SOLO VIAJA AL NAVEGADOR DE QUIEN PUEDE EDITAR. Es una
+  // credencial: con esos 6 dígitos se entra al taller de esa persona y se
+  // responde por ella. Quien entra «solo a mirar» (el permiso «ve todos los
+  // grupos») no tiene a quién dictárselo, así que ni se le pinta ni se le
+  // manda — no basta con no pintarlo, igual que con `correctChoice` del
+  // cuestionario (5-oct).
   const miembros: MiembroVista[] = construirMiembros(grupo).map((miembro) => ({
     membershipId: miembro.membershipId,
     learnerId: miembro.learnerId,
     nombre: miembro.nombre,
     fase: miembro.fase,
     telefono: miembro.telefono,
+    codigo: puedeEditar ? miembro.codigo : null,
   }));
 
   return (

@@ -158,7 +158,15 @@ export async function cargarCasaDeFe(groupId: string) {
             select: {
               phase: true,
               person: {
-                select: { firstName: true, lastName: true, callPhone: true },
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  callPhone: true,
+                  // El código entra en el MISMO viaje que ya se hacía. Pedirlo
+                  // aparte sería una consulta por miembro y, con `max: 1`, una
+                  // latencia por miembro (§7).
+                  memberCode: { select: { code: true } },
+                },
               },
             },
           },
@@ -178,6 +186,10 @@ export type MiembroCasaDeFe = {
   nombre: string;
   fase: string;
   telefono: string | null;
+  /// Su código de miembro, el de 6 dígitos con el que entra al taller.
+  /// `null` solo si esa ficha todavía no tiene uno — «Mandarle su código» lo
+  /// crea (`codigoDeMiembro`), así que la pantalla lo dice en vez de callarlo.
+  codigo: string | null;
 };
 
 export function construirMiembros(grupo: DatosCasaDeFe): MiembroCasaDeFe[] {
@@ -187,6 +199,7 @@ export function construirMiembros(grupo: DatosCasaDeFe): MiembroCasaDeFe[] {
     nombre: nombreCompleto(miembro.learner.person),
     fase: miembro.learner.phase,
     telefono: miembro.learner.person.callPhone,
+    codigo: miembro.learner.person.memberCode?.code ?? null,
   }));
 }
 

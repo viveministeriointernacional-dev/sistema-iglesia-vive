@@ -331,6 +331,77 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 12. Bitácora (añadir lo nuevo arriba)
 
+- **2026-10-12** — **El código del taller se ve en la ficha de la Casa de Fe**
+  (pedido del usuario con pantallazo: «que al igual que en el prematrimonial se
+  muestre el código de ingreso al taller en la vista de casa de fe»). Ajuste
+  sobre una pantalla que ya existe → **directo, sin mockup** (§2).
+  **⚠️ EL AGUJERO QUE TAPA ESTABA ESCRITO EN ESTA BITÁCORA DESDE EL 2-OCT Y NO
+  SE HABÍA CERRADO.** Aquel día se construyó «Mandarle su código» y se anotó
+  que el aviso trae el código escrito «**que es lo único que le permite al
+  líder dictarlo por teléfono sin ir a buscarlo a Administración**». Pero ese
+  aviso **solo sale cuando algo falla**: si el correo y el WhatsApp salieron
+  bien, el líder nunca ve el código. Y es justo entonces cuando le hace falta
+  —la persona borró el mensaje, cambió de teléfono, o simplemente no lo
+  encuentra—, así que tocaba ir hasta Administración, buscar la ficha y
+  volver. Ahora está en el renglón, al lado del nombre.
+  - **⚠️ EL CÓDIGO SOLO VIAJA AL NAVEGADOR DE QUIEN PUEDE EDITAR, y no basta
+    con no pintarlo.** Es una credencial: con esos 6 dígitos se entra al taller
+    de esa persona y **se responde por ella**. A la ficha entra también quien
+    tiene «ve todos los grupos (**solo mirar**)» —el permiso del 16-sep, hoy el
+    líder de intercesión—, y ese no tiene a quién dictárselo. `page.tsx` manda
+    `codigo: puedeEditar ? … : null`, así que al que solo mira **no le llega**,
+    no es que no se le dibuje. Es la misma línea que `correctChoice` del
+    cuestionario (5-oct) y el token del calendario (17-sep): lo que es secreto
+    no sale del servidor.
+  - **⚠️ ES EL MISMO CRITERIO QUE YA GOBERNABA EL BOTÓN**, y por eso no hay un
+    permiso nuevo que explicar: quien puede pulsar «Mandarle su código» es
+    exactamente quien ahora lo ve escrito. Si fueran dos reglas distintas
+    habría que acordarse de las dos.
+  - **CERO viajes nuevos a la base.** El `memberCode` entra en el `select` de
+    los miembros que `cargarCasaDeFe` ya hacía. Pedirlo aparte sería una
+    consulta por miembro y, con `PrismaPg max:1`, **una latencia por miembro**
+    (§7) — en una casa de 10 personas, diez.
+  - **⚠️ NO SE CREA EL CÓDIGO AL PINTAR LA PANTALLA.** `codigoDeMiembro` lo crea
+    si falta, pero llamarlo aquí sería **escribir en una lectura**, y una
+    escritura por renglón. Si falta, el renglón **lo dice** («todavía no tiene ·
+    se lo crea "Mandarle su código"») en vez de callarlo o de dar un hueco.
+  - **Medido antes de decidir eso: hoy no se va a ver nunca.** En las **14 Casas
+    de Fe abiertas hay 25 miembros y los 25 tienen código** — lógico, porque
+    todos tienen expediente y las 6 fichas sin código del 2-oct eran justo las
+    que no lo tienen. La rama existe por si entra una ficha vieja, no porque
+    haga falta hoy.
+  - El pie de la sección lo dice en una línea («si no le llegó, el código está
+    aquí para dictárselo: es suyo y no cambia»), que es lo que convierte un
+    número suelto en algo que se sabe para qué sirve.
+  - **Alpha NO lo lleva, y es a propósito**: el taller de los 12 temas es de
+    Casa de Fe. En Alpha ese número no abriría nada.
+  - `tsc`, eslint, **193/193 pruebas** y `npm run cf:build` en verde. **Sin
+    migraciones**, así que se puede fusionar a cualquier hora.
+
+- **2026-10-12** — **El taller 2 corto quedó VIVO (PR #113), PERO ⚠️ EL MERGE
+  ANTERIOR SE LLEVÓ SOLO PARTE DEL TRABAJO. CUARTA VEZ — Y ESTA FUE CULPA MÍA.**
+  **Lo que quedó vivo, verificado en la base:** la migración
+  `20261012030000_prematrimonial_tema_2_mas_corto` es **la última aplicada**, a
+  las **02:01:07 hora Colombia**, y el tema 2 quedó en **22 preguntas y 34
+  casillas** (la 1 con 8, la 2 con 4, la 5 con 3 y 19 sueltas), con los
+  **números del 1 al 22, sin huecos ni repetidos**. Las **112 respuestas** de
+  toda la base siguen ahí: son del tema 1 y la migración no las rozó, que era
+  justo lo que había que no romper.
+  Las dos mitades de la receta del 22-sep en el #113:
+  `git log --oneline origin/main..origin/<rama>` **vacío** y los padres del
+  merge son `468def2 0e589d6`, o sea **la cabeza de la rama**.
+  **⚠️ PERO EL #112 ENTRÓ A MEDIAS: sus padres son `f927a40 3be1645`**, que es
+  el commit de la bitácora — **no** el del taller. GitHub fusionó una cabeza
+  vieja, igual que el 11-sep (PR #77), el 11-sep (PR #80) y el 3-oct (PR #100).
+  **⚠️ Y LA CAUSA ESTA VEZ NO FUE DE GITHUB, FUE MÍA: EMPUJÉ TRABAJO NUEVO
+  ENCIMA DE UN PR QUE YA ESTABA ABIERTO.** La regla del 11-sep dice «no abrir
+  el PR hasta que TODO esté empujado», y yo hice lo contrario: con el #112 ya
+  abierto le puse el taller encima. El usuario fusiona en minutos, así que la
+  página que él tenía delante mostraba la cabeza vieja. **La regla que faltaba,
+  y es la que de verdad lo evita: si aparece trabajo nuevo y hay un PR abierto,
+  se abre OTRO PR — no se apila sobre el abierto.** Reiniciar la rama desde
+  `main` y volver a empujar (§5) arregló el síntoma; no apilar lo evita.
+
 - **2026-10-12** — **Taller 2 del prematrimonial: de 64 casillas a 34** (pedido
   del usuario: «está muy largo, quiero que lo hagas más corto y mejore la
   redacción de alguna de las preguntas»). Contenido, no interfaz → directo, sin

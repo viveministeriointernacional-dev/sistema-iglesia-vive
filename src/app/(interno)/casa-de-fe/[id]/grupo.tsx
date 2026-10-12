@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { codigoLegible } from "@/lib/taller-catalogo";
 import {
   alternarCierreCasaDeFe,
   buscarCandidatosCasaDeFe,
@@ -18,6 +19,8 @@ export type MiembroVista = {
   nombre: string;
   fase: string;
   telefono: string | null;
+  /// Su código del taller. Llega en `null` a quien solo puede mirar.
+  codigo: string | null;
 };
 
 export function CasaDeFe({
@@ -90,6 +93,25 @@ export function CasaDeFe({
                   {miembro.fase}
                   {miembro.telefono ? ` · ${miembro.telefono}` : ""}
                 </p>
+                {puedeEditar ? (
+                  <p className="mt-2 flex flex-wrap items-baseline gap-2">
+                    <span className="text-[10px] leading-none font-semibold tracking-[.1em] text-[rgba(19,28,36,.4)] uppercase">
+                      Código del taller
+                    </span>
+                    {miembro.codigo ? (
+                      <span className="font-mono text-[15px] leading-none font-semibold tracking-[.12em] tabular-nums text-tinta">
+                        {codigoLegible(miembro.codigo)}
+                      </span>
+                    ) : (
+                      // No es un error: hay fichas sin código todavía, y
+                      // «Mandarle su código» lo crea. Decirlo evita que el
+                      // líder lo busque en Administración.
+                      <span className="text-[11.5px] leading-none font-medium text-[rgba(19,28,36,.45)]">
+                        todavía no tiene · se lo crea «Mandarle su código»
+                      </span>
+                    )}
+                  </p>
+                ) : null}
               </div>
               <Link
                 href={`/expediente/${miembro.learnerId}`}
@@ -154,7 +176,8 @@ export function CasaDeFe({
 
       <p className="text-[11.5px] leading-[1.6] font-medium text-[rgba(19,28,36,.45)]">
         Al inscribir a alguien, el sistema le manda por correo y por WhatsApp su
-        código y el enlace a sus 12 talleres. El avance se registra en el
+        código y el enlace a sus 12 talleres. Si no le llegó, el código está
+        aquí para dictárselo: es suyo y no cambia. El avance se registra en el
         expediente de cada persona, y los talleres enviados se revisan en «Por
         revisar».
       </p>
