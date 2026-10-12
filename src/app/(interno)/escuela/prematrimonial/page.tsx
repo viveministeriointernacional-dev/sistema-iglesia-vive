@@ -153,8 +153,22 @@ export default async function PaginaPrematrimonial() {
                     className="flex flex-wrap items-center gap-3 rounded-[10px] bg-papel p-3"
                   >
                     <span className="min-w-0 flex-1">
-                      <span className="block text-[13px] font-semibold text-tinta">
-                        {p.nombreA} &amp; {p.nombreB}
+                      {/* ⚠️ El código va PEGADO a cada nombre, entre
+                          corchetes, y no en un renglón aparte: así se lee de
+                          un golpe a quién pertenece cada número a la hora de
+                          dictarlo. Hace falta porque abrir una pareja NO le
+                          manda nada a nadie — quien la abre se lo pasa a
+                          mano, y sin esto toca buscarlo en Administración
+                          ficha por ficha. */}
+                      <span className="block text-[13px] leading-[1.45] font-semibold text-tinta">
+                        {p.nombreA}{" "}
+                        <span className="tabular-nums text-[rgba(19,28,36,.55)]">
+                          [{p.codigoA ?? "sin código"}]
+                        </span>{" "}
+                        &amp; {p.nombreB}{" "}
+                        <span className="tabular-nums text-[rgba(19,28,36,.55)]">
+                          [{p.codigoB ?? "sin código"}]
+                        </span>
                       </span>
                       <span className="mt-1 block text-[11.5px] font-semibold text-[rgba(19,28,36,.5)]">
                         {p.pastor ? `Acompaña ${p.pastor} · ` : ""}
