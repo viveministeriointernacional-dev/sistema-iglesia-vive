@@ -179,6 +179,14 @@ export type ParejaEnLista = {
   learnerAId: string;
   learnerBId: string;
   pastor: string | null;
+  /// El código de miembro de cada uno, para poder dictárselo.
+  ///
+  /// ⚠️ **Va aquí porque abrir una pareja no le manda nada a nadie** (al
+  /// contrario que entrar a una Casa de Fe, que sí envía correo y WhatsApp).
+  /// Quien la abre tiene que pasarle el código a mano, y sin esto hay que ir
+  /// a buscarlo a Administración, ficha por ficha.
+  codigoA: string | null;
+  codigoB: string | null;
   empezaron: Date;
   cerrada: boolean;
   aprobados: number;
@@ -204,8 +212,28 @@ export async function cargarParejas(usuario: UsuarioSesion): Promise<ParejaEnLis
         startedAt: true,
         closedAt: true,
         leader: { select: { fullName: true } },
-        learnerA: { select: { person: { select: { firstName: true, lastName: true } } } },
-        learnerB: { select: { person: { select: { firstName: true, lastName: true } } } },
+        learnerA: {
+          select: {
+            person: {
+              select: {
+                firstName: true,
+                lastName: true,
+                memberCode: { select: { code: true } },
+              },
+            },
+          },
+        },
+        learnerB: {
+          select: {
+            person: {
+              select: {
+                firstName: true,
+                lastName: true,
+                memberCode: { select: { code: true } },
+              },
+            },
+          },
+        },
       },
     }),
     prisma.premaritalWorkshop.findMany({
@@ -258,6 +286,8 @@ export async function cargarParejas(usuario: UsuarioSesion): Promise<ParejaEnLis
       id: p.id,
       learnerAId: p.learnerAId,
       learnerBId: p.learnerBId,
+      codigoA: p.learnerA.person.memberCode?.code ?? null,
+      codigoB: p.learnerB.person.memberCode?.code ?? null,
       nombreA: nombreCompleto(p.learnerA.person),
       nombreB: nombreCompleto(p.learnerB.person),
       pastor: p.leader?.fullName ?? null,

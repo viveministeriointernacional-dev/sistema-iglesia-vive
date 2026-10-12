@@ -160,6 +160,21 @@ export default async function PaginaPrematrimonial() {
                         {p.pastor ? `Acompaña ${p.pastor} · ` : ""}
                         desde {momentoCorto(p.empezaron)}
                       </span>
+                      {/* ⚠️ Los códigos van aquí porque abrir una pareja NO le
+                          manda nada a nadie: quien la abre tiene que pasarle
+                          el código a mano, y sin esto toca ir a buscarlo a
+                          Administración, ficha por ficha. */}
+                      <span className="mt-1.5 block text-[11.5px] leading-[1.5] font-semibold text-[rgba(19,28,36,.5)]">
+                        Códigos ·{" "}
+                        <span className="tabular-nums text-tinta">
+                          {p.codigoA ?? "—"}
+                        </span>{" "}
+                        {p.nombreA.split(" ")[0]} ·{" "}
+                        <span className="tabular-nums text-tinta">
+                          {p.codigoB ?? "—"}
+                        </span>{" "}
+                        {p.nombreB.split(" ")[0]}
+                      </span>
                     </span>
                     <span className="text-[11.5px] font-semibold text-[rgba(19,28,36,.5)]">
                       {p.aprobados} de {TOTAL_DE_TEMAS_PRE}
