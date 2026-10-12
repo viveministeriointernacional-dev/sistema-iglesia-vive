@@ -77,6 +77,28 @@
   // despliegue que se deje el binding fuera desharía la mejora en silencio, que
   // es la forma más cara de perderla.
   "hyperdrive": [
-    { "binding": "HYPERDRIVE", "id": "67fbd6377dda4e9a81ad95471a6e4708" }
+    {
+      "binding": "HYPERDRIVE",
+      "id": "67fbd6377dda4e9a81ad95471a6e4708",
+      // ⚠️ **ESTA CADENA ES FALSA Y TIENE QUE SERLO. NO ES LA BASE DE VERDAD.**
+      //
+      // Apunta a un `localhost` que no existe, y aun así es obligatoria: sin
+      // ella **el DESPLIEGUE falla**, no el build (12-oct-2026). El comando de
+      // despliegue es `opennextjs-cloudflare deploy`, que llama a
+      // `getPlatformProxy()` por su cuenta — fuera de `next.config.ts`, así que
+      // el `if (NODE_ENV === "development")` de allí **no lo cubre**— y wrangler
+      // entonces exige una Postgres local para emular Hyperdrive:
+      // «When developing locally, you should use a local Postgres connection
+      // string…». El build sale verde (23 s) y el despliegue muere (13 s).
+      //
+      // **Nunca se conecta a esto.** Solo existe para que
+      // `applyHyperdriveEnvVars` encuentre un valor y no lance. En producción el
+      // worker recibe el binding real por el `id` de arriba; en este proyecto
+      // **nadie desarrolla en local** (§2), así que esta cadena no se usa jamás.
+      //
+      // ⚠️ **Por eso mismo: NO poner aquí la cadena real de Supabase.** Llevaría
+      // la contraseña al repositorio (§10), y no haría falta para nada.
+      "localConnectionString": "postgresql://local:local@localhost:5432/local"
+    }
   ]
 }
