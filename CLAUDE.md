@@ -64,8 +64,26 @@ panel; antes este archivo decía «Paid» y era falso — de ahí parte de la le
     build`: aplica migraciones y genera `.open-next/worker.js`). ⚠️ Si aquí se pone
     solo `npx opennextjs-cloudflare build`, **las migraciones no corren** (fue el
     bug de sep-2026).
-  - **Deploy command:** `npx wrangler deploy` (sube **y activa** al 100%).
+  - **Deploy command:** ⚠️ **CORREGIDO EL 12-OCT-2026: es
+    `opennextjs-cloudflare deploy`, NO `npx wrangler deploy`.** Este archivo dijo
+    lo segundo durante semanas y **era falso**; se vio en el rastro de un build
+    fallido (`at async deployCommand (@opennextjs/cloudflare/dist/cli/commands/
+    deploy.js)`). **La diferencia importa de verdad:** `wrangler deploy` NO llama
+    a `getPlatformProxy()` y `opennextjs-cloudflare deploy` **SÍ**, así que el
+    despliegue monta la emulación local de los bindings y puede fallar por cosas
+    que al build no le pasan — exactamente lo de Hyperdrive del 12-oct. Con la
+    suposición vieja ese fallo era imposible de prever.
     ⚠️ `npx wrangler versions upload` **sube pero NO activa** → el sitio no cambia.
+  - **⚠️ EL BUILD Y EL DESPLIEGUE SON DOS ETAPAS, Y FALLAN POR SEPARADO.** En el
+    panel se ven como **Building** y **Deploying** con su tiempo cada una. Un
+    «Building ✅ 23 s · Deploying ❌ 13 s» NO es un error de compilación: es que
+    el worker se construyó bien y no se pudo activar. **Mirar cuál de las dos
+    está en rojo antes de buscar la causa**, o se pierde media hora leyendo el
+    log equivocado.
+  - **⚠️ Y UN BUILD DE RAMA EN VERDE NO PRUEBA QUE EL DE `main` VAYA A PASAR**,
+    porque la rama **no ejecuta el Deploy command**. El 12-oct el mismo commit
+    salió **Ready** en la rama y **Failed** en `main`: esa discrepancia es la
+    pista de que lo que falla es el despliegue, no el código.
   - `wrangler.jsonc` ya incluye `build.command = npx opennextjs-cloudflare build`
     como respaldo, para que el worker se compile aunque el «Build command» del
     panel esté vacío (eso rompió despliegues en ago-2026).
@@ -262,35 +280,36 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ## 9. Pendientes / temas abiertos
 
-- **Lentitud**: Cloudflare está en Workers Paid, pero **Supabase está en FREE**
-  (compute más pequeño y sin pooler dedicado). Palancas: subir Supabase a Pro, o
-  **Hyperdrive** (mantiene el pool de conexiones del lado de Cloudflare).
-  Plantilla comentada en `wrangler.jsonc`.
-- **⚠️ HYPERDRIVE: SOLO FALTA EL `id`, y es acción del usuario en dos páginas
-  web.** El código está listo (`src/lib/prisma.ts` ya lo lee del binding y
-  **avisa a gritos si falta**, para que un despliegue no deshaga la mejora en
-  silencio) y el bloque está escrito y comentado en `wrangler.jsonc`. Los pasos,
-  con **las dos correcciones medidas que la documentación genérica dice al
-  revés**:
-  1. Supabase → **Connect** → pestaña **Session pooler** ⚠️ **(NO «Direct
-     connection»: `db.<proyecto>.supabase.co` no resuelve a IPv4 en el plan FREE
-     y Hyperdrive no la alcanza)** → copiar la cadena y reemplazar
-     `[YOUR-PASSWORD]`.
-  2. Cloudflare → **Storage & Databases** → **Hyperdrive** → Create
-     configuration → pegar la cadena → ⚠️ **DESACTIVAR «Caching»** (cachea 60 s
-     por defecto, y aquí eso sería la regresión del 11-sep: guardar y leer el
-     dato viejo durante un minuto). **Lo que se quiere es el pool, no la caché.**
-  3. Pasarme **solo el `id`**. ⚠️ **La contraseña NO** (§10): va únicamente en
-     ese formulario.
-  **Está incluido en Workers Paid: no cuesta nada más.** Es lo único que ataca
-  la causa de la pantalla negra del 12-oct — las cuatro pantallas de error que
-  entraron ese día solo hacen que el tropiezo se pueda reintentar.
-- **Bajar los viajes a la base de `/taller/mis`**, que es la pantalla más lenta
-  del sitio: hoy hace **cuatro viajes EN FILA** (`learnerPorToken`, luego
+- **⚠️ HYPERDRIVE: YA ESTÁ VIVO (12-oct-2026).** Lo que queda escrito aquí es
+  **la configuración, para no volver a decidirla**:
+  **id `67fbd6377dda4e9a81ad95471a6e4708`** · host
+  `aws-0-ca-central-1.pooler.supabase.com` (**Session pooler**, puerto **5432**;
+  la conexión directa no resuelve a IPv4 en el plan FREE) · usuario
+  `postgres.cxtfftuexqmkktxumkfz` · **caché DESACTIVADA** · **Maximum
+  connections 20**.
+  **⚠️ Los dos valores del panel que vinieron MAL de fábrica y hay que volver a
+  mirar si alguien recrea la configuración:**
+  1. **«Enable caching» viene MARCADA** (Max Age 60 s · SWR 15 s). Con eso el
+     equipo vería datos de hasta un minuto antes: registra una llamada, la
+     tarjeta no se mueve, la registra otra vez — el fallo del 11-sep, y **no
+     parecería caché, parecería que el sistema no guarda**. De Hyperdrive
+     queremos **el pool, no la caché**.
+  2. **«Maximum connections» viene en 60, y la base no da para eso.** Medido:
+     `max_connections` = 60, menos 3 reservadas al superusuario, menos ~12 en
+     uso por los servicios de Supabase → **~45 reales**. Y como va por el
+     Session pooler, **cada conexión de Hyperdrive ocupa una conexión real de
+     Postgres**. Pedir 60 es el camino al «max clients reached» (error 1102) por
+     el que existe la regla de una conexión por petición (§7).
+- **Lentitud**: con Hyperdrive puesto, el viaje a la base pasó de **236 a
+  ~80 ms de mínimo y de 258 a ~100 ms de mediana** — unas **3 veces** más
+  rápido (§bitácora 12-oct, con la advertencia de cómo medirlo sin engañarse).
+  **Supabase sigue en FREE**, así que la palanca que queda es subirlo a Pro.
+- **Bajar los viajes a la base de `/taller/mis`**, que sigue siendo la pantalla
+  con más consultas: hace **cuatro viajes EN FILA** (`learnerPorToken`, luego
   `cargarMisTalleres`, `cargarMiPrematrimonial` y `resumenDelCuestionario`, que
   con `PrismaPg max:1` no corren en paralelo aunque vayan en un `Promise.all`).
-  Se pueden bajar a dos. **Ofrecido y aplazado a propósito: primero medir
-  Hyperdrive solo**, o no se sabría cuál de los dos cambios movió el número.
+  Se pueden bajar a dos. Se aplazó a propósito para medir Hyperdrive solo; **ya
+  está medido, así que esto se puede hacer cuando se quiera**.
 - **Registros de HighLevel**: si dejan de entrar, revisar que el workflow de
   registro esté activo y enviando; algunos llegan y se marcan «duplicado» (409).
 - **Tabla huérfana `inbound_registration`** en Supabase: ya no está en el modelo
@@ -311,6 +330,125 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 - Validar deploy sin credenciales: `npx wrangler deploy --dry-run --outdir /tmp/x`
 
 ## 12. Bitácora (añadir lo nuevo arriba)
+
+- **2026-10-12** — **HYPERDRIVE VIVO (PR #110 + #111), y el viaje a la base pasó
+  de 236 ms a 73 ms.** Costó **dos despliegues fallidos**, y los dos fallos
+  enseñan algo distinto.
+  **La medida, que es lo único que lo prueba** (20 muestras de cada una, con su
+  control):
+
+  | Viaje a la base | Antes | Ahora |
+  |---|---|---|
+  | mínimo | 236 ms | **~80 ms** (73 · 96 · 79) |
+  | mediana | 258 ms | **~100 ms** (111 · 204 · 94) |
+
+  O sea **unas 3 veces más rápido**, no las 10 que llegó a parecer.
+  **⚠️ Y AHÍ VA LA LECCIÓN DE MEDICIÓN, PORQUE CASI VENDO UN RESULTADO FALSO:
+  un vigilante con 5 MUESTRAS por vuelta dio «~0 ms» varias veces seguidas, y
+  hasta −450 ms, que es imposible.** El mínimo de 5 muestras es ruido, no una
+  medida. Con **25 muestras** el número se asienta en ~80/~100 ms, y de tres
+  tandas grandes **una salió desviada (96/204)** — se reconoce porque **su
+  propio control se disparó** (p90 de la ruta sin base en 0,615 s, cuando lo
+  normal es 0,15).
+  **REGLA: para comparar latencias, 20-25 muestras y mirar el CONTROL de cada
+  tanda; si el control se movió, la tanda no vale.**
+
+  **⚠️ Y EL CONTROL ES LO QUE HACE VALER LA MEDIDA: la parte SIN base no se
+  movió** (0,142–0,155 s antes y después). Solo cambió lo que pasa por Postgres
+  — que es exactamente lo que Hyperdrive toca.
+  **⚠️ CÓMO SE MIDE ESTO, porque es reutilizable y costó encontrarlo: UN PAR DE
+  RUTAS HERMANAS QUE DEVUELVEN EL MISMO 404.**
+  `/calendario/NO-ES-HEX.ics` → 404 **sin** tocar la base (el código corta en el
+  `/^[0-9a-f]{32}$/`), y `/calendario/<32 hex>.ics` → 404 **consultando**
+  `app_user` por el token. **La resta de las dos es el viaje a la base,
+  aislado**, sin sesión y sin escribir nada.
+  **⚠️ Y ANTES DE ESO ESTUVE MIDIENDO MAL TODA LA NOCHE, que es la lección de
+  método: `/taller/mis` y `/taller/lider`, SIN COOKIE, NO CONSULTAN LA BASE.**
+  `const persona = token ? await learnerPorToken(token) : null` — sin cookie no
+  hay token y no hay ni una consulta. Mi «línea base» de 0,994 s medía arranque
+  del worker, no Postgres: **con ella jamás habría visto el efecto, ni habría
+  movido el contador de Queries**. Eso explicó además por qué el panel decía
+  «Queries 0 · Inactive» sin que significara un fallo.
+  **REGLA: antes de usar una ruta como medidor, comprobar EN EL CÓDIGO que de
+  verdad llega a la base.**
+
+  **EL PRIMER FALLO (PR #110) — el build.**
+  Declarar el binding **rompe `next build`**: `next.config.ts` llamaba a
+  `initOpenNextCloudflareForDev()` **sin condición**, eso levanta la emulación
+  local de los bindings, y wrangler entonces exige una Postgres local
+  (`applyHyperdriveEnvVars`). Lo cazó **`npm run cf:build`, no `tsc`** — la
+  lección del 6-sep otra vez. Arreglado con
+  `if (process.env.NODE_ENV === "development")`.
+
+  **EL SEGUNDO FALLO (el merge del #110) — el despliegue, y es el que enseña
+  más.**
+  El log de Cloudflare: **Building 23 s ✅ · Deploying 13 s ❌**, con el MISMO
+  error pero desde otro sitio:
+  `at async deployCommand (@opennextjs/cloudflare/dist/cli/commands/deploy.js)`
+  → `getEnvFromPlatformProxy` → `getPlatformProxy` → `applyHyperdriveEnvVars`.
+  **⚠️ EL `if` DE `next.config.ts` NO CUBRE EL DESPLIEGUE**, porque
+  `opennextjs-cloudflare deploy` llama a `getPlatformProxy()` **por su cuenta**,
+  sin pasar por ahí.
+  **⚠️ Y DE PASO DESTAPÓ QUE §4 ESTABA MAL: el Deploy command NO es
+  `npx wrangler deploy`, es `opennextjs-cloudflare deploy`.** Corregido. La
+  diferencia no es cosmética: `wrangler deploy` **no** llama a
+  `getPlatformProxy()` y el otro **sí**, así que con la suposición vieja este
+  fallo era imposible de prever.
+  **⚠️ LA PISTA QUE LO RESOLVIÓ, y sirve siempre: EL MISMO COMMIT SALIÓ «Ready»
+  EN LA RAMA Y «Failed» EN `main`.** Lo único que hace `main` y la rama no es
+  **desplegar**. **Un build de rama en verde NO prueba que el de `main` vaya a
+  pasar.**
+
+  **El arreglo (PR #111): `localConnectionString` con una cadena FALSA a
+  localhost.**
+  **⚠️ QUE SEA FALSA ES LA MITAD DE LA DECISIÓN.** Nunca se conecta a eso: solo
+  existe para que `applyHyperdriveEnvVars` encuentre un valor y no lance. En
+  producción el worker recibe el binding real por el `id`, y aquí **nadie
+  desarrolla en local** (§2). **Yo descarté esta vía en el #110 dando por hecho
+  que tenía que ser la cadena REAL** —lo cual habría llevado la contraseña al
+  repositorio (§10)—, y esa suposición costó un despliegue entero. **Poner ahí
+  la de Supabase sigue estando prohibido; poner una inventada es lo correcto.**
+  **Reproducido y probado al revés** con un script de usar y tirar que llama a
+  `getPlatformProxy()` igual que el despliegue: sin el arreglo lanza el error
+  **exacto** del log de Cloudflare; con él devuelve los bindings
+  (`EMAIL_FROM, HYPERDRIVE, ASSETS`).
+  **Honestidad sobre el `if` que se quedó: medido, YA NO hace falta** — con
+  `localConnectionString` el build pasa también sin él. Se conserva porque sigue
+  siendo correcto, **no porque sostenga nada**.
+
+  **⚠️ TRES COSAS QUE SE EVITARON Y LAS TRES ERAN INVISIBLES:**
+  1. **El id que me pasó el usuario era un EJEMPLO.** Se detectó **midiendo, no
+     a ojo**: `9f8e7d6c5b4a39281706f5e4d3c2b1a0` baja exactamente **0x11 byte a
+     byte**, los 15 saltos iguales — un id aleatorio no hace eso. El formato era
+     válido (32 hex) y el `--dry-run` lo aceptó sin chistar, porque **valida la
+     forma, no que exista**. Con él, el build habría fallado. La lista del panel
+     decía además «You have no Configurations» **estando ya creada**: esa
+     pantalla se queda pegada, hay que darle al botón de refrescar.
+  2. **«Enable caching» viene MARCADA de fábrica** (60 s). Ver §9.
+  3. **«Maximum connections» viene en 60 y la base da ~45.** Ver §9.
+  **Ninguna de las tres da señal si se deja mal**: la 1 rompe el build (ruidosa),
+  pero la 2 y la 3 **harían el sitio más rápido y romperían semanas después**.
+
+  **Lo que NO hubo que tocar, y se comprobó en vez de preguntarlo:** la
+  contraseña de la base **no se restableció**, así que **no hizo falta cambiar
+  ningún secreto de Cloudflare**. Se midió contra el sitio vivo:
+  `/calendario/token-inventado.ics` → **404** (consultó la base y no lo
+  encontró) y ninguna pantalla mostraba el error nuevo. Si la contraseña hubiera
+  cambiado, el worker vivo —con el `DATABASE_URL` viejo— ya no conectaría.
+  **REGLA: para saber si una credencial de la base sigue sirviendo, pedirle al
+  sitio algo que la use; no hace falta preguntar.**
+  (Y el dato por si algún día hace falta: **la contraseña de Supabase no se
+  puede recuperar**, solo restablecer — y entonces hay que cambiarla en **tres**
+  sitios: el secreto del worker, el de los builds y Hyperdrive. Como los
+  secretos solo se toman en el rebuild (§4), el sitio queda caído hasta que
+  termine un despliegue nuevo: **hacerlo de noche**.)
+  **⚠️ ESTE PR NO DEJA HUELLA DE ARCHIVO, y se dijo antes de medir:** no toca
+  estilos ni código del navegador, así que el CSS sale **byte a byte idéntico**
+  (`3zeef08fj251e.css` antes y después). Decir «sirve ese CSS, ya está» habría
+  sido repetir el falso positivo del 3-oct. **Las únicas pruebas válidas aquí
+  son el log del build, el contador «Queries» del panel y la latencia.**
+  `tsc`, eslint, **193/193 pruebas** y `npm run cf:build` en verde. Sin
+  migraciones.
 
 - **2026-10-12** — **Pantallas de error propias: la pantalla negra de Cloudflare
   ya no se le enseña a nadie (PR #108, VIVO y comprobado).**
