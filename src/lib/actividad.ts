@@ -1030,6 +1030,36 @@ export async function cargarActividad(
         observacion = texto(m.motivo);
         break;
       // ---------------------------------------------------------------------
+      // Peticiones de oración (el módulo del líder de intercesión)
+      //
+      // ⚠️ **NI UNA DE LAS DOS ESCRIBE EL TEXTO DE LA PETICIÓN, y es la
+      // decisión que las sostiene.** «Actividad del día» la ve cualquier
+      // administrador: repetir ahí lo que alguien contó de su enfermedad o de
+      // su familia lo esparce por una pantalla que no es la suya, y con las
+      // reservadas sería justo lo contrario de lo que esa persona pidió. Se
+      // audita QUE pasó, no QUÉ se pidió. Es la misma línea que el código del
+      // QR (27-sep) y el token del calendario (17-sep).
+      // ---------------------------------------------------------------------
+      case "oracion.peticion_registrada":
+        // ⚠️ Sin actor cuando la escribió la persona desde su celular: ahí no
+        // hay nadie del equipo, y poner un nombre haría creer que ya la
+        // atendieron.
+        tipo = "eventos"; etiqueta = "ORACIÓN"; tono = "verde";
+        frase =
+          texto(m.origen) === "PERSONA"
+            ? [t("Alguien pidió oración desde su celular")]
+            : [A(), t(" registró una petición de oración")];
+        observacion =
+          m.reservada === true
+            ? "La persona pidió que no se sepa quién la pidió"
+            : null;
+        break;
+      case "oracion.peticion_orada":
+        tipo = "eventos"; etiqueta = "ORACIÓN"; tono = "verde";
+        frase = [A(), t(" marcó una petición como orada")];
+        observacion = m.conNota === true ? "Dejó una nota" : null;
+        break;
+      // ---------------------------------------------------------------------
       // Cuestionario de Dominio para Líderes (Escuela Ser Líder)
       // ---------------------------------------------------------------------
       case "cuestionario.enviado":

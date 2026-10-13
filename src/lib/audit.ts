@@ -75,6 +75,8 @@ export type AccionAuditada =
   | "escuela.inscripcion"
   | "escuela.inscripcion_por_qr"
   | "escuela.retirado"
+  | "oracion.peticion_registrada"
+  | "oracion.peticion_orada"
   | "escuela.cerrada"
   | "cuestionario.enviado"
   | "cuestionario.aprobado"

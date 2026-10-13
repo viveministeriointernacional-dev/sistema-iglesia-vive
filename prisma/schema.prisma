@@ -154,6 +154,8 @@ model AppUser {
   prematrimonialRevisiones  PremaritalReview[]          @relation("RevisoPrematrimonial")
   prematrimonialDestapes    PremaritalReveal[]          @relation("DestapoPrematrimonial")
   cuestionarioRevisiones    LeaderQuizReview[]          @relation("RevisoCuestionario")
+  peticionesRegistradas     PrayerRequest[]             @relation("PeticionRegistrada")
+  peticionesOradas          PrayerRequest[]             @relation("PeticionOrada")
 
   @@index([role, active])
   @@map("app_user")
@@ -243,6 +245,7 @@ model Person {
   highLevelContacts      HighLevelContact[]
   declaracionesLiderazgo LeadershipDeclaration[]
   memberCode             MemberCode?
+  peticionesDeOracion    PrayerRequest[]
 
   @@index([callPhone])
   @@index([whatsappPhone])
@@ -1891,4 +1894,60 @@ model LeaderQuizReview {
 
   @@index([quizId, reviewedAt])
   @@map("leader_quiz_review")
+}
+
+
+/// Una petición de oración concreta: por quién se ora, qué pidió, quién la
+/// registró y si el equipo de intercesión ya oró por ella.
+///
+/// ⚠️ **Existe porque `person.prayer_request` NO podía contestar lo que hace
+/// falta.** Esa columna es un solo texto por persona, y cuando llegaba una
+/// segunda petición se APILABA con un salto de línea: se perdía quién la pidió,
+/// cuándo y por qué. Medido el 13-oct-2026: 217 personas con petición, 2 de
+/// ellas ya con varias apiladas. **La columna vieja se conserva** (la ficha la
+/// sigue mostrando); lo que cambia es que a partir de ahora cada petición es
+/// además su propio renglón aquí.
+model PrayerRequest {
+  id       String @id @default(uuid())
+  personId String @map("person_id")
+  /// El texto tal cual lo escribió quien pidió. No se resume ni se corrige.
+  text     String
+  /// De dónde vino, y cada uno se pinta distinto porque pide cosas distintas:
+  /// REGISTRO (llegó con el formulario de registro — persona NUEVA, hay que
+  /// llamarla) · PERSONA (la pidió ella misma desde su celular) · EQUIPO (la
+  /// registró un consolidador, mentor o pastor) · HISTORICO (venía de la ficha
+  /// antes de que existiera esta tabla; no se sabe de dónde salió, y decirlo
+  /// es más honesto que inventarle un origen).
+  origin   String @default("PERSONA")
+  /// ⚠️ **Reservada NO es anónima.** La persona pidió que no se sepa quién la
+  /// pidió, así que la lista enseña «Reservada» en vez del nombre — pero la
+  /// ficha sigue enlazada, porque quien la acompaña tiene que poder
+  /// acompañarla. Un anónimo de verdad dejaría a la persona sola justo cuando
+  /// más necesita que alguien la busque.
+  reserved Boolean @default(false)
+  /// Quién la escribió en el sistema. **Nulo cuando la escribió la persona
+  /// desde su celular**: ahí no hay nadie del equipo a quien atribuírsela, y
+  /// poner su propio nombre haría pensar que alguien la atendió.
+  recordedById String?  @map("recorded_by_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  /// Cuándo el equipo de intercesión oró por esto. **Nulo = sigue esperando**,
+  /// y es lo que separa la lista de trabajo del historial.
+  prayedAt   DateTime? @map("prayed_at")
+  /// ⚠️ **Puede quedar nulo con `prayedAt` puesto, y es a propósito.** Si se
+  /// borra la cuenta de quien oró, el `ON DELETE SET NULL` lo vacía: por esa
+  /// petición **sí se oró**, y lo único que se pierde es quién. El CHECK de la
+  /// base va en una sola dirección por esto — con la versión simétrica, la
+  /// base se NIEGA a borrar la cuenta (probado el 13-oct).
+  prayedById String?   @map("prayed_by_id")
+  prayedNote String?   @map("prayed_note")
+
+  person     Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  recordedBy AppUser? @relation("PeticionRegistrada", fields: [recordedById], references: [id], onDelete: SetNull)
+  prayedBy   AppUser? @relation("PeticionOrada", fields: [prayedById], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([prayedAt])
+  @@index([personId])
+  @@map("prayer_request")
 }

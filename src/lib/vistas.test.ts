@@ -41,6 +41,14 @@ function perfil(role: Role, extra: Partial<PerfilParaVistas> = {}): PerfilParaVi
 /// ⚠️ **El prematrimonial no aparece aquí a propósito**: no tiene vista propia,
 /// es una pestaña dentro de «Escuela» (3-oct-2026). Quién lo ve lo decide
 /// `puedeLlevarPrematrimonial`, no el configurador.
+///
+/// ⚠️ **«oracion» es la segunda excepción, como «gi»: tampoco reconstruye
+/// nada.** El módulo de peticiones de oración no existía antes del
+/// 13-oct-2026. Su renglón solo está en ADMIN **a propósito**: son datos
+/// íntimos, y el líder de intercesión la recibe como excepción por cuenta
+/// desde Administración, no por su rol. Si alguien la añade a PASTOR aquí,
+/// estará repartiendo las peticiones de toda la iglesia entre los siete
+/// pastores — que es justo lo que el usuario descartó al elegir.
 const LO_QUE_VEIA_CADA_ROL: Record<Role, VistaId[]> = {
   [Role.APRENDIZ]: ["mi-proceso"],
   [Role.CONSOLIDADOR]: ["operacion-72", "registro-interno", "eventos"],
@@ -69,6 +77,7 @@ const LO_QUE_VEIA_CADA_ROL: Record<Role, VistaId[]> = {
     "llamadas",
     "asistentes",
     "bajas",
+    "oracion",
   ],
 };
 
