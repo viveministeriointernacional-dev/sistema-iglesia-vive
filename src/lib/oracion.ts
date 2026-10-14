@@ -1,6 +1,6 @@
 import { getPrisma } from "@/lib/prisma";
 import { auditar } from "@/lib/audit";
-import { nombreCompleto } from "@/lib/dominio";
+import { colaDeTelefono, nombreCompleto } from "@/lib/dominio";
 import { ETIQUETA_FASE } from "@/lib/procesos-catalogo";
 import {
   type FiltroDeOracion,
@@ -224,4 +224,106 @@ export async function marcarOrada(datos: {
   });
 
   return { ok: true };
+}
+
+
+// ---------------------------------------------------------------------------
+// El formulario público: la persona pide oración desde su celular
+// ---------------------------------------------------------------------------
+
+/// ⚠️ **Se reconoce a la persona igual que en «Actualizar datos»** (7-sep):
+/// primero por el celular y, si no aparece, por **correo + fecha de
+/// nacimiento**. Los dos datos juntos, nunca el correo solo: hay fichas con el
+/// correo de otra persona (§8), y solo por correo alguien podría pedir oración
+/// a nombre de quien no es.
+///
+/// **Y si no la encuentra, NO crea ficha.** Es la diferencia con el formulario
+/// de liderazgo, y es deliberada: aquel sirve para darse de alta; este es para
+/// que alguien que YA está en la casa pida oración. Crear una ficha por cada
+/// desconocido que escriba llenaría la base de personas sin proceso, sin
+/// consolidador y sin nadie que las llame — justo lo contrario de lo que la
+/// Operación 72 existe para evitar.
+export async function pedirOracionDesdeElCelular(datos: {
+  callPhone: string;
+  email: string;
+  birthDate: string;
+  texto: string;
+  reservada: boolean;
+}): Promise<
+  | { ok: true; nombre: string }
+  | { ok: false; mensaje: string; noEncontrada?: boolean }
+> {
+  const validacion = peticionValida(datos.texto);
+  if (!validacion.ok) return validacion;
+
+  const cola = colaDeTelefono(datos.callPhone);
+  const correo = datos.email.trim();
+  if (!cola && !correo) {
+    return {
+      ok: false,
+      mensaje: "Escribe tu celular para que sepamos por quién orar.",
+    };
+  }
+
+  const prisma = await getPrisma();
+  const CAMPOS_PERSONA = {
+    id: true,
+    firstName: true,
+    lastName: true,
+  } as const;
+
+  let candidatas =
+    cola && cola.length >= 10
+      ? await prisma.person.findMany({
+          where: {
+            OR: [
+              { callPhone: { endsWith: cola } },
+              { whatsappPhone: { endsWith: cola } },
+            ],
+          },
+          select: CAMPOS_PERSONA,
+        })
+      : [];
+
+  if (candidatas.length === 0 && correo && datos.birthDate) {
+    candidatas = await prisma.person.findMany({
+      where: {
+        email: { equals: correo, mode: "insensitive" },
+        birthDate: new Date(datos.birthDate),
+      },
+      select: CAMPOS_PERSONA,
+    });
+  }
+
+  // Dos fichas que casan: antes que escribir sobre la persona equivocada, se
+  // para y se avisa (la misma regla del formulario de liderazgo).
+  if (candidatas.length > 1) {
+    return {
+      ok: false,
+      mensaje:
+        "Encontramos más de una ficha con esos datos. Avísale al equipo de la iglesia para que lo revisen.",
+    };
+  }
+
+  const persona = candidatas[0];
+  if (!persona) {
+    return {
+      ok: false,
+      noEncontrada: true,
+      mensaje:
+        "No encontramos tu ficha con ese celular. Prueba con tu correo y tu fecha de nacimiento, o pídele al equipo de la iglesia que te registre.",
+    };
+  }
+
+  const resultado = await registrarPeticion({
+    personId: persona.id,
+    texto: datos.texto,
+    origen: "PERSONA",
+    reservada: datos.reservada,
+    // ⚠️ Nulo a propósito: la escribió ella, no el equipo.
+    recordedById: null,
+  });
+  if (!resultado.ok) return resultado;
+
+  return { ok: true, nombre: persona.firstName };
 }

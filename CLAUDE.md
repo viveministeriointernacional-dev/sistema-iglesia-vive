@@ -444,6 +444,12 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   puntos de control. No perder tiempo buscándolo en Supabase.
 - `ALTER TYPE … ADD VALUE` **sí** corre dentro de la transacción, mientras el
   valor **no se USE** en ella.
+- **⚠️ Un `ON DELETE SET NULL` puede volver IMBORRABLE la fila referenciada si
+  un CHECK prohíbe el estado que deja.** Pasó el 13-oct: un CHECK simétrico
+  («o están la fecha y el autor, o ninguno») hacía que **ninguna cuenta que
+  hubiera marcado una petición se pudiera borrar** — y el error no mencionaba
+  nada de oración. **Al escribir un CHECK sobre una columna con SET NULL,
+  probar SIEMPRE borrando la fila referenciada.**
 - Si `app_migration` no existe, el script **nunca arrancó** (la crea en su
   primera instrucción).
 
@@ -579,8 +585,9 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 > archivo del mes** y su renglón **arriba de este índice**. Si de ese trabajo
 > sale una regla general, va **además** a §12.
 
-### `docs/bitacora/2026-10.md` — octubre de 2026 (13 entradas)
+### `docs/bitacora/2026-10.md` — octubre de 2026 (14 entradas)
 
+- **14-oct** · **Módulo de oración**: el líder de intercesión ve todas las peticiones · formulario público `/pedir-oracion` · 217 trasladadas · **un CHECK simétrico volvía imborrables las cuentas**.
 - **12-oct** · **La memoria se parte en dos**: `CLAUDE.md` (siempre) y `docs/bitacora/` (se busca) · 303 → 51 KB · verificado por sha256 · el 6-sep estaba duplicado.
 - **12-oct** · El código del taller se ve en la ficha de la Casa de Fe — credencial, solo viaja a quien edita; cero viajes nuevos.
 - **12-oct** · El taller 2 corto quedó VIVO (PR #113) · **CUARTA vez** que un merge se lleva media rama, y la causa fui yo.

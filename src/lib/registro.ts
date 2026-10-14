@@ -382,6 +382,31 @@ export async function crearRegistroEnTransaccion(
     select: { id: true, gender: true },
   });
 
+  // **La petición de oración, además, como renglón propio.**
+  //
+  // ⚠️ **Va DENTRO de la transacción, al contrario que el correo y el WhatsApp
+  // del 2-oct**: eso es red y por eso va fuera; esto es una escritura en la
+  // misma base, y si quedara fuera podría guardarse la ficha y perderse la
+  // petición — justo el dato que hace que el equipo de intercesión sepa que
+  // esta persona acaba de llegar.
+  //
+  // La columna `person.prayer_request` se sigue llenando arriba, igual que
+  // siempre: la ficha la enseña y nada de lo que ya existía cambia.
+  if (datos.prayerRequest?.trim()) {
+    await db.prayerRequest.create({
+      data: {
+        personId: persona.id,
+        text: datos.prayerRequest.trim(),
+        // Origen REGISTRO: es lo que hace que salga en el bloque de arriba del
+        // módulo de oración, el de «acaban de llegar a la iglesia».
+        origin: "REGISTRO",
+        // Sin actor: lo escribió la persona en el formulario público, no
+        // alguien del equipo.
+        recordedById: null,
+      },
+    });
+  }
+
   // **Su código de miembro, desde el primer día.**
   //
   // ⚠️ Va aquí y no en un proceso aparte porque si naciera sin código, la
