@@ -408,6 +408,10 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   `git log --oneline origin/main..origin/<rama>` **vacío** y los **padres del
   merge** (`git log --format='%h %p'`) iguales a la **cabeza de la rama**. Si no,
   GitHub fusionó una cabeza vieja — **ha pasado CUATRO veces**.
+- **⚠️ Tras un merge reciente, el primer `git fetch` puede traer una copia en
+  CACHÉ** y hacer creer que `main` no se movió. Pasó el 14-oct: dije que el
+  #116 no estaba fusionado y GitHub lo daba por `merged: true`. **Repetir el
+  fetch antes de decirle a nadie que su merge no entró.**
 - **La huella del despliegue**, según qué se tocó: si es trabajo de **servidor**,
   la **hoja de estilos** (nombre y bytes exactos); si es de **cliente**, el
   chunk de JS; si hay **ruta nueva**, pedirla.
@@ -418,6 +422,18 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   coinciden, no prueba nada (falso positivo del 3-oct).
 - **Comparar nombres de paquete para demostrar que algo NO está desplegado da
   falsos negativos.** Sirve para probar que SÍ, no que no.
+- **⚠️ Que ALGUNOS chunks coincidan no valida un chunk CONCRETO como huella.**
+  El 14-oct comprobé que 10 de 11 chunks de `/ingresar` coincidían con mi
+  build, y aun así el chunk que yo vigilaba daba **404 con el código ya
+  desplegado** — defendí ese falso negativo dos días. **El CSS sí vale**:
+  es uno solo y se compara por **nombre Y tamaño en bytes**.
+- **⚠️ SI UN MERGE NO DESPLIEGA EN ~15 MINUTOS, NO ES EL CÓDIGO: PEDIRLE AL
+  USUARIO QUE REFRESQUE «Deployments» Y LE DÉ `Retry build`.** Los builds de
+  Cloudflare **se atascan en cola sin dar ninguna señal de error**: el 14-oct
+  tres merges seguidos (#114, #115, #116) pasaron **~20 horas** sin desplegar
+  nada, y el Retry lo resolvió **en dos minutos**. Antes de molestarle,
+  descartar el repositorio con `wrangler deploy --dry-run` y una llamada a
+  `getPlatformProxy()`, que es lo que ejecuta el Deploy command.
 - **La migración corre al EMPEZAR el build; el worker se activa al terminarlo.**
   A los 2 minutos del merge la base puede estar migrada y la ruta todavía no
   existir. No diagnosticar con una sola de las dos señales.
@@ -585,8 +601,9 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 > archivo del mes** y su renglón **arriba de este índice**. Si de ese trabajo
 > sale una regla general, va **además** a §12.
 
-### `docs/bitacora/2026-10.md` — octubre de 2026 (14 entradas)
+### `docs/bitacora/2026-10.md` — octubre de 2026 (15 entradas)
 
+- **14-oct** · El módulo de oración quedó VIVO (219 de 217 personas) · ⚠️ **tres merges sin desplegar en 20 h: lo arregló `Retry build`** · dos falsos negativos míos (fetch en caché, y el chunk como huella).
 - **14-oct** · **Módulo de oración**: el líder de intercesión ve todas las peticiones · formulario público `/pedir-oracion` · 217 trasladadas · **un CHECK simétrico volvía imborrables las cuentas**.
 - **12-oct** · **La memoria se parte en dos**: `CLAUDE.md` (siempre) y `docs/bitacora/` (se busca) · 303 → 51 KB · verificado por sha256 · el 6-sep estaba duplicado.
 - **12-oct** · El código del taller se ve en la ficha de la Casa de Fe — credencial, solo viaja a quien edita; cero viajes nuevos.
