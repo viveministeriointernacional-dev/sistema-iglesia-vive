@@ -4,6 +4,9 @@ import { NextResponse, type NextRequest } from "next/server";
 const RUTAS_PUBLICAS = [
   "/registro",
   "/actualizar-datos",
+  // Pedir oración: se llega por un QR pegado en la iglesia o por WhatsApp, sin
+  // cuenta. Sin este renglón el middleware la redirige a /ingresar con un 307.
+  "/pedir-oracion",
   "/ingresar",
   "/recuperar",
   "/nueva-clave",

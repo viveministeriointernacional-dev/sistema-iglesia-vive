@@ -53,7 +53,8 @@ export type VistaId =
   | "actividad"
   | "llamadas"
   | "asistentes"
-  | "bajas";
+  | "bajas"
+  | "oracion";
 
 export type DefinicionDeVista = {
   id: VistaId;
@@ -107,6 +108,15 @@ export const VISTAS: readonly DefinicionDeVista[] = [
     ruta: "/alpha",
     alcance: "rama",
     alcanceDetalle: "Los que lleva y los de su rama",
+    grupo: "menu",
+  },
+  {
+    id: "oracion",
+    nombre: "Oración",
+    ruta: "/oracion",
+    alcance: "todo",
+    alcanceDetalle:
+      "Todas las peticiones de oración de la iglesia, con quién la pidió y sobre qué",
     grupo: "menu",
   },
   {
@@ -222,6 +232,21 @@ export const POR_DEFECTO_SEGUN_ROL: Record<VistaId, readonly Role[]> = {
   // hereda ESTA vista — y como «Escuela» la ve también el rol MENTOR, cada
   // página del prematrimonial repite el guardia con
   // `puedeLlevarPrematrimonial` (pastores y administración).
+  // ⚠️ **Solo ADMIN de fábrica, y es el renglón más restrictivo de la tabla.**
+  // Una petición de oración toca salud, familia y problemas íntimos, así que
+  // esto NO se reparte por rol: el líder de intercesión —hoy el pastor Luis
+  // Alberto Facundo— la recibe como **excepción por cuenta** desde
+  // Administración (decisión del usuario, 13-oct-2026, elegida sobre
+  // dárselo a todos los pastores).
+  //
+  // Por eso tampoco hace falta ninguna columna nueva en `app_user`: el
+  // configurador del 16-sep ya sabe encender una vista a una sola cuenta, y
+  // así no hay que tocar una tabla caliente (§12.3) ni pedir un despliegue
+  // para cambiar quién la ve.
+  //
+  // Esta vista NO reconstruye nada: el módulo no existía antes, así que este
+  // renglón es una decisión, no una foto — como pasó con GI.
+  oracion: [Role.ADMIN],
   escuela: [Role.MENTOR, Role.PASTOR, Role.ADMIN],
   eventos: [
     Role.CONSOLIDADOR,
