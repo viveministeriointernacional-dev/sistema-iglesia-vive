@@ -1,4 +1,5 @@
 import { codigoLegible } from "@/lib/taller-catalogo";
+import { VolverAlTablero } from "./volver-al-tablero";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requerirRol, ROLES_ADMIN } from "@/lib/auth";
@@ -157,6 +158,27 @@ export default async function PaginaPersonaAdmin({
               Díctaselo para que lo anote. Es de ella y no cambia.
             </p>
           </section>
+        ) : null}
+
+        {/* ⚠️ Solo cuando de verdad se puede, y las tres condiciones importan:
+            ACTIVA (de baja no debe estar en ningún tablero), en GANAR (de
+            Fortalecer en adelante la acompaña su mentor) y con su Operación 72
+            FUERA del tablero (si ya está dentro, para moverla de columna existe
+            «Se equivocaron de persona», en el propio tablero). Pintarla siempre
+            sería enseñar un botón que el núcleo rechaza. */}
+        {aprendiz &&
+        aprendiz.status === "ACTIVO" &&
+        aprendiz.phase === "GANAR" &&
+        aprendiz.operation72 &&
+        !["INICIADA", "SEGUIMIENTO", "CONTACTADA", "VISITA_PENDIENTE", "LISTA_PARA_ENTREGA"].includes(
+          aprendiz.operation72.status,
+        ) ? (
+          <div className="mt-[14px]">
+            <VolverAlTablero
+              learnerId={aprendiz.id}
+              nombre={persona.firstName}
+            />
+          </div>
         ) : null}
 
         <EditorPersona
