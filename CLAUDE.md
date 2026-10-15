@@ -422,11 +422,20 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   coinciden, no prueba nada (falso positivo del 3-oct).
 - **Comparar nombres de paquete para demostrar que algo NO está desplegado da
   falsos negativos.** Sirve para probar que SÍ, no que no.
-- **⚠️ Que ALGUNOS chunks coincidan no valida un chunk CONCRETO como huella.**
-  El 14-oct comprobé que 10 de 11 chunks de `/ingresar` coincidían con mi
-  build, y aun así el chunk que yo vigilaba daba **404 con el código ya
-  desplegado** — defendí ese falso negativo dos días. **El CSS sí vale**:
-  es uno solo y se compara por **nombre Y tamaño en bytes**.
+- **⚠️ UN CHUNK DE PÁGINA NO SIRVE COMO HUELLA, NI PARA SÍ NI PARA NO.**
+  Pasó **dos veces** (#114 el 14-oct, #118 el 15-oct): el chunk que yo vigilaba
+  daba **404 con el código demostrablemente vivo** — la segunda vez
+  comprobado contra el usuario, que estaba viendo la pantalla nueva en su
+  navegador mientras mi `curl` decía 404. Que 10 de 11 chunks de `/ingresar`
+  coincidan con el build local **no valida un chunk concreto**: los de página
+  se nombran distinto en Cloudflare. **El CSS sí vale**: es uno solo y se
+  compara por **nombre Y tamaño en bytes**.
+- **⚠️ Y PARA UNA PANTALLA INTERNA QUE NO PRODUCE CSS NUEVO NO HAY HUELLA
+  POSIBLE DESDE FUERA.** El middleware da 307 a todo sin sesión, así que no
+  queda nada que pedir. **La prueba es pedirle al usuario que abra la
+  pantalla** — y antes, comprobar en la base que esa persona cumple las
+  condiciones para que la sección le salga, para que el «no la veo» signifique
+  algo. Es lo que se hizo con el #118 y funcionó a la primera.
 - **⚠️ SI UN MERGE NO DESPLIEGA EN ~15 MINUTOS, NO ES EL CÓDIGO: PEDIRLE AL
   USUARIO QUE REFRESQUE «Deployments» Y LE DÉ `Retry build`.** Los builds de
   Cloudflare **se atascan en cola sin dar ninguna señal de error**: el 14-oct
