@@ -1029,6 +1029,20 @@ export async function cargarActividad(
         frase = [A(), t(" retiró de la Escuela a "), P()];
         observacion = texto(m.motivo);
         break;
+      // ⚠️ En VERDE, no en ámbar: devolver a alguien al proceso después de una
+      // baja no es corregir un error, es que esa persona volvió. El ámbar se
+      // reserva para lo que retrocede (ver `escuela.retirado`).
+      case "operacion72.regresa_tras_baja":
+        tipo = "op72"; etiqueta = "OPERACIÓN 72"; tono = "verde";
+        frase = [
+          A(),
+          t(" devolvió al tablero a "),
+          P(),
+          t(" · "),
+          b(texto(m.destino) ?? ""),
+        ];
+        observacion = texto(m.nota);
+        break;
       // ---------------------------------------------------------------------
       // Peticiones de oración (el módulo del líder de intercesión)
       //

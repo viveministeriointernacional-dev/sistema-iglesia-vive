@@ -601,8 +601,9 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 > archivo del mes** y su renglón **arriba de este índice**. Si de ese trabajo
 > sale una regla general, va **además** a §12.
 
-### `docs/bitacora/2026-10.md` — octubre de 2026 (15 entradas)
+### `docs/bitacora/2026-10.md` — octubre de 2026 (16 entradas)
 
+- **15-oct** · **Volver al tablero de Op72 tras una baja** · reactivar no reabría la Op72: 206 personas vivas sin tarjeta · **Casa de Fe y asignar mentor YA funcionaban** con solo estar activa.
 - **14-oct** · El módulo de oración quedó VIVO (219 de 217 personas) · ⚠️ **tres merges sin desplegar en 20 h: lo arregló `Retry build`** · dos falsos negativos míos (fetch en caché, y el chunk como huella).
 - **14-oct** · **Módulo de oración**: el líder de intercesión ve todas las peticiones · formulario público `/pedir-oracion` · 217 trasladadas · **un CHECK simétrico volvía imborrables las cuentas**.
 - **12-oct** · **La memoria se parte en dos**: `CLAUDE.md` (siempre) y `docs/bitacora/` (se busca) · 303 → 51 KB · verificado por sha256 · el 6-sep estaba duplicado.

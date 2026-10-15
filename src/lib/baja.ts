@@ -338,3 +338,156 @@ export async function retirarSolicitudDeBaja(
 
   return { ok: true, solicitudId: solicitud.id };
 }
+
+
+// ---------------------------------------------------------------------------
+// Volver al tablero después de una baja
+// ---------------------------------------------------------------------------
+
+/// ⚠️ **Reactivar NO devuelve la Operación 72, y eso dejaba un agujero.**
+/// Dar de baja cierra la Op72 (arriba, `CERRADA`), y `reactivar` solo toca el
+/// estado de la persona y su acceso: quedaba **viva pero sin tarjeta**, así que
+/// nadie la volvía a llamar ni le agendaba visita. Medido el 15-oct-2026: **206
+/// personas dadas de baja, las 206 en fase GANAR y con su Op72 cerrada** — o
+/// sea que no es un caso raro, es el caso.
+///
+/// ⚠️ **Casa de Fe y asignar mentor NO necesitan esto**: sus pantallas solo
+/// exigen que la persona esté `ACTIVO`, así que en cuanto se la reactiva ya se
+/// la puede inscribir o asignarle mentor. Lo único que faltaba era el tablero.
+export async function devolverAlTableroOp72(
+  prisma: ClientePrisma,
+  datos: {
+    learnerId: string;
+    destino: Operation72Status;
+    nota: string;
+    actorId: string;
+    /// Solo cuando el destino es VISITA PENDIENTE.
+    visita?: { cuando: Date; lugar: string | null; virtual: boolean } | null;
+  },
+): Promise<ResultadoBaja> {
+  const nota = datos.nota.trim();
+  if (nota.length < 10) {
+    return {
+      ok: false,
+      mensaje: "Escribe por qué vuelve al proceso (mínimo 10 caracteres).",
+    };
+  }
+
+  const aprendiz = await prisma.learnerProfile.findUnique({
+    where: { id: datos.learnerId },
+    select: {
+      id: true,
+      status: true,
+      phase: true,
+      personId: true,
+      operation72: { select: { id: true, status: true } },
+    },
+  });
+  if (!aprendiz) {
+    return { ok: false, mensaje: "No se encontró el proceso de la persona." };
+  }
+
+  // ⚠️ **Primero hay que reactivarla.** Devolver al tablero a alguien que
+  // sigue de baja la pondría a la vista del equipo de consolidación —que la
+  // llamaría— mientras su expediente dice que está retirada y su acceso
+  // apagado. Son dos decisiones distintas y se toman en ese orden.
+  if (aprendiz.status !== LearnerStatus.ACTIVO) {
+    return {
+      ok: false,
+      mensaje:
+        "Primero reactívala: una persona dada de baja no puede estar en el tablero.",
+    };
+  }
+
+  // El tablero es de consolidación. De FORTALECER en adelante la acompaña su
+  // mentor, así que devolverla aquí sería sacarla de su línea.
+  if (aprendiz.phase !== "GANAR") {
+    return {
+      ok: false,
+      mensaje:
+        "Solo vuelve al tablero quien está en Ganar: de Fortalecer en adelante la acompaña su mentor.",
+    };
+  }
+
+  if (!aprendiz.operation72) {
+    return {
+      ok: false,
+      mensaje: "Esta persona no tiene Operación 72 que reabrir.",
+    };
+  }
+
+  // Si ya está en el tablero no hay nada que reabrir — y para moverla de
+  // columna ya existe «Se equivocaron de persona», en el propio tablero.
+  const enElTablero: Operation72Status[] = [
+    Operation72Status.INICIADA,
+    Operation72Status.SEGUIMIENTO,
+    Operation72Status.CONTACTADA,
+    Operation72Status.VISITA_PENDIENTE,
+    Operation72Status.LISTA_PARA_ENTREGA,
+  ];
+  if (enElTablero.includes(aprendiz.operation72.status)) {
+    return {
+      ok: false,
+      mensaje: "Esta persona ya está en el tablero de Operación 72.",
+    };
+  }
+
+  if (datos.destino === Operation72Status.VISITA_PENDIENTE && !datos.visita) {
+    return {
+      ok: false,
+      mensaje: "Para dejarla en Visita pendiente hace falta la fecha y el lugar.",
+    };
+  }
+
+  const ahora = new Date();
+  const operacionId = aprendiz.operation72.id;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.operation72.update({
+      where: { id: operacionId },
+      data: {
+        status: datos.destino,
+        startedAt: ahora,
+        // ⚠️ **El plazo se reinicia** (decisión del usuario, 15-oct). El viejo
+        // venció hace semanas o meses: conservarlo la haría nacer en rojo, sin
+        // que nadie haya tenido oportunidad de atenderla. Lo que se mide es la
+        // respuesta del equipo desde que vuelve, no desde su registro original.
+        deadlineAt: new Date(ahora.getTime() + 72 * 60 * 60 * 1000),
+        deliveredAt: null,
+        // Lo que traía de la entrega anterior se descarta: era de otro momento.
+        proposedMentorId: null,
+        proposedMentorNote: null,
+        detail: `Vuelve al proceso tras la baja · ${nota}`,
+      },
+    });
+
+    // ⚠️ **No se inventa ninguna llamada.** Solo cuando el destino es Visita
+    // pendiente se crea un registro, porque esa columna se ORDENA por la fecha
+    // de la visita: sin ella la tarjeta caería al final sin decir cuándo es
+    // (la regla del 12-sep).
+    if (datos.visita) {
+      await tx.contactAttempt.create({
+        data: {
+          operation72Id: operacionId,
+          type: "VISITA",
+          result: "Visita agendada",
+          note: nota,
+          scheduledAt: datos.visita.cuando,
+          place: datos.visita.virtual ? null : datos.visita.lugar,
+          isVirtual: datos.visita.virtual,
+          byUserId: datos.actorId,
+        },
+      });
+    }
+
+    await auditar(tx, {
+      actorId: datos.actorId,
+      action: "operacion72.regresa_tras_baja",
+      entityType: "learner_profile",
+      entityId: aprendiz.id,
+      metadata: { destino: datos.destino, nota, conVisita: Boolean(datos.visita) },
+    });
+  });
+
+  return { ok: true, personId: aprendiz.personId };
+}

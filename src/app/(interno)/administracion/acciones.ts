@@ -5,12 +5,18 @@ import {
   LearnerStatus,
   MilestoneKind,
   MilestoneStatus,
+  Operation72Status,
   Phase,
   Role,
 } from "@iglesia/prisma-client";
 import { HITOS_EDITABLES } from "@/lib/administracion";
+import { DESTINOS_REASIGNABLES } from "@/lib/op72";
 import { auditar } from "@/lib/audit";
-import { darDeBajaAprendiz, resolverSolicitudDeBaja } from "@/lib/baja";
+import {
+  darDeBajaAprendiz,
+  devolverAlTableroOp72,
+  resolverSolicitudDeBaja,
+} from "@/lib/baja";
 import { devolverAProceso, marcarComoAsistente } from "@/lib/asistente";
 import { guardarLlaveMaestra, revocarLlaveMaestra } from "@/lib/llave-maestra";
 import { resolverDeclaracion } from "@/lib/liderazgo";
@@ -29,7 +35,7 @@ import {
 } from "@/lib/correo";
 import { enviarCorreoDeEntrega } from "@/lib/correo-entrega";
 import { LARGO_MINIMO_CONTRASENA } from "@/lib/contrasena";
-import { nombreCompleto } from "@/lib/dominio";
+import { momentoDesdeCampo, nombreCompleto } from "@/lib/dominio";
 import { actualizarDatosPersona, type DatosPersona } from "@/lib/persona";
 import { getPrisma } from "@/lib/prisma";
 import { crearSupabaseAdmin } from "@/lib/supabase/admin";
@@ -799,6 +805,64 @@ export async function reactivar(
     revalidatePath(`/administracion/${aprendiz.personId}`);
     revalidatePath("/administracion");
     revalidatePath("/administracion/bajas");
+    return { ok: true };
+  });
+}
+
+/// Devuelve al tablero de Operación 72 a quien volvió después de una baja.
+///
+/// ⚠️ **Es un paso aparte de «Reactivar», a propósito.** Reactivar dice que la
+/// persona vuelve a estar en la iglesia; esto dice que vuelve al trabajo de
+/// consolidación, y no siempre van juntas: alguien puede reactivarse para
+/// entrar directo a una Casa de Fe o para que su mentor la retome, sin pasar
+/// por el tablero.
+export async function devolverAlTablero(
+  learnerId: string,
+  datos: {
+    destino: string;
+    nota: string;
+    visita?: { cuando: string; lugar: string; virtual: boolean };
+  },
+): Promise<ResultadoAdmin> {
+  return conAdmin(async (usuario) => {
+    const destino = DESTINOS_REASIGNABLES.find((e) => e === datos.destino);
+    if (!destino) {
+      return { ok: false, mensaje: "Elige a qué columna vuelve." };
+    }
+
+    // La visita solo se pide —y solo se acepta— cuando el destino la necesita.
+    let visita: { cuando: Date; lugar: string | null; virtual: boolean } | null =
+      null;
+    if (destino === Operation72Status.VISITA_PENDIENTE) {
+      // ⚠️ `momentoDesdeCampo`, nunca `new Date`: el campo manda la hora sin
+      // zona y el servidor corre en UTC (la trampa de las cinco horas).
+      const cuando = momentoDesdeCampo(datos.visita?.cuando ?? "");
+      if (!cuando) {
+        return { ok: false, mensaje: "La fecha y hora de la visita no son válidas." };
+      }
+      const virtual = Boolean(datos.visita?.virtual);
+      const lugar = (datos.visita?.lugar ?? "").trim();
+      if (!virtual && !lugar) {
+        return {
+          ok: false,
+          mensaje: "Escribe el lugar, o marca que la visita es virtual.",
+        };
+      }
+      visita = { cuando, lugar: virtual ? null : lugar, virtual };
+    }
+
+    const prisma = await getPrisma();
+    const resultado = await devolverAlTableroOp72(prisma, {
+      learnerId,
+      destino,
+      nota: datos.nota,
+      actorId: usuario.id,
+      visita,
+    });
+    if (!resultado.ok) return resultado;
+
+    revalidatePath(`/administracion/${resultado.personId}`);
+    revalidatePath("/operacion-72");
     return { ok: true };
   });
 }

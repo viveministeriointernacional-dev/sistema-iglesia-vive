@@ -533,6 +533,11 @@ export async function cargarPersonaAdmin(personId: string) {
           attendeeSince: true,
           attendeeReason: true,
           attendeeNote: true,
+          // El estado de su Operación 72: es lo que decide si se le puede
+          // ofrecer volver al tablero después de una baja. Sin esto la ficha
+          // tendría que adivinarlo, o pintar un botón que a veces falla — y
+          // «si se enseña, tiene que funcionar» (la regla del 16-sep).
+          operation72: { select: { status: true } },
           milestones: { select: { kind: true, status: true } },
           mentorRelationships: {
             where: { endedAt: null },
