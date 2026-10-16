@@ -442,14 +442,22 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   navegador mientras mi `curl` decía 404. Que 10 de 11 chunks de `/ingresar`
   coincidan con el build local **no valida un chunk concreto**: los de página
   se nombran distinto en Cloudflare.
-- **⚠️ Y EL NOMBRE DEL CSS TAMPOCO VALE — ESTO CORRIGE LO QUE DECÍA AQUÍ ANTES.**
-  El 16-oct (#120) el CSS de producción pesaba **66 646 bytes** y el de mi build
-  local **66 547**, con hash distinto, **y el código estaba desplegado**: el
-  build de Cloudflare no sale bit a bit igual al local (basta una versión menor
-  de una dependencia para mover unos bytes y con ellos el hash). Dije «no ha
-  desplegado» y era falso. Que el CSS de Leaflet coincidiera **exacto** en
-  nombre y bytes no salvó la prueba: ese archivo no cambiaba, así que solo
-  demostraba que los archivos que NO cambian conservan su nombre.
+- **⚠️ EL CSS SÍ VALE COMO HUELLA, PERO HAY QUE RECONSTRUIR JUSTO ANTES DE
+  COMPARAR. La trampa es un `.open-next` VIEJO.** El 16-oct (#120) dije «no ha
+  desplegado» porque producción servía 66 646 bytes y mi build local daba
+  66 547, con otro hash. **Era falso, y la causa fui yo:** ese `.open-next` se
+  había generado **antes de mi última edición** (el arreglo del `<dialog>`, que
+  añadió `mx-0` y movió el CSS), así que el archivo que yo vigilaba
+  correspondía a un código que nunca llegó a existir en `main`.
+  **Comprobado después por `sha256`: el CSS de producción y el de mi build
+  local son EL MISMO ARCHIVO, byte a byte.** El build de Cloudflare **sí**
+  reproduce el local. Así que la regla es: **`npm run cf:build` y acto seguido
+  comparar**; si entre el build y la comparación se editó algo, la huella no
+  vale.
+  Y el control honesto para saber si **hay** huella: si el CSS de tu build
+  (ya reconstruido) **es idéntico** al de producción, ese trabajo **no cambia
+  el CSS** y por esta vía no hay nada que comprobar — es el caso de un cambio
+  de solo servidor, textos y lógica (#123).
 - **✅ LA HUELLA QUE SÍ FUNCIONA: BUSCAR DENTRO DEL CSS DE PRODUCCIÓN UN LITERAL
   QUE SOLO PUEDA VENIR DEL CÓDIGO NUEVO.** No depende del hash ni del tamaño.
   La receta, con su control, en tres pasos:
@@ -679,8 +687,9 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 > archivo del mes** y su renglón **arriba de este índice**. Si de ese trabajo
 > sale una regla general, va **además** a §12.
 
-### `docs/bitacora/2026-10.md` — octubre de 2026 (20 entradas)
+### `docs/bitacora/2026-10.md` — octubre de 2026 (21 entradas)
 
+- **16-oct** · ✅ **CORRECCIÓN: el CSS SÍ es huella** — comprobado por `sha256` que producción y el build local son el MISMO archivo · el falso negativo del #120 fue mío, por comparar con un `.open-next` anterior a mi última edición.
 - **16-oct** · ⚠️ **«VISITAS» contaba promesas: inflaba casi 4 veces** (43 en un mes cuando se cumplieron 11) · acordar y cumplir van los dos como `type = VISITA` y solo los separa `result` · **cinco sitios lo contaban, uno ya filtraba bien**.
 - **16-oct** · ⚠️ **El #121 se fusionó A MEDIAS: QUINTA vez, y la causa fui yo** — empujé un commit a la rama DESPUÉS de abrir el PR y GitHub fusionó la cabeza vieja.
 - **16-oct** · El desglose quedó VIVO (PR #120) · ⚠️ **el NOMBRE del CSS no es huella**: 66 547 vs 66 646 bytes y estaba desplegado · la prueba es **un literal que solo exista en el código nuevo**, verificado con `git grep`.
