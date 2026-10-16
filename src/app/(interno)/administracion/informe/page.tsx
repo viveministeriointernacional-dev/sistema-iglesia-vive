@@ -253,6 +253,14 @@ function Tiles({ informe }: { informe: Informe }) {
         rotulo={ROTULO_INDICADOR.visitas}
         valor={informe.visitas.ahora}
         dato={informe.visitas}
+        // La cifra grande son las visitas CUMPLIDAS; debajo, cuántas se
+        // acordaron. Acordar no es visitar, y antes el recuadro contaba las dos
+        // juntas (decisión del usuario, 16-oct-2026).
+        pie={
+          informe.visitasAcordadas.ahora > informe.visitas.ahora
+            ? `${informe.visitasAcordadas.ahora} acordadas`
+            : undefined
+        }
       />
       <Tile
         indicador="entregadas"
@@ -380,7 +388,7 @@ function BloqueEfectividad({ informe }: { informe: Informe }) {
               }
             />
             <EscalonEmbudo
-              titulo="Se les agendó visita"
+              titulo="Se les cumplió la visita"
               cuantas={e.visita}
               total={e.entraron}
               color={COLOR_OP72[3]}
@@ -629,7 +637,7 @@ function BloqueActividad({ informe }: { informe: Informe }) {
         </h2>
         <div className="flex items-center gap-4">
           <Leyenda color={COLOR_LLAMADAS}>Llamadas marcadas</Leyenda>
-          <Leyenda color={COLOR_VISITAS}>Visitas</Leyenda>
+          <Leyenda color={COLOR_VISITAS}>Visitas cumplidas</Leyenda>
           <Leyenda color={COLOR_REGISTROS}>Registros</Leyenda>
         </div>
       </div>
@@ -793,7 +801,7 @@ function BloqueConsolidadores({ informe }: { informe: Informe }) {
               <Encabezado>A CARGO</Encabezado>
               <Encabezado>LLAMÓ</Encabezado>
               <Encabezado>CONTESTARON</Encabezado>
-              <Encabezado>VISITAS</Encabezado>
+              <Encabezado>VISITAS CUMPLIDAS</Encabezado>
               <Encabezado>ENTREGÓ</Encabezado>
               <Encabezado>SIN TOCAR</Encabezado>
               <Encabezado>EFECTIVIDAD</Encabezado>

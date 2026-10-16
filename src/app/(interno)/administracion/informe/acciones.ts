@@ -39,7 +39,9 @@ export async function pedirDesglose(datos: {
   return cargarDesglose(prisma, {
     indicador,
     rango: calcularRango(datos.desde, datos.hasta),
-    pestana: pestanaValida(datos.pestana),
+    // La pestaña válida depende del indicador: llamadas y visitas no tienen las
+    // mismas, y cada uno abre en la que explica su cifra.
+    pestana: pestanaValida(indicador, datos.pestana),
   });
 }
 

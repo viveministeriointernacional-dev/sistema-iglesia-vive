@@ -1,13 +1,14 @@
 import { Prisma } from "@iglesia/prisma-client";
 import { ETIQUETA_HITO } from "@/lib/administracion";
 import { telefonoLegible, ZONA_HORARIA } from "@/lib/dominio";
+import { VISITA_CUMPLIDA } from "@/lib/op72";
 import {
   type Desglose,
   type Etiqueta,
   type Extremo,
   type Indicador,
   type MovimientosOp72,
-  type PestanaLlamadas,
+  type Pestana,
   ROTULO_INDICADOR,
   type Salto,
   ETIQUETA_EXTREMO,
@@ -132,7 +133,7 @@ function pieDe(mostradas: number, total: number, singular: string, plural: strin
 
 export async function cargarDesglose(
   prisma: ClientePrisma,
-  opciones: { indicador: Indicador; rango: Rango; pestana?: PestanaLlamadas },
+  opciones: { indicador: Indicador; rango: Rango; pestana?: Pestana },
 ): Promise<Desglose> {
   const { indicador, rango } = opciones;
   switch (indicador) {
@@ -141,7 +142,7 @@ export async function cargarDesglose(
     case "llamadas":
       return llamadas(prisma, rango, opciones.pestana ?? "todas");
     case "visitas":
-      return visitas(prisma, rango);
+      return visitas(prisma, rango, opciones.pestana ?? "cumplidas");
     case "entregadas":
       return entregadas(prisma, rango);
     case "hitos":
@@ -230,7 +231,7 @@ async function personasNuevas(prisma: ClientePrisma, rango: Rango): Promise<Desg
 async function llamadas(
   prisma: ClientePrisma,
   rango: Rango,
-  pestana: PestanaLlamadas,
+  pestana: Pestana,
 ): Promise<Desglose> {
   const filas = await prisma.$queryRaw<
     {
@@ -346,68 +347,117 @@ function duracion(segundos: number) {
   return `${minutos} min ${String(resto).padStart(2, "0")} s`;
 }
 
-async function visitas(prisma: ClientePrisma, rango: Rango): Promise<Desglose> {
+/// **Las visitas, separadas por lo que de verdad pasó.** La pestaña por defecto
+/// es «cumplidas» porque es la cifra del recuadro: la ventana tiene que
+/// explicar el número que se clicó, no otro.
+///
+/// Las anuladas no salen en ninguna de las dos: se agendaron a la persona
+/// equivocada y el recuadro tampoco las cuenta.
+async function visitas(
+  prisma: ClientePrisma,
+  rango: Rango,
+  pestana: Pestana,
+): Promise<Desglose> {
   const filas = await prisma.$queryRaw<
     {
-      id: string;
-      cuando: Date;
+      cumplidas: number;
+      acordadas: number;
+      id: string | null;
+      cuando: Date | null;
       scheduled_at: Date | null;
       place: string | null;
-      is_virtual: boolean;
+      is_virtual: boolean | null;
       note: string | null;
-      annulled_at: Date | null;
-      learner_id: string;
-      first_name: string;
+      result: string | null;
+      cumplida: boolean | null;
+      learner_id: string | null;
+      first_name: string | null;
       last_name: string | null;
       registrada_por: string | null;
-      status: string;
-      total: number;
+      status: string | null;
     }[]
   >`
-    SELECT ca.id, ca.occurred_at AS cuando, ca.scheduled_at, ca.place, ca.is_virtual,
-           ca.note, ca.annulled_at,
-           lp.id AS learner_id, p.first_name, p.last_name,
-           u.full_name AS registrada_por, o.status::text AS status,
-           count(*) OVER ()::int AS total
-    FROM contact_attempt ca
-    JOIN operation72 o ON o.id = ca.operation72_id
-    JOIN learner_profile lp ON lp.id = o.learner_id
-    JOIN person p ON p.id = lp.person_id
-    LEFT JOIN app_user u ON u.id = ca.by_user_id
-    WHERE ca.type = 'VISITA' AND ca.occurred_at BETWEEN ${rango.desde} AND ${rango.hasta}
-    ORDER BY ca.occurred_at DESC
-    LIMIT ${TOPE}
+    WITH base AS (
+      SELECT ca.id, ca.occurred_at, ca.scheduled_at, ca.place, ca.is_virtual,
+             ca.note, ca.result, (ca.result = ${VISITA_CUMPLIDA}) AS cumplida,
+             lp.id AS learner_id, p.first_name, p.last_name,
+             u.full_name AS registrada_por, o.status::text AS status
+      FROM contact_attempt ca
+      JOIN operation72 o ON o.id = ca.operation72_id
+      JOIN learner_profile lp ON lp.id = o.learner_id
+      JOIN person p ON p.id = lp.person_id
+      LEFT JOIN app_user u ON u.id = ca.by_user_id
+      WHERE ca.type = 'VISITA' AND ca.annulled_at IS NULL
+        AND ca.occurred_at BETWEEN ${rango.desde} AND ${rango.hasta}
+    ), cuentas AS (
+      SELECT count(*) FILTER (WHERE cumplida)::int AS cumplidas,
+             count(*) FILTER (WHERE NOT cumplida)::int AS acordadas
+      FROM base
+    )
+    SELECT c.cumplidas, c.acordadas,
+           b.id, b.occurred_at AS cuando, b.scheduled_at, b.place, b.is_virtual,
+           b.note, b.result, b.cumplida,
+           b.learner_id, b.first_name, b.last_name, b.registrada_por, b.status
+    FROM cuentas c
+    LEFT JOIN LATERAL (
+      SELECT * FROM base
+      WHERE (${pestana} = 'cumplidas' AND base.cumplida)
+         OR (${pestana} = 'acordadas' AND NOT base.cumplida)
+      ORDER BY base.occurred_at DESC
+      LIMIT ${TOPE}
+    ) b ON true
   `;
 
-  const total = filas[0]?.total ?? 0;
-  const anuladas = filas.filter((fila) => fila.annulled_at).length;
+  const cumplidas = filas[0]?.cumplidas ?? 0;
+  const acordadas = filas[0]?.acordadas ?? 0;
+  const conDatos = filas.filter((fila) => fila.id !== null);
+  const viendoCumplidas = pestana === "cumplidas";
+  const total = viendoCumplidas ? cumplidas : acordadas;
 
   return {
     rotulo: ROTULO_INDICADOR.visitas,
-    titulo: `${total} ${total === 1 ? "visita acordada" : "visitas acordadas"}`,
+    titulo: viendoCumplidas
+      ? `${cumplidas} ${cumplidas === 1 ? "visita que se cumplió" : "visitas que se cumplieron"}`
+      : `${acordadas} ${acordadas === 1 ? "visita acordada" : "visitas acordadas"}`,
     subtitulo: rango.etiqueta,
+    // Solo cuando hay algo que mirar: si se acordaron más de las que se
+    // cumplieron, la diferencia es trabajo prometido que no ocurrió.
     aviso:
-      anuladas > 0
-        ? `${anuladas} de estas se anularon después por haberse agendado a la persona equivocada. Se cuentan porque el recuadro del informe también las cuenta; van marcadas.`
+      acordadas > cumplidas
+        ? `En el periodo se acordaron ${acordadas} y se cumplieron ${cumplidas}. El recuadro cuenta las cumplidas; acordar no es visitar.`
         : null,
-    pestanas: null,
-    filas: filas.map((fila) => ({
-      id: fila.id,
-      dia: dia(fila.cuando),
-      hora: hora(fila.cuando),
-      nombre: nombreDe(fila.first_name, fila.last_name),
+    pestanas: [
+      { clave: "cumplidas", etiqueta: `Cumplidas · ${cumplidas}`, activa: viendoCumplidas },
+      { clave: "acordadas", etiqueta: `Solo acordadas · ${acordadas}`, activa: !viendoCumplidas },
+    ],
+    filas: conDatos.map((fila) => ({
+      id: fila.id as string,
+      dia: dia(fila.cuando as Date),
+      hora: hora(fila.cuando as Date),
+      nombre: nombreDe(fila.first_name ?? "", fila.last_name),
       learnerId: fila.learner_id,
-      contexto: contexto(
-        fila.registrada_por ? `la agendó ${fila.registrada_por}` : "entró por el formulario",
-        fila.scheduled_at ? `para el ${dia(fila.scheduled_at)} a las ${hora(fila.scheduled_at)}` : "sin fecha pactada",
-        fila.is_virtual ? "virtual" : fila.place,
-      ),
+      contexto: fila.cumplida
+        ? contexto(
+            fila.registrada_por ? `la cerró ${fila.registrada_por}` : "entró por el formulario",
+            "la visita se hizo",
+          )
+        : contexto(
+            fila.registrada_por ? `la agendó ${fila.registrada_por}` : "entró por el formulario",
+            fila.scheduled_at
+              ? `pactada para el ${dia(fila.scheduled_at)} a las ${hora(fila.scheduled_at)}`
+              : "sin fecha pactada",
+            fila.is_virtual ? "virtual" : fila.place,
+          ),
       observacion: comillas(fila.note),
-      chip: ETIQUETA_ESTADO[fila.status] ?? null,
-      marca: fila.annulled_at ? { texto: "anulada después", tono: "rojo" } : null,
+      chip: ETIQUETA_ESTADO[fila.status ?? ""] ?? null,
+      marca: fila.cumplida
+        ? { texto: "✓ cumplida", tono: "verde" }
+        : { texto: "— solo acordada", tono: "ambar" },
     })),
     total,
-    pie: pieDe(filas.length, total, "visita", "visitas"),
+    pie: viendoCumplidas
+      ? `${pieDe(conDatos.length, cumplidas, "visita cumplida", "visitas cumplidas")} Son las que el equipo cerró diciendo que la visita se hizo.`
+      : `${pieDe(conDatos.length, acordadas, "visita acordada", "visitas acordadas")} Estas se pactaron en el periodo pero todavía no constan como cumplidas.`,
     enlace: { texto: "Abrir el tablero de Operación 72", href: "/operacion-72" },
   };
 }

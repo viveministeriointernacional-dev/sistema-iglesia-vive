@@ -1,6 +1,7 @@
 import { LearnerStatus, Operation72Status, Phase, Prisma } from "@iglesia/prisma-client";
 import { ZONA_HORARIA } from "@/lib/dominio";
 import { granoPara, type Grano } from "@/lib/informe-catalogo";
+import { VISITA_CUMPLIDA } from "@/lib/op72";
 import type { ClientePrisma } from "@/lib/prisma";
 
 export * from "@/lib/informe-catalogo";
@@ -334,7 +335,14 @@ export type Informe = {
   /// las dos cifras es justo lo que hay que vigilar: quien marca pero no
   /// registra.
   llamadasRegistradas: Comparacion;
+  /// **Las visitas que SE CUMPLIERON**, no las acordadas (§ `VISITA_CUMPLIDA`).
+  /// Aparecer en visitas significa que la visita se concretó: era lo que el
+  /// usuario esperaba del indicador y lo que no hacía (16-oct-2026).
   visitas: Comparacion;
+  /// Las que se acordaron en el periodo. Van debajo de la cifra grande, como el
+  /// «con formulario» de las llamadas: la diferencia entre las dos es lo que
+  /// hay que vigilar.
+  visitasAcordadas: Comparacion;
   entregas: Comparacion;
   hitos: Comparacion;
   bajas: Comparacion;
@@ -604,6 +612,8 @@ async function contarMovimientos(
       registradas_previo: bigint;
       visitas: bigint;
       visitas_previo: bigint;
+      acordadas: bigint;
+      acordadas_previo: bigint;
       entregas: bigint;
       entregas_previo: bigint;
       hitos: bigint;
@@ -620,8 +630,24 @@ async function contarMovimientos(
       (SELECT count(*) FROM call_log WHERE started_at BETWEEN ${desdePrevio} AND ${hastaPrevio}) AS llamadas_previo,
       (SELECT count(*) FROM contact_attempt WHERE type IN ('LLAMADA','INTENTO_LLAMADA') AND occurred_at BETWEEN ${desde} AND ${hasta}) AS registradas,
       (SELECT count(*) FROM contact_attempt WHERE type IN ('LLAMADA','INTENTO_LLAMADA') AND occurred_at BETWEEN ${desdePrevio} AND ${hastaPrevio}) AS registradas_previo,
-      (SELECT count(*) FROM contact_attempt WHERE type = 'VISITA' AND occurred_at BETWEEN ${desde} AND ${hasta}) AS visitas,
-      (SELECT count(*) FROM contact_attempt WHERE type = 'VISITA' AND occurred_at BETWEEN ${desdePrevio} AND ${hastaPrevio}) AS visitas_previo,
+      -- ⚠️ VISITAS = las que SE CUMPLIERON, no las que se acordaron (ver
+      -- VISITA_CUMPLIDA en op72.ts). Contar todo lo de tipo VISITA mezcla la
+      -- promesa con el hecho: en un mes daba 43 cuando se habían cumplido 11.
+      -- Las anuladas tampoco cuentan: se agendaron a la persona equivocada.
+      (SELECT count(*) FROM contact_attempt
+        WHERE type = 'VISITA' AND result = ${VISITA_CUMPLIDA} AND annulled_at IS NULL
+          AND occurred_at BETWEEN ${desde} AND ${hasta}) AS visitas,
+      (SELECT count(*) FROM contact_attempt
+        WHERE type = 'VISITA' AND result = ${VISITA_CUMPLIDA} AND annulled_at IS NULL
+          AND occurred_at BETWEEN ${desdePrevio} AND ${hastaPrevio}) AS visitas_previo,
+      -- Las acordadas en el periodo, para poder decir debajo cuántas se
+      -- prometieron frente a cuántas se cumplieron.
+      (SELECT count(*) FROM contact_attempt
+        WHERE type = 'VISITA' AND result <> ${VISITA_CUMPLIDA} AND annulled_at IS NULL
+          AND occurred_at BETWEEN ${desde} AND ${hasta}) AS acordadas,
+      (SELECT count(*) FROM contact_attempt
+        WHERE type = 'VISITA' AND result <> ${VISITA_CUMPLIDA} AND annulled_at IS NULL
+          AND occurred_at BETWEEN ${desdePrevio} AND ${hastaPrevio}) AS acordadas_previo,
       (SELECT count(*) FROM mentor_relationship WHERE started_at BETWEEN ${desde} AND ${hasta}) AS entregas,
       (SELECT count(*) FROM mentor_relationship WHERE started_at BETWEEN ${desdePrevio} AND ${hastaPrevio}) AS entregas_previo,
       (SELECT count(*) FROM milestone WHERE status = 'COMPLETADO' AND achieved_at BETWEEN ${desde} AND ${hasta}) AS hitos,
@@ -637,6 +663,7 @@ async function contarMovimientos(
     llamadas: comparar(n(fila?.llamadas), n(fila?.llamadas_previo)),
     llamadasRegistradas: comparar(n(fila?.registradas), n(fila?.registradas_previo)),
     visitas: comparar(n(fila?.visitas), n(fila?.visitas_previo)),
+    visitasAcordadas: comparar(n(fila?.acordadas), n(fila?.acordadas_previo)),
     entregas: comparar(n(fila?.entregas), n(fila?.entregas_previo)),
     hitos: comparar(n(fila?.hitos), n(fila?.hitos_previo)),
     bajas: comparar(n(fila?.bajas), n(fila?.bajas_previo)),
@@ -681,6 +708,7 @@ async function medirEfectividad(
       count(*) FILTER (WHERE EXISTS (
         SELECT 1 FROM contact_attempt a
         WHERE a.operation72_id = c.id AND a.type = 'VISITA'
+          AND a.result = ${VISITA_CUMPLIDA} AND a.annulled_at IS NULL
           AND a.occurred_at BETWEEN ${desde} AND ${hasta})) AS visita,
       count(*) FILTER (WHERE EXISTS (
         SELECT 1 FROM mentor_relationship m
@@ -744,7 +772,7 @@ async function actividadPorPeriodo(
         WHERE (l.started_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota') >= c.dia
           AND (l.started_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota') < c.dia + ${Prisma.raw(`interval '${paso}'`)}) AS llamadas,
       (SELECT count(*) FROM contact_attempt a
-        WHERE a.type = 'VISITA'
+        WHERE a.type = 'VISITA' AND a.result = ${VISITA_CUMPLIDA} AND a.annulled_at IS NULL
           AND (a.occurred_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota') >= c.dia
           AND (a.occurred_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota') < c.dia + ${Prisma.raw(`interval '${paso}'`)}) AS visitas,
       (SELECT count(*) FROM operation72 o
@@ -806,6 +834,7 @@ async function medirConsolidadores(
             AND a.occurred_at BETWEEN ${desde} AND ${hasta}) AS contesto,
         EXISTS (SELECT 1 FROM contact_attempt a
           WHERE a.operation72_id = s.op_id AND a.type = 'VISITA'
+            AND a.result = ${VISITA_CUMPLIDA} AND a.annulled_at IS NULL
             AND a.occurred_at BETWEEN ${desde} AND ${hasta}) AS visita,
         EXISTS (SELECT 1 FROM mentor_relationship m
           WHERE m.learner_id = s.learner_id AND m.started_at BETWEEN ${desde} AND ${hasta}) AS entregada
