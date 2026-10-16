@@ -25,6 +25,10 @@ import {
 import { mentoresElegibles } from "@/lib/equipo";
 import { TOPE_DE_BUSQUEDA, ubicarPersonas } from "@/lib/busqueda-op72";
 import { seleccionarTarjetasDelTablero } from "@/lib/tablero-op72";
+import { atajosDelInforme, calcularRango } from "@/lib/informe";
+import { cargarMovimientoDelTablero } from "@/lib/movimiento-op72";
+import type { Lista } from "@/lib/movimiento-op72-catalogo";
+import { FilaDeContadores } from "./movimientos";
 import { BuscadorPersonas } from "@/components/buscador-personas";
 import { TarjetaDePersona, type TarjetaPersona } from "./tarjeta";
 
@@ -62,6 +66,12 @@ const ETIQUETA_CHIP: Record<Operation72Status, string> = {
 /// Cuántas tarjetas se añaden con cada «Ver 60 más».
 const BLOQUE = 60;
 
+/// Los periodos del ⊕ y del ⊖. Son cuatro de los atajos del informe —los que
+/// sirven para mirar el trabajo reciente— y salen de la misma función para que
+/// «esta semana» signifique lo mismo en las dos pantallas: de viernes a
+/// viernes (§ bitácora 7-sep).
+const CLAVES_DE_PERIODO = ["hoy", "semana", "semana-pasada", "mes"];
+
 function estadoDesde(valor: string | undefined): Operation72Status | null {
   const encontrado = ESTADOS_EN_TABLERO.find((estado) => estado === valor);
   return encontrado ?? null;
@@ -85,6 +95,8 @@ export default async function TableroOperacion72({
     estado?: string;
     ampliada?: string;
     n?: string;
+    desde?: string;
+    hasta?: string;
   }>;
 }) {
   const usuario = await requerirVista("operacion-72");
@@ -94,6 +106,8 @@ export default async function TableroOperacion72({
     estado: estadoCrudo,
     ampliada: ampliadaCruda,
     n: cuantasCrudas,
+    desde: desdeCrudo,
+    hasta: hastaCrudo,
   } = await searchParams;
   const consulta = (consultaCruda ?? "").trim();
   const orden = ordenDesde(ordenCrudo);
@@ -105,6 +119,12 @@ export default async function TableroOperacion72({
   const columnaAmpliada = estadoElegido ? null : estadoDesde(ampliadaCruda);
   const cuantas =
     estadoElegido || columnaAmpliada ? cuantasDesde(cuantasCrudas) : BLOQUE;
+  // El periodo del ⊕ y el ⊖. Por defecto, esta semana (de viernes a viernes,
+  // como en el informe): es el tramo que el equipo mira para saber cómo va.
+  const rango = calcularRango(desdeCrudo, hastaCrudo);
+  const periodos = atajosDelInforme().filter((atajo) =>
+    CLAVES_DE_PERIODO.includes(atajo.clave),
+  );
   const ahora = new Date();
   const prisma = await getPrisma();
 
@@ -177,7 +197,7 @@ export default async function TableroOperacion72({
   // columna—, y con una sola conexión por petición esos viajes se hacen en
   // fila, sumando cada uno su latencia completa hasta Supabase.
   const tope = Math.max(...columnasVisibles.map((columna) => limiteDe(columna.estado)));
-  const [seleccion, mentores] = await Promise.all([
+  const [seleccion, mentores, movimiento] = await Promise.all([
     seleccionarTarjetasDelTablero(prisma, {
       estados: columnasVisibles.map((columna) => columna.estado),
       consolidadorId: consolidadorDelAlcance,
@@ -186,6 +206,13 @@ export default async function TableroOperacion72({
       tope,
     }),
     mentoresElegibles(prisma),
+    // Los números del ⊕ y del ⊖. Es UNA consulta, y con `PrismaPg max: 1` se
+    // serializa con las demás aunque vaya en el `Promise.all` (§12.5): por eso
+    // trae los seis números juntos en vez de pedir uno por botón.
+    cargarMovimientoDelTablero(prisma, {
+      rango,
+      consolidadorId: consolidadorDelAlcance,
+    }),
   ]);
 
   // Cada columna se recorta a SU límite: «Ver 60 más» alarga una sola columna,
@@ -460,6 +487,12 @@ export default async function TableroOperacion72({
     const url = new URLSearchParams();
     if (consulta) url.set("q", consulta);
     if (orden !== "urgencia") url.set("orden", orden);
+    // El periodo se conserva al filtrar: cambiar de columna no tiene por qué
+    // devolver al tablero a «esta semana».
+    if (desdeCrudo || hastaCrudo) {
+      url.set("desde", rango.inicio);
+      url.set("hasta", rango.fin);
+    }
     for (const [clave, valor] of Object.entries(parametros)) {
       if (valor) url.set(clave, valor);
     }
@@ -658,47 +691,73 @@ export default async function TableroOperacion72({
           </section>
         ) : null}
 
-        {/* Chips «Ver solo»: una etapa a la vez, a todo lo ancho. Es lo que
-            permite llegar a las personas que no caben en la columna angosta.
-            Son enlaces (no JavaScript) para que la vista quede compartible. */}
+        {/* Los contadores «Ver solo»: una etapa a la vez, a todo lo ancho. Es
+            lo que permite llegar a las personas que no caben en la columna
+            angosta. Siguen siendo enlaces (no JavaScript) para que la vista
+            quede compartible, y encima de cada uno va el ⊕ con cuántas
+            entraron en el periodo; al final, el ⊖ con cuántas salieron. */}
         <div className="mt-[18px] border-t border-[rgba(19,28,36,.09)] pt-[14px]">
-          <p className="text-[9.5px] leading-none font-extrabold tracking-[.06em] text-[rgba(19,28,36,.42)]">
-            VER SOLO
-          </p>
-          <div className="mt-[9px] flex flex-wrap gap-[7px]">
-            <Link
-              href={enlace({})}
-              aria-current={estadoElegido ? undefined : "page"}
-              className={`flex items-center gap-[7px] rounded-[20px] px-[13px] py-2 text-[12px] leading-none ${
-                estadoElegido
-                  ? "border border-borde-control bg-white font-semibold text-[rgba(19,28,36,.62)]"
-                  : "border-[1.5px] border-azul-900 bg-azul-050 font-bold text-tinta"
-              }`}
-            >
-              Todas
-              <span className="font-extrabold text-[rgba(19,28,36,.42)]">{totalEnCurso}</span>
-            </Link>
-            {COLUMNAS_OP72.map((columna) => {
-              const activo = estadoElegido === columna.estado;
-              return (
-                <Link
-                  key={columna.estado}
-                  href={enlace({ estado: columna.estado })}
-                  aria-current={activo ? "page" : undefined}
-                  className={`flex items-center gap-[7px] rounded-[20px] px-[13px] py-2 text-[12px] leading-none ${
-                    activo
-                      ? "border-[1.5px] border-azul-900 bg-azul-050 font-bold text-tinta"
-                      : "border border-borde-control bg-white font-semibold text-[rgba(19,28,36,.62)]"
-                  }`}
-                >
-                  {ETIQUETA_CHIP[columna.estado]}
-                  <span className="font-extrabold text-[rgba(19,28,36,.42)]">
-                    {totalPorEstado.get(columna.estado) ?? 0}
-                  </span>
-                </Link>
-              );
-            })}
+          <div className="flex flex-wrap items-baseline justify-between gap-x-5 gap-y-2">
+            <p className="etiqueta-seccion">VER SOLO · Y CÓMO SE MOVIERON</p>
+            <p className="text-[11px] leading-[1.45] font-semibold text-[rgba(19,28,36,.5)]">
+              El <span className="font-extrabold text-azul-700">+</span> es cuántas entraron a esa
+              lista · el <span className="font-extrabold text-rojo">−</span>, cuántas salieron de
+              Operación 72
+            </p>
           </div>
+
+          {/* El periodo del movimiento. Son enlaces por lo mismo que los
+              contadores: así una vista concreta se puede pasar por WhatsApp. */}
+          <div className="mt-[11px] flex flex-wrap items-center gap-x-[14px] gap-y-2">
+            <span className="text-[10px] leading-none font-extrabold tracking-[.06em] text-[rgba(19,28,36,.42)]">
+              MOVIMIENTO EN
+            </span>
+            <div className="flex flex-wrap items-center gap-[5px]">
+              {periodos.map((periodo) => {
+                const activo = rango.inicio === periodo.inicio && rango.fin === periodo.fin;
+                return (
+                  <Link
+                    key={periodo.clave}
+                    href={enlace({
+                      estado: estadoElegido ?? undefined,
+                      desde: periodo.inicio,
+                      hasta: periodo.fin,
+                    })}
+                    aria-current={activo ? "page" : undefined}
+                    className={`rounded-[20px] px-[12px] py-[7px] text-[11.5px] leading-none ${
+                      activo
+                        ? "bg-azul-900 font-bold text-white"
+                        : "border border-borde-control bg-white font-semibold text-[rgba(19,28,36,.6)]"
+                    }`}
+                  >
+                    {periodo.etiqueta}
+                  </Link>
+                );
+              })}
+            </div>
+            <span className="text-[11px] leading-none font-bold text-tinta">{rango.etiqueta}</span>
+          </div>
+
+          <FilaDeContadores
+            periodo={{ inicio: rango.inicio, fin: rango.fin }}
+            movimiento={movimiento}
+            chips={[
+              {
+                clave: "todas" as const,
+                etiqueta: "Todas",
+                total: totalEnCurso,
+                href: enlace({}),
+                activo: !estadoElegido,
+              },
+              ...COLUMNAS_OP72.map((columna) => ({
+                clave: columna.estado as Lista,
+                etiqueta: ETIQUETA_CHIP[columna.estado],
+                total: totalPorEstado.get(columna.estado) ?? 0,
+                href: enlace({ estado: columna.estado }),
+                activo: estadoElegido === columna.estado,
+              })),
+            ]}
+          />
         </div>
 
         {estadoElegido ? (

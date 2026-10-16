@@ -225,6 +225,17 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 - **Tablero de llamadas** (solo ADMIN): tabla `call_log`, webhook, y
   `/administracion/llamadas` (global + por persona + historial individual con «A
   quién se llamó»). Libs: `src/lib/llamadas.ts`, `src/lib/llamada-highlevel.ts`.
+- **El tablero de Operación 72 dice cuánto se movió** (16-oct): encima de cada
+  contador de «Ver solo» va un **⊕ con cuántas entraron** a esa lista en el
+  periodo, y al final un **⊖ rojo con cuántas salieron** de Operación 72; los
+  dos abren la ventana de detalle. El tablero tiene **selector de periodo**
+  (Hoy · Esta semana · Semana pasada · Este mes), de `atajosDelInforme`, así que
+  la semana es **de viernes a viernes** como en el informe. Lib:
+  `src/lib/movimiento-op72.ts` (+ su catálogo). **Tres reglas que lo sostienen:**
+  un giro en el sitio (volver a llamar y que no conteste) **no es una entrada**;
+  el ⊖ son **tres puertas** (entregada / asistente / baja) y la ventana las
+  separa; y la consulta **no recorre `audit_log`** (21 ms en vez de 115) porque
+  entra por `created_at` y luego por `(entity_type, entity_id)`.
 - **El informe se abre al clic, y Operación 72 tiene histórico** (16-oct): los
   **seis recuadros** (personas nuevas, llamadas, visitas, entregadas, hitos,
   bajas) abren una ventana con quiénes fueron, el día, la hora y quién lo hizo;
@@ -554,6 +565,18 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   ejecución. Se encadenan rondas.
 - **Añadir una columna son TRES archivos, no uno**: el `select` de la página y
   los dos `select` del lib. `tsc` no ve las selecciones de Prisma por sí solo.
+- **⚠️ Al contar algo por `action`, buscar TODAS las acciones que lo producen.**
+  Dar de baja se audita con **dos** acciones distintas según de dónde se haga:
+  `operacion72.dado_de_baja` (tablero) y `administracion.dado_de_baja`
+  (Administración). El 16-oct, de 8 bajas de una semana **una entró por la
+  segunda**: contar solo la primera daba 7 y **nada lo habría delatado**. El
+  catálogo de `audit.ts` es la lista a leer entera, no la acción que primero
+  aparece en el `grep`.
+- **⚠️ Un hueco en una cadena derivada no da error: da un salto que parece otra
+  cosa.** Antes de meter la baja en la cadena de Operación 72, quien salía por
+  una baja y volvía (`regresa_tras_baja`) dejaba el rastro «misma lista, dos
+  veces seguidas» — idéntico a «se le volvió a llamar y sigue ahí». Se contaba
+  como un giro en el sitio en vez de como la entrada que era.
 - **⚠️ Para reconstruir una historia desde `audit_log`, unificar PRIMERO por la
   entidad de negocio.** Las acciones de Operación 72 se auditan con **dos
   `entity_type` distintos** —unas con `operation72` (el id de la tarjeta) y
@@ -578,6 +601,14 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 - El truco que funciona: **un par de rutas hermanas que devuelven el mismo
   404**, una tocando la base y otra no. **La resta es el viaje a la base,
   aislado.**
+- **⚠️ Una consulta que vale para el informe puede no valer para una pantalla
+  que se abre todo el día.** La cadena de `audit_log` del informe recorre la
+  tabla entera: 115 ms y subiendo para siempre. Para el tablero se reescribió
+  en dos pasos —**quiénes se movieron** por el índice `created_at`, y luego
+  **su historia** por `(entity_type, entity_id)`— y bajó a **21 ms sin ningún
+  recorrido de tabla**, con un coste que depende de la semana y no del
+  historial. **Antes de reusar una consulta, mirar cuántas veces al día se va
+  a ejecutar y con qué `EXPLAIN (ANALYZE)`.**
 
 ### 12.6 Producto y permisos
 
@@ -687,8 +718,9 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 > archivo del mes** y su renglón **arriba de este índice**. Si de ese trabajo
 > sale una regla general, va **además** a §12.
 
-### `docs/bitacora/2026-10.md` — octubre de 2026 (21 entradas)
+### `docs/bitacora/2026-10.md` — octubre de 2026 (22 entradas)
 
+- **16-oct** · **El tablero dice cuánto se movió**: ⊕ sobre cada contador y ⊖ rojo al final, con selector de periodo · ⚠️ **hay DOS acciones de baja** y una de 8 entró por la segunda · un giro en el sitio no es entrada · **115 → 21 ms** sin recorrer `audit_log` · y el fallo viejo de los contadores en cero al filtrar.
 - **16-oct** · ✅ **CORRECCIÓN: el CSS SÍ es huella** — comprobado por `sha256` que producción y el build local son el MISMO archivo · el falso negativo del #120 fue mío, por comparar con un `.open-next` anterior a mi última edición.
 - **16-oct** · ⚠️ **«VISITAS» contaba promesas: inflaba casi 4 veces** (43 en un mes cuando se cumplieron 11) · acordar y cumplir van los dos como `type = VISITA` y solo los separa `result` · **cinco sitios lo contaban, uno ya filtraba bien**.
 - **16-oct** · ⚠️ **El #121 se fusionó A MEDIAS: QUINTA vez, y la causa fui yo** — empujé un commit a la rama DESPUÉS de abrir el PR y GitHub fusionó la cabeza vieja.
