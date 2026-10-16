@@ -437,14 +437,38 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   comprobado contra el usuario, que estaba viendo la pantalla nueva en su
   navegador mientras mi `curl` decía 404. Que 10 de 11 chunks de `/ingresar`
   coincidan con el build local **no valida un chunk concreto**: los de página
-  se nombran distinto en Cloudflare. **El CSS sí vale**: es uno solo y se
-  compara por **nombre Y tamaño en bytes**.
-- **⚠️ Y PARA UNA PANTALLA INTERNA QUE NO PRODUCE CSS NUEVO NO HAY HUELLA
-  POSIBLE DESDE FUERA.** El middleware da 307 a todo sin sesión, así que no
-  queda nada que pedir. **La prueba es pedirle al usuario que abra la
+  se nombran distinto en Cloudflare.
+- **⚠️ Y EL NOMBRE DEL CSS TAMPOCO VALE — ESTO CORRIGE LO QUE DECÍA AQUÍ ANTES.**
+  El 16-oct (#120) el CSS de producción pesaba **66 646 bytes** y el de mi build
+  local **66 547**, con hash distinto, **y el código estaba desplegado**: el
+  build de Cloudflare no sale bit a bit igual al local (basta una versión menor
+  de una dependencia para mover unos bytes y con ellos el hash). Dije «no ha
+  desplegado» y era falso. Que el CSS de Leaflet coincidiera **exacto** en
+  nombre y bytes no salvó la prueba: ese archivo no cambiaba, así que solo
+  demostraba que los archivos que NO cambian conservan su nombre.
+- **✅ LA HUELLA QUE SÍ FUNCIONA: BUSCAR DENTRO DEL CSS DE PRODUCCIÓN UN LITERAL
+  QUE SOLO PUEDA VENIR DEL CÓDIGO NUEVO.** No depende del hash ni del tamaño.
+  La receta, con su control, en tres pasos:
+  1. Elegir clases arbitrarias del trabajo nuevo (`max-h-[88vh]`,
+     `rounded-t-[20px]`, `min-h-[180px]`…).
+  2. **Comprobar con `git grep -- "<literal>" <commit-anterior> -- 'src/*'` que
+     NO existían antes.** Sin este paso la prueba no vale: el 16-oct, de cinco
+     literales, `w-[42px]` ya estaba en otra pantalla y había que descartarlo.
+  3. Descargar el CSS que referencia el HTML y buscarlos dentro. Si están,
+     **el código está vivo**.
+  ⚠️ **Y NO SERVIRSE DE PATRONES QUE TAILWIND GENERA SIEMPRE**: `::backdrop`
+  está en el *reset*, y los nombres de los tokens del `@theme`
+  (`ambar-barra`, `verde-500`…) salen como variables **aunque nadie use la
+  clase**. El 16-oct esos cuatro patrones dieron «1 y 1» y parecían confirmar;
+  no probaban nada.
+- **⚠️ PARA UNA PANTALLA INTERNA QUE NO PRODUCE NI UNA CLASE NUEVA sí que no
+  hay huella posible desde fuera.** El middleware da 307 a todo sin sesión, así
+  que no queda nada que pedir. **La prueba es pedirle al usuario que abra la
   pantalla** — y antes, comprobar en la base que esa persona cumple las
   condiciones para que la sección le salga, para que el «no la veo» signifique
   algo. Es lo que se hizo con el #118 y funcionó a la primera.
+  **Pero si la pantalla trae clases nuevas, SÍ hay huella**: la de buscar el
+  literal dentro del CSS, de arriba. Es el caso del #120.
 - **⚠️ SI UN MERGE NO DESPLIEGA EN ~15 MINUTOS, NO ES EL CÓDIGO: PEDIRLE AL
   USUARIO QUE REFRESQUE «Deployments» Y LE DÉ `Retry build`.** Los builds de
   Cloudflare **se atascan en cola sin dar ninguna señal de error**: el 14-oct
@@ -628,8 +652,9 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 > archivo del mes** y su renglón **arriba de este índice**. Si de ese trabajo
 > sale una regla general, va **además** a §12.
 
-### `docs/bitacora/2026-10.md` — octubre de 2026 (17 entradas)
+### `docs/bitacora/2026-10.md` — octubre de 2026 (18 entradas)
 
+- **16-oct** · El desglose quedó VIVO (PR #120) · ⚠️ **el NOMBRE del CSS no es huella**: 66 547 vs 66 646 bytes y estaba desplegado · la prueba es **un literal que solo exista en el código nuevo**, verificado con `git grep`.
 - **16-oct** · **Cada indicador del informe se abre** (quiénes, día y hora) **y Operación 72 tiene histórico** · ⚠️ **las acciones de Op72 se auditan con DOS `entity_type`** y eso daba 80 de 136 movimientos «sin origen» · el histórico no llega antes del 15-ago.
 - **15-oct** · **Volver al tablero de Op72 tras una baja** · reactivar no reabría la Op72: 206 personas vivas sin tarjeta · **Casa de Fe y asignar mentor YA funcionaban** con solo estar activa.
 - **14-oct** · El módulo de oración quedó VIVO (219 de 217 personas) · ⚠️ **tres merges sin desplegar en 20 h: lo arregló `Retry build`** · dos falsos negativos míos (fetch en caché, y el chunk como huella).
