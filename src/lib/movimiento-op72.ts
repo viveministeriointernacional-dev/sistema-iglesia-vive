@@ -230,6 +230,7 @@ const COLUMNAS_DE_FILA = Prisma.sql`
   m.metadata->>'motivo' AS motivo,
   nota.note AS nota,
   o.status::text AS status,
+  lp.status::text AS estado_persona,
   count(*) OVER ()::int AS total
 `;
 
@@ -263,6 +264,7 @@ type FilaCruda = {
   motivo: string | null;
   nota: string | null;
   status: string | null;
+  estado_persona: string | null;
   total: number;
   /// Cuántas se quedaron en esta misma lista tras un intento nuevo. No están
   /// en las filas (no entraron), pero son trabajo hecho y el pie las dice.
@@ -347,7 +349,7 @@ export async function cargarEntradasDeLista(
         quienLoHizo(fila.quien),
       ),
       observacion: comillas(fila.nota),
-      chip: estadoHoy(fila.status),
+      chip: estadoHoy(fila.status, fila.estado_persona),
       marca: marcaDeSitio(lista, fila.status),
     })),
     total,

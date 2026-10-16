@@ -134,6 +134,9 @@ export default async function TableroOperacion72({
   // Quien puede autorizar bajas las aplica directo; a los demás la tarjeta les
   // habla de pedirla, no de darla.
   const bajaRequiereAutorizacion = !puedeAutorizarBaja(usuario);
+  // El tablero es para trabajar y el histórico para analizar: la pestaña es
+  // solo de administradores, igual que el informe.
+  const veElHistorico = usuario.role === Role.ADMIN;
   const consolidadorDelAlcance = soloSuRed ? usuario.id : null;
   // El mismo alcance, pero sobre el aprendiz: la búsqueda mira a personas que
   // ya NO tienen Operación 72 abierta, así que no puede filtrar por ella.
@@ -515,6 +518,26 @@ export default async function TableroOperacion72({
                 : `${totalEnCurso} en curso`}
               {consulta ? ` que coinciden con «${consulta}»` : ""}
             </p>
+
+            {/* La pestaña del histórico solo se pinta a quien puede abrirla:
+                enseñar un enlace que va a dar 404 es peor que no enseñarlo
+                (§12.6). El guardia de verdad está en la página y en su acción. */}
+            {veElHistorico ? (
+              <div className="mt-[14px] flex items-end gap-[3px] border-b border-[rgba(19,28,36,.14)]">
+                <span
+                  aria-current="page"
+                  className="-mb-px rounded-t-[9px] border border-[rgba(19,28,36,.14)] border-b-white bg-white px-[17px] py-[11px] text-[13px] leading-none font-extrabold text-tinta"
+                >
+                  Tablero
+                </span>
+                <Link
+                  href="/operacion-72/historico"
+                  className="rounded-t-[9px] px-[17px] py-[11px] text-[13px] leading-none font-semibold text-[rgba(19,28,36,.62)]"
+                >
+                  Histórico
+                </Link>
+              </div>
+            ) : null}
           </div>
           <Link
             href="/registro-interno"

@@ -225,6 +225,16 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 - **Tablero de llamadas** (solo ADMIN): tabla `call_log`, webhook, y
   `/administracion/llamadas` (global + por persona + historial individual con «A
   quién se llamó»). Libs: `src/lib/llamadas.ts`, `src/lib/llamada-highlevel.ts`.
+- **Operación 72 tiene pestaña «Histórico»** (17-oct, solo ADMIN):
+  `/operacion-72/historico` con la línea de movimientos del recorrido, **siete
+  paneles** (uno por salto, **cada uno con su escala**, y el tope escrito
+  porque es lo único que impide comparar alturas entre paneles), la gráfica de
+  las tres puertas de salida y la tabla. Rango libre y grano Día / Semana /
+  Mes; abre con **las últimas 8 semanas** (el defecto del informe, «esta
+  semana», dejaría un solo tramo). Cada punto abre la ventana de detalle. Libs:
+  `src/lib/historico-op72.ts` (+ catálogo). **Las salidas van aparte de la
+  línea a propósito**: las bajas son limpiezas puntuales (198 de 211 en ocho
+  días) y sumadas aplastarían la medida del trabajo semanal.
 - **El tablero de Operación 72 dice cuánto se movió** (16-oct): encima de cada
   contador de «Ver solo» va un **⊕ con cuántas entraron** a esa lista en el
   periodo, y al final un **⊖ rojo con cuántas salieron** de Operación 72; los
@@ -572,6 +582,12 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   segunda**: contar solo la primera daba 7 y **nada lo habría delatado**. El
   catálogo de `audit.ts` es la lista a leer entera, no la acción que primero
   aparece en el `grep`.
+- **⚠️ En una cadena derivada, la regla que atrapa un caso especial tiene que ir
+  ANTES de la que decide por posición.** `grupoDelSalto` ordena los saltos por
+  su puesto en el recorrido, y `BAJA` va la última de todas: sin el `if` que la
+  atrapa primero, **una baja desde cualquier columna se cuenta como AVANCE** y
+  el informe dice que progresaron 211 personas que se perdieron. El orden de
+  los `if` no es estilo, es el significado.
 - **⚠️ Un hueco en una cadena derivada no da error: da un salto que parece otra
   cosa.** Antes de meter la baja en la cadena de Operación 72, quien salía por
   una baja y volvía (`regresa_tras_baja`) dejaba el rastro «misma lista, dos
@@ -592,6 +608,12 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 - **Con `PrismaPg max: 1` las consultas se SERIALIZAN**, aunque vayan en un
   `Promise.all`: cada viaje de más es una latencia de más. Juntar en un
   `$transaction` o en una sola consulta.
+- **⚠️ Antes de dar por buena una pantalla de gráficas, DIBUJARLA con los
+  números de verdad.** Los seis paneles del diseño sumaban 286 movimientos
+  contra los 480 de la línea de arriba: **el 40 % no aparecía en ninguno**, y
+  eso no se ve leyendo el código. Se arregló añadiendo el panel que faltaba
+  (`Iniciada → Visita pendiente`, 56). La receta: un script que llame a **las
+  funciones reales de dibujo** con datos medidos y escupa un HTML.
 - **⚠️ Para comparar latencias: 20-25 muestras y mirar el CONTROL de cada
   tanda.** Un mínimo de 5 muestras es ruido, no una medida (llegó a dar «~0 ms»
   y «−450 ms»). Si el control se movió, **la tanda no vale**.
@@ -647,6 +669,16 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   Y lo anulado no se cuenta en ninguna de las dos.
 - **El orden en la pantalla es la única forma de decir ciertas cosas sin un
   cartel**: lo que caduca o bloquea a alguien va **arriba del todo**.
+- **⚠️ EL ÚLTIMO TRAMO DE CUALQUIER SERIE TEMPORAL CASI SIEMPRE ESTÁ EN CURSO.**
+  La semana en curso lleva dos días y el mes en curso, diez. Dibujado igual que
+  los demás, **la línea cae a plomo al final siempre** y parece un derrumbe cada
+  vez que alguien abre la pantalla. Va con trazo discontinuo y punto hueco, y
+  la tabla lo dice con palabras.
+- **⚠️ Un pico que no es trabajo no va en la gráfica del trabajo.** Las bajas de
+  Operación 72 son limpiezas de lista: 198 de 211 en ocho días, 67 en uno solo.
+  Sumadas a la línea de movimientos, una semana de 25 pasa a 99 y la gráfica
+  deja de medir lo que su título dice. Van en su propia gráfica. Es la misma
+  regla que dejó el import de agosto fuera del histórico.
 
 ### 12.7 Datos y fusiones de fichas
 
@@ -718,8 +750,9 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 > archivo del mes** y su renglón **arriba de este índice**. Si de ese trabajo
 > sale una regla general, va **además** a §12.
 
-### `docs/bitacora/2026-10.md` — octubre de 2026 (22 entradas)
+### `docs/bitacora/2026-10.md` — octubre de 2026 (23 entradas)
 
+- **17-oct** · **Pestaña «Histórico» en Operación 72** · ⚠️ **el informe no contaba NINGUNA baja**: 211 de 875 movimientos (24 %) y el salto más frecuente de todos invisible · sin la regla, una baja contaba como **avance** · el preview con datos reales delató que faltaba un panel (40 % fuera) · los colores de la marca fallan el validador · el último tramo va discontinuo.
 - **16-oct** · **El tablero dice cuánto se movió**: ⊕ sobre cada contador y ⊖ rojo al final, con selector de periodo · ⚠️ **hay DOS acciones de baja** y una de 8 entró por la segunda · un giro en el sitio no es entrada · **115 → 21 ms** sin recorrer `audit_log` · y el fallo viejo de los contadores en cero al filtrar.
 - **16-oct** · ✅ **CORRECCIÓN: el CSS SÍ es huella** — comprobado por `sha256` que producción y el build local son el MISMO archivo · el falso negativo del #120 fue mío, por comparar con un `.open-next` anterior a mi última edición.
 - **16-oct** · ⚠️ **«VISITAS» contaba promesas: inflaba casi 4 veces** (43 en un mes cuando se cumplieron 11) · acordar y cumplir van los dos como `type = VISITA` y solo los separa `result` · **cinco sitios lo contaban, uno ya filtraba bien**.

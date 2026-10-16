@@ -631,7 +631,9 @@ const PASOS_SQL = Prisma.sql`
       'operacion72.marcado_asistente',
       'operacion72.columna_reasignada',
       'operacion72.estado_corregido',
-      'operacion72.regresa_tras_baja'
+      'operacion72.regresa_tras_baja',
+      'operacion72.dado_de_baja',
+      'administracion.dado_de_baja'
     )
   ), pasos AS (
     SELECT learner_id, created_at, actor_id, metadata,
@@ -644,6 +646,8 @@ const PASOS_SQL = Prisma.sql`
         WHEN 'operacion72.pasa_a_entrega_por_proceso_previo' THEN 'LISTA_PARA_ENTREGA'
         WHEN 'operacion72.entregada' THEN 'ENTREGADA'
         WHEN 'operacion72.marcado_asistente' THEN 'CERRADA'
+        WHEN 'operacion72.dado_de_baja' THEN 'BAJA'
+        WHEN 'administracion.dado_de_baja' THEN 'BAJA'
         WHEN 'operacion72.columna_reasignada' THEN upper(metadata->>'hasta')
         WHEN 'operacion72.estado_corregido' THEN upper(metadata->>'a')
         WHEN 'operacion72.regresa_tras_baja' THEN upper(metadata->>'destino')
@@ -704,9 +708,14 @@ function esExtremo(valor: string | null): valor is Extremo {
 
 /// Quiénes hicieron un salto concreto. La observación sale del intento de
 /// contacto registrado a la misma hora, que es lo que explica el movimiento.
+///
+/// **`desde` en `null` significa «vinieran de donde vinieran».** Lo usa el
+/// histórico para las tres puertas de salida: ahí la pregunta es «quiénes
+/// salieron por aquí», no «desde qué columna», y las bajas llegan desde las
+/// cinco.
 export async function cargarPersonasDelSalto(
   prisma: ClientePrisma,
-  opciones: { rango: Rango; desde: Extremo; hacia: Extremo },
+  opciones: { rango: Rango; desde: Extremo | null; hacia: Extremo },
 ): Promise<Desglose> {
   const { rango, desde, hacia } = opciones;
 
@@ -720,6 +729,7 @@ export async function cargarPersonasDelSalto(
       resultado: string | null;
       nota: string | null;
       status: string | null;
+      estado_persona: string | null;
       total: number;
     }[]
   >`
@@ -730,6 +740,7 @@ export async function cargarPersonasDelSalto(
            s.metadata->>'resultado' AS resultado,
            nota.note AS nota,
            o.status::text AS status,
+           lp.status::text AS estado_persona,
            count(*) OVER ()::int AS total
     FROM saltos s
     JOIN learner_profile lp ON lp.id = s.learner_id
@@ -745,13 +756,21 @@ export async function cargarPersonasDelSalto(
       LIMIT 1
     ) nota ON true
     WHERE s.created_at BETWEEN ${rango.desde} AND ${rango.hasta}
-      AND s.desde = ${desde} AND s.hacia = ${hacia}
+      AND s.hacia = ${hacia}
+      AND (${desde}::text IS NULL OR s.desde = ${desde}::text)
+      AND s.desde <> s.hacia
+      -- Una baja de quien ya había salido no es una salida nueva: se marcó
+      -- asistente antes y se le dio de baja después, pero del tablero salió
+      -- una sola vez.
+      AND (s.hacia <> 'BAJA' OR s.desde NOT IN ('ENTREGADA', 'CERRADA', 'BAJA'))
     ORDER BY s.created_at DESC
     LIMIT ${TOPE}
   `;
 
   const total = filas[0]?.total ?? 0;
-  const titulo = tituloDelSalto(desde, hacia);
+  const titulo = desde
+    ? tituloDelSalto(desde, hacia)
+    : `salieron a ${ETIQUETA_EXTREMO[hacia].toLowerCase()}`;
 
   return {
     rotulo: "CÓMO SE MOVIÓ OPERACIÓN 72",
@@ -773,7 +792,7 @@ export async function cargarPersonasDelSalto(
         fila.resultado ? ETIQUETA_RESULTADO[fila.resultado] ?? fila.resultado : null,
       ),
       observacion: comillas(fila.nota),
-      chip: estadoHoy(fila.status),
+      chip: estadoHoy(fila.status, fila.estado_persona),
       marca: marcaDeAvance(hacia, fila.status),
     })),
     total,
