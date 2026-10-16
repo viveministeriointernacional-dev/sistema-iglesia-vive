@@ -1,5 +1,32 @@
 import { CallOutcome, ContactType, Operation72Status } from "@iglesia/prisma-client";
 
+/// **Acordar una visita y cumplirla son dos hechos distintos, y lo que los
+/// distingue es `result`, NO el tipo**: las dos se guardan como
+/// `ContactType.VISITA`.
+///
+/// ⚠️ Esto costó un indicador que mentía casi cuatro veces (16-oct-2026): el
+/// recuadro «VISITAS» del informe contaba los dos juntos, así que decía 43
+/// visitas en un mes cuando se habían cumplido 11. **Contar visitas sin filtrar
+/// por `result` es contar promesas, no visitas.**
+///
+/// Medido ese día sobre las 224 filas de tipo VISITA que había: las cumplidas
+/// (`VISITA_CUMPLIDA`) **nunca** llevan `scheduledAt`, y las acordadas y
+/// reprogramadas lo llevan **siempre** salvo dos filas de agosto. Por eso la
+/// prueba buena es el `result`, no la presencia de la fecha pactada.
+export const VISITA_ACORDADA = "Visita agendada";
+export const VISITA_CUMPLIDA = "Visita realizada";
+/// Lo que escribe el reprogramar, que conserva el prefijo para poder agruparlo.
+export const VISITA_REPROGRAMADA = "Visita reprogramada";
+
+/// Si este intento es una visita que **de verdad se cumplió**. Se usa igual en
+/// el tablero, en el informe y en el correo de entrega: una sola definición.
+export function esVisitaCumplida(intento: {
+  type: ContactType;
+  result: string | null;
+}): boolean {
+  return intento.type === ContactType.VISITA && intento.result === VISITA_CUMPLIDA;
+}
+
 export const DURACION_OPERACION_72_HORAS = 72;
 const MS_POR_HORA = 3_600_000;
 
@@ -187,7 +214,9 @@ export function tituloDelMovimiento(intento: {
   result: string | null;
   intentosPrevios?: number;
 }): string {
-  if (intento.type === ContactType.VISITA) return "Visita agendada";
+  if (intento.type === ContactType.VISITA) {
+    return esVisitaCumplida(intento) ? "Visita realizada" : "Visita agendada";
+  }
   if (intento.type === ContactType.INTENTO_VISITA) return "Visita intentada";
   if (intento.type === ContactType.MENSAJE) return "Mensaje enviado";
   if (intento.type === ContactType.CONVERSACION) return "Conversación";

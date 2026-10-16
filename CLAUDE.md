@@ -234,6 +234,10 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   El histórico se **deriva de `audit_log`** (no hay tabla de historial) y por eso
   **no llega antes del 15-ago-2026**; ojo con la trampa de los dos
   `entity_type` (§12.4).
+  **⚠️ «VISITAS» cuenta las CUMPLIDAS** (`result = VISITA_CUMPLIDA`), no las
+  acordadas, y el pie dice cuántas se acordaron (16-oct). Lo mismo el embudo, la
+  gráfica por día y la tabla de consolidadores; **`medirBrecha` es la excepción
+  a propósito**, porque su oficio es mirar las acordadas.
 
 ## 8. Operaciones de datos ya hechas
 
@@ -587,6 +591,21 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 - **Un estado que se puede DERIVAR no se guarda** (si no, un reenvío se queda
   «devuelto» para siempre).
 - **Un aviso que sale siempre se deja de leer.** Solo cuando hay algo que hacer.
+- **⚠️ PROMETER Y HACER SON DOS HECHOS DISTINTOS: UN INDICADOR QUE LOS SUMA
+  MIENTE.** El recuadro «VISITAS» del informe contaba las acordadas junto con
+  las cumplidas e **inflaba casi cuatro veces** (43 en un mes cuando se habían
+  cumplido 11; 16-oct-2026). La causa: **las dos se guardan como
+  `type = VISITA`** y solo las separa `result` (`VISITA_CUMPLIDA` /
+  `VISITA_ACORDADA` en `op72.ts`, con `esVisitaCumplida()`). Tres cosas que
+  hay que repetir en cualquier indicador parecido:
+  1. **Buscar TODOS los sitios que lo cuentan**, no solo el recuadro. Eran
+     cinco, y arreglar uno habría dejado el informe contradiciéndose.
+  2. **Si un sitio ya filtraba bien, es un descuido, no una decisión** — aquí
+     `medirBrecha` filtraba por `'Visita agendada'` desde el primer día.
+  3. **La cifra grande es el hecho; la promesa va en el pie**, como el «con
+     formulario» de llamadas. La diferencia entre las dos es lo que hay que
+     vigilar, así que no se tira: se enseña debajo.
+  Y lo anulado no se cuenta en ninguna de las dos.
 - **El orden en la pantalla es la única forma de decir ciertas cosas sin un
   cartel**: lo que caduca o bloquea a alguien va **arriba del todo**.
 
@@ -660,8 +679,9 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 > archivo del mes** y su renglón **arriba de este índice**. Si de ese trabajo
 > sale una regla general, va **además** a §12.
 
-### `docs/bitacora/2026-10.md` — octubre de 2026 (19 entradas)
+### `docs/bitacora/2026-10.md` — octubre de 2026 (20 entradas)
 
+- **16-oct** · ⚠️ **«VISITAS» contaba promesas: inflaba casi 4 veces** (43 en un mes cuando se cumplieron 11) · acordar y cumplir van los dos como `type = VISITA` y solo los separa `result` · **cinco sitios lo contaban, uno ya filtraba bien**.
 - **16-oct** · ⚠️ **El #121 se fusionó A MEDIAS: QUINTA vez, y la causa fui yo** — empujé un commit a la rama DESPUÉS de abrir el PR y GitHub fusionó la cabeza vieja.
 - **16-oct** · El desglose quedó VIVO (PR #120) · ⚠️ **el NOMBRE del CSS no es huella**: 66 547 vs 66 646 bytes y estaba desplegado · la prueba es **un literal que solo exista en el código nuevo**, verificado con `git grep`.
 - **16-oct** · **Cada indicador del informe se abre** (quiénes, día y hora) **y Operación 72 tiene histórico** · ⚠️ **las acciones de Op72 se auditan con DOS `entity_type`** y eso daba 80 de 136 movimientos «sin origen» · el histórico no llega antes del 15-ago.

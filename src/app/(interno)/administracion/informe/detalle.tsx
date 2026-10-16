@@ -11,7 +11,8 @@ import {
   type FilaDetalle,
   type Indicador,
   type MovimientosOp72,
-  type PestanaLlamadas,
+  type Pestana,
+  pestanaPorDefecto,
   TITULO_GRUPO,
   TONO_GRUPO,
   tituloDelSalto,
@@ -31,7 +32,7 @@ import { pedirDesglose, pedirPersonasDelSalto } from "./acciones";
 type Periodo = { inicio: string; fin: string };
 
 type Peticion =
-  | { tipo: "indicador"; indicador: Indicador; pestana: PestanaLlamadas }
+  | { tipo: "indicador"; indicador: Indicador; pestana: Pestana }
   | { tipo: "salto"; desde: Extremo; hacia: Extremo };
 
 type Abridor = {
@@ -103,7 +104,7 @@ export function ProveedorDesglose({
 
   const abrirIndicador = useCallback(
     (indicador: Indicador) => {
-      void cargar({ tipo: "indicador", indicador, pestana: "todas" });
+      void cargar({ tipo: "indicador", indicador, pestana: pestanaPorDefecto(indicador) });
     },
     [cargar],
   );
@@ -121,7 +122,7 @@ export function ProveedorDesglose({
   }, []);
 
   const cambiarPestana = useCallback(
-    (pestana: PestanaLlamadas) => {
+    (pestana: Pestana) => {
       if (peticion?.tipo !== "indicador") return;
       void cargar({ ...peticion, pestana });
     },
@@ -158,7 +159,7 @@ function Ventana({
   cargando: boolean;
   error: string | null;
   alCerrar: () => void;
-  alCambiarPestana: (pestana: PestanaLlamadas) => void;
+  alCambiarPestana: (pestana: Pestana) => void;
 }) {
   const referencia = useRef<HTMLDialogElement>(null);
 

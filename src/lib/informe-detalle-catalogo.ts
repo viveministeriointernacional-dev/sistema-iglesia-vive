@@ -36,16 +36,33 @@ export const ROTULO_INDICADOR: Record<Indicador, string> = {
   bajas: "BAJAS",
 };
 
-/// **Las pestañas de llamadas.** Solo llamadas las tiene, porque es el único
-/// indicador con dos cifras distintas: las marcaciones del discador y las que
-/// quedaron registradas en el formulario (§6 de CLAUDE.md).
+/// **Las pestañas, que solo tienen dos indicadores**: los dos cuyo total
+/// esconde dos hechos distintos.
+///
+/// - **Llamadas**: las marcaciones del discador frente a las que quedaron
+///   registradas en el formulario, que es lo único que mueve la tarjeta (§6).
+/// - **Visitas**: las que **se cumplieron** frente a las que solo se
+///   **acordaron**. Aparecer en visitas significa que la visita se concretó
+///   (decisión del usuario, 16-oct-2026).
 export const PESTANAS_LLAMADAS = ["todas", "registradas", "sin-registrar"] as const;
-export type PestanaLlamadas = (typeof PESTANAS_LLAMADAS)[number];
+export const PESTANAS_VISITAS = ["cumplidas", "acordadas"] as const;
 
-export function pestanaValida(valor: string | undefined): PestanaLlamadas {
-  return PESTANAS_LLAMADAS.includes(valor as PestanaLlamadas)
-    ? (valor as PestanaLlamadas)
-    : "todas";
+export type Pestana =
+  | (typeof PESTANAS_LLAMADAS)[number]
+  | (typeof PESTANAS_VISITAS)[number];
+
+/// Con qué pestaña abre cada indicador. Visitas abre en **cumplidas** porque es
+/// la cifra del recuadro: la ventana tiene que explicar el número que se clicó.
+export function pestanaPorDefecto(indicador: Indicador): Pestana {
+  return indicador === "visitas" ? "cumplidas" : "todas";
+}
+
+export function pestanaValida(indicador: Indicador, valor: string | undefined): Pestana {
+  const permitidas: readonly string[] =
+    indicador === "visitas" ? PESTANAS_VISITAS : PESTANAS_LLAMADAS;
+  return permitidas.includes(valor ?? "")
+    ? (valor as Pestana)
+    : pestanaPorDefecto(indicador);
 }
 
 /// Los cinco tonos de etiqueta del sistema. Se decide en servidor y el cliente
@@ -103,7 +120,7 @@ export type Desglose = {
   /// El recuadro ámbar de arriba, solo cuando hay algo que hacer. Un aviso que
   /// sale siempre se deja de leer (§12.6).
   aviso: string | null;
-  pestanas: { clave: PestanaLlamadas; etiqueta: string; activa: boolean }[] | null;
+  pestanas: { clave: Pestana; etiqueta: string; activa: boolean }[] | null;
   filas: FilaDetalle[];
   total: number;
   pie: string;
