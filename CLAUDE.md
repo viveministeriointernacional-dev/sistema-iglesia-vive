@@ -225,6 +225,15 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 - **Tablero de llamadas** (solo ADMIN): tabla `call_log`, webhook, y
   `/administracion/llamadas` (global + por persona + historial individual con «A
   quién se llamó»). Libs: `src/lib/llamadas.ts`, `src/lib/llamada-highlevel.ts`.
+- **El informe se abre al clic, y Operación 72 tiene histórico** (16-oct): los
+  **seis recuadros** (personas nuevas, llamadas, visitas, entregadas, hitos,
+  bajas) abren una ventana con quiénes fueron, el día, la hora y quién lo hizo;
+  y el bloque **«Cómo se movió Operación 72»** enseña los saltos de columna del
+  periodo, cada uno abrible. **El desglose no se carga hasta que se hace clic.**
+  Libs: `src/lib/informe-detalle.ts` y `informe-detalle-catalogo.ts`.
+  El histórico se **deriva de `audit_log`** (no hay tabla de historial) y por eso
+  **no llega antes del 15-ago-2026**; ojo con la trampa de los dos
+  `entity_type` (§12.4).
 
 ## 8. Operaciones de datos ya hechas
 
@@ -509,6 +518,15 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   ejecución. Se encadenan rondas.
 - **Añadir una columna son TRES archivos, no uno**: el `select` de la página y
   los dos `select` del lib. `tsc` no ve las selecciones de Prisma por sí solo.
+- **⚠️ Para reconstruir una historia desde `audit_log`, unificar PRIMERO por la
+  entidad de negocio.** Las acciones de Operación 72 se auditan con **dos
+  `entity_type` distintos** —unas con `operation72` (el id de la tarjeta) y
+  otras con `learner_profile` (el id del expediente)— y **`operacion72.entregada`
+  está PARTIDA entre los dos** (89 filas y 23). Agrupar por `entity_id` a secas
+  rompe cualquier `LAG`: el 16-oct eso dejaba **80 de 136 movimientos «sin
+  origen conocido»** y la pantalla se veía perfectamente normal. Se arregla con
+  `COALESCE(o.learner_id, a.entity_id)` antes de ordenar. **Un histórico mal
+  reconstruido no falla: miente.**
 
 ### 12.5 Rendimiento
 
@@ -610,8 +628,9 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 > archivo del mes** y su renglón **arriba de este índice**. Si de ese trabajo
 > sale una regla general, va **además** a §12.
 
-### `docs/bitacora/2026-10.md` — octubre de 2026 (16 entradas)
+### `docs/bitacora/2026-10.md` — octubre de 2026 (17 entradas)
 
+- **16-oct** · **Cada indicador del informe se abre** (quiénes, día y hora) **y Operación 72 tiene histórico** · ⚠️ **las acciones de Op72 se auditan con DOS `entity_type`** y eso daba 80 de 136 movimientos «sin origen» · el histórico no llega antes del 15-ago.
 - **15-oct** · **Volver al tablero de Op72 tras una baja** · reactivar no reabría la Op72: 206 personas vivas sin tarjeta · **Casa de Fe y asignar mentor YA funcionaban** con solo estar activa.
 - **14-oct** · El módulo de oración quedó VIVO (219 de 217 personas) · ⚠️ **tres merges sin desplegar en 20 h: lo arregló `Retry build`** · dos falsos negativos míos (fetch en caché, y el chunk como huella).
 - **14-oct** · **Módulo de oración**: el líder de intercesión ve todas las peticiones · formulario público `/pedir-oracion` · 217 trasladadas · **un CHECK simétrico volvía imborrables las cuentas**.

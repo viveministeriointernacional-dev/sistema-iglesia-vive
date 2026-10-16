@@ -4,13 +4,15 @@ import { requerirVista } from "@/lib/auth";
 import { ETIQUETA_HITO } from "@/lib/administracion";
 import {
   atajosDelInforme,
+  calcularRango,
   cargarInforme,
-  type Comparacion,
   type Efectividad,
   type Informe,
   type Rango,
 } from "@/lib/informe";
+import { cargarMovimientosOp72, ROTULO_INDICADOR } from "@/lib/informe-detalle";
 import { getPrisma } from "@/lib/prisma";
+import { BloqueMovimientos, ProveedorDesglose, Tile } from "./detalle";
 
 export const metadata = { title: "Informe · Iglesia Vive" };
 export const dynamic = "force-dynamic";
@@ -78,8 +80,14 @@ export default async function PaginaInforme({
   await requerirVista("informe");
   const { desde, hasta } = await searchParams;
   const prisma = await getPrisma();
-  const informe = await cargarInforme(prisma, { desde, hasta });
-  const { rango } = informe;
+  // El rango se calcula aquí porque también lo necesita el histórico, y es puro
+  // (no toca la base): sale gratis. Los desgloses de los recuadros NO se piden
+  // aquí a propósito — son un viaje cada uno y solo se piden al abrirlos.
+  const rango = calcularRango(desde, hasta);
+  const [informe, movimientos] = await Promise.all([
+    cargarInforme(prisma, { desde, hasta }),
+    cargarMovimientosOp72(prisma, rango),
+  ]);
   const atajos = atajosDelInforme();
 
   const enlace = (tramo: { inicio: string; fin: string }) =>
@@ -165,18 +173,28 @@ export default async function PaginaInforme({
           </span>
         </p>
 
-        <Tiles informe={informe} />
-        <BloqueEfectividad informe={informe} />
-        <BloqueBrecha informe={informe} />
-        <BloqueRecorrido informe={informe} />
-        <BloqueActividad informe={informe} />
+        {/* Todo lo que se puede abrir vive dentro del proveedor: él tiene la
+            ventana y el periodo que hay que pedirle a la base. */}
+        <ProveedorDesglose periodo={{ inicio: rango.inicio, fin: rango.fin }}>
+          <Tiles informe={informe} />
+          <BloqueEfectividad informe={informe} />
+          <BloqueBrecha informe={informe} />
+          <BloqueRecorrido informe={informe} />
+          <BloqueActividad informe={informe} />
 
-        <section className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-[1.3fr_1fr]">
-          <BloqueOp72 informe={informe} />
-          <BloqueHitos informe={informe} />
-        </section>
+          {/* La película a la izquierda y la foto a la derecha: «cómo se movió»
+              dice quién cambió de columna en el periodo, y «hoy» dónde están
+              paradas las tarjetas en este momento. */}
+          <section className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-[1.55fr_1fr]">
+            <BloqueMovimientos movimientos={movimientos} />
+            <div className="flex flex-col gap-3">
+              <BloqueOp72 informe={informe} />
+              <BloqueHitos informe={informe} />
+            </div>
+          </section>
 
-        <BloqueConsolidadores informe={informe} />
+          <BloqueConsolidadores informe={informe} />
+        </ProveedorDesglose>
       </div>
     </main>
   );
@@ -208,78 +226,21 @@ function CampoFecha({
 
 /// El porcentaje va SIEMPRE con la cifra contra la que compara: pasar de 1 a 3
 /// también es «+200 %», y sin la base ese número engaña.
-function Variacion({ dato, alRevés = false }: { dato: Comparacion; alRevés?: boolean }) {
-  const sube = dato.ahora > dato.antes;
-  const igual = dato.ahora === dato.antes;
-  const bueno = alRevés ? !sube : sube;
-  const color = igual
-    ? "text-[rgba(19,28,36,.5)]"
-    : bueno
-      ? "text-verde-700"
-      : "text-rojo";
-
-  return (
-    <>
-      <p className={`mt-2 text-[12px] leading-[1.3] font-bold ${color}`}>
-        {igual
-          ? "igual"
-          : dato.porcentaje === null
-            ? `+${dato.ahora}`
-            : `${dato.porcentaje > 0 ? "+" : "−"}${Math.abs(Math.round(dato.porcentaje))} %`}
-      </p>
-      <p className="mt-[3px] text-[10.5px] leading-[1.35] font-semibold text-[rgba(19,28,36,.45)]">
-        antes: {dato.antes}
-      </p>
-    </>
-  );
-}
-
-function Tile({
-  rotulo,
-  valor,
-  dato,
-  pie,
-  alerta = false,
-  alRevés = false,
-}: {
-  rotulo: string;
-  valor: number;
-  dato: Comparacion;
-  pie?: string;
-  alerta?: boolean;
-  alRevés?: boolean;
-}) {
-  return (
-    <div
-      className={`tarjeta p-[15px] ${alerta ? "border-[rgba(180,70,47,.3)]" : ""}`}
-    >
-      <p
-        className={`etiqueta-seccion ${alerta ? "text-rojo" : ""}`}
-        style={{ letterSpacing: ".16em" }}
-      >
-        {rotulo}
-      </p>
-      <p
-        className={`mt-[10px] text-[30px] leading-none font-extrabold tracking-[-.02em] ${alerta ? "text-rojo" : "text-tinta"}`}
-      >
-        {valor}
-      </p>
-      <Variacion dato={dato} alRevés={alRevés} />
-      {pie ? (
-        <p className="mt-[3px] text-[10.5px] leading-[1.35] font-semibold text-[rgba(19,28,36,.45)]">
-          {pie}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
+/// Los seis indicadores de arriba. Cada uno **se abre** con el detalle de
+/// quiénes son, qué día y a qué hora: `Tile` vive en `detalle.tsx` porque el
+/// clic es cosa del navegador.
 function Tiles({ informe }: { informe: Informe }) {
   return (
     <section className="mt-4 grid grid-cols-2 gap-[10px] sm:grid-cols-3 lg:grid-cols-6">
-      <Tile rotulo="PERSONAS NUEVAS" valor={informe.registros.ahora} dato={informe.registros} />
       <Tile
-        rotulo="LLAMADAS"
+        indicador="personas-nuevas"
+        rotulo={ROTULO_INDICADOR["personas-nuevas"]}
+        valor={informe.registros.ahora}
+        dato={informe.registros}
+      />
+      <Tile
+        indicador="llamadas"
+        rotulo={ROTULO_INDICADOR.llamadas}
         valor={informe.llamadas.ahora}
         dato={informe.llamadas}
         // Las marcaciones son la cifra grande porque es la misma del historial
@@ -287,11 +248,27 @@ function Tiles({ informe }: { informe: Informe }) {
         // único que mueve la tarjeta.
         pie={`${informe.llamadasRegistradas.ahora} con formulario`}
       />
-      <Tile rotulo="VISITAS" valor={informe.visitas.ahora} dato={informe.visitas} />
-      <Tile rotulo="ENTREGADAS" valor={informe.entregas.ahora} dato={informe.entregas} />
-      <Tile rotulo="HITOS" valor={informe.hitos.ahora} dato={informe.hitos} />
       <Tile
-        rotulo="BAJAS"
+        indicador="visitas"
+        rotulo={ROTULO_INDICADOR.visitas}
+        valor={informe.visitas.ahora}
+        dato={informe.visitas}
+      />
+      <Tile
+        indicador="entregadas"
+        rotulo={ROTULO_INDICADOR.entregadas}
+        valor={informe.entregas.ahora}
+        dato={informe.entregas}
+      />
+      <Tile
+        indicador="hitos"
+        rotulo={ROTULO_INDICADOR.hitos}
+        valor={informe.hitos.ahora}
+        dato={informe.hitos}
+      />
+      <Tile
+        indicador="bajas"
+        rotulo={ROTULO_INDICADOR.bajas}
         valor={informe.bajas.ahora}
         dato={informe.bajas}
         alerta
