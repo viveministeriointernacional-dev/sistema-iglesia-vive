@@ -621,6 +621,14 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 - **⚠️ NO abrir el PR hasta que TODO esté empujado** — el usuario fusiona en
   minutos. **Y si aparece trabajo nuevo con un PR ya abierto, se abre OTRO PR:
   no se apila sobre el abierto** (así entró a medias el #112).
+  **⚠️ ESTO HA COSTADO CINCO MERGES A MEDIAS, Y LA CAUSA SOY YO, NO GITHUB.** La
+  última, el #121 el 16-oct: abrí el PR y **empujé un commit más a la misma rama
+  después**; GitHub fusionó la cabeza que tenía cuando se abrió (`40ef462`) y
+  dejó la nueva (`ab113e2`) fuera de `main`. **Un push a una rama con PR abierto
+  NO garantiza que el merge se lo lleve.** Si ya ocurrió: la rama queda con lo
+  que falta encima de lo ya fusionado, así que **se abre un PR nuevo** —
+  `git log --oneline origin/main..origin/<rama>` dice exactamente qué quedó
+  fuera, y si sale un solo commit, eso es todo lo que hay que fusionar.
 - **Squash sobre historia ya fusionada duplica código**: al reiniciar la rama
   desde `main`, verificar que no quedó nada duplicado.
 - **⚠️ `execute_sql` del MCP se cuelga 60 s** con `do $$ … raise notice`, con
@@ -652,8 +660,9 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 > archivo del mes** y su renglón **arriba de este índice**. Si de ese trabajo
 > sale una regla general, va **además** a §12.
 
-### `docs/bitacora/2026-10.md` — octubre de 2026 (18 entradas)
+### `docs/bitacora/2026-10.md` — octubre de 2026 (19 entradas)
 
+- **16-oct** · ⚠️ **El #121 se fusionó A MEDIAS: QUINTA vez, y la causa fui yo** — empujé un commit a la rama DESPUÉS de abrir el PR y GitHub fusionó la cabeza vieja.
 - **16-oct** · El desglose quedó VIVO (PR #120) · ⚠️ **el NOMBRE del CSS no es huella**: 66 547 vs 66 646 bytes y estaba desplegado · la prueba es **un literal que solo exista en el código nuevo**, verificado con `git grep`.
 - **16-oct** · **Cada indicador del informe se abre** (quiénes, día y hora) **y Operación 72 tiene histórico** · ⚠️ **las acciones de Op72 se auditan con DOS `entity_type`** y eso daba 80 de 136 movimientos «sin origen» · el histórico no llega antes del 15-ago.
 - **15-oct** · **Volver al tablero de Op72 tras una baja** · reactivar no reabría la Op72: 206 personas vivas sin tarjeta · **Casa de Fe y asignar mentor YA funcionaban** con solo estar activa.
