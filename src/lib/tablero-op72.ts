@@ -1,5 +1,6 @@
 import { Prisma, type Operation72Status } from "@iglesia/prisma-client";
 import { normalizarBusqueda } from "@/lib/dominio";
+import { ESTADOS_EN_TABLERO } from "@/lib/op72";
 import type { ClientePrisma } from "@/lib/prisma";
 
 /// Qué tarjetas van en cada columna del tablero, y cuántas hay en total, **en
@@ -49,9 +50,18 @@ const ORDEN_VISITA = `CASE WHEN f.status = 'VISITA_PENDIENTE'::"Operation72Statu
                              THEN f.visita_at END ASC NULLS LAST`;
 
 export type SeleccionDelTablero = {
-  /// Los ids de cada columna, ya en el orden en que se van a pintar.
+  /// Los ids de cada columna, ya en el orden en que se van a pintar. Solo de
+  /// las columnas visibles.
   porEstado: Map<Operation72Status, string[]>;
   /// Cuántas hay en total en esa columna (no solo las que caben).
+  ///
+  /// **Están SIEMPRE las cinco columnas, aunque se esté mirando una sola.**
+  /// Hasta el 16-oct-2026 solo venían las visibles, y al entrar en una columna
+  /// los demás contadores de «Ver solo» se ponían en **cero** y «Todas»
+  /// enseñaba el total de esa única columna: filtrar por Contactada decía
+  /// «Todas 28» en vez de 85. Se notó al poner el ⊕ encima de cada contador,
+  /// porque el ⊕ sí mira el tablero entero y los dos números se contradecían
+  /// a la vista.
   totales: Map<Operation72Status, number>;
 };
 
@@ -72,6 +82,8 @@ export async function seleccionarTarjetasDelTablero(
   if (estados.length === 0) {
     return { porEstado: new Map(), totales: new Map() };
   }
+  // Las tarjetas son solo de las columnas visibles; los totales, de las cinco.
+  const todas = [...ESTADOS_EN_TABLERO];
 
   const texto = consulta.trim();
   // El nombre y el correo salen de `person.search_text`, que ya está sin tildes
@@ -83,7 +95,7 @@ export async function seleccionarTarjetasDelTablero(
   const patronDigitos = digitos.length >= 4 ? `%${digitos}%` : null;
 
   const filas = await prisma.$queryRaw<
-    { id: string; status: Operation72Status; total: bigint; puesto: bigint }[]
+    { id: string | null; status: Operation72Status; total: bigint; puesto: bigint | null }[]
   >`
     WITH filtradas AS (
       SELECT o.id, o.status, o.deadline_at, o.started_at, v.scheduled_at AS visita_at
@@ -104,7 +116,7 @@ export async function seleccionarTarjetasDelTablero(
         ORDER BY ca.occurred_at DESC, ca.created_at DESC
         LIMIT 1
       ) v ON true
-      WHERE o.status = ANY(${estados as Operation72Status[]}::text[]::"Operation72Status"[])
+      WHERE o.status = ANY(${todas}::text[]::"Operation72Status"[])
         AND (${consolidadorId}::text IS NULL OR lp.consolidator_id = ${consolidadorId}::text)
         AND (
           ${patronTexto}::text IS NULL
@@ -128,16 +140,31 @@ export async function seleccionarTarjetasDelTablero(
     SELECT id, status, total, puesto
     FROM numeradas
     WHERE puesto <= ${tope}
+      AND status = ANY(${estados as Operation72Status[]}::text[]::"Operation72Status"[])
+    UNION ALL
+    -- El total de CADA columna, también las que no se están pintando: son los
+    -- contadores de «Ver solo», y tienen que decir la verdad siempre.
+    SELECT NULL::text, status, count(*)::bigint, NULL::bigint
+    FROM filtradas
+    GROUP BY status
+    -- El orden es el de la columna, no un detalle: el puesto es lo que decidió
+    -- la función de ventana y es el orden en que se pintan las tarjetas. Las
+    -- filas de total no tienen puesto y caen al final de su columna.
     ORDER BY status, puesto
   `;
 
   const porEstado = new Map<Operation72Status, string[]>();
   const totales = new Map<Operation72Status, number>();
   for (const fila of filas) {
+    // Las filas sin id son los totales por columna, que vienen en el mismo
+    // viaje (§12.5: con una sola conexión, cada consulta de más es latencia).
+    if (fila.id === null) {
+      totales.set(fila.status, Number(fila.total));
+      continue;
+    }
     const lista = porEstado.get(fila.status);
     if (lista) lista.push(fila.id);
     else porEstado.set(fila.status, [fila.id]);
-    totales.set(fila.status, Number(fila.total));
   }
   return { porEstado, totales };
 }

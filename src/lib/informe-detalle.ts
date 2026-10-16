@@ -1,6 +1,19 @@
 import { Prisma } from "@iglesia/prisma-client";
 import { ETIQUETA_HITO } from "@/lib/administracion";
-import { telefonoLegible, ZONA_HORARIA } from "@/lib/dominio";
+import { telefonoLegible } from "@/lib/dominio";
+import {
+  comillas,
+  contexto,
+  dia,
+  estadoHoy,
+  ETIQUETA_ESTADO,
+  ETIQUETA_RESULTADO,
+  hora,
+  nombreDe,
+  pieDe,
+  quienLoHizo,
+  TOPE,
+} from "@/lib/detalle-filas";
 import { VISITA_CUMPLIDA } from "@/lib/op72";
 import {
   type Desglose,
@@ -34,26 +47,11 @@ export * from "@/lib/informe-detalle-catalogo";
 ///    trajera los seis desgloses por si acaso, serían seis viajes más en cada
 ///    carga, para datos que casi nunca se miran.
 ///
-/// El día y la hora se escriben **aquí**, en hora de Colombia, y viajan ya
-/// hechos: formatearlos en el navegador es la trampa de las cinco horas.
-
-const DIA_FILA = new Intl.DateTimeFormat("es-CO", {
-  weekday: "short",
-  day: "numeric",
-  month: "short",
-  timeZone: ZONA_HORARIA,
-});
-
-const HORA_FILA = new Intl.DateTimeFormat("es-CO", {
-  hour: "numeric",
-  minute: "2-digit",
-  timeZone: ZONA_HORARIA,
-});
-
-/// Cuántas filas trae la ventana. Medido el 15-oct-2026: en una semana el
-/// indicador más grande son 89 marcaciones, pero en un mes son 735 — por eso
-/// hay tope y por eso el pie dice siempre cuántas se están viendo.
-const TOPE = 60;
+/// El día y la hora se escriben **en el servidor**, en hora de Colombia, y
+/// viajan ya hechos: formatearlos en el navegador es la trampa de las cinco
+/// horas. Esos ayudantes viven en `detalle-filas.ts`, compartidos con las
+/// ventanas del tablero de Operación 72, para que el formato tenga una sola
+/// definición.
 
 /// **Desde cuándo se puede reconstruir el histórico de Operación 72.** No hay
 /// tabla de historial: los saltos se derivan de `audit_log`, y la primera
@@ -62,72 +60,6 @@ const TOPE = 60;
 /// fecha el histórico está vacío por fuerza, y eso **se dice en pantalla** en
 /// vez de pintar un cero que parezca un dato.
 export const INICIO_AUDITORIA_OP72 = new Date("2026-08-15T05:00:00.000Z");
-
-function dia(fecha: Date) {
-  return DIA_FILA.format(fecha).replace(".", "").replace(",", "");
-}
-
-function hora(fecha: Date) {
-  return HORA_FILA.format(fecha);
-}
-
-function nombreDe(first: string, last: string | null) {
-  return [first, last].filter(Boolean).join(" ");
-}
-
-/// Junta las piezas de la línea gris saltándose las que están en blanco: un
-/// dato que falta no deja un « · » colgando.
-function contexto(...piezas: (string | null | undefined)[]) {
-  const limpias = piezas.filter((pieza): pieza is string => Boolean(pieza));
-  return limpias.length > 0 ? limpias.join(" · ") : null;
-}
-
-/// Las observaciones del equipo vienen de un campo libre y algunas son varios
-/// párrafos (medido: 260 caracteres en una sola llamada del 16-oct). En la
-/// ventana se recortan para que una fila no empuje a las demás fuera de la
-/// pantalla; el expediente las tiene completas.
-const TOPE_OBSERVACION = 200;
-
-function comillas(texto: string | null | undefined) {
-  const limpio = texto?.trim().replace(/\s+/g, " ");
-  if (!limpio) return null;
-  if (limpio.length <= TOPE_OBSERVACION) return `«${limpio}»`;
-  return `«${limpio.slice(0, TOPE_OBSERVACION).trimEnd()}…»`;
-}
-
-const ETIQUETA_ESTADO: Record<string, Etiqueta> = {
-  INICIADA: { texto: "Iniciada", tono: "neutro" },
-  SEGUIMIENTO: { texto: "Seguimiento", tono: "ambar" },
-  CONTACTADA: { texto: "Contactada", tono: "azul" },
-  VISITA_PENDIENTE: { texto: "Visita pendiente", tono: "verde" },
-  LISTA_PARA_ENTREGA: { texto: "Lista para entrega", tono: "verde" },
-  ENTREGADA: { texto: "Entregada", tono: "verde" },
-  CERRADA: { texto: "Asistente", tono: "neutro" },
-};
-
-function estadoHoy(status: string | null): Etiqueta | null {
-  if (!status) return null;
-  const base = ETIQUETA_ESTADO[status];
-  if (!base) return null;
-  return { texto: `Hoy: ${base.texto.toLowerCase()}`, tono: base.tono };
-}
-
-/// Cómo salió la llamada, en palabras. `CallOutcome` del esquema.
-const ETIQUETA_RESULTADO: Record<string, string> = {
-  CONTESTO_BIEN: "contestó bien",
-  CONTESTO_REPROGRAMO: "contestó, reprogramó",
-  CONTESTO_REGULAR: "contestó, regular",
-  CONTESTO_MAL: "contestó mal",
-  NO_CONTESTO: "no contestó",
-};
-
-function pieDe(mostradas: number, total: number, singular: string, plural: string) {
-  if (total === 0) return `No hubo ${plural} en este periodo.`;
-  if (mostradas >= total) {
-    return total === 1 ? `Una ${singular}.` : `Las ${total} ${plural}, de la más reciente a la más antigua.`;
-  }
-  return `Mostrando las ${mostradas} más recientes de ${total}.`;
-}
 
 // --------------------------------------------------------------- Los 6 indicadores
 
@@ -837,11 +769,7 @@ export async function cargarPersonasDelSalto(
       nombre: nombreDe(fila.first_name, fila.last_name),
       learnerId: fila.learner_id,
       contexto: contexto(
-        // Sin actor significa que el movimiento entró por el formulario público
-        // de HighLevel, que es como trabaja el equipo de consolidación: no
-        // tienen cuenta en la plataforma (§6). Decir «lo movió el sistema»
-        // sería falso — lo movió una persona, llenando el formulario.
-        fila.quien ? `lo registró ${fila.quien}` : "entró por el formulario",
+        quienLoHizo(fila.quien),
         fila.resultado ? ETIQUETA_RESULTADO[fila.resultado] ?? fila.resultado : null,
       ),
       observacion: comillas(fila.nota),

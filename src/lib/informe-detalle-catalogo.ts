@@ -120,7 +120,11 @@ export type Desglose = {
   /// El recuadro ámbar de arriba, solo cuando hay algo que hacer. Un aviso que
   /// sale siempre se deja de leer (§12.6).
   aviso: string | null;
-  pestanas: { clave: Pestana; etiqueta: string; activa: boolean }[] | null;
+  /// La clave va como texto, no como `Pestana`: la misma ventana la usan el
+  /// informe y el tablero de Operación 72, y cada uno tiene sus pestañas. Quien
+  /// la reciba la vuelve a validar contra SU lista cerrada antes de usarla —
+  /// viene del navegador.
+  pestanas: { clave: string; etiqueta: string; activa: boolean }[] | null;
   filas: FilaDetalle[];
   total: number;
   pie: string;
