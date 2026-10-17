@@ -133,9 +133,18 @@ export type Desglose = {
 
 // ------------------------------------------------- El histórico de Operación 72
 
-/// Los extremos de un salto. Además de los siete estados, dos casos que no son
-/// estados: la tarjeta acaba de entrar, o entró antes de que existiera la
-/// auditoría (15-ago-2026) y no se sabe de dónde venía.
+/// Los extremos de un salto. Además de los siete estados, tres casos que no
+/// son estados de la tarjeta: la tarjeta acaba de entrar, entró antes de que
+/// existiera la auditoría (15-ago-2026) y no se sabe de dónde venía, o la
+/// persona se dio de baja.
+///
+/// ⚠️ **`BAJA` se añadió el 16-oct-2026 y tapó un agujero grande.** Dar de baja
+/// cierra la tarjeta sin pasar por ningún estado de Operación 72, así que el
+/// histórico **no contaba ni una sola baja**: medido sobre las 7 semanas de
+/// septiembre y octubre, se perdían **211 de 875 movimientos (24 %)** y entre
+/// ellos **el salto más frecuente de todos**, `Iniciada → Baja`, con 127.
+/// El bloque «Cómo se movió Operación 72» enseñaba un recorrido en el que lo
+/// que más pasa era invisible.
 export const EXTREMOS = [
   "NUEVA",
   "SIN_REGISTRO",
@@ -146,6 +155,7 @@ export const EXTREMOS = [
   "LISTA_PARA_ENTREGA",
   "ENTREGADA",
   "CERRADA",
+  "BAJA",
 ] as const;
 
 export type Extremo = (typeof EXTREMOS)[number];
@@ -164,6 +174,7 @@ export const ETIQUETA_EXTREMO: Record<Extremo, string> = {
   LISTA_PARA_ENTREGA: "Lista para entrega",
   ENTREGADA: "Entregada",
   CERRADA: "Asistente de la iglesia",
+  BAJA: "Dada de baja",
 };
 
 /// El orden del recorrido. `Operation72Status` no lo garantiza.
@@ -177,6 +188,7 @@ const PUESTO: Record<Extremo, number> = {
   LISTA_PARA_ENTREGA: 4,
   ENTREGADA: 5,
   CERRADA: 6,
+  BAJA: 7,
 };
 
 /// En qué bloque se cuenta cada salto. **El orden de las reglas importa**, y la
@@ -188,6 +200,7 @@ export const GRUPOS_SALTO = [
   "avance",
   "sin-contacto",
   "salida",
+  "baja",
   "retroceso",
 ] as const;
 
@@ -195,6 +208,11 @@ export type GrupoSalto = (typeof GRUPOS_SALTO)[number];
 
 export function grupoDelSalto(desde: Extremo, hacia: Extremo): GrupoSalto {
   if (desde === "NUEVA") return "entrada";
+  // Antes que nada lo que saca a la persona del proceso, y **antes que
+  // `CERRADA`**: una baja no es «pasó a asistente», es lo contrario. Si cayera
+  // en el mismo bloque, el informe diría que 211 personas se quedaron
+  // asistiendo cuando se habían perdido.
+  if (hacia === "BAJA") return "baja";
   if (hacia === "CERRADA") return "salida";
   if (hacia === "SEGUIMIENTO") return "sin-contacto";
   if (PUESTO[hacia] > PUESTO[desde]) return "avance";
@@ -207,6 +225,7 @@ export const TITULO_GRUPO: Record<GrupoSalto, string> = {
   avance: "AVANZARON",
   "sin-contacto": "SE LLAMÓ Y NO CONTESTÓ",
   salida: "SALIERON A ASISTENTES",
+  baja: "SE DIERON DE BAJA",
   retroceso: "VOLVIERON ATRÁS",
 };
 
@@ -215,7 +234,10 @@ export const TONO_GRUPO: Record<GrupoSalto, Tono> = {
   avance: "verde",
   "sin-contacto": "ambar",
   salida: "neutro",
-  retroceso: "rojo",
+  baja: "rojo",
+  // Volver atrás es raro y casi siempre es una corrección de alguien, no una
+  // pérdida: el rojo se reserva para las bajas, que sí lo son.
+  retroceso: "ambar",
 };
 
 /// El orden en que se pintan los bloques: primero lo que avanzó, porque es lo
@@ -224,6 +246,7 @@ export const TONO_GRUPO: Record<GrupoSalto, Tono> = {
 export const ORDEN_GRUPOS: GrupoSalto[] = [
   "avance",
   "sin-contacto",
+  "baja",
   "salida",
   "retroceso",
   "entrada",
@@ -266,5 +289,7 @@ export function agruparSaltos(saltos: Salto[]) {
 /// son estados se dice lo que son, sin flecha de origen.
 export function tituloDelSalto(desde: Extremo, hacia: Extremo): string {
   if (desde === "NUEVA") return `Entró en ${ETIQUETA_EXTREMO[hacia].toLowerCase()}`;
+  if (hacia === "BAJA" && desde === "SIN_REGISTRO") return "Dada de baja (sin historial)";
+  if (hacia === "BAJA") return `Dada de baja desde ${ETIQUETA_EXTREMO[desde]}`;
   return `${ETIQUETA_EXTREMO[desde]} → ${ETIQUETA_EXTREMO[hacia]}`;
 }

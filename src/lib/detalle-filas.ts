@@ -69,7 +69,20 @@ export const ETIQUETA_ESTADO: Record<string, Etiqueta> = {
   CERRADA: { texto: "Asistente", tono: "neutro" },
 };
 
-export function estadoHoy(status: string | null): Etiqueta | null {
+/// Dónde está hoy la persona, para el chip de la derecha.
+///
+/// ⚠️ **El estado del expediente manda sobre el de la tarjeta.** Dar de baja
+/// deja la Operación 72 en `CERRADA`, que es el mismo estado que «pasó a
+/// asistente de la iglesia»: mirando solo la tarjeta, la ventana de bajas
+/// diría «Hoy: asistente» de cada persona que se perdió. Son dos desenlaces
+/// opuestos y solo los distingue `learner_profile.status`.
+export function estadoHoy(
+  status: string | null,
+  estadoDelExpediente?: string | null,
+): Etiqueta | null {
+  if (estadoDelExpediente === "RETIRADO") {
+    return { texto: "Hoy: dada de baja", tono: "rojo" };
+  }
   if (!status) return null;
   const base = ETIQUETA_ESTADO[status];
   if (!base) return null;
