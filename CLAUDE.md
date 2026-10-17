@@ -669,6 +669,12 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   Y lo anulado no se cuenta en ninguna de las dos.
 - **El orden en la pantalla es la única forma de decir ciertas cosas sin un
   cartel**: lo que caduca o bloquea a alguien va **arriba del todo**.
+- **⚠️ SI UN NÚMERO SE PUEDE PULSAR PARA VER DE DÓNDE SALE, EL NÚMERO Y SU
+  LISTA TIENEN QUE CONTARSE CON LA MISMA REGLA, ESCRITA UNA SOLA VEZ.** En
+  Oración el recuadro se cuenta en memoria y su filtro en el `WHERE` de la
+  consulta: con «7 días» puesto en los dos sitios, basta tocar uno para que
+  arriba diga 5 y abajo salgan 7, y nada avisa. Se comparte la función que
+  calcula el límite, y se prueba el **caso borde**.
 - **⚠️ EL ÚLTIMO TRAMO DE CUALQUIER SERIE TEMPORAL CASI SIEMPRE ESTÁ EN CURSO.**
   La semana en curso lleva dos días y el mes en curso, diez. Dibujado igual que
   los demás, **la línea cae a plomo al final siempre** y parece un derrumbe cada
@@ -750,8 +756,9 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 > archivo del mes** y su renglón **arriba de este índice**. Si de ese trabajo
 > sale una regla general, va **además** a §12.
 
-### `docs/bitacora/2026-10.md` — octubre de 2026 (23 entradas)
+### `docs/bitacora/2026-10.md` — octubre de 2026 (24 entradas)
 
+- **17-oct** · **Los tres recuadros de Oración filtran la lista** al pulsarlos · la ventana de tiempo sale de **una sola función** para que el número y su lista no discrepen · una prueba vigila el mapa recuadro → filtro, que si no fallaría en silencio · ⚠️ **nadie ha pulsado nunca «Ya oramos por esto»**.
 - **17-oct** · **Pestaña «Histórico» en Operación 72** · ⚠️ **el informe no contaba NINGUNA baja**: 211 de 875 movimientos (24 %) y el salto más frecuente de todos invisible · sin la regla, una baja contaba como **avance** · el preview con datos reales delató que faltaba un panel (40 % fuera) · los colores de la marca fallan el validador · el último tramo va discontinuo.
 - **16-oct** · **El tablero dice cuánto se movió**: ⊕ sobre cada contador y ⊖ rojo al final, con selector de periodo · ⚠️ **hay DOS acciones de baja** y una de 8 entró por la segunda · un giro en el sitio no es entrada · **115 → 21 ms** sin recorrer `audit_log` · y el fallo viejo de los contadores en cero al filtrar.
 - **16-oct** · ✅ **CORRECCIÓN: el CSS SÍ es huella** — comprobado por `sha256` que producción y el build local son el MISMO archivo · el falso negativo del #120 fue mío, por comparar con un `.open-next` anterior a mi última edición.

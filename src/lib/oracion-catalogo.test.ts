@@ -1,8 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  DIAS_DE_LA_SEMANA,
+  DIAS_DEL_MES,
   ETIQUETA_ORIGEN,
   EXPLICACION_ORIGEN,
+  FILTRO_DEL_RECUADRO,
+  FILTROS,
+  desdeHace,
   LARGO_MAXIMO_PETICION,
   NOMBRE_RESERVADO,
   ORIGENES,
@@ -133,4 +138,69 @@ test("una petición larguísima se rechaza con su mensaje", () => {
 test("los espacios de los bordes no cuentan para el mínimo", () => {
   assert.equal(peticionValida("  paz  ").ok, true);
   assert.equal(peticionValida("  a  ").ok, false);
+});
+
+// --------------------------------------------- Los recuadros, que ahora filtran
+
+/// ⚠️ **El número de un recuadro y la lista que abre tienen que contar lo
+/// mismo.** Cada recuadro de la cabecera lleva a un filtro, y si alguien
+/// renombrara un filtro sin tocar el mapa, el recuadro llevaría a «pendientes»
+/// sin avisar: `filtroValido` traga cualquier cosa desconocida.
+test("cada recuadro apunta a un filtro que existe de verdad", () => {
+  for (const [recuadro, id] of Object.entries(FILTRO_DEL_RECUADRO)) {
+    assert.ok(
+      FILTROS.some((f) => f.id === id),
+      `el recuadro ${recuadro} apunta a «${id}», que no está en FILTROS`,
+    );
+    // Y sobrevive al validador: si no, la URL caería en «pendientes».
+    assert.equal(filtroValido(id), id, `«${id}» no sobrevive a filtroValido`);
+  }
+});
+
+test("filtroValido acepta los cinco y rechaza lo demás", () => {
+  for (const opcion of FILTROS) {
+    assert.equal(filtroValido(opcion.id), opcion.id);
+  }
+  assert.equal(filtroValido("semana"), "semana");
+  assert.equal(filtroValido("oradas-mes"), "oradas-mes");
+  assert.equal(filtroValido("inventado"), "pendientes");
+  assert.equal(filtroValido(undefined), "pendientes");
+  assert.equal(filtroValido(null), "pendientes");
+  assert.equal(filtroValido("__proto__"), "pendientes");
+});
+
+/// Las dos ventanas de tiempo las usan el conteo del recuadro y el `WHERE` de
+/// su lista. Esta prueba es lo que impide que se separen.
+test("desdeHace devuelve el límite exacto de la ventana", () => {
+  const ahora = new Date("2026-10-17T15:00:00Z");
+  assert.equal(
+    desdeHace(DIAS_DE_LA_SEMANA, ahora).toISOString(),
+    "2026-10-10T15:00:00.000Z",
+  );
+  assert.equal(
+    desdeHace(DIAS_DEL_MES, ahora).toISOString(),
+    "2026-09-17T15:00:00.000Z",
+  );
+  assert.equal(DIAS_DE_LA_SEMANA, 7);
+  assert.equal(DIAS_DEL_MES, 30);
+});
+
+/// El recuadro cuenta con `>=` sobre el mismo instante que el filtro, así que
+/// una petición justo en el borde tiene que caer del mismo lado en los dos.
+test("una petición justo en el borde cuenta igual en el recuadro que en el filtro", () => {
+  const ahora = new Date("2026-10-17T15:00:00Z");
+  const borde = desdeHace(DIAS_DE_LA_SEMANA, ahora);
+  const unMsAntes = new Date(borde.getTime() - 1);
+
+  const dentro = resumirPeticiones(
+    [{ origen: "PERSONA", pedidaEl: borde, oradaEl: null }],
+    ahora,
+  );
+  const fuera = resumirPeticiones(
+    [{ origen: "PERSONA", pedidaEl: unMsAntes, oradaEl: null }],
+    ahora,
+  );
+
+  assert.equal(dentro.estaSemana, 1, "justo en el borde SÍ entra, como el gte de la consulta");
+  assert.equal(fuera.estaSemana, 0, "un milisegundo antes queda fuera");
 });
