@@ -6,6 +6,9 @@ import {
   type FiltroDeOracion,
   type OrigenDeLaPeticion,
   type PeticionParaPintar,
+  DIAS_DE_LA_SEMANA,
+  DIAS_DEL_MES,
+  desdeHace,
   type ResumenDeOracion,
   esOrigen,
   peticionValida,
@@ -100,9 +103,22 @@ export async function cargarPeticiones(opciones: {
   const ahora = opciones.ahora ?? new Date();
   const busqueda = opciones.busqueda?.trim() ?? "";
 
+  // ⚠️ **Cada filtro tiene que contar EXACTAMENTE lo que dice su recuadro.**
+  // Los tres de arriba son pulsables y llevan aquí: «esperan oración» a
+  // `pendientes`, «entraron esta semana» a `semana` y «oraron este mes» a
+  // `oradas-mes`. Las dos ventanas de tiempo salen de `desdeHace`, la misma
+  // función con la que se cuentan los recuadros, para que no puedan separarse:
+  // si una dijera 7 días y la otra 7 días menos un rato, el número de arriba y
+  // la lista de abajo se contradirían y no habría forma de saber cuál miente.
   const donde = {
     ...(opciones.filtro === "pendientes" ? { prayedAt: null } : {}),
     ...(opciones.filtro === "atendidas" ? { prayedAt: { not: null } } : {}),
+    ...(opciones.filtro === "semana"
+      ? { createdAt: { gte: desdeHace(DIAS_DE_LA_SEMANA, ahora) } }
+      : {}),
+    ...(opciones.filtro === "oradas-mes"
+      ? { prayedAt: { gte: desdeHace(DIAS_DEL_MES, ahora) } }
+      : {}),
     // ⚠️ El buscador mira `search_text`, que es la columna normalizada sin
     // tildes que mantiene el trigger (§7). Buscar por `firstName` dejaría
     // fuera a «José» cuando se escribe «jose».

@@ -42,17 +42,44 @@ export function esOrigen(valor: string): valor is OrigenDeLaPeticion {
 }
 
 /// Qué se muestra en los filtros de arriba.
-export type FiltroDeOracion = "pendientes" | "atendidas" | "todas";
+///
+/// **Los tres recuadros de la cabecera son tres de estos filtros**, y por eso
+/// están aquí y no sueltos: al pulsar un recuadro la lista pasa a enseñar
+/// exactamente lo que ese número cuenta. Si el recuadro y su filtro contaran
+/// cosas distintas, la pantalla se contradiría sola — de ahí que la ventana de
+/// tiempo de cada uno salga de `DESDE_HACE`, una sola vez (§12.6).
+export type FiltroDeOracion =
+  | "pendientes"
+  | "semana"
+  | "oradas-mes"
+  | "atendidas"
+  | "todas";
 
 export const FILTROS: readonly { id: FiltroDeOracion; etiqueta: string }[] = [
   { id: "pendientes", etiqueta: "Pendientes" },
+  { id: "semana", etiqueta: "Entraron esta semana" },
+  { id: "oradas-mes", etiqueta: "Oradas este mes" },
   { id: "atendidas", etiqueta: "Atendidas" },
   { id: "todas", etiqueta: "Todas" },
 ] as const;
 
+const IDS_DE_FILTRO: readonly string[] = FILTROS.map((f) => f.id);
+
+/// Lo que llegue por la URL se valida contra la lista cerrada; cualquier otra
+/// cosa cae en «pendientes», que es la vista con la que abre la pantalla.
 export function filtroValido(valor: string | null | undefined): FiltroDeOracion {
-  return valor === "atendidas" || valor === "todas" ? valor : "pendientes";
+  return IDS_DE_FILTRO.includes(valor ?? "")
+    ? (valor as FiltroDeOracion)
+    : "pendientes";
 }
+
+/// **Qué recuadro lleva a qué filtro.** La cabecera lee esto en vez de repetir
+/// los identificadores: añadir un recuadro nuevo es añadir un renglón aquí.
+export const FILTRO_DEL_RECUADRO = {
+  pendientes: "pendientes",
+  estaSemana: "semana",
+  atendidasEsteMes: "oradas-mes",
+} as const satisfies Record<string, FiltroDeOracion>;
 
 /// Lo mínimo que hace falta para pintar un renglón. Lo arma `oracion.ts`.
 export type PeticionParaPintar = {
@@ -116,6 +143,19 @@ export type ResumenDeOracion = {
 
 const DIA = 24 * 60 * 60 * 1000;
 
+/// **Cuántos días mira cada recuadro con ventana de tiempo.** Lo usan las dos
+/// puntas: el conteo del recuadro (aquí mismo, en memoria) y el `WHERE` de la
+/// consulta que arma su lista. Escrito dos veces, bastaría con que alguien
+/// cambiara uno para que el recuadro dijera 5 y la lista enseñara 7.
+export const DIAS_DE_LA_SEMANA = 7;
+export const DIAS_DEL_MES = 30;
+
+/// El instante a partir del cual cuenta una ventana. Devuelve una fecha, que es
+/// lo que necesita la consulta, y se compara igual que el conteo.
+export function desdeHace(dias: number, ahora: Date): Date {
+  return new Date(ahora.getTime() - dias * DIA);
+}
+
 /// Las tres cifras de arriba, calculadas sobre lo que ya se cargó.
 ///
 /// ⚠️ **«Esta semana» son los últimos 7 días, no la semana del calendario.**
@@ -143,8 +183,8 @@ export function resumirPeticiones(
       pendientes += 1;
       if (p.origen === "REGISTRO") dePersonasNuevas += 1;
     }
-    if (ahora.getTime() - p.pedidaEl.getTime() <= 7 * DIA) estaSemana += 1;
-    if (p.oradaEl && ahora.getTime() - p.oradaEl.getTime() <= 30 * DIA) {
+    if (p.pedidaEl >= desdeHace(DIAS_DE_LA_SEMANA, ahora)) estaSemana += 1;
+    if (p.oradaEl && p.oradaEl >= desdeHace(DIAS_DEL_MES, ahora)) {
       atendidasEsteMes += 1;
     }
   }

@@ -3,7 +3,9 @@ import { requerirVista } from "@/lib/auth";
 import { momentoLargo } from "@/lib/dominio";
 import { cargarPeticiones } from "@/lib/oracion";
 import {
+  FILTRO_DEL_RECUADRO,
   FILTROS,
+  type FiltroDeOracion,
   esDePersonaNueva,
   filtroValido,
 } from "@/lib/oracion-catalogo";
@@ -37,9 +39,13 @@ export default async function PaginaDeOracion({
   // ⚠️ **Las de personas NUEVAS se sacan a su propio bloque, arriba del todo.**
   // Quien acaba de registrarse está dentro de las 72 horas de la Operación 72,
   // y su petición es la mejor excusa para esa primera llamada. Mezclada entre
-  // doscientas, se enfría. Solo se separan en «Pendientes»: en el historial
-  // ya no hay nada que correr.
-  const separar = filtro === "pendientes";
+  // doscientas, se enfría.
+  //
+  // Se separan en las dos vistas donde queda algo por hacer: «Pendientes» y
+  // «Entraron esta semana». En las de historial no — ahí ya se oró por todas,
+  // y `esDePersonaNueva` solo cuenta las pendientes, así que el bloque saldría
+  // vacío de todos modos.
+  const separar = filtro === "pendientes" || filtro === "semana";
   const nuevas = separar ? peticiones.filter(esDePersonaNueva) : [];
   const resto = separar
     ? peticiones.filter((p) => !esDePersonaNueva(p))
@@ -68,6 +74,9 @@ export default async function PaginaDeOracion({
           </p>
         </header>
 
+        {/* Los tres recuadros **se pulsan** y la lista de abajo pasa a
+            enseñar justo lo que ese número cuenta. El que está puesto se
+            marca, para que nunca haya duda de qué se está mirando. */}
         <section className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-3">
           <Tile
             rotulo="ESPERAN ORACIÓN"
@@ -78,13 +87,23 @@ export default async function PaginaDeOracion({
                 : undefined
             }
             tono={resumen.pendientes > 0 ? "ambar" : undefined}
+            href={enlace(FILTRO_DEL_RECUADRO.pendientes)}
+            puesto={filtro === FILTRO_DEL_RECUADRO.pendientes}
           />
-          <Tile rotulo="ENTRARON ESTA SEMANA" valor={resumen.estaSemana} pie="últimos 7 días" />
+          <Tile
+            rotulo="ENTRARON ESTA SEMANA"
+            valor={resumen.estaSemana}
+            pie="últimos 7 días"
+            href={enlace(FILTRO_DEL_RECUADRO.estaSemana)}
+            puesto={filtro === FILTRO_DEL_RECUADRO.estaSemana}
+          />
           <Tile
             rotulo="ORARON ESTE MES"
             valor={resumen.atendidasEsteMes}
             pie="últimos 30 días"
             tono="verde"
+            href={enlace(FILTRO_DEL_RECUADRO.atendidasEsteMes)}
+            puesto={filtro === FILTRO_DEL_RECUADRO.atendidasEsteMes}
           />
         </section>
 
@@ -169,11 +188,7 @@ export default async function PaginaDeOracion({
 
           {peticiones.length === 0 ? (
             <p className="rounded-[10px] bg-papel p-4 text-[13px] leading-[1.5] font-medium text-[rgba(19,28,36,.5)]">
-              {busqueda
-                ? "No hay peticiones de alguien con ese nombre."
-                : filtro === "pendientes"
-                  ? "No queda ninguna petición esperando. Ya oraron por todas."
-                  : "Todavía no hay peticiones aquí."}
+              {busqueda ? "No hay peticiones de alguien con ese nombre." : VACIO[filtro]}
             </p>
           ) : null}
         </section>
@@ -182,26 +197,51 @@ export default async function PaginaDeOracion({
   );
 }
 
+/// Lo que se lee cuando la lista sale vacía. Cada filtro dice lo suyo: un
+/// «todavía no hay peticiones aquí» después de pulsar «oraron este mes» haría
+/// pensar que el módulo está vacío, cuando lo que pasa es que nadie ha marcado
+/// ninguna en treinta días.
+const VACIO: Record<FiltroDeOracion, string> = {
+  pendientes: "No queda ninguna petición esperando. Ya oraron por todas.",
+  semana: "No entró ninguna petición nueva en los últimos 7 días.",
+  "oradas-mes": "Nadie ha marcado una petición como orada en los últimos 30 días.",
+  atendidas: "Todavía no se ha marcado ninguna petición como orada.",
+  todas: "Todavía no hay peticiones aquí.",
+};
+
+/// Uno de los tres recuadros de la cabecera.
+///
+/// **Se pulsa y filtra la lista.** En cero no es un enlace: no hay nada que
+/// enseñar, y un botón que lleva a una lista vacía es peor que no enseñarlo
+/// (§12.6). El recuadro puesto lleva el borde marcado y `aria-current`, que es
+/// lo que dice —a la vista y al lector de pantalla— qué se está mirando.
 function Tile({
   rotulo,
   valor,
   pie,
   tono,
+  href,
+  puesto,
 }: {
   rotulo: string;
   valor: number;
   pie?: string;
   tono?: "verde" | "ambar";
+  href: string;
+  puesto: boolean;
 }) {
   const ambar = tono === "ambar";
-  return (
-    <div
-      className={
-        ambar
-          ? "rounded-[14px] border border-[rgba(201,123,44,.35)] bg-ambar-fondo p-4"
-          : "tarjeta p-4"
-      }
-    >
+  const fondo = ambar
+    ? "rounded-[14px] border border-[rgba(201,123,44,.35)] bg-ambar-fondo p-4"
+    : "tarjeta p-4";
+  const marca = puesto
+    ? ambar
+      ? " !border-[1.5px] !border-ambar-texto"
+      : " !border-[1.5px] !border-azul-900"
+    : "";
+
+  const cuerpo = (
+    <>
       <p
         className={
           ambar
@@ -223,6 +263,20 @@ function Tile({
           {pie}
         </p>
       ) : null}
-    </div>
+    </>
+  );
+
+  if (valor === 0) {
+    return <div className={fondo + marca}>{cuerpo}</div>;
+  }
+
+  return (
+    <Link
+      href={href}
+      aria-current={puesto ? "page" : undefined}
+      className={`${fondo}${marca} block transition-colors hover:border-azul-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-azul-900`}
+    >
+      {cuerpo}
+    </Link>
   );
 }
