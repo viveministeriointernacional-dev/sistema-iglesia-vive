@@ -220,8 +220,17 @@ function Pulso({ historico }: { historico: Historico }) {
 /// dos cosas, en proporciones muy distintas.
 ///
 /// **Se reparten en dos grupos porque son dos cosas**: 96 eran tarjetas sin
-/// historial (un hueco de la auditoría, no un salto de nadie) y **45 saltos
-/// reales que se saltaron un paso**, que es la señal que vale la pena mirar.
+/// historial (un hueco de la auditoría, no un salto de nadie) y 45 movimientos
+/// que de verdad fueron por otro camino.
+///
+/// ⚠️ **Y el rótulo del segundo grupo NO puede decir «se saltaron un paso»,
+/// que es lo que dijo el primer día.** Medido el 20-oct después del merge:
+/// **31 de esos 46 son el atajo «ya lleva proceso»** (los tres pares hacia
+/// «Lista para entrega», 31 de 31 por `pasa_a_entrega_por_proceso_previo`),
+/// que se salta la visita **a propósito** desde el 11-sep. Llamarle «se
+/// saltaron un paso» acusaba al equipo de un descuido en dos tercios de los
+/// casos. El rótulo nombra el hecho —fueron por otro camino— y el pie dice las
+/// tres causas posibles sin fingir que el renglón las distingue.
 ///
 /// Sale **solo cuando hay algo que decir**: un pie que aparece siempre, con
 /// ceros, se deja de leer (§12.6).
@@ -250,8 +259,8 @@ function PieDeLosPasos({
 
       {conocidos.length > 0 ? (
         <GrupoDeSaltos
-          titulo="Se saltaron un paso, o volvieron atrás"
-          pie="Casi siempre es que se llenó el formulario de un paso sin llenar antes el del anterior."
+          titulo="Fueron por otro camino"
+          pie="Son tres cosas distintas, y el renglón no las separa: el atajo «ya lleva proceso» —que se salta la visita a propósito—, formularios llenados fuera de orden, y correcciones a mano. Ábrelo y mira quién lo hizo."
           total={totalConocidos}
           saltos={conocidos}
           periodo={periodo}
