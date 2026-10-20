@@ -73,6 +73,7 @@ async function enlaceExistente(learnerId: string) {
     where: { id: learnerId },
     select: {
       personId: true,
+      consolidator: { select: { highlevelUserId: true } },
       person: {
         select: {
           firstName: true,
@@ -149,6 +150,36 @@ export async function exportarContactoNuevo(
       },
       update: { personId: aprendiz.personId },
     });
+
+    // **Y el dueño, que antes se quedaba sin mandar.** El contacto se creaba
+    // con nombre, teléfono y correo pero sin `assignedTo`, así que todo el que
+    // nace en la plataforma llegaba al CRM **sin consolidador** — y solo se le
+    // empujaba si alguien lo CAMBIABA después, porque `exportarConsolidador`
+    // es lo único que lo manda. Medido el 20-oct: de 154 personas activas con
+    // consolidador, **96 las exportó el sistema**, así que era la mayoría.
+    //
+    // ⚠️ **Pero no se pisa un dueño que ya estuviera puesto.** El `upsert` de
+    // arriba puede devolver un contacto que YA existía en HighLevel (casa por
+    // teléfono o correo), y ese dueño lo puso una persona a mano, mientras el
+    // nuestro lo acaba de elegir una regla automática: lo hecho a mano manda
+    // (§12.7). Si ya tiene dueño se deja como está y se dice en el log, que es
+    // justo la discrepancia que hoy hay que descubrir mirando los dos lados.
+    try {
+      const dueno = await consultarDuenoDelContacto(contactId);
+      if (dueno === null) {
+        await exportarConsolidador(learnerId);
+      } else {
+        const propio = aprendiz.consolidator?.highlevelUserId ?? null;
+        if (propio && dueno !== propio) {
+          console.warn(
+            `El contacto ${contactId} ya tenía dueño en HighLevel (${dueno}) y no se pisó; el sistema tiene otro consolidador.`,
+          );
+        }
+      }
+    } catch (error) {
+      // No saber quién es el dueño NO es razón para escribirlo a ciegas.
+      console.error("No se pudo consultar el dueño del contacto nuevo", error);
+    }
 
     return contactId;
   } catch (error) {
