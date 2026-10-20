@@ -535,6 +535,16 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   puntos de control. No perder tiempo buscándolo en Supabase.
 - `ALTER TYPE … ADD VALUE` **sí** corre dentro de la transacción, mientras el
   valor **no se USE** en ella.
+- **⚠️ UN GUARDA DEL TIPO «solo si nadie lo ha usado todavía» CONVIERTE LA
+  MIGRACIÓN EN UN NO-OP PERMANENTE Y SILENCIOSO.** Se registra como aplicada y
+  no se reintenta nunca, así que si la condición falla entre el merge y el
+  despliegue, el cambio no entra y **nadie se entera**. Si lo que protege es
+  recuperable (texto que deja de pintarse, no de existir), va **incondicional**
+  y se comprueba después.
+- **⚠️ En un `UPDATE … FROM`, el `WHERE` que acota la fila es lo único que
+  impide tocar las hermanas.** La 10 del taller 3 y la 10 del taller 2 son dos
+  filas con el mismo `number`: sin `t.number = 3` se cambian las dos. **Probarlo
+  con una fila hermana en la tabla**, no solo con la que se quiere cambiar.
 - **⚠️ Un `ON DELETE SET NULL` puede volver IMBORRABLE la fila referenciada si
   un CHECK prohíbe el estado que deja.** Pasó el 13-oct: un CHECK simétrico
   («o están la fecha y el autor, o ninguno») hacía que **ninguna cuenta que
@@ -756,8 +766,9 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 > archivo del mes** y su renglón **arriba de este índice**. Si de ese trabajo
 > sale una regla general, va **además** a §12.
 
-### `docs/bitacora/2026-10.md` — octubre de 2026 (24 entradas)
+### `docs/bitacora/2026-10.md` — octubre de 2026 (25 entradas)
 
+- **20-oct** · **La 10 del taller 3 pasa de escribir a marcar** (`OPCION`, 5 opciones) · de una sola marca para que nadie pueda decir «apartamento» y «casa» a la vez · la quinta no está en el libro y se añadió adrede · ⚠️ el `UPDATE` va **incondicional** porque un guarda se quedaría en nada para siempre y sin avisar.
 - **17-oct** · **Los tres recuadros de Oración filtran la lista** al pulsarlos · la ventana de tiempo sale de **una sola función** para que el número y su lista no discrepen · una prueba vigila el mapa recuadro → filtro, que si no fallaría en silencio · ⚠️ **nadie ha pulsado nunca «Ya oramos por esto»**.
 - **17-oct** · **Pestaña «Histórico» en Operación 72** · ⚠️ **el informe no contaba NINGUNA baja**: 211 de 875 movimientos (24 %) y el salto más frecuente de todos invisible · sin la regla, una baja contaba como **avance** · el preview con datos reales delató que faltaba un panel (40 % fuera) · los colores de la marca fallan el validador · el último tramo va discontinuo.
 - **16-oct** · **El tablero dice cuánto se movió**: ⊕ sobre cada contador y ⊖ rojo al final, con selector de periodo · ⚠️ **hay DOS acciones de baja** y una de 8 entró por la segunda · un giro en el sitio no es entrada · **115 → 21 ms** sin recorrer `audit_log` · y el fallo viejo de los contadores en cero al filtrar.
