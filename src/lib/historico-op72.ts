@@ -10,6 +10,7 @@ import {
   ALTO_SALIDAS,
   FUERA_DEL_TABLERO,
   type Historico,
+  type OtroSalto,
   PASOS_RECORRIDO,
   PUERTAS_SALIDA,
   type Punto,
@@ -161,6 +162,10 @@ export async function cargarHistorico(
   let fueraDeCarril = 0;
   let giros = 0;
   let sinOrigen = 0;
+  // Los saltos de fuera del recorrido, uno por uno. Se acumulan en el MISMO
+  // recuento que `fueraDeCarril` para que el número y su lista no puedan
+  // discrepar (§12.6): no hay dos reglas, hay una.
+  const otros = new Map<string, OtroSalto>();
 
   for (const fila of filas) {
     const posicion = indice.get(claveDeDia(fila.cubo));
@@ -187,8 +192,22 @@ export async function cargarHistorico(
 
     pulso[posicion] += cuantas;
     const paso = PASOS_RECORRIDO.find((p) => p.desde === desde && p.hacia === hacia);
-    if (paso) porPaso.get(paso.clave)![posicion] += cuantas;
-    else fueraDeCarril += cuantas;
+    if (paso) {
+      porPaso.get(paso.clave)![posicion] += cuantas;
+      continue;
+    }
+
+    fueraDeCarril += cuantas;
+    const clave = `${desde}>${hacia}`;
+    const yaVisto = otros.get(clave);
+    if (yaVisto) yaVisto.cuantas += cuantas;
+    else
+      otros.set(clave, {
+        desde: desde as Extremo,
+        hacia: hacia as Extremo,
+        cuantas,
+        sinOrigen: desde === "SIN_REGISTRO",
+      });
   }
 
   const puntos = (valores: number[]): Punto[] =>
@@ -235,6 +254,7 @@ export async function cargarHistorico(
     // sí, que es la pregunta («¿salen más por la puerta buena o por la mala?»).
     salidasTope: topeDe(salidas.flatMap((serie) => serie.puntos.map((p) => p.valor))),
     fueraDeCarril,
+    otrosSaltos: [...otros.values()],
     giros,
     antesDeLaAuditoria: rango.desde < INICIO_AUDITORIA_OP72,
     sinOrigen,

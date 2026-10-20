@@ -232,7 +232,11 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   las tres puertas de salida y la tabla. Rango libre y grano Día / Semana /
   Mes; abre con **las últimas 8 semanas** (el defecto del informe, «esta
   semana», dejaría un solo tramo). Cada punto abre la ventana de detalle. Libs:
-  `src/lib/historico-op72.ts` (+ catálogo). **Las salidas van aparte de la
+  `src/lib/historico-op72.ts` (+ catálogo). **Y «fuera del recorrido» es una
+  lista, no una frase** (20-oct): los saltos que no son ninguno de los siete
+  paneles van uno por uno y abribles, repartidos en «se saltaron un paso» y «no
+  se sabe de qué lista venían» — **eran el 28 % de lo medido** y los dos grupos
+  significan cosas distintas. **Las salidas van aparte de la
   línea a propósito**: las bajas son limpiezas puntuales (198 de 211 en ocho
   días) y sumadas aplastarían la medida del trabajo semanal.
 - **El tablero de Operación 72 dice cuánto se movió** (16-oct): encima de cada
@@ -677,6 +681,16 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
      formulario» de llamadas. La diferencia entre las dos es lo que hay que
      vigilar, así que no se tira: se enseña debajo.
   Y lo anulado no se cuenta en ninguna de las dos.
+- **⚠️ UN «OTROS» GRANDE NO ES UN RESUMEN, ES UN ESCONDITE — Y DOS CIFRAS
+  PARECIDAS EN LA MISMA PANTALLA SE LEEN COMO LA MISMA.** En el histórico, los
+  movimientos que no cabían en ningún panel eran **141 de 508 (el 28 %)** y se
+  decían en una frase que no se podía abrir; encima, el aviso de arriba hablaba
+  de **139** «sin origen conocido» y el pie de **141** «fuera de carril»: nadie
+  iba a suponer que son grupos distintos que **solo comparten 96**. Separados,
+  aparecen **45 saltos reales del equipo** que la suma tapaba. **Si un «otros»
+  pasa de una décima parte del total, hay que desglosarlo y hacerlo abrible; y
+  si dos números de la misma pantalla casi coinciden sin ser lo mismo, uno de
+  los dos está mal nombrado.**
 - **El orden en la pantalla es la única forma de decir ciertas cosas sin un
   cartel**: lo que caduca o bloquea a alguien va **arriba del todo**.
 - **⚠️ SI UN NÚMERO SE PUEDE PULSAR PARA VER DE DÓNDE SALE, EL NÚMERO Y SU
@@ -768,6 +782,7 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ### `docs/bitacora/2026-10.md` — octubre de 2026 (25 entradas)
 
+- **20-oct** · **«Fuera del recorrido» del histórico pasa de una frase a una lista abrible** · eran **141 de 508 movimientos (28 %)** resumidos en un renglón · ⚠️ **139 y 141 parecían la misma cifra y solo 96 coinciden**: separadas, salen **45 saltos reales del equipo** · los 12 pares cuadran con la ventana, comprobado contra producción.
 - **20-oct** · **La 10 del taller 3 pasa de escribir a marcar** (`OPCION`, 5 opciones) · de una sola marca para que nadie pueda decir «apartamento» y «casa» a la vez · la quinta no está en el libro y se añadió adrede · ⚠️ el `UPDATE` va **incondicional** porque un guarda se quedaría en nada para siempre y sin avisar.
 - **17-oct** · **Los tres recuadros de Oración filtran la lista** al pulsarlos · la ventana de tiempo sale de **una sola función** para que el número y su lista no discrepen · una prueba vigila el mapa recuadro → filtro, que si no fallaría en silencio · ⚠️ **nadie ha pulsado nunca «Ya oramos por esto»**.
 - **17-oct** · **Pestaña «Histórico» en Operación 72** · ⚠️ **el informe no contaba NINGUNA baja**: 211 de 875 movimientos (24 %) y el salto más frecuente de todos invisible · sin la regla, una baja contaba como **avance** · el preview con datos reales delató que faltaba un panel (40 % fuera) · los colores de la marca fallan el validador · el último tramo va discontinuo.
