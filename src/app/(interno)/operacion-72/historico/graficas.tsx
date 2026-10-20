@@ -7,13 +7,15 @@ import {
   ALTO_SALIDAS,
   ANCHO_VISTA,
   type Historico,
+  type OtroSalto,
   PUERTAS_SALIDA,
   type Punto,
   puntosEnCoordenadas,
+  repartirOtrosSaltos,
   rutasDeLinea,
   type Serie,
 } from "@/lib/historico-op72-catalogo";
-import type { Desglose } from "@/lib/informe-detalle-catalogo";
+import { type Desglose, ETIQUETA_EXTREMO } from "@/lib/informe-detalle-catalogo";
 import { VentanaDesglose } from "@/components/ventana-desglose";
 import { pedirPersonasDelTramo } from "./acciones";
 
@@ -29,7 +31,15 @@ import { pedirPersonasDelTramo } from "./acciones";
 
 type Peticion = { desde: string | null; hacia: string; tramoDesde: string; tramoHasta: string };
 
-export function Graficas({ historico }: { historico: Historico }) {
+export function Graficas({
+  historico,
+  periodo,
+}: {
+  historico: Historico;
+  /// El periodo entero de la pantalla. Los saltos de fuera del recorrido no
+  /// tienen gráfica, así que se abren por el periodo completo, no por un tramo.
+  periodo: { inicio: string; fin: string };
+}) {
   const [abierta, setAbierta] = useState(false);
   const [datos, setDatos] = useState<Desglose | null>(null);
   const [cargando, setCargando] = useState(false);
@@ -75,10 +85,7 @@ export function Graficas({ historico }: { historico: Historico }) {
             <Panel key={serie.clave} serie={serie} alAbrir={abrir} />
           ))}
         </div>
-        <PieDeLosPasos
-          fueraDeCarril={historico.fueraDeCarril}
-          giros={historico.giros}
-        />
+        <PieDeLosPasos historico={historico} periodo={periodo} alAbrir={abrir} />
       </section>
 
       <Salidas historico={historico} alAbrir={abrir} />
@@ -204,30 +211,128 @@ function Pulso({ historico }: { historico: Historico }) {
   );
 }
 
-/// Lo que los seis paneles NO cuentan, dicho en voz alta. **Solo cuando hay
-/// algo que decir**: un pie que sale siempre, con dos ceros, se deja de leer
-/// (§12.6).
-function PieDeLosPasos({ fueraDeCarril, giros }: { fueraDeCarril: number; giros: number }) {
-  if (fueraDeCarril === 0 && giros === 0) return null;
-
-  const frases: string[] = [];
-  if (fueraDeCarril > 0) {
-    frases.push(
-      `Otros ${fueraDeCarril} movimientos no siguieron este orden: saltos de columna, correcciones a mano o regresos.`,
-    );
-  }
-  if (giros > 0) {
-    frases.push(
-      giros === 1
-        ? "Y a una persona se le volvió a intentar sin que la tarjeta cambiara de lista: es trabajo hecho, pero no es un movimiento."
-        : `Y a ${giros} personas se les volvió a intentar sin que la tarjeta cambiara de lista: es trabajo hecho, pero no es un movimiento.`,
-    );
-  }
+/// **Lo que los siete paneles NO cuentan, dicho con nombre y abrible.**
+///
+/// ⚠️ **Antes era una sola frase, y esa frase tapaba el 28 % de la pantalla.**
+/// Medido el 20-oct sobre las últimas ocho semanas: 141 de 508 movimientos
+/// caían aquí. Quien lo leía no podía saber si eran correcciones de
+/// administración o trabajo del equipo mal registrado — y resulta que son las
+/// dos cosas, en proporciones muy distintas.
+///
+/// **Se reparten en dos grupos porque son dos cosas**: 96 eran tarjetas sin
+/// historial (un hueco de la auditoría, no un salto de nadie) y **45 saltos
+/// reales que se saltaron un paso**, que es la señal que vale la pena mirar.
+///
+/// Sale **solo cuando hay algo que decir**: un pie que aparece siempre, con
+/// ceros, se deja de leer (§12.6).
+function PieDeLosPasos({
+  historico,
+  periodo,
+  alAbrir,
+}: {
+  historico: Historico;
+  periodo: { inicio: string; fin: string };
+  alAbrir: (peticion: Peticion) => void;
+}) {
+  const { conocidos, sinOrigen, totalConocidos, totalSinOrigen } = repartirOtrosSaltos(
+    historico.otrosSaltos,
+  );
+  if (conocidos.length === 0 && sinOrigen.length === 0 && historico.giros === 0) return null;
 
   return (
-    <p className="mt-[10px] text-[11.5px] leading-[1.5] font-medium text-[rgba(19,28,36,.55)]">
-      {frases.join(" ")}
-    </p>
+    <div className="mt-[11px] rounded-[12px] border border-[rgba(19,28,36,.12)] bg-[rgba(19,28,36,.02)] p-[14px]">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h3 className="text-[12.5px] leading-none font-bold text-tinta">Fuera del recorrido</h3>
+        <p className="text-[11.5px] leading-none font-semibold text-[rgba(19,28,36,.6)]">
+          {historico.fueraDeCarril} movimientos que no son ninguno de los paneles de arriba
+        </p>
+      </div>
+
+      {conocidos.length > 0 ? (
+        <GrupoDeSaltos
+          titulo="Se saltaron un paso, o volvieron atrás"
+          pie="Casi siempre es que se llenó el formulario de un paso sin llenar antes el del anterior."
+          total={totalConocidos}
+          saltos={conocidos}
+          periodo={periodo}
+          alAbrir={alAbrir}
+        />
+      ) : null}
+
+      {sinOrigen.length > 0 ? (
+        <GrupoDeSaltos
+          titulo="No se sabe de qué lista venían"
+          pie="Su tarjeta ya existía cuando empezó la auditoría, en agosto de 2026. Es un hueco del historial, no un salto de nadie."
+          total={totalSinOrigen}
+          saltos={sinOrigen}
+          periodo={periodo}
+          alAbrir={alAbrir}
+        />
+      ) : null}
+
+      {historico.giros > 0 ? (
+        <p className="mt-[11px] border-t border-[rgba(19,28,36,.1)] pt-[9px] text-[11.5px] leading-[1.5] font-medium text-[rgba(19,28,36,.55)]">
+          {historico.giros === 1
+            ? "Aparte, a una persona se le volvió a intentar sin que la tarjeta cambiara de lista:"
+            : `Aparte, a ${historico.giros} personas se les volvió a intentar sin que la tarjeta cambiara de lista:`}{" "}
+          es trabajo hecho, pero no es un movimiento, así que no entra en ninguna gráfica.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function GrupoDeSaltos({
+  titulo,
+  pie,
+  total,
+  saltos,
+  periodo,
+  alAbrir,
+}: {
+  titulo: string;
+  pie: string;
+  total: number;
+  saltos: OtroSalto[];
+  periodo: { inicio: string; fin: string };
+  alAbrir: (peticion: Peticion) => void;
+}) {
+  return (
+    <div className="mt-[11px]">
+      <p className="text-[11px] leading-none font-extrabold tracking-[.1em] text-[rgba(19,28,36,.5)] uppercase">
+        {titulo} · {total}
+      </p>
+      <ul className="mt-[7px] grid grid-cols-1 gap-[5px] sm:grid-cols-2">
+        {saltos.map((salto) => (
+          <li key={`${salto.desde}-${salto.hacia}`}>
+            <button
+              type="button"
+              onClick={() =>
+                alAbrir({
+                  desde: salto.desde,
+                  hacia: salto.hacia,
+                  tramoDesde: periodo.inicio,
+                  tramoHasta: periodo.fin,
+                })
+              }
+              className="flex w-full items-baseline justify-between gap-2 rounded-[8px] bg-white px-[10px] py-[7px] text-left"
+            >
+              <span className="text-[11.5px] leading-[1.35] font-semibold text-tinta">
+                {salto.sinOrigen
+                  ? `→ ${ETIQUETA_EXTREMO[salto.hacia]}`
+                  : `${ETIQUETA_EXTREMO[salto.desde]} → ${ETIQUETA_EXTREMO[salto.hacia]}`}
+              </span>
+              <span className="shrink-0 text-[12.5px] leading-none font-extrabold text-azul-900">
+                {salto.cuantas}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-[6px] text-[11px] leading-[1.45] font-medium text-[rgba(19,28,36,.5)]">
+        {pie}
+      </p>
+    </div>
   );
 }
 

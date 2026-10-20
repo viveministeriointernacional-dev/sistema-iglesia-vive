@@ -156,7 +156,10 @@ export default async function HistoricoOperacion72({
 
         <Avisos historico={historico} ajustado={ajustado} grano={grano} />
 
-        <Graficas historico={historico} />
+        <Graficas
+          historico={historico}
+          periodo={{ inicio: rango.inicio, fin: rango.fin }}
+        />
       </div>
     </main>
   );

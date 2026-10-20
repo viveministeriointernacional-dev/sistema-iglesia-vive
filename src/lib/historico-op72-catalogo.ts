@@ -125,6 +125,51 @@ export type PuertaSalida = (typeof PUERTAS_SALIDA)[number];
 /// Los tres destinos que sacan a alguien del tablero.
 export const FUERA_DEL_TABLERO: Extremo[] = ["ENTREGADA", "CERRADA", "BAJA"];
 
+/// **Un salto que no es ninguno de los siete pasos ni una salida.** Existe:
+/// medido el 20-oct sobre las últimas ocho semanas, son **141 de 508
+/// movimientos (el 28 %)**, y hasta hoy la pantalla los resumía en una sola
+/// frase que no se podía abrir.
+export type OtroSalto = {
+  desde: Extremo;
+  hacia: Extremo;
+  cuantas: number;
+  /// **No se sabe de qué lista venía**: la tarjeta ya existía cuando empezó la
+  /// auditoría. No es un salto raro del equipo, es un hueco del historial, y
+  /// mezclarlo con los demás hace ilegibles los dos.
+  sinOrigen: boolean;
+};
+
+/// Los saltos de fuera del recorrido, repartidos en las **dos cosas distintas**
+/// que de verdad son, y cada grupo de mayor a menor.
+///
+/// ⚠️ **Mezclarlos engaña, y se vio con los números de verdad.** El aviso de
+/// arriba decía «de 139 movimientos no se sabe de qué lista venía» y el pie
+/// «otros 141 no siguieron este orden»: dos cifras casi iguales que parecen la
+/// misma y no lo son —solo 96 están en las dos—. Separadas, la segunda baja a
+/// **45**, y esos 45 sí son una señal sobre cómo trabaja el equipo: se llenó el
+/// formulario de un paso sin llenar el del paso anterior.
+///
+/// El empate se rompe por el nombre para que el orden no dependa de cómo
+/// llegaron las filas de la base.
+export function repartirOtrosSaltos(saltos: OtroSalto[]): {
+  conocidos: OtroSalto[];
+  sinOrigen: OtroSalto[];
+  totalConocidos: number;
+  totalSinOrigen: number;
+} {
+  const orden = (a: OtroSalto, b: OtroSalto) =>
+    b.cuantas - a.cuantas || `${a.desde}${a.hacia}`.localeCompare(`${b.desde}${b.hacia}`);
+  const conocidos = saltos.filter((salto) => !salto.sinOrigen).sort(orden);
+  const sinOrigen = saltos.filter((salto) => salto.sinOrigen).sort(orden);
+  const suma = (lista: OtroSalto[]) => lista.reduce((total, s) => total + s.cuantas, 0);
+  return {
+    conocidos,
+    sinOrigen,
+    totalConocidos: suma(conocidos),
+    totalSinOrigen: suma(sinOrigen),
+  };
+}
+
 /// Un punto de cualquier serie. La etiqueta viene escrita del servidor, en
 /// hora de Colombia (§12.1).
 export type Punto = {
@@ -169,9 +214,13 @@ export type Historico = {
   salidas: Serie[];
   salidasTotal: number;
   salidasTope: number;
-  /// Movimientos que no siguieron ninguno de los seis pasos ni salieron: saltos
-  /// de carril, correcciones a mano, regresos. Se dicen, no se esconden.
+  /// Movimientos que no siguieron ninguno de los siete pasos ni salieron:
+  /// saltos de carril, correcciones a mano, regresos. Se dicen, no se esconden.
   fueraDeCarril: number;
+  /// **Los mismos, uno por uno y abribles.** Suman exactamente
+  /// `fueraDeCarril`: el número y su lista se cuentan con la misma regla
+  /// porque salen del mismo recuento (§12.6).
+  otrosSaltos: OtroSalto[];
   /// Los que se volvieron a intentar y la tarjeta no se movió.
   giros: number;
   /// true cuando el periodo empieza antes de que hubiera auditoría.

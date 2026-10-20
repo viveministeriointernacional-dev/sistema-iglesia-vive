@@ -7,8 +7,10 @@ import {
   FUERA_DEL_TABLERO,
   PASOS_RECORRIDO,
   PUERTAS_SALIDA,
+  type OtroSalto,
   type Punto,
   puntosEnCoordenadas,
+  repartirOtrosSaltos,
   rutasDeLinea,
   topeDe,
 } from "./historico-op72-catalogo";
@@ -120,4 +122,106 @@ test("el tramo en curso se devuelve como un trazo aparte", () => {
   const cerrados = rutasDeLinea(serie([10, 8, 2]), 10, ALTO_PANEL);
   assert.equal(cerrados.enCurso, "");
   assert.equal(cerrados.firme.split("L").length - 1, 2);
+});
+
+// ------------------------------- Los saltos de fuera del recorrido
+
+function salto(desde: Extremo, hacia: Extremo, cuantas: number): OtroSalto {
+  return { desde, hacia, cuantas, sinOrigen: desde === "SIN_REGISTRO" };
+}
+
+/// Lo medido el 20-oct en producción sobre las últimas ocho semanas. Se usa
+/// tal cual porque es el caso que de verdad se pinta.
+const MEDIDOS: OtroSalto[] = [
+  salto("SIN_REGISTRO", "SEGUIMIENTO", 51),
+  salto("SIN_REGISTRO", "VISITA_PENDIENTE", 24),
+  salto("SIN_REGISTRO", "CONTACTADA", 15),
+  salto("SEGUIMIENTO", "LISTA_PARA_ENTREGA", 12),
+  salto("INICIADA", "LISTA_PARA_ENTREGA", 12),
+  salto("SEGUIMIENTO", "VISITA_PENDIENTE", 10),
+  salto("CONTACTADA", "LISTA_PARA_ENTREGA", 7),
+  salto("SIN_REGISTRO", "LISTA_PARA_ENTREGA", 6),
+  salto("LISTA_PARA_ENTREGA", "VISITA_PENDIENTE", 1),
+  salto("BAJA", "CONTACTADA", 1),
+  salto("BAJA", "SEGUIMIENTO", 1),
+  salto("LISTA_PARA_ENTREGA", "CONTACTADA", 1),
+];
+
+test("el reparto separa los saltos reales de los huecos del historial", () => {
+  const { conocidos, sinOrigen, totalConocidos, totalSinOrigen } = repartirOtrosSaltos(MEDIDOS);
+
+  // Los números medidos: 96 sin origen y 45 saltos de verdad, que juntos
+  // daban el 141 opaco de antes.
+  assert.equal(totalSinOrigen, 96);
+  assert.equal(totalConocidos, 45);
+  assert.equal(totalConocidos + totalSinOrigen, 141);
+
+  // Y ninguno se queda por el camino: el número y su lista salen del mismo
+  // recuento (§12.6).
+  assert.equal(conocidos.length + sinOrigen.length, MEDIDOS.length);
+  assert.ok(sinOrigen.every((s) => s.desde === "SIN_REGISTRO"));
+  assert.ok(conocidos.every((s) => s.desde !== "SIN_REGISTRO"));
+});
+
+test("cada grupo va de mayor a menor", () => {
+  const { conocidos, sinOrigen } = repartirOtrosSaltos(MEDIDOS);
+  for (const lista of [conocidos, sinOrigen]) {
+    for (let i = 1; i < lista.length; i += 1) {
+      assert.ok(lista[i - 1].cuantas >= lista[i].cuantas, "el orden tiene que ser descendente");
+    }
+  }
+  assert.equal(conocidos[0].cuantas, 12);
+  assert.equal(sinOrigen[0].cuantas, 51);
+});
+
+/// Probado al revés (§12.8): el orden no puede depender de cómo llegaron las
+/// filas de la base, o la lista se reordenaría sola entre dos cargas iguales y
+/// nadie sabría por qué.
+test("el empate se rompe igual venga como venga de la base", () => {
+  const derecho = repartirOtrosSaltos([
+    salto("INICIADA", "LISTA_PARA_ENTREGA", 12),
+    salto("SEGUIMIENTO", "LISTA_PARA_ENTREGA", 12),
+  ]);
+  const alReves = repartirOtrosSaltos([
+    salto("SEGUIMIENTO", "LISTA_PARA_ENTREGA", 12),
+    salto("INICIADA", "LISTA_PARA_ENTREGA", 12),
+  ]);
+  assert.deepEqual(
+    derecho.conocidos.map((s) => s.desde),
+    alReves.conocidos.map((s) => s.desde),
+  );
+});
+
+/// Un salto de fuera del recorrido NO puede ser uno de los paneles: si lo
+/// fuera, se contaría dos veces y el pie contradiría la gráfica de arriba.
+test("ningún salto de los paneles cabe en «fuera del recorrido»", () => {
+  for (const s of MEDIDOS) {
+    const esPanel = PASOS_RECORRIDO.some((p) => p.desde === s.desde && p.hacia === s.hacia);
+    assert.ok(!esPanel, `${s.desde}>${s.hacia} tiene panel propio: no puede estar aquí`);
+  }
+});
+
+/// Y ninguno puede ser una salida: esas tienen su propia gráfica.
+test("ninguna salida cae en «fuera del recorrido»", () => {
+  for (const s of MEDIDOS) {
+    assert.ok(
+      !PUERTAS_SALIDA.some((puerta) => puerta.hacia === s.hacia),
+      `${s.hacia} es una puerta de salida`,
+    );
+  }
+});
+
+test("sin nada fuera del recorrido el reparto queda en cero, no en NaN", () => {
+  const vacio = repartirOtrosSaltos([]);
+  assert.deepEqual(vacio.conocidos, []);
+  assert.deepEqual(vacio.sinOrigen, []);
+  assert.equal(vacio.totalConocidos, 0);
+  assert.equal(vacio.totalSinOrigen, 0);
+});
+
+test("todos los extremos medidos existen en el catálogo", () => {
+  for (const s of MEDIDOS) {
+    assert.ok(EXTREMOS.includes(s.desde), `${s.desde} no es un extremo válido`);
+    assert.ok(EXTREMOS.includes(s.hacia), `${s.hacia} no es un extremo válido`);
+  }
 });
