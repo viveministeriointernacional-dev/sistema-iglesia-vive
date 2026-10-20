@@ -347,6 +347,25 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   Método: todo en **una sola transacción**, probada antes con `BEGIN … ROLLBACK`
   en la misma llamada. Verificado después: **1 sola ficha** con ese correo y ese
   celular, 12 hitos, 2 declaraciones, 1 contacto de CRM, 1 discípula.
+- **Saray Barreiro (20-oct):** consolidadora puesta a mano en **Johanna
+  Quintero Correa** porque **manda HighLevel** (decisión del usuario). Auditado
+  con `origen: "highlevel"`, que es lo que impide devolver el eco al CRM.
+  ⚠️ **Sigue SIN teléfono ni correo**, así que `/contacts/upsert` la rechaza y
+  **no tiene enlace al CRM**: nada suyo sincroniza, y nadie puede llamarla.
+  Su contacto en HighLevel existe (`syOqdckurzAbVfkJWkIv`), pero el webhook lo
+  rechazó como duplicado de ella misma sin guardar el enlace.
+- **Maricela Rojas (20-oct):** creada **a mano por SQL** porque su registro por
+  el formulario **se lo absorbió la ficha de Celina Osorio Rojas**, que tiene
+  el mismo teléfono (**312 3444054**). Decisión del usuario: **son dos personas
+  distintas** — la evidencia es la llamada del 5-oct, donde quien contestó ese
+  número **negó ser Celina**. Se imitaron las **8 escrituras** de
+  `crearRegistroEnTransaccion` (incluido el **código de miembro**, que es fácil
+  de olvidar) más el traslado del contacto `Kbxw0HrXPyU9i26i7ihc`, que era de
+  ella y colgaba de Celina.
+  ⚠️ **PENDIENTE DEL USUARIO:** ese teléfono sigue en **las dos** fichas, así
+  que el próximo registro con él volverá a engancharse mal; y la Op72 de Celina
+  sigue en **CONTACTADA por esa misma llamada**, así que puede que a Celina
+  **nunca se la haya contactado**.
 - **NO fusionar (decisión del usuario, 7-sep):** **Luna Sandoval / Lina Mercedes
   Jovel** (`linitajovel@gmail.com`) y **Nini Guerrón / Dilan Cadena**
   (`ninijguerrons@gmail.com`) **son personas distintas que comparten correo** —
@@ -744,6 +763,29 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   quinta con la nueva.
 - **Al fusionar, revisar nombre Y apellidos**, no solo apellidos.
 - **Lo marcado a mano manda sobre lo automático.**
+- **⚠️ ANTES DE CREAR UNA FICHA POR SQL, LEER `crearRegistroEnTransaccion`
+  ENTERA: SON OCHO ESCRITURAS, NO TRES.** `person` · **`member_code`** (el
+  código de miembro, que es el que más fácil se olvida y sin él la persona no
+  puede entrar al taller) · `learner_profile` · `operation72` · **dos
+  `milestone`** (REGISTRO completado y OPERACION_72 en curso) · **tres filas de
+  `audit_log`** · **dos `integration_event`**. Y si la persona trae petición de
+  oración, una novena en `prayer_request` con `origin: REGISTRO`.
+- **⚠️ Y el consolidador NO se elige a ojo: se corre la regla.** La carga de
+  `asignarConsolidador` **no es «personas activas»**, es **fase GANAR con la
+  Op72 en una de las cinco columnas del tablero** — con el otro criterio salen
+  números muy distintos (Johanna, 7 contra 12). El desempate importa: mayor
+  cupo libre y, a igualdad, **el primero por nombre**, porque el `reduce` solo
+  sustituye con mejora estricta sobre una lista ordenada por `fullName`.
+- **⚠️ Las marcas de tiempo de un INSERT a mano van como
+  `now() AT TIME ZONE 'UTC'`**, nunca `CURRENT_TIMESTAMP`: las columnas son
+  `timestamp without time zone` que guardan UTC, y dejarlo a la zona de la
+  sesión es la trampa de §12.1. Se comprueba contra una fila que ya exista.
+- **⚠️ UN TELÉFONO REPETIDO NO DA UN DUPLICADO: SE TRAGA AL RECIÉN LLEGADO.**
+  El webhook de registro casa por teléfono, y si el número ya está en otra
+  ficha **engancha el contacto nuevo a ESA ficha y no crea nada**. El único
+  rastro es una fila `highlevel.contacto_vinculado` con criterio «Mismo
+  teléfono registrado»; desde fuera se ve igual que un registro perdido. Pasó
+  con Maricela Rojas el 20-oct.
 - Todo en **una sola transacción**, probada antes con `BEGIN … ROLLBACK`.
 
 ### 12.8 Método de trabajo
@@ -806,6 +848,7 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ### `docs/bitacora/2026-10.md` — octubre de 2026 (25 entradas)
 
+- **20-oct** · **Saray y Maricela: dos «no entraron» por causas distintas** · Saray no tenía enlace al CRM (sin teléfono ni correo) · a Maricela **se la absorbió la ficha de Celina por compartir el teléfono** · ⚠️ **me equivoqué dos veces y las desmontó el dato** · Maricela creada a mano: **8 escrituras, no 3**.
 - **20-oct** · ⚠️ **El consolidador NO llegaba a HighLevel al nacer en la plataforma**: `exportarContactoNuevo` no mandaba `assignedTo` y **96 de 154** se exportan así · ahora se pregunta el dueño y **solo se escribe si está vacío** · y Saray no tiene enlace porque **no tiene teléfono ni correo**, que el `upsert` rechaza en silencio.
 - **20-oct** · El bloque nuevo quedó VIVO (PR #130) · ⚠️ **y mi rótulo «se saltaron un paso» era FALSO para 31 de 46**: son el atajo «ya lleva proceso», que salta la visita a propósito · pasa a **«Fueron por otro camino»** · el chunk de página dio 404 con el código vivo, **tercera vez**.
 - **20-oct** · **«Fuera del recorrido» del histórico pasa de una frase a una lista abrible** · eran **141 de 508 movimientos (28 %)** resumidos en un renglón · ⚠️ **139 y 141 parecían la misma cifra y solo 96 coinciden**: separadas, salen **45 saltos reales del equipo** · los 12 pares cuadran con la ventana, comprobado contra producción.
