@@ -234,9 +234,11 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   semana», dejaría un solo tramo). Cada punto abre la ventana de detalle. Libs:
   `src/lib/historico-op72.ts` (+ catálogo). **Y «fuera del recorrido» es una
   lista, no una frase** (20-oct): los saltos que no son ninguno de los siete
-  paneles van uno por uno y abribles, repartidos en «se saltaron un paso» y «no
-  se sabe de qué lista venían» — **eran el 28 % de lo medido** y los dos grupos
-  significan cosas distintas. **Las salidas van aparte de la
+  paneles van uno por uno y abribles, repartidos en **«Fueron por otro camino»**
+  y **«No se sabe de qué lista venían»** — eran el **28 %** de lo medido y los
+  dos grupos significan cosas distintas. ⚠️ El primero **NO se llama «se
+  saltaron un paso»**, y la razón está medida: **31 de sus 46 son el atajo «ya
+  lleva proceso»**, que salta la visita a propósito (§12.6). **Las salidas van aparte de la
   línea a propósito**: las bajas son limpiezas puntuales (198 de 211 en ocho
   días) y sumadas aplastarían la medida del trabajo semanal.
 - **El tablero de Operación 72 dice cuánto se movió** (16-oct): encima de cada
