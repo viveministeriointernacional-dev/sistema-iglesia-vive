@@ -691,6 +691,17 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   pasa de una décima parte del total, hay que desglosarlo y hacerlo abrible; y
   si dos números de la misma pantalla casi coinciden sin ser lo mismo, uno de
   los dos está mal nombrado.**
+- **⚠️ Y AL DESGLOSAR UN «OTROS», EL RÓTULO DEL GRUPO NUEVO ES UNA AFIRMACIÓN:
+  HAY QUE COMPROBARLA.** El mismo día, al partir los 142 del histórico, llamé
+  al grupo «se saltaron un paso» — y **31 de sus 46 son el atajo «ya lleva
+  proceso»**, que se salta la visita **a propósito** (los tres pares hacia
+  «Lista para entrega», 31 de 31 por `pasa_a_entrega_por_proceso_previo`). El
+  rótulo acusaba al equipo de un descuido en dos tercios de los casos: la misma
+  trampa que estaba arreglando, un nivel más abajo. **Antes de nombrar un
+  grupo, mirar QUÉ ACCIÓN produjo sus filas**, no solo de dónde a dónde van. Y
+  si el grupo mezcla causas que el dato no separa, el rótulo nombra **el hecho**
+  y el pie dice las causas **avisando que no las distingue** — partirlo en un
+  grupo más solo vale si su número puede cuadrar con su propia lista.
 - **El orden en la pantalla es la única forma de decir ciertas cosas sin un
   cartel**: lo que caduca o bloquea a alguien va **arriba del todo**.
 - **⚠️ SI UN NÚMERO SE PUEDE PULSAR PARA VER DE DÓNDE SALE, EL NÚMERO Y SU
@@ -782,6 +793,7 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ### `docs/bitacora/2026-10.md` — octubre de 2026 (25 entradas)
 
+- **20-oct** · El bloque nuevo quedó VIVO (PR #130) · ⚠️ **y mi rótulo «se saltaron un paso» era FALSO para 31 de 46**: son el atajo «ya lleva proceso», que salta la visita a propósito · pasa a **«Fueron por otro camino»** · el chunk de página dio 404 con el código vivo, **tercera vez**.
 - **20-oct** · **«Fuera del recorrido» del histórico pasa de una frase a una lista abrible** · eran **141 de 508 movimientos (28 %)** resumidos en un renglón · ⚠️ **139 y 141 parecían la misma cifra y solo 96 coinciden**: separadas, salen **45 saltos reales del equipo** · los 12 pares cuadran con la ventana, comprobado contra producción.
 - **20-oct** · **La 10 del taller 3 pasa de escribir a marcar** (`OPCION`, 5 opciones) · de una sola marca para que nadie pueda decir «apartamento» y «casa» a la vez · la quinta no está en el libro y se añadió adrede · ⚠️ el `UPDATE` va **incondicional** porque un guarda se quedaría en nada para siempre y sin avisar.
 - **17-oct** · **Los tres recuadros de Oración filtran la lista** al pulsarlos · la ventana de tiempo sale de **una sola función** para que el número y su lista no discrepen · una prueba vigila el mapa recuadro → filtro, que si no fallaría en silencio · ⚠️ **nadie ha pulsado nunca «Ya oramos por esto»**.
