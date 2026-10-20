@@ -189,6 +189,17 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   llamada»** → acción **Webhook** (POST, header del secreto, y datos:
   `userId={{user.id}}`, `contactId`, `direction`, `callStatus`, `callDuration`,
   `from`, `to`, `callId`). Parser tolerante en `src/lib/llamada-highlevel.ts`.
+- **El dueño del contacto (consolidador) viaja en DOS momentos**, y hasta el
+  20-oct solo viajaba en uno: al **cambiarlo** (`exportarConsolidador`, desde
+  `consolidador.ts`) y, desde ese día, también al **crear** el contacto
+  (`exportarContactoNuevo`). ⚠️ Al crear **se pregunta primero** quién es el
+  dueño (`consultarDuenoDelContacto`) y **solo se escribe si está vacío**: el
+  `upsert` puede devolver un contacto que ya existía con dueño puesto a mano, y
+  eso manda sobre nuestra regla automática.
+  ⚠️ **Y una persona SIN teléfono y SIN correo no se puede exportar**:
+  `/contacts/upsert` la rechaza, el error se traga (best-effort) y **queda sin
+  enlace**, así que ningún dato suyo sincroniza nunca. Pasó con Saray Barreiro
+  el 20-oct, y era la única de 154.
 - **Mapa de personal ↔ HighLevel:** en la lista «Mi personal» de HighLevel, el
   código bajo cada correo es el **user id de HighLevel**. Se guarda en
   `app_user.highlevel_user_id`. Sirve para: asignar el consolidador dueño de un
@@ -234,9 +245,11 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   semana», dejaría un solo tramo). Cada punto abre la ventana de detalle. Libs:
   `src/lib/historico-op72.ts` (+ catálogo). **Y «fuera del recorrido» es una
   lista, no una frase** (20-oct): los saltos que no son ninguno de los siete
-  paneles van uno por uno y abribles, repartidos en «se saltaron un paso» y «no
-  se sabe de qué lista venían» — **eran el 28 % de lo medido** y los dos grupos
-  significan cosas distintas. **Las salidas van aparte de la
+  paneles van uno por uno y abribles, repartidos en **«Fueron por otro camino»**
+  y **«No se sabe de qué lista venían»** — eran el **28 %** de lo medido y los
+  dos grupos significan cosas distintas. ⚠️ El primero **NO se llama «se
+  saltaron un paso»**, y la razón está medida: **31 de sus 46 son el atajo «ya
+  lleva proceso»**, que salta la visita a propósito (§12.6). **Las salidas van aparte de la
   línea a propósito**: las bajas son limpiezas puntuales (198 de 211 en ocho
   días) y sumadas aplastarían la medida del trabajo semanal.
 - **El tablero de Operación 72 dice cuánto se movió** (16-oct): encima de cada
@@ -793,6 +806,7 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ### `docs/bitacora/2026-10.md` — octubre de 2026 (25 entradas)
 
+- **20-oct** · ⚠️ **El consolidador NO llegaba a HighLevel al nacer en la plataforma**: `exportarContactoNuevo` no mandaba `assignedTo` y **96 de 154** se exportan así · ahora se pregunta el dueño y **solo se escribe si está vacío** · y Saray no tiene enlace porque **no tiene teléfono ni correo**, que el `upsert` rechaza en silencio.
 - **20-oct** · El bloque nuevo quedó VIVO (PR #130) · ⚠️ **y mi rótulo «se saltaron un paso» era FALSO para 31 de 46**: son el atajo «ya lleva proceso», que salta la visita a propósito · pasa a **«Fueron por otro camino»** · el chunk de página dio 404 con el código vivo, **tercera vez**.
 - **20-oct** · **«Fuera del recorrido» del histórico pasa de una frase a una lista abrible** · eran **141 de 508 movimientos (28 %)** resumidos en un renglón · ⚠️ **139 y 141 parecían la misma cifra y solo 96 coinciden**: separadas, salen **45 saltos reales del equipo** · los 12 pares cuadran con la ventana, comprobado contra producción.
 - **20-oct** · **La 10 del taller 3 pasa de escribir a marcar** (`OPCION`, 5 opciones) · de una sola marca para que nadie pueda decir «apartamento» y «casa» a la vez · la quinta no está en el libro y se añadió adrede · ⚠️ el `UPDATE` va **incondicional** porque un guarda se quedaría en nada para siempre y sin avisar.
