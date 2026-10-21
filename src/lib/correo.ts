@@ -1,5 +1,12 @@
 import { variableDeEntorno } from "@/lib/entorno";
 import type { ClientePrisma } from "@/lib/prisma";
+import {
+  asuntoDelCorreo,
+  type Aviso,
+  nombreDePila,
+  type TipoDeEnvio,
+} from "@/lib/recordatorio-casas-de-fe-catalogo";
+import { horaLegible } from "@/lib/reunion-catalogo";
 
 /// Dónde guardar la copia del correo, para poder previsualizarlo después desde
 /// la actividad del día. Es opcional y best-effort: si la tabla no existe o el
@@ -384,6 +391,141 @@ export async function correoTalleresDeCasaDeFe(datos: {
       </p>
       <p style="font-size:12.5px;color:#8a929a">
         No necesitas contraseña ni crear una cuenta.
+      </p>
+    `),
+  });
+}
+
+/// **El recordatorio de las Casas de Fe del día.**
+///
+/// Uno por persona, no uno por casa: quien lleva siete casas recibiría siete
+/// correos a la semana y dejaría de abrirlos (§12.6). Las direcciones y el
+/// «Cómo llegar» van **aquí** y no en el WhatsApp, que se queda con el resumen
+/// corto: tres direcciones completas no se leen en el celular.
+///
+/// Si la persona además acompaña como mentor, las casas de su línea van en un
+/// bloque aparte y **se dice que no tiene que ir** — si no, un correo que lista
+/// cuatro reuniones se lee como cuatro obligaciones.
+export async function correoRecordatorioCasaDeFe(datos: {
+  to: string;
+  /// El aviso entero, tal como lo armó el catálogo.
+  ///
+  /// ⚠️ **Recibe el `Aviso` y no sus trozos a propósito.** La primera versión
+  /// de esta función tomaba `propias` y `deLinea` por separado y volvía a
+  /// construir un `Aviso` de mentira solo para pedirle el asunto: dos sitios
+  /// armando la misma cosa, que es exactamente lo que se desincroniza sin que
+  /// nada avise (§12.6). El asunto y el cuerpo salen del mismo objeto.
+  aviso: Aviso;
+  tipo: TipoDeEnvio;
+  registro?: RegistroDeCorreo;
+}): Promise<ResultadoCorreo> {
+  const cuando = datos.tipo === "DIA" ? "Hoy" : "Mañana";
+  const nombre = nombreDePila(datos.aviso.nombre);
+  const asunto = asuntoDelCorreo(datos.aviso, datos.tipo);
+
+  const propias = datos.aviso.propias
+    .map((casa) => {
+      const boton = casa.comoLlegar
+        ? `<p style="margin:10px 0 0">
+             <a href="${casa.comoLlegar}"
+                style="background:#0e2a4e;color:#fff;text-decoration:none;padding:11px 15px;border-radius:9px;font-weight:bold;font-size:13px;display:inline-block">
+               Cómo llegar
+             </a>
+           </p>`
+        : `<p style="margin:10px 0 0;font-size:12.5px;color:#8a929a">
+             A esta casa todavía no le han puesto la dirección en la plataforma.
+           </p>`;
+      return `
+        <div style="margin:10px 0;border:1px solid #c9ccd1;border-radius:12px;padding:14px 16px">
+          <p style="margin:0;font-size:24px;font-weight:bold;color:#0e2a4e">${escapar(
+            horaLegible(casa.hora),
+          )}</p>
+          <p style="margin:4px 0 0;font-size:15px;font-weight:bold">${escapar(casa.nombre)}</p>
+          ${
+            casa.direccion
+              ? `<p style="margin:6px 0 0;font-size:13.5px">${escapar(casa.direccion)}</p>`
+              : ""
+          }
+          <p style="margin:4px 0 0;font-size:13px;color:#4a5560">${casa.miembros} ${
+            casa.miembros === 1 ? "miembro inscrito" : "miembros inscritos"
+          }</p>
+          ${boton}
+        </div>`;
+    })
+    .join("");
+
+  const linea = datos.aviso.deLinea
+    .map(
+      (casa) => `
+        <tr>
+          <td style="padding:8px 12px 8px 0;border-bottom:1px solid #e7e3d8;font-size:13.5px;font-weight:bold;color:#0e2a4e;white-space:nowrap">${escapar(
+            horaLegible(casa.hora),
+          )}</td>
+          <td style="padding:8px 12px 8px 0;border-bottom:1px solid #e7e3d8;font-size:13.5px;font-weight:bold">${escapar(
+            casa.nombre,
+          )}</td>
+          <td style="padding:8px 12px 8px 0;border-bottom:1px solid #e7e3d8;font-size:13px;color:#4a5560">${escapar(
+            casa.lider,
+          )}</td>
+          <td style="padding:8px 0;border-bottom:1px solid #e7e3d8;font-size:13px;color:#4a5560;text-align:right">${
+            casa.miembros
+          }</td>
+        </tr>`,
+    )
+    .join("");
+
+  const bloqueDeLinea =
+    datos.aviso.deLinea.length === 0
+      ? ""
+      : `
+        <p style="font-size:11px;font-weight:bold;letter-spacing:.1em;color:#8a929a;margin-top:24px">
+          ${datos.aviso.propias.length > 0 ? "ADEMÁS, DE TU LÍNEA" : `DE TU LÍNEA, ${cuando.toUpperCase()}`}
+        </p>
+        <p style="font-size:12.5px;color:#4a5560;margin:6px 0 0">
+          No tienes que ir. Es para que sepas qué está abierto y a quién
+          preguntarle después.
+        </p>
+        <table style="width:100%;border-collapse:collapse;margin-top:8px">${linea}</table>`;
+
+  const cierre =
+    datos.aviso.propias.length === 0
+      ? ""
+      : `
+        <div style="margin:18px 0 0;border:1px solid #c9ccd1;border-radius:12px;padding:14px 16px;background:#f7f5ee">
+          <p style="font-size:11px;font-weight:bold;letter-spacing:.1em;color:#8a929a;margin:0">
+            ${datos.tipo === "DIA" ? "SI HOY NO SE PUEDE" : "POR QUÉ TE LLEGA ESTA NOCHE"}
+          </p>
+          <p style="font-size:12.5px;color:#4a5560;margin:7px 0 0">
+            ${
+              datos.tipo === "DIA"
+                ? `Avísale a tu mentor y a los miembros. El grupo no se cierra por
+                   faltar un día, pero que nadie llegue a una casa que no abrió.`
+                : `Tu casa se reúne antes de las 9 de la mañana, así que el aviso
+                   de mañana temprano te llegaría cuando ya estuvieras reunida.`
+            }
+          </p>
+        </div>`;
+
+  return enviarCorreo({
+    to: datos.to,
+    subject: asunto,
+    registro: datos.registro,
+    html: MARCO(`
+      <p>Hola ${escapar(nombre)}.</p>
+      ${
+        datos.aviso.propias.length > 0
+          ? `<p style="font-size:15px">${cuando} te reúnes con ${
+              datos.aviso.propias.length === 1
+                ? "tu Casa de Fe"
+                : `<strong>${datos.aviso.propias.length}</strong> Casas de Fe`
+            }.</p>${propias}`
+          : ""
+      }
+      ${bloqueDeLinea}
+      ${cierre}
+      <p style="font-size:12px;color:#8a929a;margin-top:22px">
+        Este aviso sale solo los días que tus casas se reúnen. Si cambias el día
+        o la hora en la plataforma, el recordatorio cambia contigo.
       </p>
     `),
   });

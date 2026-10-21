@@ -156,6 +156,7 @@ model AppUser {
   cuestionarioRevisiones    LeaderQuizReview[]          @relation("RevisoCuestionario")
   peticionesRegistradas     PrayerRequest[]             @relation("PeticionRegistrada")
   peticionesOradas          PrayerRequest[]             @relation("PeticionOrada")
+  recordatoriosDeCasa       FaithHouseReminder[]
 
   @@index([role, active])
   @@map("app_user")
@@ -1950,4 +1951,44 @@ model PrayerRequest {
   @@index([prayedAt])
   @@index([personId])
   @@map("prayer_request")
+}
+
+
+/// **Lo que ya se le mandó a alguien del recordatorio de Casas de Fe.**
+///
+/// Existe por una razón: que el envio sea idempotente. El disparador es un
+/// workflow de HighLevel llamando a un webhook, y un workflow se reintenta,
+/// se duplica o queda configurado dos veces sin que nadie se entere. El indice
+/// unico de abajo es lo que impide el segundo WhatsApp del mismo dia.
+///
+/// Y de paso deja VER que se mando. Los dos fallos del 20-oct —el contacto de
+/// Saray que no se pudo exportar y el registro de Maricela absorbido por otra
+/// ficha— fueron del mismo tipo: algo no paso y solo quedo en un log.
+model FaithHouseReminder {
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  /// El dia de las REUNIONES que resume, «AAAA-MM-DD».
+  ///
+  /// ⚠️ Es texto y no `@db.Date` a proposito: las fechas civiles de este
+  /// proyecto viajan como texto de punta a punta (§12.1) para no volver a
+  /// tropezar con la zona horaria, y esta columna solo se compara por igualdad.
+  scopeDate String @map("scope_date")
+  /// DIA (el resumen de la mañana) o NOCHE_ANTES (las de mañana de madrugada).
+  kind String
+  /// Cuantas casas resumio, en total y cuantas eran suyas. Responde «¿por que
+  /// no me llego?» sin reconstruir el dia.
+  groups         Int      @default(0)
+  ownGroups      Int      @default(0)
+  emailSent      Boolean  @default(false) @map("email_sent")
+  whatsappQueued Boolean  @default(false) @map("whatsapp_queued")
+  /// Por que no salio, cuando no salio. Un envio que falla sin decir el motivo
+  /// es imposible de diagnosticar desde fuera.
+  failure   String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, scopeDate, kind], map: "faith_house_reminder_unico")
+  @@index([scopeDate], map: "faith_house_reminder_scope_date_idx")
+  @@map("faith_house_reminder")
 }

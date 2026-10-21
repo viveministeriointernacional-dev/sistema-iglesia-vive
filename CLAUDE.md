@@ -200,6 +200,19 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   `/contacts/upsert` la rechaza, el error se traga (best-effort) y **queda sin
   enlace**, así que ningún dato suyo sincroniza nunca. Pasó con Saray Barreiro
   el 20-oct, y era la única de 154.
+- **El recordatorio de Casas de Fe, por WhatsApp**: el sistema escribe el texto
+  completo en el campo **«Recordatorio de casa de fe»** (uno solo: el mensaje lo
+  arma el sistema, que es el único que sabe cuántas casas tiene hoy esa persona)
+  y mueve la etiqueta **`casa-de-fe-recordatorio`**, que es la que dispara el
+  workflow. El campo se busca **por nombre** con `buscarIdsDeCampos`, así que no
+  hay ningún id que copiar.
+  ⚠️ **La etiqueta se QUITA y se vuelve a poner.** El workflow escucha «se
+  añadió esta etiqueta»; del segundo día en adelante ya está puesta, añadirla
+  otra vez no es un cambio y **el mensaje no sale**. Sin eso el recordatorio
+  funciona un día y nunca más.
+  ⚠️ **Y si el campo no existe, no se toca la etiqueta**: aquí el campo **es**
+  el mensaje, así que disparar sin él manda un WhatsApp vacío. (El acceso al
+  taller hace lo contrario a propósito: ahí falta un dato, no el mensaje.)
 - **Mapa de personal ↔ HighLevel:** en la lista «Mi personal» de HighLevel, el
   código bajo cada correo es el **user id de HighLevel**. Se guarda en
   `app_user.highlevel_user_id`. Sirve para: asignar el consolidador dueño de un
@@ -252,6 +265,21 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   lleva proceso»**, que salta la visita a propósito (§12.6). **Las salidas van aparte de la
   línea a propósito**: las bajas son limpiezas puntuales (198 de 211 en ocho
   días) y sumadas aplastarían la medida del trabajo semanal.
+- **Recordatorio de las Casas de Fe** (21-oct): correo + WhatsApp al **líder**,
+  a sus **encargados** y al **mentor de la línea**, con las casas que se reúnen
+  ese día. Libs: `src/lib/recordatorio-casas-de-fe.ts` (+ catálogo), webhook
+  `POST /api/recordatorios/casas-de-fe`. **Lo dispara un workflow de HighLevel
+  con horario, dos veces al día** (`{"tipo":"DIA"}` temprano y
+  `{"tipo":"NOCHE_ANTES"}` por la tarde) — ⚠️ **no un Cron Trigger: el worker de
+  OpenNext solo exporta `fetch`, no `scheduled`** (§12.2). **Cuatro reglas que
+  lo sostienen:** un aviso por **persona y día**, no por casa (el líder que más
+  lleva tiene 7 casas y el mentor con más línea recibiría 19 avisos semanales);
+  **si la casa se reúne antes de las 9:00 a. m. el aviso sale la noche
+  anterior**, porque tres casas reales empiezan a las 06:00, 07:00 y 08:34; es
+  **idempotente** por el índice único de `faith_house_reminder` (usuario · día ·
+  tipo), así que el workflow se puede reintentar; y **las direcciones van solo
+  al correo**. El WhatsApp sale por **etiqueta + campo personalizado**, igual
+  que el acceso al taller.
 - **El tablero de Operación 72 dice cuánto se movió** (16-oct): encima de cada
   contador de «Ver solo» va un **⊕ con cuántas entraron** a esa lista en el
   periodo, y al final un **⊖ rojo con cuántas salieron** de Operación 72; los
@@ -347,6 +375,25 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   Método: todo en **una sola transacción**, probada antes con `BEGIN … ROLLBACK`
   en la misma llamada. Verificado después: **1 sola ficha** con ese correo y ese
   celular, 12 hitos, 2 declaraciones, 1 contacto de CRM, 1 discípula.
+- **Saray Barreiro (20-oct):** consolidadora puesta a mano en **Johanna
+  Quintero Correa** porque **manda HighLevel** (decisión del usuario). Auditado
+  con `origen: "highlevel"`, que es lo que impide devolver el eco al CRM.
+  ⚠️ **Sigue SIN teléfono ni correo**, así que `/contacts/upsert` la rechaza y
+  **no tiene enlace al CRM**: nada suyo sincroniza, y nadie puede llamarla.
+  Su contacto en HighLevel existe (`syOqdckurzAbVfkJWkIv`), pero el webhook lo
+  rechazó como duplicado de ella misma sin guardar el enlace.
+- **Maricela Rojas (20-oct):** creada **a mano por SQL** porque su registro por
+  el formulario **se lo absorbió la ficha de Celina Osorio Rojas**, que tiene
+  el mismo teléfono (**312 3444054**). Decisión del usuario: **son dos personas
+  distintas** — la evidencia es la llamada del 5-oct, donde quien contestó ese
+  número **negó ser Celina**. Se imitaron las **8 escrituras** de
+  `crearRegistroEnTransaccion` (incluido el **código de miembro**, que es fácil
+  de olvidar) más el traslado del contacto `Kbxw0HrXPyU9i26i7ihc`, que era de
+  ella y colgaba de Celina.
+  ⚠️ **PENDIENTE DEL USUARIO:** ese teléfono sigue en **las dos** fichas, así
+  que el próximo registro con él volverá a engancharse mal; y la Op72 de Celina
+  sigue en **CONTACTADA por esa misma llamada**, así que puede que a Celina
+  **nunca se la haya contactado**.
 - **NO fusionar (decisión del usuario, 7-sep):** **Luna Sandoval / Lina Mercedes
   Jovel** (`linitajovel@gmail.com`) y **Nini Guerrón / Dilan Cadena**
   (`ninijguerrons@gmail.com`) **son personas distintas que comparten correo** —
@@ -526,6 +573,14 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   nada, y el Retry lo resolvió **en dos minutos**. Antes de molestarle,
   descartar el repositorio con `wrangler deploy --dry-run` y una llamada a
   `getPlatformProxy()`, que es lo que ejecuta el Deploy command.
+- **⚠️ NO HAY CRONS: EL WORKER QUE GENERA OPENNEXT SOLO EXPORTA `fetch`.**
+  Comprobado en `.open-next/worker.js` (21-oct): `export default { async fetch(…)`
+  y nada más. Un **Cron Trigger de Cloudflare se podría configurar y no tendría
+  nada que lo atendiera**, y parchear el worker generado es frágil porque se
+  rehace en cada build. Lo que sí funciona para algo con horario: **un webhook
+  protegido con el secreto de siempre, llamado por un workflow de HighLevel con
+  horario** — y encima deja el camino entero donde el usuario lo puede pausar y
+  ver. Es como se dispara el recordatorio de Casas de Fe.
 - **La migración corre al EMPEZAR el build; el worker se activa al terminarlo.**
   A los 2 minutos del merge la base puede estar migrada y la ruta todavía no
   existir. No diagnosticar con una sola de las dos señales.
@@ -744,6 +799,29 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   quinta con la nueva.
 - **Al fusionar, revisar nombre Y apellidos**, no solo apellidos.
 - **Lo marcado a mano manda sobre lo automático.**
+- **⚠️ ANTES DE CREAR UNA FICHA POR SQL, LEER `crearRegistroEnTransaccion`
+  ENTERA: SON OCHO ESCRITURAS, NO TRES.** `person` · **`member_code`** (el
+  código de miembro, que es el que más fácil se olvida y sin él la persona no
+  puede entrar al taller) · `learner_profile` · `operation72` · **dos
+  `milestone`** (REGISTRO completado y OPERACION_72 en curso) · **tres filas de
+  `audit_log`** · **dos `integration_event`**. Y si la persona trae petición de
+  oración, una novena en `prayer_request` con `origin: REGISTRO`.
+- **⚠️ Y el consolidador NO se elige a ojo: se corre la regla.** La carga de
+  `asignarConsolidador` **no es «personas activas»**, es **fase GANAR con la
+  Op72 en una de las cinco columnas del tablero** — con el otro criterio salen
+  números muy distintos (Johanna, 7 contra 12). El desempate importa: mayor
+  cupo libre y, a igualdad, **el primero por nombre**, porque el `reduce` solo
+  sustituye con mejora estricta sobre una lista ordenada por `fullName`.
+- **⚠️ Las marcas de tiempo de un INSERT a mano van como
+  `now() AT TIME ZONE 'UTC'`**, nunca `CURRENT_TIMESTAMP`: las columnas son
+  `timestamp without time zone` que guardan UTC, y dejarlo a la zona de la
+  sesión es la trampa de §12.1. Se comprueba contra una fila que ya exista.
+- **⚠️ UN TELÉFONO REPETIDO NO DA UN DUPLICADO: SE TRAGA AL RECIÉN LLEGADO.**
+  El webhook de registro casa por teléfono, y si el número ya está en otra
+  ficha **engancha el contacto nuevo a ESA ficha y no crea nada**. El único
+  rastro es una fila `highlevel.contacto_vinculado` con criterio «Mismo
+  teléfono registrado»; desde fuera se ve igual que un registro perdido. Pasó
+  con Maricela Rojas el 20-oct.
 - Todo en **una sola transacción**, probada antes con `BEGIN … ROLLBACK`.
 
 ### 12.8 Método de trabajo
@@ -806,6 +884,8 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ### `docs/bitacora/2026-10.md` — octubre de 2026 (25 entradas)
 
+- **21-oct** · **Recordatorio de Casas de Fe por correo y WhatsApp** · ⚠️ **el worker solo exporta `fetch`, no `scheduled`**: lo dispara un workflow de HighLevel, no un cron · uno por **persona y día** (hoy serían 16 y son 10) · **si se reúne antes de las 9:00, el aviso sale la noche anterior** · la etiqueta se quita y se vuelve a poner o solo funciona un día.
+- **20-oct** · **Saray y Maricela: dos «no entraron» por causas distintas** · Saray no tenía enlace al CRM (sin teléfono ni correo) · a Maricela **se la absorbió la ficha de Celina por compartir el teléfono** · ⚠️ **me equivoqué dos veces y las desmontó el dato** · Maricela creada a mano: **8 escrituras, no 3**.
 - **20-oct** · ⚠️ **El consolidador NO llegaba a HighLevel al nacer en la plataforma**: `exportarContactoNuevo` no mandaba `assignedTo` y **96 de 154** se exportan así · ahora se pregunta el dueño y **solo se escribe si está vacío** · y Saray no tiene enlace porque **no tiene teléfono ni correo**, que el `upsert` rechaza en silencio.
 - **20-oct** · El bloque nuevo quedó VIVO (PR #130) · ⚠️ **y mi rótulo «se saltaron un paso» era FALSO para 31 de 46**: son el atajo «ya lleva proceso», que salta la visita a propósito · pasa a **«Fueron por otro camino»** · el chunk de página dio 404 con el código vivo, **tercera vez**.
 - **20-oct** · **«Fuera del recorrido» del histórico pasa de una frase a una lista abrible** · eran **141 de 508 movimientos (28 %)** resumidos en un renglón · ⚠️ **139 y 141 parecían la misma cifra y solo 96 coinciden**: separadas, salen **45 saltos reales del equipo** · los 12 pares cuadran con la ventana, comprobado contra producción.

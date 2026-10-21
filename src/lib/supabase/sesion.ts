@@ -16,6 +16,11 @@ const RUTAS_PUBLICAS = [
   "/api/integraciones/highlevel/llamada",
   "/api/integraciones/highlevel/visita",
   "/api/integraciones/highlevel/asignacion",
+  // El recordatorio de Casas de Fe: lo dispara un workflow de HighLevel con
+  // horario, no una persona con sesión. Como los demás webhooks, lo único que
+  // autoriza es el secreto de la cabecera; sin este renglón el middleware lo
+  // redirige a /ingresar con un 307 y el aviso no sale nunca (§12.8).
+  "/api/recordatorios",
   // El feed de calendario: los calendarios no saben iniciar sesión, así que el
   // token de la URL es lo único que autoriza (ver `calendario/[token]`).
   "/calendario",
