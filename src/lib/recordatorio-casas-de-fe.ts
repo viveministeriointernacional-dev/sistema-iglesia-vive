@@ -16,11 +16,14 @@ import type { ClientePrisma } from "@/lib/prisma";
 
 /// **El recordatorio de las Casas de Fe: a quién le toca hoy y el envío.**
 ///
-/// Lo dispara un workflow de HighLevel llamando al webhook
-/// `/api/recordatorios/casas-de-fe` dos veces al día. No hay cron de
-/// Cloudflare porque **el worker que genera OpenNext solo exporta `fetch`**, no
-/// `scheduled`: un Cron Trigger no tendría nada que lo atendiera, y parchear el
-/// worker generado es frágil porque se regenera en cada build.
+/// Lo dispara **un worker aparte de Cloudflare** (`recordatorio-casas-de-fe`)
+/// con dos Cron Triggers, que en cada uno pide el webhook
+/// `/api/recordatorios/casas-de-fe`. No es un cron de ESTE worker porque **el
+/// que genera OpenNext solo exporta `fetch`**, no `scheduled`: un Cron Trigger
+/// aquí no tendría nada que lo atendiera, y parchear el worker generado es
+/// frágil porque se rehace en cada build. Y no es un workflow de HighLevel
+/// —que era el plan— porque esta cuenta **no tiene ningún activador por
+/// horario**.
 ///
 /// ## Lo que hace, en orden
 ///
