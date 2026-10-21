@@ -38,7 +38,7 @@ async function credenciales(): Promise<Credenciales | null> {
 
 async function pedir(
   ruta: string,
-  metodo: "POST" | "PUT",
+  metodo: "POST" | "PUT" | "DELETE",
   cuerpo: unknown,
   token: string,
 ): Promise<Record<string, unknown>> {
@@ -449,6 +449,15 @@ export const ETIQUETA_TALLER = "casa-de-fe-taller";
 const NOMBRES_DE_CAMPO = {
   codigo: ["codigo de miembro", "código de miembro"],
   enlace: ["enlace de talleres", "enlace de los talleres"],
+  /// El texto completo del recordatorio del día. **Uno solo y no varios
+  /// campos**: así el workflow de HighLevel manda `{{contact.…}}` tal cual y
+  /// el mensaje lo arma el sistema, que es el único que sabe cuántas casas
+  /// tiene hoy esa persona.
+  recordatorio: [
+    "recordatorio de casa de fe",
+    "recordatorio casa de fe",
+    "recordatorio de casas de fe",
+  ],
 } as const;
 
 /// Sin tildes, sin mayúsculas y sin espacios de sobra: así «Código de Miembro»
@@ -466,9 +475,10 @@ function plano(texto: string): string {
 ///
 /// Devuelve lo que encuentre: si el usuario solo creó uno, se escribe ese. Un
 /// campo que no existe no es un error — es que todavía no lo han creado.
-async function camposDelTaller(
+async function buscarIdsDeCampos<Clave extends string>(
   cred: Credenciales,
-): Promise<{ codigo: string | null; enlace: string | null }> {
+  nombres: Record<Clave, readonly string[]>,
+): Promise<Record<Clave, string | null>> {
   const respuesta = await fetch(
     `${BASE}/locations/${cred.locationId}/customFields`,
     {
@@ -505,10 +515,21 @@ async function camposDelTaller(
     return null;
   };
 
-  return {
-    codigo: buscar(NOMBRES_DE_CAMPO.codigo),
-    enlace: buscar(NOMBRES_DE_CAMPO.enlace),
-  };
+  const salida = {} as Record<Clave, string | null>;
+  for (const clave of Object.keys(nombres) as Clave[]) {
+    salida[clave] = buscar(nombres[clave]);
+  }
+  return salida;
+}
+
+/// Los dos campos del taller, por su nombre.
+async function camposDelTaller(
+  cred: Credenciales,
+): Promise<{ codigo: string | null; enlace: string | null }> {
+  return buscarIdsDeCampos(cred, {
+    codigo: NOMBRES_DE_CAMPO.codigo,
+    enlace: NOMBRES_DE_CAMPO.enlace,
+  });
 }
 
 /// Escribe en el CRM el código de miembro y el enlace a «Mis talleres», y le
@@ -592,6 +613,85 @@ export async function exportarAccesoAlTaller(
     return { ok: true };
   } catch (error) {
     console.error("No se pudo exportar el acceso al taller a HighLevel", error);
+    return {
+      ok: false,
+      motivo: "HighLevel rechazó la escritura. Revisa el registro del Worker.",
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// El recordatorio de las Casas de Fe, por WhatsApp
+// ---------------------------------------------------------------------------
+
+/// La etiqueta que dispara el WhatsApp del recordatorio. Como la del taller, va
+/// **por nombre**: nadie tiene que copiar ningún id.
+export const ETIQUETA_RECORDATORIO = "casa-de-fe-recordatorio";
+
+/// **Deja listo el WhatsApp del recordatorio del día.**
+///
+/// Escribe el texto completo en el campo personalizado y después mueve la
+/// etiqueta, que es lo que hace que el workflow de HighLevel envíe.
+///
+/// ⚠️ **La etiqueta se QUITA y se vuelve a poner, y sin eso esto no funciona
+/// más de una vez.** El workflow escucha «se añadió esta etiqueta»; a partir
+/// del segundo día la etiqueta ya está puesta, añadirla otra vez no es un
+/// cambio y el mensaje no sale. Es la diferencia entre un recordatorio diario y
+/// uno que funciona el primer día y nunca más.
+///
+/// ⚠️ **Y si el campo no existe, se sale ANTES de tocar la etiqueta.** Es lo
+/// contrario de lo que hace el acceso al taller, que etiqueta igual y avisa de
+/// que el mensaje irá incompleto: ahí el mensaje tiene sentido a medias, aquí
+/// el campo **es** el mensaje, así que disparar sin él manda un WhatsApp vacío.
+export async function exportarRecordatorioDeCasaDeFe(
+  contactId: string,
+  texto: string,
+): Promise<{ ok: true } | { ok: false; motivo: string }> {
+  const cred = await credenciales();
+  if (!cred) return { ok: false, motivo: "sin credenciales de HighLevel" };
+
+  try {
+    const campos = await buscarIdsDeCampos(cred, {
+      recordatorio: NOMBRES_DE_CAMPO.recordatorio,
+    });
+    if (!campos.recordatorio) {
+      return {
+        ok: false,
+        motivo:
+          "en HighLevel todavía no existe el campo «Recordatorio de casa de fe», así que el WhatsApp saldría vacío y no se disparó",
+      };
+    }
+
+    await pedir(
+      `/contacts/${contactId}`,
+      "PUT",
+      {
+        customFields: [
+          { id: campos.recordatorio, field_value: texto, value: texto },
+        ],
+      },
+      cred.token,
+    );
+
+    // Quitarla puede fallar porque no estaba (el primer día): eso no es un
+    // error, es el estado inicial. Lo que no puede fallar es ponerla.
+    await pedir(
+      `/contacts/${contactId}/tags`,
+      "DELETE",
+      { tags: [ETIQUETA_RECORDATORIO] },
+      cred.token,
+    ).catch(() => undefined);
+
+    await pedir(
+      `/contacts/${contactId}/tags`,
+      "POST",
+      { tags: [ETIQUETA_RECORDATORIO] },
+      cred.token,
+    );
+
+    return { ok: true };
+  } catch (error) {
+    console.error("No se pudo dejar listo el recordatorio en HighLevel", error);
     return {
       ok: false,
       motivo: "HighLevel rechazó la escritura. Revisa el registro del Worker.",
