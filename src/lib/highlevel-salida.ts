@@ -588,6 +588,25 @@ export async function exportarAccesoAlTaller(
     // ⚠️ **La etiqueta va DESPUÉS de los campos, siempre.** Es lo que dispara
     // el mensaje: si fuera primero, el WhatsApp saldría con los campos todavía
     // vacíos y la persona recibiría un mensaje sin su código ni su enlace.
+    //
+    // ⚠️ **Y se QUITA antes de ponerla, igual que la del recordatorio.** El
+    // flujo escucha «se añadió esta etiqueta»; si ya está puesta, añadirla otra
+    // vez **no es un cambio y el mensaje no sale**. Faltaba aquí, y se midió lo
+    // que costó: de 56 envíos entre el 2 y el 21-oct, **46 personas distintas y
+    // 10 reenvíos** — y esos 10 no habrían disparado nada ni con la plantilla
+    // aprobada. Un reenvío ocurre cuando alguien entra a una segunda Casa de Fe
+    // o cuando el líder lo repite porque la persona dice que no le llegó, que
+    // es justo el momento en el que más falta hace que salga.
+    //
+    // El borrado va con `.catch`: que la etiqueta no estuviera puesta no es un
+    // error, es el estado inicial. Lo que no puede fallar es ponerla.
+    await pedir(
+      `/contacts/${contactId}/tags`,
+      "DELETE",
+      { tags: [ETIQUETA_TALLER] },
+      cred.token,
+    ).catch(() => undefined);
+
     await pedir(
       `/contacts/${contactId}/tags`,
       "POST",

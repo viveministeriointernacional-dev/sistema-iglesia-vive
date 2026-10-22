@@ -287,7 +287,20 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   **`casa_de_fe.acceso_enviado` 56 veces** entre el 2 y el 21-oct: escribió los
   campos, movió la etiqueta, y Meta no mandó nada. Solo salieron los correos.
   **Nadie se enteró en tres semanas porque el sistema no puede saber qué hace el
-  CRM con la etiqueta una vez puesta.** HighLevel no enseña el motivo del
+  CRM con la etiqueta una vez puesta.**
+  **El daño medido el 22-oct, que es más pequeño de lo que parece:** 56 envíos
+  son **46 personas distintas**; **42 tenían correo y el correo sí salió**, así
+  que los que **no recibieron nada son 14 envíos — 13 personas sin correo**, y
+  **las 13 tienen celular y enlace al CRM**, o sea que son alcanzables.
+  ⚠️ **Y había un SEGUNDO fallo, independiente de Meta:** `exportarAccesoAlTaller`
+  **solo añadía la etiqueta, no la quitaba** (al revés que el recordatorio), así
+  que **los 10 reenvíos no habrían disparado nada ni con la plantilla
+  aprobada** — y un reenvío es justo cuando alguien dice «no me llegó».
+  Arreglado el 22-oct: ahora la quita y la vuelve a poner.
+  ⚠️ **Y «Actividad del día» afirmaba «se lo mandó por correo y WhatsApp»**,
+  que era falso: `porWhatsapp` solo significa que **el CRM aceptó nuestra
+  escritura**. Ahora dice «los dejó encargados por WhatsApp», que es el hecho
+  que sí es nuestro. HighLevel no enseña el motivo del
   rechazo; las dos sospechas son que un **código de 6 dígitos** obliga a la
   categoría *Authentication* (está como *Marketing*) y que el texto promete «el
   botón de aquí abajo» **sin que la plantilla tenga botón**.
@@ -1004,8 +1017,9 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 > archivo del mes** y su renglón **arriba de este índice**. Si de ese trabajo
 > sale una regla general, va **además** a §12.
 
-### `docs/bitacora/2026-10.md` — octubre de 2026 (27 entradas)
+### `docs/bitacora/2026-10.md` — octubre de 2026 (28 entradas)
 
+- **22-oct (tarde)** · **El WhatsApp del taller: el daño medido son 13 personas, no 56** (42 de 56 sí recibieron el correo) · ⚠️ **y un SEGUNDO fallo nuestro: la etiqueta no se quitaba, así que los 10 reenvíos no habrían disparado ni con la plantilla aprobada** · «Actividad del día» decía «por WhatsApp» y era mentira · **la plantilla nueva va SIN el código**: el enlace ya identifica, y el código es lo que Meta trata como OTP.
 - **22-oct** · ⚠️ **El WhatsApp de este CRM no manda texto libre: solo plantillas aprobadas, y el VALOR de una variable no admite ni un salto de línea** · ⚠️ **y de paso: el WhatsApp del acceso al taller NUNCA ha salido — 56 envíos en 3 semanas con la plantilla Rechazada**, y nadie se enteró porque `acceso_enviado` afirma un hecho que no es nuestro · el mensaje se parte en dos y nace `variableDeWhatsApp` · **cerrado el mismo día: Utility aprobada en 12 min** frente a la Marketing-con-código rechazada · ⚠️ **y dos ajustes del flujo lo habrían apagado en silencio** («Permitir reentrada» y «Ventana de tiempo») · ayer eran 3 casas de madrugada y hoy son 6.
 - **21-oct (tarde)** · ⚠️ **El disparador NO podía ser un workflow de HighLevel: esa cuenta no tiene activadores por horario** (4 búsquedas, 0 resultados) · lo mueve **un SEGUNDO worker de Cloudflare** con dos crons · huella 200 «Hello World!» → **404** · ⚠️ **Cloudflare no deja releer un secreto guardado** y buscarlo en el CRM costó una hora: los «webhooks» del flujo eran **«Go To»** · la ruta acepta dos secretos.
 - **21-oct** · **Recordatorio de Casas de Fe por correo y WhatsApp** · ⚠️ **el worker solo exporta `fetch`, no `scheduled`**: lo dispara un workflow de HighLevel, no un cron · uno por **persona y día** (hoy serían 16 y son 10) · **si se reúne antes de las 9:00, el aviso sale la noche anterior** · la etiqueta se quita y se vuelve a poner o solo funciona un día.
