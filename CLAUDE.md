@@ -119,6 +119,27 @@ panel; antes este archivo decía «Paid» y era falso — de ahí parte de la le
   → **401** = desplegado (ruta existe, pide secreto). **307** = aún NO desplegado
   (redirige a `/ingresar`; la ruta no está en el bundle).
 - URL del worker: `https://sistema-iglesia-vive.viveministeriointernacional.workers.dev`
+- **⚠️ HAY UN SEGUNDO WORKER EN LA CUENTA, Y NO ES BASURA: `recordatorio-casas-de-fe`.**
+  Veinte líneas escritas a mano en el editor del panel (no sale de este repo, no
+  tiene build ni despliegue automático). Su único oficio es tener los **Cron
+  Triggers** que el worker principal no puede tener (§12.2) y llamar al webhook
+  `POST /api/recordatorios/casas-de-fe`:
+  - `0 11 * * *` → 6:00 a. m. Colombia → `?tipo=DIA`
+  - `0 0 * * *` → 7:00 p. m. Colombia → `?tipo=NOCHE_ANTES`
+  - secreto del worker: variable **`SECRETO`** (el valor va también en el worker
+    principal como **`RECORDATORIOS_SECRET`**; los dos tienen que coincidir).
+  - **Cómo comprobar que está vivo sin entrar al editor:** pedirle su URL
+    (`https://recordatorio-casas-de-fe.viveministeriointernacional.workers.dev`)
+    → **404 «Este worker solo trabaja por horario.»** = su código está puesto ·
+    **200 «Hello World!»** = se quedó en la plantilla y **no dispara nada**.
+  - **Si alguien lo borra, los recordatorios se apagan en silencio.** No tiene
+    nada que avise.
+- **Secretos del worker principal que no están en ningún otro sitio:**
+  `HIGHLEVEL_WEBHOOK_SECRET` (los tres webhooks del CRM) y **`RECORDATORIOS_SECRET`**
+  (solo el recordatorio de Casas de Fe). ⚠️ **Cloudflare NO deja volver a leer un
+  secreto guardado.** El de HighLevel solo se puede releer entrando a un paso
+  Webhook de un flujo del CRM; el de recordatorios no se puede releer en ninguna
+  parte, así que si se pierde **se cambia en los dos workers a la vez**.
 - **No hay credenciales de Cloudflare en el entorno** → no puedo hacer
   `wrangler deploy` yo mismo; el deploy pasa por Workers Builds (merge del usuario).
 
@@ -268,16 +289,19 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 - **Recordatorio de las Casas de Fe** (21-oct): correo + WhatsApp al **líder**,
   a sus **encargados** y al **mentor de la línea**, con las casas que se reúnen
   ese día. Libs: `src/lib/recordatorio-casas-de-fe.ts` (+ catálogo), webhook
-  `POST /api/recordatorios/casas-de-fe`. **Lo dispara un workflow de HighLevel
-  con horario, dos veces al día** (`{"tipo":"DIA"}` temprano y
-  `{"tipo":"NOCHE_ANTES"}` por la tarde) — ⚠️ **no un Cron Trigger: el worker de
-  OpenNext solo exporta `fetch`, no `scheduled`** (§12.2). **Cuatro reglas que
+  `POST /api/recordatorios/casas-de-fe`. **Lo dispara un WORKER APARTE de
+  Cloudflare, `recordatorio-casas-de-fe`**, de 20 líneas, con dos Cron Triggers:
+  `0 11 * * *` (6:00 a. m. Colombia → `tipo=DIA`) y `0 0 * * *` (7:00 p. m. →
+  `tipo=NOCHE_ANTES`). ⚠️ **No es un cron del worker principal** porque OpenNext
+  solo exporta `fetch` (§12.2), y ⚠️ **no es un workflow de HighLevel**, que era
+  el plan del 21-oct: **esa cuenta no tiene NINGÚN activador por horario**. Usa
+  su propio secreto `RECORDATORIOS_SECRET` (§4). **Cuatro reglas que
   lo sostienen:** un aviso por **persona y día**, no por casa (el líder que más
   lleva tiene 7 casas y el mentor con más línea recibiría 19 avisos semanales);
   **si la casa se reúne antes de las 9:00 a. m. el aviso sale la noche
   anterior**, porque tres casas reales empiezan a las 06:00, 07:00 y 08:34; es
   **idempotente** por el índice único de `faith_house_reminder` (usuario · día ·
-  tipo), así que el workflow se puede reintentar; y **las direcciones van solo
+  tipo), así que el disparo se puede reintentar; y **las direcciones van solo
   al correo**. El WhatsApp sale por **etiqueta + campo personalizado**, igual
   que el acceso al taller.
 - **El tablero de Operación 72 dice cuánto se movió** (16-oct): encima de cada
@@ -577,10 +601,24 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   Comprobado en `.open-next/worker.js` (21-oct): `export default { async fetch(…)`
   y nada más. Un **Cron Trigger de Cloudflare se podría configurar y no tendría
   nada que lo atendiera**, y parchear el worker generado es frágil porque se
-  rehace en cada build. Lo que sí funciona para algo con horario: **un webhook
-  protegido con el secreto de siempre, llamado por un workflow de HighLevel con
-  horario** — y encima deja el camino entero donde el usuario lo puede pausar y
-  ver. Es como se dispara el recordatorio de Casas de Fe.
+  rehace en cada build.
+  **✅ Lo que SÍ funciona: un SEGUNDO worker de Cloudflare, suyo, que no hace más
+  que llamar al webhook.** Veinte líneas con `scheduled` y los Cron Triggers
+  puestos ahí. Es como se dispara el recordatorio de Casas de Fe
+  (`recordatorio-casas-de-fe`, §4).
+  ⚠️ **Y NO con un workflow de HighLevel, que es lo que decía aquí el 21-oct por
+  la mañana y resultó FALSO: esa cuenta no tiene ningún activador por horario.**
+  Se buscó `program`, `recurr`, `fech` y `hora` en la lista de activadores; lo
+  único parecido, «Recordatorio de fecha personalizada», cuelga de una fecha del
+  contacto, no de un reloj — no sirve para «todos los días a las 6». **Antes de
+  dar por bueno un disparador en una herramienta ajena, buscarlo en SU lista**,
+  no suponer que existe porque sería lo razonable.
+  ⚠️ **Y el worker nuevo necesita SU PROPIO secreto, no el de siempre: Cloudflare
+  no deja volver a leer un secreto ya guardado**, ni a su dueño. El valor de
+  `HIGHLEVEL_WEBHOOK_SECRET` solo está escrito dentro de los pasos Webhook de
+  los flujos de HighLevel, y buscarlo ahí costó una hora sin encontrarlo (el
+  flujo de registro tiene cinco ramas y lo que parecían webhooks eran «Go To»).
+  Salió más barato aceptar un segundo secreto en la ruta.
 - **La migración corre al EMPEZAR el build; el worker se activa al terminarlo.**
   A los 2 minutos del merge la base puede estar migrada y la ruta todavía no
   existir. No diagnosticar con una sola de las dos señales.
@@ -882,8 +920,9 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 > archivo del mes** y su renglón **arriba de este índice**. Si de ese trabajo
 > sale una regla general, va **además** a §12.
 
-### `docs/bitacora/2026-10.md` — octubre de 2026 (25 entradas)
+### `docs/bitacora/2026-10.md` — octubre de 2026 (26 entradas)
 
+- **21-oct (tarde)** · ⚠️ **El disparador NO podía ser un workflow de HighLevel: esa cuenta no tiene activadores por horario** (4 búsquedas, 0 resultados) · lo mueve **un SEGUNDO worker de Cloudflare** con dos crons · huella 200 «Hello World!» → **404** · ⚠️ **Cloudflare no deja releer un secreto guardado** y buscarlo en el CRM costó una hora: los «webhooks» del flujo eran **«Go To»** · la ruta acepta dos secretos.
 - **21-oct** · **Recordatorio de Casas de Fe por correo y WhatsApp** · ⚠️ **el worker solo exporta `fetch`, no `scheduled`**: lo dispara un workflow de HighLevel, no un cron · uno por **persona y día** (hoy serían 16 y son 10) · **si se reúne antes de las 9:00, el aviso sale la noche anterior** · la etiqueta se quita y se vuelve a poner o solo funciona un día.
 - **20-oct** · **Saray y Maricela: dos «no entraron» por causas distintas** · Saray no tenía enlace al CRM (sin teléfono ni correo) · a Maricela **se la absorbió la ficha de Celina por compartir el teléfono** · ⚠️ **me equivoqué dos veces y las desmontó el dato** · Maricela creada a mano: **8 escrituras, no 3**.
 - **20-oct** · ⚠️ **El consolidador NO llegaba a HighLevel al nacer en la plataforma**: `exportarContactoNuevo` no mandaba `assignedTo` y **96 de 154** se exportan así · ahora se pregunta el dueño y **solo se escribe si está vacío** · y Saray no tiene enlace porque **no tiene teléfono ni correo**, que el `upsert` rechaza en silencio.
