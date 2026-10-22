@@ -873,18 +873,23 @@ export async function cargarActividad(
         // caminos funcionó: la persona quedó inscrita y no tiene cómo entrar a
         // su taller, así que alguien tiene que dictarle el código a mano.
         const porCorreo = m.porCorreo === true;
-        const porWhatsapp = m.porWhatsapp === true;
-        const vias = [porCorreo ? "correo" : null, porWhatsapp ? "WhatsApp" : null]
-          .filter(Boolean)
-          .join(" y ");
+        // ⚠️ **Esto NO dice que el WhatsApp llegara, y la diferencia costó 56
+        // envíos.** `porWhatsapp` significa «el CRM aceptó que le escribiéramos
+        // los campos y le moviéramos la etiqueta» — el envío lo hace HighLevel
+        // después, y entre el 2 y el 21-oct **no mandó ni uno** porque su
+        // plantilla estaba rechazada. La frase decía «se lo mandó por correo y
+        // WhatsApp» y era falsa. Se nombra el hecho que SÍ es nuestro.
+        const encargadoAlCrm = m.porWhatsapp === true;
         tipo = "grupos"; etiqueta = "GRUPOS";
-        tono = porCorreo || porWhatsapp ? "verde" : "ambar";
-        frase = [
-          A(),
-          t(" le mandó a "),
-          P(),
-          t(vias ? ` su código y sus talleres por ${vias}` : " su código y sus talleres, y NO salió por ningún lado"),
-        ];
+        tono = porCorreo || encargadoAlCrm ? "verde" : "ambar";
+        const comoSalio = porCorreo
+          ? encargadoAlCrm
+            ? " su código y sus talleres por correo, y los dejó encargados por WhatsApp"
+            : " su código y sus talleres por correo"
+          : encargadoAlCrm
+            ? " su código y sus talleres, encargados por WhatsApp (no tiene correo)"
+            : " su código y sus talleres, y NO salió por ningún lado";
+        frase = [A(), t(" le mandó a "), P(), t(comoSalio)];
         break;
       }
       case "casa_de_fe.taller_enviado":
