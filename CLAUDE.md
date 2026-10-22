@@ -362,6 +362,25 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   lleva proceso»**, que salta la visita a propósito (§12.6). **Las salidas van aparte de la
   línea a propósito**: las bajas son limpiezas puntuales (198 de 211 en ocho
   días) y sumadas aplastarían la medida del trabajo semanal.
+- **El correo de entrada a una Casa de Fe es una CONFIRMACIÓN DE INSCRIPCIÓN**
+  (22-oct), no una entrega de talleres. Antes despachaba la inscripción en media
+  línea —«ya entraste a X»— y dedicaba el resto a los 12 temas: **la persona
+  quedaba inscrita sin saber cuándo ni dónde presentarse**, y los datos ya
+  existían en el sistema desde septiembre, solo que no llegaban al correo
+  (la función recibía únicamente el *nombre* de la casa).
+  Ahora la reunión va **primero** —día, hora, dirección con su «Cómo llegar» y
+  quién la lleva— y los talleres después. Libs: `casa-de-fe-bienvenida-catalogo.ts`
+  (el texto, probado solo) y `correoDeInscripcionACasaDeFe` en `correo.ts`, que
+  **devuelve asunto y cuerpo sin mandar nada** para poder dibujarlo con datos de
+  verdad antes de darlo por bueno (§12.5).
+  **Las decisiones del usuario (22-oct), con su medida:** el asunto lleva **el
+  nombre de pila, no el completo** (con el completo llegaba a 77-82 caracteres y
+  el celular ve unos 40); dice **«Lleva un corazón dispuesto, y una agenda y un
+  lapicero para anotar»** en vez de «no tienes que llevar nada»; y nombra al
+  líder **por su papel y su nombre** («avísale a tu líder de Casa de Fe, Paola
+  Alejandra»). ⚠️ Y **cuando falta un dato no queda un hueco ni un «null»**,
+  sino una frase que dice qué va a pasar — no es un caso raro: falta la
+  dirección en **24 de las 59 casas abiertas**.
 - **Recordatorio de las Casas de Fe** (21-oct): correo + WhatsApp al **líder**,
   a sus **encargados** y al **mentor de la línea**, con las casas que se reúnen
   ese día. Libs: `src/lib/recordatorio-casas-de-fe.ts` (+ catálogo), webhook
@@ -905,6 +924,15 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   puede:** solo plantillas aprobadas, y el valor de una variable no admite ni un
   salto de línea (§6). Rehacerlo fue barato porque el texto estaba en una sola
   función del catálogo; haberlo mirado antes habría sido gratis.
+- **⚠️ EL NOMBRE DE PILA NO ES LA PRIMERA PALABRA DEL NOMBRE COMPLETO.** Cortar
+  por el primer espacio se equivoca en **7 de los 17 líderes** (22-oct): «Paola
+  Alejandra» sale «Paola», «Juan Felipe» sale «Juan», «Harold Mauricio» sale
+  «Harold», «Yuli Katherine» sale «Yuli». En Colombia los dos nombres **son** el
+  nombre, y llamar a alguien por la mitad se nota. El dato bueno está en
+  `person.first_name`, que guarda los NOMBRES; `app_user.full_name` no se puede
+  partir. ⚠️ Y ojo con lo que hay dentro: la ficha de Alejandro Facundo tiene
+  «Pastores Alejandro & Cristina» ahí, así que es la pareja metida en el nombre
+  otra vez (21-sep) — eso se arregla en la ficha, no en el código.
 - **El orden en la pantalla es la única forma de decir ciertas cosas sin un
   cartel**: lo que caduca o bloquea a alguien va **arriba del todo**.
 - **⚠️ SI UN NÚMERO SE PUEDE PULSAR PARA VER DE DÓNDE SALE, EL NÚMERO Y SU
@@ -1017,8 +1045,9 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 > archivo del mes** y su renglón **arriba de este índice**. Si de ese trabajo
 > sale una regla general, va **además** a §12.
 
-### `docs/bitacora/2026-10.md` — octubre de 2026 (28 entradas)
+### `docs/bitacora/2026-10.md` — octubre de 2026 (29 entradas)
 
+- **22-oct (noche)** · **El correo de Casa de Fe pasa a ser una confirmación de inscripción**: la reunión va primero, porque la persona quedaba inscrita **sin saber cuándo ni dónde presentarse** y los datos existían desde septiembre · medido: **24 de 59 casas sin dirección**, 6 de 58 sin género · ⚠️ **el nombre de pila NO es la primera palabra**: cortar se equivoca en **7 de 17 líderes** · dibujado con datos reales, y la primera vez lo presenté con el mismo nombre tres veces y confundió.
 - **22-oct (tarde)** · **El WhatsApp del taller: el daño medido son 13 personas, no 56** (42 de 56 sí recibieron el correo) · ⚠️ **y un SEGUNDO fallo nuestro: la etiqueta no se quitaba, así que los 10 reenvíos no habrían disparado ni con la plantilla aprobada** · «Actividad del día» decía «por WhatsApp» y era mentira · **la plantilla nueva va SIN el código**: el enlace ya identifica, y el código es lo que Meta trata como OTP.
 - **22-oct** · ⚠️ **El WhatsApp de este CRM no manda texto libre: solo plantillas aprobadas, y el VALOR de una variable no admite ni un salto de línea** · ⚠️ **y de paso: el WhatsApp del acceso al taller NUNCA ha salido — 56 envíos en 3 semanas con la plantilla Rechazada**, y nadie se enteró porque `acceso_enviado` afirma un hecho que no es nuestro · el mensaje se parte en dos y nace `variableDeWhatsApp` · **cerrado el mismo día: Utility aprobada en 12 min** frente a la Marketing-con-código rechazada · ⚠️ **y dos ajustes del flujo lo habrían apagado en silencio** («Permitir reentrada» y «Ventana de tiempo») · ayer eran 3 casas de madrugada y hoy son 6.
 - **21-oct (tarde)** · ⚠️ **El disparador NO podía ser un workflow de HighLevel: esa cuenta no tiene activadores por horario** (4 búsquedas, 0 resultados) · lo mueve **un SEGUNDO worker de Cloudflare** con dos crons · huella 200 «Hello World!» → **404** · ⚠️ **Cloudflare no deja releer un secreto guardado** y buscarlo en el CRM costó una hora: los «webhooks» del flujo eran **«Go To»** · la ruta acepta dos secretos.
