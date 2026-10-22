@@ -55,15 +55,15 @@ test("sin género, el texto es neutro y no dice «inscrito» ni «inscrita»", (
 
 test("el asunto lleva el día y la hora, que es lo único que se ve en el celular", () => {
   assert.equal(
-    asuntoDeInscripcion({ nombre: "Luisa Fernanda Medina", genero: "MUJER", casa: casa() }),
-    "Luisa Fernanda Medina, quedaste inscrita en tu Casa de Fe · jueves 4:00 p. m.",
+    asuntoDeInscripcion({ nombreDePila: "Luisa Fernanda", genero: "MUJER", casa: casa() }),
+    "Luisa Fernanda, quedaste inscrita en tu Casa de Fe · jueves 4:00 p. m.",
   );
 });
 
 test("el asunto sin género tampoco se rompe", () => {
   assert.equal(
-    asuntoDeInscripcion({ nombre: "Alex Tovar", genero: null, casa: casa() }),
-    "Alex Tovar, ya tienes Casa de Fe · jueves 4:00 p. m.",
+    asuntoDeInscripcion({ nombreDePila: "Alex", genero: null, casa: casa() }),
+    "Alex, ya tienes Casa de Fe · jueves 4:00 p. m.",
   );
 });
 
@@ -85,8 +85,8 @@ test("sin día o sin hora, ni hueco ni «null»", () => {
   assert.equal(cuandoSeReune(casa({ meetingTime: null })), null);
   assert.equal(cuandoSeReune(casa({ meetingTime: "no es una hora" })), null);
   // Y el asunto se queda sin el sufijo en vez de escribir « · null».
-  const asunto = asuntoDeInscripcion({ nombre: "Luisa Fernanda Medina", genero: "MUJER", casa: casa({ weekday: null }) });
-  assert.equal(asunto, "Luisa Fernanda Medina, quedaste inscrita en tu Casa de Fe");
+  const asunto = asuntoDeInscripcion({ nombreDePila: "Luisa Fernanda", genero: "MUJER", casa: casa({ weekday: null }) });
+  assert.equal(asunto, "Luisa Fernanda, quedaste inscrita en tu Casa de Fe");
   assert.ok(!asunto.includes("null"));
   assert.ok(!asunto.includes("·"));
 });

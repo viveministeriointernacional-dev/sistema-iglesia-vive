@@ -64,16 +64,24 @@ export function participioDeInscripcion(genero: GeneroDePersona): string | null 
 /// **El asunto.** Lleva el día y la hora porque es lo único que se ve en la
 /// lista del celular antes de abrir, y es justo el dato que faltaba.
 export function asuntoDeInscripcion(datos: {
-  /// El nombre **completo**: esto es la confirmación de una inscripción, y una
-  /// confirmación lleva el nombre entero, no el de pila.
-  nombre: string;
+  /// Los NOMBRES de la ficha, no el nombre completo.
+  ///
+  /// Decisión del usuario (22-oct), y la medida la respalda: con el nombre
+  /// completo delante el asunto llegaba a **77 y 82 caracteres**, y el celular
+  /// corta por los **45** — el día y la hora, que es lo que queríamos que se
+  /// viera sin abrir, se quedaban fuera de la vista previa.
+  ///
+  /// ⚠️ Sale del campo de nombres, **no de cortar por el primer espacio**: es
+  /// el mismo error que se arregló en el nombre del líder. «Luisa Fernanda», no
+  /// «Luisa».
+  nombreDePila: string;
   genero: GeneroDePersona;
   casa: CasaDeLaInscripcion;
 }): string {
   const participio = participioDeInscripcion(datos.genero);
   const encabezado = participio
-    ? `${datos.nombre}, quedaste ${participio} en tu Casa de Fe`
-    : `${datos.nombre}, ya tienes Casa de Fe`;
+    ? `${datos.nombreDePila}, quedaste ${participio} en tu Casa de Fe`
+    : `${datos.nombreDePila}, ya tienes Casa de Fe`;
 
   const cuando = cuandoSeReune(datos.casa);
   return cuando ? `${encabezado} · ${cuando.corto}` : encabezado;

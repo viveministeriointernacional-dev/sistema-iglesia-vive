@@ -342,7 +342,12 @@ export async function correoRecuperarContrasena(datos: {
 /// sigue existiendo para la casa, y se saca desde «Los 12 temas».
 /// Lo que hace falta para escribir la confirmación de inscripción.
 export type DatosDeLaInscripcion = {
+  /// El nombre completo, para el cuerpo si hiciera falta.
   nombre: string;
+  /// Los NOMBRES de la ficha, que es con lo que se le habla y lo que va en el
+  /// asunto. Llega ya calculado: cortar `nombre` por el espacio se equivoca
+  /// con quien tiene dos nombres, que aquí son muchos.
+  nombreDePila: string;
   /// De la ficha. Decide «inscrita» / «inscrito»; si falta, el texto neutro.
   genero: GeneroDePersona;
   codigo: string;
@@ -363,10 +368,10 @@ export function correoDeInscripcionACasaDeFe(datos: DatosDeLaInscripcion): {
   subject: string;
   html: string;
 } {
-  const nombreDePila = datos.nombre.split(" ")[0] ?? datos.nombre;
+  const nombreDePila = datos.nombreDePila;
 
   const subject = datos.casa
-    ? asuntoDeInscripcion({ nombre: datos.nombre, genero: datos.genero, casa: datos.casa })
+    ? asuntoDeInscripcion({ nombreDePila, genero: datos.genero, casa: datos.casa })
     : `${nombreDePila}, aquí están tus 12 talleres de Casa de Fe`;
 
   const renglones = datos.temas

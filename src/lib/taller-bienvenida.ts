@@ -48,7 +48,10 @@ export async function enviarAccesoAlTaller(
     // `gender` decide «inscrita» / «inscrito». Va en el MISMO select que ya
     // existía: una columna más no cuesta un viaje más, y con `PrismaPg max:1`
     // cada viaje de más es latencia de más (§12.5).
-    select: { personId: true, person: { select: { email: true, gender: true } } },
+    select: {
+      personId: true,
+      person: { select: { email: true, gender: true, firstName: true } },
+    },
   });
   if (!aprendiz) return null;
 
@@ -68,6 +71,7 @@ export async function enviarAccesoAlTaller(
     const resultado = await correoTalleresDeCasaDeFe({
       to: correoDestino,
       nombre: mis.nombre,
+      nombreDePila: aprendiz.person.firstName,
       genero: aprendiz.person.gender,
       codigo: mis.codigo,
       casa: datos.casa,
