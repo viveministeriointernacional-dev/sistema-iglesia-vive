@@ -8,7 +8,7 @@ import {
   cuantasCasas,
   envioQueLeToca,
   type Papel,
-  textoWhatsApp,
+  variableDeWhatsApp,
   type TipoDeEnvio,
 } from "@/lib/recordatorio-casas-de-fe-catalogo";
 import { enlaceComoLlegar, proximasReuniones, puntoDe } from "@/lib/reunion-catalogo";
@@ -222,7 +222,7 @@ export async function mandarRecordatorios(
     if (aviso.contactoCrm) {
       const salida = await exportarRecordatorioDeCasaDeFe(
         aviso.contactoCrm,
-        textoWhatsApp(aviso, tipo),
+        variableDeWhatsApp(aviso, tipo),
       );
       if (salida.ok) whatsappEncolado = true;
       else problemas.push(`WhatsApp: ${salida.motivo}`);

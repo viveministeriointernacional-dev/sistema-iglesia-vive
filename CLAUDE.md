@@ -221,11 +221,24 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   `/contacts/upsert` la rechaza, el error se traga (best-effort) y **queda sin
   enlace**, así que ningún dato suyo sincroniza nunca. Pasó con Saray Barreiro
   el 20-oct, y era la única de 154.
-- **El recordatorio de Casas de Fe, por WhatsApp**: el sistema escribe el texto
-  completo en el campo **«Recordatorio de casa de fe»** (uno solo: el mensaje lo
-  arma el sistema, que es el único que sabe cuántas casas tiene hoy esa persona)
-  y mueve la etiqueta **`casa-de-fe-recordatorio`**, que es la que dispara el
-  workflow. El campo se busca **por nombre** con `buscarIdsDeCampos`, así que no
+- **⚠️ EL WHATSAPP DE ESTE CRM NO MANDA TEXTO LIBRE: SOLO PLANTILLAS APROBADAS
+  POR META.** Es la regla que gobierna todo lo de abajo y la descubrimos tarde
+  (22-oct), con el recordatorio ya construido. La acción «WhatsApp» de un flujo
+  pide una **plantilla** obligatoria, y la plantilla lleva el texto fijo con
+  huecos `{{1}}`, `{{2}}`… que se mapean a campos del contacto.
+  **Lo que de verdad limita el diseño:** el **valor** de una variable **no puede
+  llevar saltos de línea**, ni tabuladores, ni cuatro espacios seguidos. La
+  plantilla sí puede tener los párrafos que quiera — la restricción es sobre lo
+  que se mete en el hueco. Así que **el mensaje se parte en dos**: el saludo y el
+  cierre viven en la plantilla, y del sistema solo viaja el centro, **en una sola
+  línea**.
+  Las plantillas viven en **Configuración → WhatsApp → Plantillas** (68 el
+  22-oct, casi todas «Activo»). La del recordatorio es `recordatorio_casa_de_fe`.
+- **El recordatorio de Casas de Fe, por WhatsApp**: el sistema escribe **el
+  centro del mensaje, en UNA línea** (`variableDeWhatsApp`, que termina
+  aplanando cualquier espacio en blanco para que no se cuele un salto) en el
+  campo **«Recordatorio de casa de fe»**, y mueve la etiqueta
+  **`casa-de-fe-recordatorio`**, que es la que dispara el flujo. El campo se busca **por nombre** con `buscarIdsDeCampos`, así que no
   hay ningún id que copiar.
   ⚠️ **La etiqueta se QUITA y se vuelve a poner.** El workflow escucha «se
   añadió esta etiqueta»; del segundo día en adelante ya está puesta, añadirla
@@ -234,6 +247,16 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   ⚠️ **Y si el campo no existe, no se toca la etiqueta**: aquí el campo **es**
   el mensaje, así que disparar sin él manda un WhatsApp vacío. (El acceso al
   taller hace lo contrario a propósito: ahí falta un dato, no el mensaje.)
+- **⚠️ EL WHATSAPP DEL ACCESO AL TALLER NUNCA HA FUNCIONADO, pese a lo que dice
+  la bitácora del 2-oct.** Su plantilla, `codigo_ingreso_escuela`, está
+  **Rechazada** por Meta — y entretanto el sistema registró
+  **`casa_de_fe.acceso_enviado` 56 veces** entre el 2 y el 21-oct: escribió los
+  campos, movió la etiqueta, y Meta no mandó nada. Solo salieron los correos.
+  **Nadie se enteró en tres semanas porque el sistema no puede saber qué hace el
+  CRM con la etiqueta una vez puesta.** HighLevel no enseña el motivo del
+  rechazo; las dos sospechas, sin confirmar, son que un **código de 6 dígitos**
+  obliga a la categoría *Authentication* (está como *Marketing*) y que el texto
+  promete «el botón de aquí abajo» **sin que la plantilla tenga botón**.
 - **Mapa de personal ↔ HighLevel:** en la lista «Mi personal» de HighLevel, el
   código bajo cada correo es el **user id de HighLevel**. Se guarda en
   `app_user.highlevel_user_id`. Sirve para: asignar el consolidador dueño de un
@@ -299,7 +322,8 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   lo sostienen:** un aviso por **persona y día**, no por casa (el líder que más
   lleva tiene 7 casas y el mentor con más línea recibiría 19 avisos semanales);
   **si la casa se reúne antes de las 9:00 a. m. el aviso sale la noche
-  anterior**, porque tres casas reales empiezan a las 06:00, 07:00 y 08:34; es
+  anterior** — eran tres casas el 21-oct (06:00, 07:00 y 08:34) y al día
+  siguiente ya eran **seis**, así que la regla vale más de lo que parecía; es
   **idempotente** por el índice único de `faith_house_reminder` (usuario · día ·
   tipo), así que el disparo se puede reintentar; y **las direcciones van solo
   al correo**. El WhatsApp sale por **etiqueta + campo personalizado**, igual
@@ -808,6 +832,26 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   si el grupo mezcla causas que el dato no separa, el rótulo nombra **el hecho**
   y el pie dice las causas **avisando que no las distingue** — partirlo en un
   grupo más solo vale si su número puede cuadrar con su propia lista.
+- **⚠️ UN ENVÍO CUYA ÚLTIMA MILLA LA HACE OTRO SISTEMA NO ESTÁ HECHO HASTA QUE
+  ESE SISTEMA LO CONFIRME — Y SI NO, FALLA EN SILENCIO DURANTE SEMANAS.** El
+  WhatsApp del acceso al taller llevaba **56 envíos y tres semanas sin mandar
+  nada**: el sistema escribía los campos y movía la etiqueta, la auditoría decía
+  `casa_de_fe.acceso_enviado`, y la plantilla de Meta estaba **Rechazada**. Todo
+  lo que nosotros controlamos salió perfecto; lo que no controlamos no pasó. El
+  nombre de la acción (`acceso_enviado`) **afirmaba un hecho que no era nuestro**.
+  Tres cosas que hay que repetir:
+  1. **Auditar lo que de verdad hicimos**, no lo que esperamos que pase después:
+     «se puso la etiqueta» es cierto; «se envió» no lo sabemos.
+  2. **Antes de dar por vivo un canal ajeno, mandarse UNO a sí mismo** y mirarlo
+     llegar. Es la única prueba, y cuesta dos minutos.
+  3. **Si el canal no puede confirmar, decirlo en la pantalla** en vez de dejar
+     que el silencio parezca éxito.
+- **⚠️ Y ANTES DE ESCRIBIR UN MENSAJE PARA UN CANAL AJENO, MIRAR QUÉ FORMATO
+  ADMITE ESE CANAL.** El recordatorio se diseñó entero —mockup aprobado, código,
+  pruebas— dando por hecho que se podía mandar texto libre por WhatsApp. **No se
+  puede:** solo plantillas aprobadas, y el valor de una variable no admite ni un
+  salto de línea (§6). Rehacerlo fue barato porque el texto estaba en una sola
+  función del catálogo; haberlo mirado antes habría sido gratis.
 - **El orden en la pantalla es la única forma de decir ciertas cosas sin un
   cartel**: lo que caduca o bloquea a alguien va **arriba del todo**.
 - **⚠️ SI UN NÚMERO SE PUEDE PULSAR PARA VER DE DÓNDE SALE, EL NÚMERO Y SU
@@ -920,8 +964,9 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 > archivo del mes** y su renglón **arriba de este índice**. Si de ese trabajo
 > sale una regla general, va **además** a §12.
 
-### `docs/bitacora/2026-10.md` — octubre de 2026 (26 entradas)
+### `docs/bitacora/2026-10.md` — octubre de 2026 (27 entradas)
 
+- **22-oct** · ⚠️ **El WhatsApp de este CRM no manda texto libre: solo plantillas aprobadas, y el VALOR de una variable no admite ni un salto de línea** · ⚠️ **y de paso: el WhatsApp del acceso al taller NUNCA ha salido — 56 envíos en 3 semanas con la plantilla Rechazada**, y nadie se enteró porque `acceso_enviado` afirma un hecho que no es nuestro · el mensaje se parte en dos y nace `variableDeWhatsApp` · ayer eran 3 casas de madrugada y hoy son 6.
 - **21-oct (tarde)** · ⚠️ **El disparador NO podía ser un workflow de HighLevel: esa cuenta no tiene activadores por horario** (4 búsquedas, 0 resultados) · lo mueve **un SEGUNDO worker de Cloudflare** con dos crons · huella 200 «Hello World!» → **404** · ⚠️ **Cloudflare no deja releer un secreto guardado** y buscarlo en el CRM costó una hora: los «webhooks» del flujo eran **«Go To»** · la ruta acepta dos secretos.
 - **21-oct** · **Recordatorio de Casas de Fe por correo y WhatsApp** · ⚠️ **el worker solo exporta `fetch`, no `scheduled`**: lo dispara un workflow de HighLevel, no un cron · uno por **persona y día** (hoy serían 16 y son 10) · **si se reúne antes de las 9:00, el aviso sale la noche anterior** · la etiqueta se quita y se vuelve a poner o solo funciona un día.
 - **20-oct** · **Saray y Maricela: dos «no entraron» por causas distintas** · Saray no tenía enlace al CRM (sin teléfono ni correo) · a Maricela **se la absorbió la ficha de Celina por compartir el teléfono** · ⚠️ **me equivoqué dos veces y las desmontó el dato** · Maricela creada a mano: **8 escrituras, no 3**.
