@@ -1973,8 +1973,20 @@ model FaithHouseReminder {
   /// proyecto viajan como texto de punta a punta (§12.1) para no volver a
   /// tropezar con la zona horaria, y esta columna solo se compara por igualdad.
   scopeDate String @map("scope_date")
-  /// DIA (el resumen de la mañana) o NOCHE_ANTES (las de mañana de madrugada).
+  /// DIA (el resumen de la mañana), NOCHE_ANTES (las de mañana de madrugada) o
+  /// UNA_HORA_ANTES (el toque de una casa concreta, poco antes de empezar).
   kind String
+  /// La casa a la que pertenece el aviso, y '' cuando resume el día entero.
+  ///
+  /// ⚠️ Entra en la llave única porque el toque de una hora antes es **por
+  /// casa**: tres casas el mismo día son tres toques. Con la llave vieja
+  /// (persona · dia · tipo) el segundo chocaria contra el primero y no saldria,
+  /// sin dar ningun error.
+  /// Para DIA y NOCHE_ANTES queda en '' y el indice se comporta igual que antes.
+  /// Es '' y no NULL —y sin clave foranea— para que este `@@unique` pueda
+  /// describir la base tal cual; con NULL habria que escribirlo como un indice
+  /// sobre COALESCE y el esquema dejaria de decir la verdad.
+  groupId String @default("") @map("group_id")
   /// Cuantas casas resumio, en total y cuantas eran suyas. Responde «¿por que
   /// no me llego?» sin reconstruir el dia.
   groups         Int      @default(0)
@@ -1988,7 +2000,8 @@ model FaithHouseReminder {
 
   user AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, scopeDate, kind], map: "faith_house_reminder_unico")
+  @@unique([userId, scopeDate, kind, groupId], map: "faith_house_reminder_unico_casa")
   @@index([scopeDate], map: "faith_house_reminder_scope_date_idx")
+  @@index([groupId], map: "faith_house_reminder_group_id_idx")
   @@map("faith_house_reminder")
 }
