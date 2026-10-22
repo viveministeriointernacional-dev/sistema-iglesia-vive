@@ -48,8 +48,15 @@ eventos, y administración. Documentación de producto en `design/`
 - **NO trabaja en local.** Todo es en la nube. Nunca pedirle comandos locales.
   Las acciones manuales que le toquen son siempre en **páginas web** (GitHub,
   Cloudflare, Supabase, HighLevel/Nexus). Dar pasos con clics exactos.
-- **El usuario fusiona los PR.** Yo desarrollo en la rama, abro PR, y él le da
-  **Merge** en GitHub. Desplegar = fusionar a `main`.
+- **⚠️ NO SE ABREN PR, Y FUSIONA CLAUDE. Cambiado por el usuario el 22-oct-2026,
+  y sustituye a la regla anterior («el usuario fusiona los PR»).** El flujo es:
+  termino el cambio, lo pruebo, **le pregunto si lo despliego**, él autoriza, y
+  **yo fusiono a `main`**. Desplegar = fusionar a `main`.
+  **No se le pide ni un clic.** Si `main` estuviera protegida y rechazara el
+  empuje directo, la salida es abrir el PR y **fusionarlo yo mismo** — nunca
+  devolverle el trabajo de fusionar.
+  ⚠️ **Preguntar no es opcional**: se pregunta **cada vez**, aunque el cambio sea
+  solo de memoria o de texto. Autorizar un cambio no autoriza el siguiente.
 - Prefiere soluciones definitivas y paso a paso; se frustra si repito cosas ya
   hechas o si algo queda a medias.
 - **MÉTODO MOCKUPS (pedido el 3-sep-2026, afinado el 4-sep):** antes de
@@ -145,11 +152,16 @@ panel; antes este archivo decía «Paid» y era falso — de ahí parte de la le
 
 ## 5. Convención de ramas / git
 
-- Desarrollar en la rama de trabajo (actual: `claude/operacion-72-dashboard-4wj0p3`),
-  abrir PR contra `main`. El usuario fusiona.
-- Si el PR de la rama ya está fusionado, **reiniciar la rama desde `main`**
+- Desarrollar en la rama de trabajo (actual: `claude/operacion-72-dashboard-4wj0p3`)
+  y **fusionar a `main` yo mismo, con la autorización del usuario y sin abrir PR**
+  (§2, cambiado el 22-oct-2026).
+- Tras fusionar, **reiniciar la rama desde `main`**
   (`git fetch origin main && git checkout -B <rama> origin/main`) y poner el
-  trabajo nuevo encima; abrir PR nuevo. Nunca apilar sobre historia ya fusionada.
+  trabajo nuevo encima. Nunca apilar sobre historia ya fusionada.
+- ⚠️ **Lo que NO cambia por dejar de abrir PR: hay que comprobar que el merge
+  entró ENTERO.** `git log --oneline origin/main..<rama>` vacío y los padres del
+  merge iguales a la cabeza de la rama (§12.2). Ha fallado cinco veces, y
+  fusionar yo no lo vuelve imposible — solo cambia de quién es el descuido.
 - **Migraciones: automáticas en cada despliegue.** Basta crear la carpeta en
   `prisma/migrations/<timestamp>_<nombre>/migration.sql` y fusionar: el build
   ejecuta `scripts/migrar.mjs` (vía `wrangler.jsonc` → `build.command` y
