@@ -170,57 +170,67 @@ export function asuntoDelCorreo(aviso: Aviso, tipo: TipoDeEnvio): string {
   return `Tu línea ${plural(n, "tiene una Casa de Fe", `tiene ${n} Casas de Fe`)} ${cuando.toLowerCase()}`;
 }
 
-/// **El texto del WhatsApp**, tal como lo manda HighLevel.
+/// **El valor de la variable `{{2}}` de la plantilla de WhatsApp.**
 ///
-/// Las negritas de WhatsApp van entre asteriscos, así que `*7:00 p. m.*` llega
-/// al teléfono ya en negrita. Y las direcciones **no van aquí a propósito**:
-/// tres direcciones completas hacen un mensaje que nadie lee en el celular, y
-/// para eso está el correo, que sí las lleva con su «Cómo llegar».
-export function textoWhatsApp(aviso: Aviso, tipo: TipoDeEnvio): string {
+/// ⚠️ **NO es el mensaje: es UN TROZO del mensaje, y tiene que caber en UNA
+/// SOLA LÍNEA.** El WhatsApp de este CRM va por la API de WhatsApp Business, que
+/// **solo manda plantillas aprobadas por Meta**, no texto libre. La plantilla
+/// `recordatorio_casa_de_fe` lleva el saludo y el cierre escritos y fijos; lo
+/// único que viaja desde el sistema es el centro — y **Meta rechaza un valor de
+/// variable que lleve saltos de línea, tabuladores o cuatro espacios seguidos**.
+///
+/// Esto lo descubrimos tarde, el 22-oct, al ir a crear el flujo: el diseño
+/// original escribía el mensaje entero con sus saltos de línea, dando por hecho
+/// que se podía mandar texto libre. **No se puede.** Y la misma trampa llevaba
+/// tres semanas tumbando el WhatsApp del acceso al taller sin que nadie lo
+/// supiera: 56 envíos en los que el sistema hizo su parte y Meta nunca mandó
+/// nada.
+///
+/// Por eso lo último que hace es `enUnaLinea`: si alguien mete un `\n` en
+/// cualquiera de los trozos, **se aplana aquí** en vez de llegar a Meta y hacer
+/// que el envío falle sin explicación.
+///
+/// El correo sí lleva el mensaje completo, con direcciones y «cómo llegar».
+/// Esto es el resumen que cabe en un WhatsApp.
+export function variableDeWhatsApp(aviso: Aviso, tipo: TipoDeEnvio): string {
   const cuando = tipo === "DIA" ? "Hoy" : "Mañana";
-  const lineas: string[] = [];
+  const partes: string[] = [];
 
   if (aviso.propias.length > 0) {
     const n = aviso.propias.length;
-    lineas.push(
-      n === 1
-        ? `*${cuando} tienes Casa de Fe*`
-        : `*${cuando} tienes ${n} Casas de Fe*`,
+    const casas = aviso.propias
+      .map(
+        (casa) =>
+          `${horaLegible(casa.hora)} - ${casa.nombre} (${casa.miembros} ${plural(casa.miembros, "miembro", "miembros")})`,
+      )
+      .join(" · ");
+    partes.push(
+      `${cuando} tienes ${n === 1 ? "Casa de Fe" : `${n} Casas de Fe`}: ${casas}`,
     );
-    lineas.push("");
-    for (const casa of aviso.propias) {
-      lineas.push(
-        `*${horaLegible(casa.hora)}* · ${casa.nombre} · ${casa.miembros} ${plural(casa.miembros, "miembro", "miembros")}`,
-      );
-    }
   }
 
   if (aviso.deLinea.length > 0) {
-    if (lineas.length > 0) lineas.push("");
     const n = aviso.deLinea.length;
-    lineas.push(
+    // Para el mentor, lo que importa de cada casa es QUIÉN la lleva: es a quien
+    // le va a preguntar. Los miembros son cosa del líder.
+    const casas = aviso.deLinea
+      .map((casa) => `${horaLegible(casa.hora)} - ${casa.nombre} (lidera ${casa.lider})`)
+      .join(" · ");
+    const encabezado =
       aviso.propias.length > 0
-        ? `*De tu línea, ${plural(n, "una casa más", `${n} casas más`)}:*`
-        : `*De tu línea se ${plural(n, "reúne una casa", `reúnen ${n} casas`)} ${cuando.toLowerCase()}:*`,
-    );
-    lineas.push("");
-    for (const casa of aviso.deLinea) {
-      lineas.push(`*${horaLegible(casa.hora)}* · ${casa.nombre} · ${casa.lider}`);
-    }
+        ? "De tu línea:"
+        : n === 1
+          ? `${cuando} se reúne una casa de tu línea:`
+          : `${cuando} se reúnen ${n} casas de tu línea:`;
+    partes.push(`${encabezado} ${casas}`);
   }
 
-  lineas.push("");
-  if (aviso.propias.length > 0) {
-    lineas.push("Las direcciones y el «cómo llegar» te llegaron al correo.");
-    lineas.push("");
-    lineas.push(
-      tipo === "DIA"
-        ? "Si hoy alguna no se puede, avísales a los miembros y a tu mentor."
-        : "Te lo mando esta noche porque mañana temprano ya estarás reunida.",
-    );
-  } else {
-    lineas.push("No tienes que ir: es para que sepas qué está abierto.");
-  }
+  return enUnaLinea(partes.join(" — "));
+}
 
-  return lineas.join("\n");
+/// Aplana cualquier espacio en blanco a un solo espacio. Es la garantía de que
+/// lo que sale de aquí cabe en una variable de plantilla, escriba lo que escriba
+/// quien toque las funciones de arriba.
+function enUnaLinea(texto: string): string {
+  return texto.replace(/\s+/g, " ").trim();
 }

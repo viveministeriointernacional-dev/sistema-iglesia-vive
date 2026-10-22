@@ -9,7 +9,7 @@ import {
   envioQueLeToca,
   HORA_TOPE_MANANA,
   nombreDePila,
-  textoWhatsApp,
+  variableDeWhatsApp,
   TIPOS_DE_ENVIO,
   tipoValido,
 } from "./recordatorio-casas-de-fe-catalogo";
@@ -156,44 +156,85 @@ test("el asunto del mentor no dice «tienes», porque no tiene que ir", () => {
   assert.ok(!asuntoDelCorreo(soloLinea, "DIA").includes("tienes"));
 });
 
-test("el WhatsApp lleva las negritas con asteriscos y NO lleva direcciones", () => {
+test("el WhatsApp va en UNA sola línea y NO lleva direcciones", () => {
   const aviso = armarAvisos([
     { usuarioId: "u1", nombre: "Esteban", correo: null, contactoCrm: "C1", papel: "LIDER", casa: casa({ hora: "10:00", nombre: "Norte", miembros: 6, direccion: "Carrera 9 #21-14" }) },
     { usuarioId: "u1", nombre: "Esteban", correo: null, contactoCrm: "C1", papel: "LIDER", casa: casa({ hora: "19:00", nombre: "Sur", miembros: 9, direccion: "Calle 48 Sur #7-02" }) },
   ])[0];
 
-  const texto = textoWhatsApp(aviso, "DIA");
-  assert.ok(texto.startsWith("*Hoy tienes 2 Casas de Fe*"));
-  assert.ok(texto.includes("*10:00 a. m.* · Norte · 6 miembros"));
-  assert.ok(texto.includes("*7:00 p. m.* · Sur · 9 miembros"));
-  // La dirección va solo al correo: tres direcciones no se leen en el celular.
+  const texto = variableDeWhatsApp(aviso, "DIA");
+  assert.ok(texto.startsWith("Hoy tienes 2 Casas de Fe:"));
+  assert.ok(texto.includes("10:00 a. m. - Norte (6 miembros)"));
+  assert.ok(texto.includes("7:00 p. m. - Sur (9 miembros)"));
+  // La dirección va solo al correo: no cabe en el resumen del celular.
   assert.ok(!texto.includes("Carrera 9"), "la dirección no debe ir en el WhatsApp");
   assert.ok(!texto.includes("Calle 48"), "la dirección no debe ir en el WhatsApp");
+});
+
+// ⚠️ La prueba que de verdad protege el envío. Meta rechaza un valor de variable
+// con saltos de línea, tabuladores o cuatro espacios seguidos, y el rechazo no
+// dice por qué: el mensaje simplemente no sale. Se comprueba sobre los cuatro
+// casos (solo propias, solo de línea, las dos, y una sola) porque cada rama arma
+// el texto por su lado.
+test("ningún caso produce saltos de línea ni espacios dobles", () => {
+  const propia = { usuarioId: "u", nombre: "Ana", correo: null, contactoCrm: "C", papel: "LIDER" as const };
+  const deLinea = { usuarioId: "u", nombre: "Ana", correo: null, contactoCrm: "C", papel: "MENTOR" as const };
+
+  const casos: Aviso[] = [
+    armarAvisos([{ ...propia, casa: casa({ hora: "18:00", nombre: "Una" }) }])[0],
+    armarAvisos([
+      { ...propia, casa: casa({ hora: "06:00", nombre: "A" }) },
+      { ...propia, casa: casa({ hora: "20:00", nombre: "B" }) },
+    ])[0],
+    armarAvisos([{ ...deLinea, casa: casa({ hora: "07:00", nombre: "C", lider: "Rosa Díaz" }) }])[0],
+    armarAvisos([
+      { ...propia, casa: casa({ hora: "09:00", nombre: "D" }) },
+      { ...deLinea, casa: casa({ hora: "19:30", nombre: "E", lider: "Rosa Díaz" }) },
+    ])[0],
+  ];
+
+  for (const aviso of casos) {
+    for (const tipo of TIPOS_DE_ENVIO) {
+      const texto = variableDeWhatsApp(aviso, tipo);
+      assert.ok(texto.length > 0, "una variable vacía también la rechaza Meta");
+      assert.ok(!/[\n\r\t]/.test(texto), `salto de línea en: ${texto}`);
+      assert.ok(!/ {2}/.test(texto), `espacios seguidos en: ${texto}`);
+    }
+  }
+});
+
+test("si un trozo trae un salto de línea, se aplana en vez de llegar a Meta", () => {
+  const aviso = armarAvisos([
+    { usuarioId: "u1", nombre: "Ana", correo: null, contactoCrm: "C", papel: "LIDER", casa: casa({ hora: "18:00", nombre: "Casa\ncon salto" }) },
+  ])[0];
+  const texto = variableDeWhatsApp(aviso, "DIA");
+  assert.ok(!texto.includes("\n"));
+  assert.ok(texto.includes("Casa con salto"));
 });
 
 test("«un miembro» en singular", () => {
   const aviso = armarAvisos([
     { usuarioId: "u1", nombre: "Ana", correo: null, contactoCrm: null, papel: "LIDER", casa: casa({ hora: "18:00", miembros: 1 }) },
   ])[0];
-  assert.ok(textoWhatsApp(aviso, "DIA").includes("· 1 miembro"));
-  assert.ok(!textoWhatsApp(aviso, "DIA").includes("1 miembros"));
+  assert.ok(variableDeWhatsApp(aviso, "DIA").includes("(1 miembro)"));
+  assert.ok(!variableDeWhatsApp(aviso, "DIA").includes("1 miembros"));
 });
 
-test("el WhatsApp del mentor dice que no tiene que ir, y nombra a quien la lleva", () => {
+test("el WhatsApp del mentor nombra a quien lleva la casa, no a sus miembros", () => {
   const aviso = armarAvisos([
     { usuarioId: "m", nombre: "Rosa", correo: null, contactoCrm: "C9", papel: "MENTOR", casa: casa({ hora: "10:00", nombre: "Norte", lider: "Esteban Lozano" }) },
   ])[0];
-  const texto = textoWhatsApp(aviso, "DIA");
-  assert.ok(texto.includes("Esteban Lozano"), "el mentor necesita saber a quién preguntarle");
-  assert.ok(texto.includes("No tienes que ir"));
+  const texto = variableDeWhatsApp(aviso, "DIA");
+  assert.ok(texto.includes("lidera Esteban Lozano"), "el mentor necesita saber a quién preguntarle");
+  assert.ok(texto.includes("se reúne una casa de tu línea"));
+  assert.ok(!texto.includes("tienes"), "el mentor no tiene que ir");
 });
 
 test("la noche anterior lo dice con palabras", () => {
   const aviso = armarAvisos([
     { usuarioId: "u1", nombre: "Ana", correo: null, contactoCrm: null, papel: "LIDER", casa: casa({ hora: "06:00" }) },
   ])[0];
-  assert.ok(textoWhatsApp(aviso, "NOCHE_ANTES").startsWith("*Mañana tienes Casa de Fe*"));
-  assert.ok(textoWhatsApp(aviso, "NOCHE_ANTES").includes("esta noche"));
+  assert.ok(variableDeWhatsApp(aviso, "NOCHE_ANTES").startsWith("Mañana tienes Casa de Fe:"));
 });
 
 test("el saludo usa el primer nombre", () => {
