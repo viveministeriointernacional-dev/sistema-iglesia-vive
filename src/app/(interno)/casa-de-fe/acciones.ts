@@ -11,6 +11,7 @@ import {
 import { guardarReunionDeGrupo } from "@/lib/reunion";
 import { nombreCompleto } from "@/lib/dominio";
 import { auditar } from "@/lib/audit";
+import type { CasaDeLaInscripcion } from "@/lib/casa-de-fe-bienvenida-catalogo";
 import { enviarAccesoAlTaller } from "@/lib/taller-bienvenida";
 import {
   ErrorDePermiso,
@@ -48,6 +49,35 @@ async function usuarioQueAbreCasas() {
 
 /// La Casa de Fe que esta persona puede administrar: la que lleva, o cualquiera
 /// si es de dirección.
+/// La casa, con lo que necesita la confirmación de inscripción.
+///
+/// ⚠️ **Sin `export`, y no es un descuido: este archivo es `"use server"` y ahí
+/// solo pueden exportarse funciones `async`** (§12.4). Exportar esto tumbaría
+/// la pantalla entera en ejecución, con `tsc`, `eslint` y `cf:build` los tres
+/// en verde. Hay un guardián (`src/lib/use-server.test.ts`), pero es más
+/// barato no provocarlo.
+function casaParaElCorreo(grupo: {
+  name: string;
+  weekday: number | null;
+  meetingTime: string | null;
+  everyNWeeks: number;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  leader: { fullName: string };
+}): CasaDeLaInscripcion {
+  return {
+    nombre: grupo.name,
+    weekday: grupo.weekday,
+    meetingTime: grupo.meetingTime,
+    everyNWeeks: grupo.everyNWeeks,
+    address: grupo.address,
+    latitude: grupo.latitude,
+    longitude: grupo.longitude,
+    lider: grupo.leader.fullName,
+  };
+}
+
 async function casaPropia(groupId: string) {
   const usuario = await obtenerUsuarioActual();
   if (!usuario) throw new ErrorDePermiso("Tu sesión expiró. Vuelve a entrar.");
@@ -66,6 +96,17 @@ async function casaPropia(groupId: string) {
       createdById: true,
       closedAt: true,
       coLeaders: { select: { userId: true } },
+      // El resto lo necesita la confirmacion de inscripcion: sin el dia, la
+      // hora y la direccion, la persona queda inscrita sin saber cuando ni
+      // donde presentarse. Van en el MISMO select, asi que no cuestan un viaje
+      // mas a la base.
+      weekday: true,
+      meetingTime: true,
+      everyNWeeks: true,
+      address: true,
+      latitude: true,
+      longitude: true,
+      leader: { select: { fullName: true } },
     },
   });
   if (!grupo) return { usuario, grupo: null };
@@ -170,7 +211,7 @@ export async function inscribirEnCasaDeFe(
   // Y **nunca deshace la inscripción**: la persona ya está en la casa. Si el
   // mensaje no salió, se dice y alguien le dicta el código.
   const acceso = await enviarAccesoAlTaller(learnerId, {
-    casa: grupo.name,
+    casa: casaParaElCorreo(grupo),
     actorId: usuario.id,
   }).catch((error) => {
     console.error("No se pudo mandar el acceso al taller", error);
@@ -208,7 +249,7 @@ export async function reenviarAccesoAlTaller(
 
   const usuario = await obtenerUsuarioActual();
   const acceso = await enviarAccesoAlTaller(learnerId, {
-    casa: grupo.name,
+    casa: casaParaElCorreo(grupo),
     actorId: usuario?.id ?? null,
   }).catch((error) => {
     console.error("No se pudo reenviar el acceso al taller", error);

@@ -1,3 +1,12 @@
+import {
+  asuntoDeInscripcion,
+  type CasaDeLaInscripcion,
+  cuandoSeReune,
+  dondeSeReune,
+  fraseDeInscripcion,
+  type GeneroDePersona,
+  SIN_DIA_NI_HORA,
+} from "@/lib/casa-de-fe-bienvenida-catalogo";
 import { variableDeEntorno } from "@/lib/entorno";
 import type { ClientePrisma } from "@/lib/prisma";
 import {
@@ -330,17 +339,34 @@ export async function correoRecuperarContrasena(datos: {
 /// en un teléfono el enlace **es** el QR, así que aquí van los doce enlaces,
 /// que es lo que de verdad se puede pulsar. La hoja impresa con los doce QR
 /// sigue existiendo para la casa, y se saca desde «Los 12 temas».
-export async function correoTalleresDeCasaDeFe(datos: {
-  to: string;
+/// Lo que hace falta para escribir la confirmación de inscripción.
+export type DatosDeLaInscripcion = {
   nombre: string;
+  /// De la ficha. Decide «inscrita» / «inscrito»; si falta, el texto neutro.
+  genero: GeneroDePersona;
   codigo: string;
-  casa: string | null;
+  /// La casa entera, no solo su nombre: sin el día, la hora y la dirección no
+  /// hay confirmación que valga. `null` solo si se perdió el grupo.
+  casa: CasaDeLaInscripcion | null;
   /// El enlace a «Mis talleres», con su token.
   enlace: string;
   temas: { number: number; name: string; enlace: string | null }[];
-  registro?: RegistroDeCorreo;
-}): Promise<ResultadoCorreo> {
+};
+
+/// **El asunto y el cuerpo, sin mandar nada.**
+///
+/// Está separado del envío a propósito: así el correo se puede **dibujar con
+/// datos de verdad** antes de darlo por bueno (§12.5). Un correo que solo se ha
+/// leído en el código es un correo sin revisar.
+export function correoDeInscripcionACasaDeFe(datos: DatosDeLaInscripcion): {
+  subject: string;
+  html: string;
+} {
   const nombreDePila = datos.nombre.split(" ")[0] ?? datos.nombre;
+
+  const subject = datos.casa
+    ? asuntoDeInscripcion({ nombreDePila, genero: datos.genero, casa: datos.casa })
+    : `${nombreDePila}, aquí están tus 12 talleres de Casa de Fe`;
 
   const renglones = datos.temas
     .map((tema) => {
@@ -352,15 +378,50 @@ export async function correoTalleresDeCasaDeFe(datos: {
     })
     .join("");
 
-  return enviarCorreo({
-    to: datos.to,
-    subject: `${nombreDePila}, aquí están tus 12 talleres de Casa de Fe`,
-    registro: datos.registro,
-    html: MARCO(`
-      <p>Hola ${escapar(nombreDePila)}, ya entraste a ${
-        datos.casa ? `<strong>${escapar(datos.casa)}</strong>` : "una Casa de Fe"
-      }.</p>
-      <p>Los 12 temas del libro los puedes hacer desde tu celular. Este enlace es tuyo: <strong>guárdalo</strong>.</p>
+  const fila = (rotulo: string, valor: string) => `
+    <tr>
+      <td style="padding:6px 14px 6px 0;font-size:12px;font-weight:bold;letter-spacing:.06em;color:#8a929a;vertical-align:top;white-space:nowrap">${rotulo}</td>
+      <td style="padding:6px 0;font-size:14px;color:#1d2a36">${valor}</td>
+    </tr>`;
+
+  let bloqueDeLaCasa = "";
+  if (datos.casa) {
+    const cuando = cuandoSeReune(datos.casa);
+    const donde = dondeSeReune(datos.casa);
+    const liderDePila = datos.casa.lider.split(" ")[0] ?? datos.casa.lider;
+    const comoLlegar = donde.comoLlegar
+      ? ` · <a href="${donde.comoLlegar}" style="color:#0e2a4e;font-weight:bold">Cómo llegar</a>`
+      : "";
+
+    bloqueDeLaCasa = `
+      <div style="margin:18px 0;border:1px solid #c9ccd1;border-radius:12px;padding:14px 16px;background:#f7f5ee">
+        <p style="font-size:11px;font-weight:bold;letter-spacing:.1em;color:#8a929a;margin:0 0 6px">TU CASA DE FE</p>
+        <table style="width:100%;border-collapse:collapse">
+          ${fila("CUÁNDO", escapar(cuando ? cuando.largo : SIN_DIA_NI_HORA))}
+          ${fila("DÓNDE", `${escapar(donde.texto)}${comoLlegar}`)}
+          ${fila("QUIÉN LA LLEVA", escapar(datos.casa.lider))}
+        </table>
+      </div>
+      <p style="font-size:13px;color:#4a5560">
+        No tienes que llevar nada. Llega, y si algún día no puedes, avísale a
+        ${escapar(liderDePila)}.
+      </p>`;
+  }
+
+  const html = MARCO(`
+      <p>${escapar(
+        datos.casa
+          ? fraseDeInscripcion({ nombreDePila, genero: datos.genero, casa: datos.casa.nombre })
+          : `Hola ${nombreDePila}, ya estás en una Casa de Fe.`,
+      )}</p>
+      ${datos.casa ? "<p>Esto es lo que necesitas para el primer día.</p>" : ""}
+
+      ${bloqueDeLaCasa}
+
+      <p style="font-size:11px;font-weight:bold;letter-spacing:.1em;color:#8a929a;margin-top:26px">TUS 12 TALLERES</p>
+      <p>En la Casa de Fe van a ir viendo los 12 temas del libro. Cada uno tiene
+      un taller que llenas desde tu celular. Este enlace es tuyo:
+      <strong>guárdalo</strong>.</p>
 
       <p style="margin:20px 0">
         <a href="${datos.enlace}"
@@ -375,8 +436,8 @@ export async function correoTalleresDeCasaDeFe(datos: {
           `${datos.codigo.slice(0, 3)} ${datos.codigo.slice(3)}`,
         )}</p>
         <p style="font-size:12.5px;color:#4a5560;margin:8px 0 0">
-          Son solo tuyos. Te sirven para entrar a tu taller desde cualquier
-          teléfono, o si escaneas uno de los QR que están en tu casa de fe.
+          Es solo tuyo. Te sirve para entrar a tu taller desde cualquier
+          teléfono, o si escaneas uno de los QR que están en tu Casa de Fe.
           <strong>No lo compartas</strong>: con él se escribe en tu expediente.
         </p>
       </div>
@@ -392,9 +453,27 @@ export async function correoTalleresDeCasaDeFe(datos: {
       <p style="font-size:12.5px;color:#8a929a">
         No necesitas contraseña ni crear una cuenta.
       </p>
-    `),
-  });
+    `);
+
+  return { subject, html };
 }
+
+/// **La confirmación de inscripción a una Casa de Fe**, con su acceso a los
+/// talleres.
+///
+/// ⚠️ **El orden es la decisión que importa, y cambió el 22-oct.** Antes esto
+/// entregaba unos talleres y despachaba la inscripción en media línea; la
+/// persona quedaba inscrita sin saber **cuándo ni dónde presentarse**, y tenía
+/// que preguntárselo a alguien. Ahora la reunión va primero —día, hora,
+/// dirección y quién la lleva— y los talleres después: el enlace puede esperar
+/// a que lo abra, llegar a la hora no.
+export async function correoTalleresDeCasaDeFe(
+  datos: DatosDeLaInscripcion & { to: string; registro?: RegistroDeCorreo },
+): Promise<ResultadoCorreo> {
+  const { subject, html } = correoDeInscripcionACasaDeFe(datos);
+  return enviarCorreo({ to: datos.to, subject, html, registro: datos.registro });
+}
+
 
 /// **El recordatorio de las Casas de Fe del día.**
 ///
