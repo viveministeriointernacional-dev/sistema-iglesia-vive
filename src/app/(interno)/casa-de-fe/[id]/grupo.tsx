@@ -28,11 +28,14 @@ export function CasaDeFe({
   miembros,
   cerrada,
   puedeEditar,
+  avisoDeDatos,
 }: {
   groupId: string;
   miembros: MiembroVista[];
   cerrada: boolean;
   puedeEditar: boolean;
+  /// Lo que falta por completar antes de poder inscribir. `null` si no falta nada.
+  avisoDeDatos: string | null;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -156,7 +159,9 @@ export function CasaDeFe({
           ) : null}
         </ul>
 
-        {puedeEditar && !cerrada ? <Inscribir groupId={groupId} /> : null}
+        {puedeEditar && !cerrada ? (
+          <Inscribir groupId={groupId} avisoDeDatos={avisoDeDatos} />
+        ) : null}
 
         {error ? (
           <p role="alert" className="mt-3 text-[11.5px] leading-[1.4] font-medium text-rojo">
@@ -185,7 +190,13 @@ export function CasaDeFe({
   );
 }
 
-function Inscribir({ groupId }: { groupId: string }) {
+function Inscribir({
+  groupId,
+  avisoDeDatos,
+}: {
+  groupId: string;
+  avisoDeDatos: string | null;
+}) {
   const router = useRouter();
   const [consulta, setConsulta] = useState("");
   const [candidatos, setCandidatos] = useState<CandidatoCasaDeFe[] | null>(null);
@@ -196,6 +207,17 @@ function Inscribir({ groupId }: { groupId: string }) {
   return (
     <div className="mt-4 border-t border-[rgba(19,28,36,.09)] pt-4">
       <span className="etiqueta-campo">Inscribir persona</span>
+
+      {/* ⚠️ Va ARRIBA del buscador y no debajo: el líder tiene que verlo antes
+          de buscar a nadie, no después de pulsar un nombre y que se lo
+          rechacen. La acción lo rechaza igual (§12.6: el guardia va en los dos
+          sitios), pero avisar después de hacer el trabajo es maleducado. */}
+      {avisoDeDatos ? (
+        <p className="mt-2 rounded-[8px] border border-[rgba(176,118,20,.3)] bg-[rgba(176,118,20,.08)] p-2 text-[12.5px] leading-snug text-[#8a5a0c]">
+          {avisoDeDatos}
+        </p>
+      ) : null}
+
       <div className="mt-2 flex gap-2">
         <input
           value={consulta}

@@ -4,6 +4,10 @@ import { requerirVista } from "@/lib/auth";
 import { paraPermiso } from "@/lib/encargados-catalogo";
 import { hoyEnColombia } from "@/lib/dominio";
 import { ReunionDelGrupo } from "@/components/reunion-del-grupo";
+import {
+  avisoDeDatosQueFaltan,
+  loQueFaltaDeLaCasa,
+} from "@/lib/casa-de-fe-bienvenida-catalogo";
 import { diaISO } from "@/lib/reunion-catalogo";
 import {
   guardarReunion,
@@ -131,6 +135,10 @@ export default async function PaginaCasaDeFe({
         <CasaDeFe
           groupId={grupo.id}
           miembros={miembros}
+          // Lo que le falta a la casa para que su confirmación salga entera. Se
+          // pinta ARRIBA del buscador, para que el líder lo vea antes de buscar
+          // a nadie y no después de pulsar un nombre.
+          avisoDeDatos={avisoDeDatosQueFaltan(loQueFaltaDeLaCasa(grupo))}
           cerrada={grupo.closedAt !== null}
           puedeEditar={puedeEditar}
         />

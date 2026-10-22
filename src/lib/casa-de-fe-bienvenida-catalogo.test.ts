@@ -6,6 +6,8 @@ import {
   cuandoSeReune,
   dondeSeReune,
   fraseDeInscripcion,
+  avisoDeDatosQueFaltan,
+  loQueFaltaDeLaCasa,
   participioDeInscripcion,
   queLlevar,
   SIN_DIA_NI_HORA,
@@ -117,4 +119,30 @@ test("qué llevar nombra el papel y el nombre del líder", () => {
   assert.ok(frase.includes("una agenda y un lapicero"));
   assert.ok(frase.includes("tu líder de Casa de Fe, Paola Alejandra"));
   assert.ok(!frase.includes("No tienes que llevar nada"));
+});
+
+// ⚠️ El guardia que impide inscribir a alguien en una casa a la que le faltan
+// datos. El aviso tiene que decir QUÉ falta: un «completa los datos» genérico
+// obliga al líder a adivinar, y falta la dirección en 24 de 59 casas.
+test("dice exactamente qué le falta a la casa", () => {
+  assert.deepEqual(loQueFaltaDeLaCasa(casa()), []);
+  assert.deepEqual(loQueFaltaDeLaCasa(casa({ address: null })), ["la dirección"]);
+  assert.deepEqual(loQueFaltaDeLaCasa(casa({ address: "  " })), ["la dirección"]);
+  assert.deepEqual(loQueFaltaDeLaCasa(casa({ weekday: null })), ["el día y la hora"]);
+  assert.deepEqual(loQueFaltaDeLaCasa(casa({ meetingTime: null })), ["el día y la hora"]);
+  assert.deepEqual(loQueFaltaDeLaCasa(casa({ weekday: null, address: null })), [
+    "el día y la hora",
+    "la dirección",
+  ]);
+});
+
+test("sin nada que falte no hay aviso, y con algo lo nombra", () => {
+  assert.equal(avisoDeDatosQueFaltan([]), null);
+
+  const uno = avisoDeDatosQueFaltan(["la dirección"]);
+  assert.ok(uno?.includes("completa la dirección de esta casa"));
+  assert.ok(uno?.includes("«La reunión»"), "hay que decirle DÓNDE completarlo");
+
+  const dos = avisoDeDatosQueFaltan(["el día y la hora", "la dirección"]);
+  assert.ok(dos?.includes("el día y la hora y la dirección"));
 });

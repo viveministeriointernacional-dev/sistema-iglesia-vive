@@ -11,7 +11,11 @@ import {
 import { guardarReunionDeGrupo } from "@/lib/reunion";
 import { nombreCompleto } from "@/lib/dominio";
 import { auditar } from "@/lib/audit";
-import type { CasaDeLaInscripcion } from "@/lib/casa-de-fe-bienvenida-catalogo";
+import {
+  avisoDeDatosQueFaltan,
+  type CasaDeLaInscripcion,
+  loQueFaltaDeLaCasa,
+} from "@/lib/casa-de-fe-bienvenida-catalogo";
 import { enviarAccesoAlTaller } from "@/lib/taller-bienvenida";
 import {
   ErrorDePermiso,
@@ -186,6 +190,16 @@ export async function inscribirEnCasaDeFe(
   const { usuario, grupo } = await casaPropia(groupId);
   if (!grupo) return { ok: false, mensaje: "Esta Casa de Fe no es tuya." };
   if (grupo.closedAt) return { ok: false, mensaje: "La Casa de Fe ya está cerrada." };
+
+  // ⚠️ **No se inscribe a nadie en una casa a la que le faltan datos** (petición
+  // del usuario, 22-oct). El correo de confirmación lleva el día, la hora y la
+  // dirección; sin ellos la persona queda inscrita sin saber cuándo ni dónde
+  // presentarse, y el correo sale cojo. Se piden antes, no después.
+  //
+  // El guardia va en la ACCIÓN y además en la pantalla (§12.6): avisar solo en
+  // la pantalla sería cosmético.
+  const avisoDeDatos = avisoDeDatosQueFaltan(loQueFaltaDeLaCasa(grupo));
+  if (avisoDeDatos) return { ok: false, mensaje: avisoDeDatos };
 
   const prisma = await getPrisma();
   const aprendiz = await prisma.learnerProfile.findUnique({

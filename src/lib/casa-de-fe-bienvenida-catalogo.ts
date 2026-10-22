@@ -154,3 +154,29 @@ export function dondeSeReune(casa: CasaDeLaInscripcion): {
     }),
   };
 }
+
+/// **Qué le falta a la casa para que su confirmación salga entera.**
+///
+/// El correo de inscripción lleva el día, la hora y la dirección. Si no están,
+/// la persona queda inscrita sin saber cuándo ni dónde presentarse — que es
+/// justo el fallo que se arregló el 22-oct. Así que en vez de mandar el correo
+/// cojo, **se piden antes de inscribir**.
+///
+/// ⚠️ No es un caso raro: el 22-oct faltaba la dirección en **24 de las 59
+/// casas abiertas** y el día u hora en 1. Por eso el aviso tiene que decir
+/// exactamente qué falta, no un «completa los datos» genérico.
+export function loQueFaltaDeLaCasa(
+  casa: Pick<CasaDeLaInscripcion, "weekday" | "meetingTime" | "everyNWeeks" | "address">,
+): string[] {
+  const falta: string[] = [];
+  if (!cuandoSeReune(casa)) falta.push("el día y la hora");
+  if (!(casa.address ?? "").trim()) falta.push("la dirección");
+  return falta;
+}
+
+/// El aviso, con lo que falta nombrado. `null` cuando no falta nada.
+export function avisoDeDatosQueFaltan(falta: string[]): string | null {
+  if (falta.length === 0) return null;
+  const lista = falta.length === 1 ? falta[0] : falta.join(" y ");
+  return `Antes de inscribir a alguien, completa ${lista} de esta casa, arriba en «La reunión». El correo de confirmación los lleva, y sin ellos la persona queda inscrita sin saber cuándo ni dónde presentarse.`;
+}
