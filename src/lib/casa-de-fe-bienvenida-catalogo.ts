@@ -36,9 +36,17 @@ export type CasaDeLaInscripcion = {
   address: string | null;
   latitude: number | null;
   longitude: number | null;
-  /// Quien la lleva. Ojo: suele ser quien **discipula**, no el dueño de la
-  /// casa — los nombres del título del grupo son los discípulos (22-oct).
+  /// Quien la lleva, con su nombre completo. Ojo: suele ser quien
+  /// **discipula**, no el dueño de la casa — los nombres del título del grupo
+  /// son los discípulos (22-oct).
   lider: string;
+  /// Cómo se le llama: los NOMBRES de su ficha, no la primera palabra.
+  ///
+  /// ⚠️ Cortar por el primer espacio se equivoca en **7 de los 17 líderes**
+  /// (22-oct): «Paola Alejandra» sale «Paola», «Juan Felipe» sale «Juan»,
+  /// «Harold Mauricio» sale «Harold». En Colombia los dos nombres son el
+  /// nombre, y llamar a alguien por la mitad se nota.
+  liderDePila: string;
 };
 
 /// **«inscrita» o «inscrito», y nada cuando no se sabe.**
@@ -56,14 +64,16 @@ export function participioDeInscripcion(genero: GeneroDePersona): string | null 
 /// **El asunto.** Lleva el día y la hora porque es lo único que se ve en la
 /// lista del celular antes de abrir, y es justo el dato que faltaba.
 export function asuntoDeInscripcion(datos: {
-  nombreDePila: string;
+  /// El nombre **completo**: esto es la confirmación de una inscripción, y una
+  /// confirmación lleva el nombre entero, no el de pila.
+  nombre: string;
   genero: GeneroDePersona;
   casa: CasaDeLaInscripcion;
 }): string {
   const participio = participioDeInscripcion(datos.genero);
   const encabezado = participio
-    ? `${datos.nombreDePila}, quedaste ${participio} en tu Casa de Fe`
-    : `${datos.nombreDePila}, ya tienes Casa de Fe`;
+    ? `${datos.nombre}, quedaste ${participio} en tu Casa de Fe`
+    : `${datos.nombre}, ya tienes Casa de Fe`;
 
   const cuando = cuandoSeReune(datos.casa);
   return cuando ? `${encabezado} · ${cuando.corto}` : encabezado;
@@ -103,6 +113,12 @@ export function cuandoSeReune(
     largo: `Todos los ${dia.plural} a las ${hora}${cada}`,
     corto: `${dia.plural} ${hora}`,
   };
+}
+
+/// **Qué llevar el primer día.** No es un detalle de redacción: alguien que
+/// llega a una casa ajena sin saber qué se espera de él llega incómodo.
+export function queLlevar(liderDePila: string): string {
+  return `Lleva un corazón dispuesto, y una agenda y un lapicero para anotar. Si algún día no puedes, avísale a tu líder de Casa de Fe, ${liderDePila}.`;
 }
 
 /// **Lo que se dice cuando el dato no está.** Nunca un renglón en blanco ni un

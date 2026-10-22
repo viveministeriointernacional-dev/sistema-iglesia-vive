@@ -64,7 +64,7 @@ function casaParaElCorreo(grupo: {
   address: string | null;
   latitude: number | null;
   longitude: number | null;
-  leader: { fullName: string };
+  leader: { fullName: string; person: { firstName: string } | null };
 }): CasaDeLaInscripcion {
   return {
     nombre: grupo.name,
@@ -75,6 +75,11 @@ function casaParaElCorreo(grupo: {
     latitude: grupo.latitude,
     longitude: grupo.longitude,
     lider: grupo.leader.fullName,
+    // Sin ficha enganchada no hay nombres separados y toca cortar; es lo mejor
+    // que se puede hacer con lo que hay.
+    liderDePila:
+      grupo.leader.person?.firstName?.trim() ||
+      (grupo.leader.fullName.split(" ")[0] ?? grupo.leader.fullName),
   };
 }
 
@@ -106,7 +111,10 @@ async function casaPropia(groupId: string) {
       address: true,
       latitude: true,
       longitude: true,
-      leader: { select: { fullName: true } },
+      // `person.firstName` son los NOMBRES, no la primera palabra: «Paola
+      // Alejandra», no «Paola». Cortar por el espacio se equivoca en 7 de los
+      // 17 líderes (22-oct).
+      leader: { select: { fullName: true, person: { select: { firstName: true } } } },
     },
   });
   if (!grupo) return { usuario, grupo: null };

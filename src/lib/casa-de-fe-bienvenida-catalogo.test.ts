@@ -7,6 +7,7 @@ import {
   dondeSeReune,
   fraseDeInscripcion,
   participioDeInscripcion,
+  queLlevar,
   SIN_DIA_NI_HORA,
   SIN_DIRECCION,
 } from "./casa-de-fe-bienvenida-catalogo";
@@ -20,7 +21,8 @@ function casa(parcial: Partial<CasaDeLaInscripcion> = {}): CasaDeLaInscripcion {
     address: "Carrera 9 #21-14",
     latitude: null,
     longitude: null,
-    lider: "Alejandro Facundo",
+    lider: "Paola Alejandra Viveros de Carvajal",
+    liderDePila: "Paola Alejandra",
     ...parcial,
   };
 }
@@ -53,15 +55,15 @@ test("sin género, el texto es neutro y no dice «inscrito» ni «inscrita»", (
 
 test("el asunto lleva el día y la hora, que es lo único que se ve en el celular", () => {
   assert.equal(
-    asuntoDeInscripcion({ nombreDePila: "Luisa", genero: "MUJER", casa: casa() }),
-    "Luisa, quedaste inscrita en tu Casa de Fe · jueves 4:00 p. m.",
+    asuntoDeInscripcion({ nombre: "Luisa Fernanda Medina", genero: "MUJER", casa: casa() }),
+    "Luisa Fernanda Medina, quedaste inscrita en tu Casa de Fe · jueves 4:00 p. m.",
   );
 });
 
 test("el asunto sin género tampoco se rompe", () => {
   assert.equal(
-    asuntoDeInscripcion({ nombreDePila: "Alex", genero: null, casa: casa() }),
-    "Alex, ya tienes Casa de Fe · jueves 4:00 p. m.",
+    asuntoDeInscripcion({ nombre: "Alex Tovar", genero: null, casa: casa() }),
+    "Alex Tovar, ya tienes Casa de Fe · jueves 4:00 p. m.",
   );
 });
 
@@ -83,8 +85,8 @@ test("sin día o sin hora, ni hueco ni «null»", () => {
   assert.equal(cuandoSeReune(casa({ meetingTime: null })), null);
   assert.equal(cuandoSeReune(casa({ meetingTime: "no es una hora" })), null);
   // Y el asunto se queda sin el sufijo en vez de escribir « · null».
-  const asunto = asuntoDeInscripcion({ nombreDePila: "Luisa", genero: "MUJER", casa: casa({ weekday: null }) });
-  assert.equal(asunto, "Luisa, quedaste inscrita en tu Casa de Fe");
+  const asunto = asuntoDeInscripcion({ nombre: "Luisa Fernanda Medina", genero: "MUJER", casa: casa({ weekday: null }) });
+  assert.equal(asunto, "Luisa Fernanda Medina, quedaste inscrita en tu Casa de Fe");
   assert.ok(!asunto.includes("null"));
   assert.ok(!asunto.includes("·"));
 });
@@ -105,4 +107,14 @@ test("con dirección va la dirección, y con pin además el «cómo llegar»", (
 
   const conPin = dondeSeReune(casa({ latitude: 2.9273, longitude: -75.2819 }));
   assert.ok(conPin.comoLlegar?.includes("2.9273"), "con pin, la ruta va al punto exacto");
+});
+
+// Lo que el usuario pidió el 22-oct, con sus palabras: un corazón dispuesto,
+// agenda y lapicero, y que nombre al líder POR SU PAPEL además de su nombre.
+test("qué llevar nombra el papel y el nombre del líder", () => {
+  const frase = queLlevar("Paola Alejandra");
+  assert.ok(frase.includes("un corazón dispuesto"));
+  assert.ok(frase.includes("una agenda y un lapicero"));
+  assert.ok(frase.includes("tu líder de Casa de Fe, Paola Alejandra"));
+  assert.ok(!frase.includes("No tienes que llevar nada"));
 });

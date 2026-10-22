@@ -4,6 +4,7 @@ import {
   cuandoSeReune,
   dondeSeReune,
   fraseDeInscripcion,
+  queLlevar,
   type GeneroDePersona,
   SIN_DIA_NI_HORA,
 } from "@/lib/casa-de-fe-bienvenida-catalogo";
@@ -365,7 +366,7 @@ export function correoDeInscripcionACasaDeFe(datos: DatosDeLaInscripcion): {
   const nombreDePila = datos.nombre.split(" ")[0] ?? datos.nombre;
 
   const subject = datos.casa
-    ? asuntoDeInscripcion({ nombreDePila, genero: datos.genero, casa: datos.casa })
+    ? asuntoDeInscripcion({ nombre: datos.nombre, genero: datos.genero, casa: datos.casa })
     : `${nombreDePila}, aquí están tus 12 talleres de Casa de Fe`;
 
   const renglones = datos.temas
@@ -388,7 +389,6 @@ export function correoDeInscripcionACasaDeFe(datos: DatosDeLaInscripcion): {
   if (datos.casa) {
     const cuando = cuandoSeReune(datos.casa);
     const donde = dondeSeReune(datos.casa);
-    const liderDePila = datos.casa.lider.split(" ")[0] ?? datos.casa.lider;
     const comoLlegar = donde.comoLlegar
       ? ` · <a href="${donde.comoLlegar}" style="color:#0e2a4e;font-weight:bold">Cómo llegar</a>`
       : "";
@@ -402,10 +402,7 @@ export function correoDeInscripcionACasaDeFe(datos: DatosDeLaInscripcion): {
           ${fila("QUIÉN LA LLEVA", escapar(datos.casa.lider))}
         </table>
       </div>
-      <p style="font-size:13px;color:#4a5560">
-        No tienes que llevar nada. Llega, y si algún día no puedes, avísale a
-        ${escapar(liderDePila)}.
-      </p>`;
+      <p style="font-size:13px;color:#4a5560">${escapar(queLlevar(datos.casa.liderDePila))}</p>`;
   }
 
   const html = MARCO(`
