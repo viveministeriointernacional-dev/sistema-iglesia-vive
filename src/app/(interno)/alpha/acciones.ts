@@ -15,6 +15,12 @@ import {
   type DatosDeReunion,
 } from "@/lib/reunion-catalogo";
 import { guardarReunionDeGrupo } from "@/lib/reunion";
+import {
+  borrarGrupo,
+  loQueTieneElGrupo,
+  renombrarGrupo,
+} from "@/lib/grupos-administrar";
+import type { LoQueTieneElGrupo } from "@/lib/borrar-grupo-catalogo";
 import { colaDeTelefono, nombreCompleto } from "@/lib/dominio";
 import { auditar, encolarEventoIntegracion } from "@/lib/audit";
 import {
@@ -759,4 +765,73 @@ export async function alphaCuentasQuePuedenLlevar(
   const { grupo } = await grupoPropio(programId);
   if (!grupo) return [];
   return lideresPosibles();
+}
+
+// ---------------------------------------------------------------------------
+// Renombrar y borrar el grupo
+// ---------------------------------------------------------------------------
+
+/// **Quién puede renombrar o borrar un grupo: quien podría haberlo creado, y
+/// solo si además lo administra.**
+///
+/// Las dos condiciones juntas, y la razón es la simetría: abrir un Alpha ya es
+/// de dirección (`puedeCrearAlpha`), así que quien se equivoca al abrirlo puede
+/// siempre deshacerlo, y quien no podía abrirlo tampoco pudo equivocarse. No
+/// hace falta un permiso nuevo en el configurador (§12.6).
+async function grupoPropioDeDireccion(programId: string) {
+  const { usuario, grupo } = await grupoPropio(programId);
+  if (!grupo) return { usuario, grupo: null };
+  if (!puedeCrearAlpha(usuario)) return { usuario, grupo: null };
+  return { usuario, grupo };
+}
+
+/// Le cambia el nombre al grupo. Hasta hoy solo se escribía al crearlo.
+export async function alphaRenombrar(
+  programId: string,
+  nombre: string,
+): Promise<Resultado> {
+  const { usuario, grupo } = await grupoPropioDeDireccion(programId);
+  if (!grupo) {
+    return { ok: false, mensaje: "No puedes cambiarle el nombre a este grupo." };
+  }
+
+  const resultado = await renombrarGrupo("alpha", programId, usuario.id, nombre);
+  if (!resultado.ok) return resultado;
+
+  revalidatePath("/alpha");
+  revalidatePath(`/alpha/${programId}`);
+  return { ok: true };
+}
+
+/// **Borra el grupo creado por error.** Hay que escribir su nombre, y el
+/// servidor lo vuelve a comprobar (`borrarGrupo`).
+export async function alphaBorrar(
+  programId: string,
+  nombreEscrito: string,
+): Promise<Resultado> {
+  const { usuario, grupo } = await grupoPropioDeDireccion(programId);
+  if (!grupo) return { ok: false, mensaje: "No puedes borrar este grupo." };
+
+  const resultado = await borrarGrupo("alpha", programId, usuario.id, nombreEscrito);
+  if (!resultado.ok) return resultado;
+
+  revalidatePath("/alpha");
+  return { ok: true };
+}
+
+/// Lo que el grupo tiene dentro, para que la ventana de confirmación pueda
+/// decir qué desaparece. Se pide al abrir la ventana y no al cargar la página:
+/// con `max: 1` cada viaje es una latencia, y esto solo hace falta si alguien
+/// va a borrar (§12.5).
+export async function alphaQueSePierdeAlBorrar(
+  programId: string,
+): Promise<
+  { ok: true; nombre: string; tiene: LoQueTieneElGrupo } | { ok: false; mensaje: string }
+> {
+  const { grupo } = await grupoPropioDeDireccion(programId);
+  if (!grupo) return { ok: false, mensaje: "No puedes borrar este grupo." };
+
+  const datos = await loQueTieneElGrupo("alpha", programId);
+  if (!datos) return { ok: false, mensaje: "No se encontró el grupo." };
+  return { ok: true, nombre: datos.nombre, tiene: datos.tiene };
 }

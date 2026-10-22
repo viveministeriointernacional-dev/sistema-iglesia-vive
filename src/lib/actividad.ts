@@ -819,6 +819,30 @@ export async function cargarActividad(
         frase = [A(), t(fila.action.endsWith("abierto") ? " abrió la Casa de Fe " : " cerró la Casa de Fe "), b(nombre), ...(usuario("liderId") ? [t(" · líder: "), b(usuario("liderId")!)] : [])];
         break;
       }
+      case "casa_de_fe.grupo_renombrado":
+      case "alpha.grupo_renombrado": {
+        tipo = "grupos"; etiqueta = "GRUPOS"; tono = "verde";
+        const clase = fila.action.startsWith("alpha") ? "el Alpha " : "la Casa de Fe ";
+        frase = [A(), t(" le cambió el nombre a "), b(texto(m.antes) ?? clase.trim()), t(" · ahora se llama "), b(texto(m.ahora) ?? "otra cosa")];
+        break;
+      }
+      // ⚠️ El nombre sale del METADATO, no de `nombreCasa`: el grupo ya no
+      // existe, así que el mapa no lo tiene. Es justo el caso en que la
+      // auditoría es el único rastro que queda.
+      case "casa_de_fe.grupo_borrado":
+      case "alpha.grupo_borrado": {
+        tipo = "grupos"; etiqueta = "GRUPOS"; tono = "rojo";
+        const clase = fila.action.startsWith("alpha") ? " borró el Alpha " : " borró la Casa de Fe ";
+        const cuantas = Array.isArray(m.personas) ? m.personas.length : 0;
+        frase = [A(), t(clase), b(texto(m.nombre) ?? "sin nombre"), t(cuantas === 0 ? " · no tenía a nadie dentro" : cuantas === 1 ? " · tenía 1 persona dentro" : ` · tenía ${cuantas} personas dentro`)];
+        tituloDetalle = "Qué tenía dentro";
+        if (Array.isArray(m.personas)) {
+          for (const persona of m.personas) {
+            if (typeof persona === "string") filas.push({ k: "Estaba dentro", v: persona });
+          }
+        }
+        break;
+      }
       case "casa_de_fe.miembro_inscrito":
       case "casa_de_fe.miembro_retirado": {
         tipo = "grupos"; etiqueta = "GRUPOS"; tono = "verde";

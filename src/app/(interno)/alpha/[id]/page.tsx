@@ -11,13 +11,18 @@ import {
   alphaAnadirEncargado,
   alphaQuitarEncargado,
   alphaCuentasQuePuedenLlevar,
+  alphaRenombrar,
+  alphaBorrar,
+  alphaQueSePierdeAlBorrar,
 } from "../acciones";
 import { EncargadosDelGrupo } from "@/components/encargados-del-grupo";
+import { AdministrarElGrupo } from "@/components/administrar-el-grupo";
 import {
   ASISTENCIA_MINIMA,
   cargarGrupo,
   construirParticipantes,
   puedeAdministrarGrupo,
+  puedeCrearAlpha,
   puedeEntrarAGrupo,
   SESIONES_DE_ALPHA,
 } from "@/lib/alpha";
@@ -153,6 +158,17 @@ export default async function PaginaGrupoDeAlpha({
             guardar={guardarReunion.bind(null, grupo.id)}
           />
         </div>
+
+        <AdministrarElGrupo
+          clase="alpha"
+          nombre={grupo.name}
+          // Dos condiciones y no una: administrarlo, **y** poder haberlo
+          // abierto. Ver la nota en `alpha/acciones.ts`.
+          puedeAdministrar={puedeEditar && puedeCrearAlpha(usuario)}
+          renombrar={alphaRenombrar.bind(null, grupo.id)}
+          queSePierde={alphaQueSePierdeAlBorrar.bind(null, grupo.id)}
+          borrar={alphaBorrar.bind(null, grupo.id)}
+        />
 
         <Grupo
           programId={grupo.id}

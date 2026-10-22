@@ -9,6 +9,12 @@ import {
   type DatosDeReunion,
 } from "@/lib/reunion-catalogo";
 import { guardarReunionDeGrupo } from "@/lib/reunion";
+import {
+  borrarGrupo,
+  loQueTieneElGrupo,
+  renombrarGrupo,
+} from "@/lib/grupos-administrar";
+import type { LoQueTieneElGrupo } from "@/lib/borrar-grupo-catalogo";
 import { nombreCompleto } from "@/lib/dominio";
 import { auditar } from "@/lib/audit";
 import {
@@ -566,4 +572,67 @@ export async function casaDeFeCuentasQuePuedenLlevar(
   const { grupo } = await casaPropia(groupId);
   if (!grupo) return [];
   return lideresPosiblesCasaDeFe();
+}
+
+// ---------------------------------------------------------------------------
+// Renombrar y borrar la Casa de Fe
+// ---------------------------------------------------------------------------
+
+/// **Quién puede renombrar o borrar una Casa de Fe: quien podría haberla
+/// abierto, y solo si además la administra.** Ver la nota en `alpha/acciones.ts`.
+async function casaPropiaDeDireccion(groupId: string) {
+  const { usuario, grupo } = await casaPropia(groupId);
+  if (!grupo) return { usuario, grupo: null };
+  if (!puedeCrearCasaDeFe(usuario)) return { usuario, grupo: null };
+  return { usuario, grupo };
+}
+
+/// Le cambia el nombre a la casa. Hasta hoy solo se escribía al crearla, y los
+/// nombres los teclea el equipo: hay casas con dos espacios seguidos.
+export async function casaDeFeRenombrar(
+  groupId: string,
+  nombre: string,
+): Promise<Resultado> {
+  const { usuario, grupo } = await casaPropiaDeDireccion(groupId);
+  if (!grupo) {
+    return { ok: false, mensaje: "No puedes cambiarle el nombre a esta Casa de Fe." };
+  }
+
+  const resultado = await renombrarGrupo("casa-de-fe", groupId, usuario.id, nombre);
+  if (!resultado.ok) return resultado;
+
+  revalidatePath("/alpha");
+  revalidatePath(`/casa-de-fe/${groupId}`);
+  return { ok: true };
+}
+
+/// **Borra la Casa de Fe creada por error.** Hay que escribir su nombre, y el
+/// servidor lo vuelve a comprobar (`borrarGrupo`).
+export async function casaDeFeBorrar(
+  groupId: string,
+  nombreEscrito: string,
+): Promise<Resultado> {
+  const { usuario, grupo } = await casaPropiaDeDireccion(groupId);
+  if (!grupo) return { ok: false, mensaje: "No puedes borrar esta Casa de Fe." };
+
+  const resultado = await borrarGrupo("casa-de-fe", groupId, usuario.id, nombreEscrito);
+  if (!resultado.ok) return resultado;
+
+  revalidatePath("/alpha");
+  return { ok: true };
+}
+
+/// Lo que la casa tiene dentro, para que la ventana de confirmación pueda decir
+/// qué desaparece. Se pide al abrir la ventana, no al cargar la página (§12.5).
+export async function casaDeFeQueSePierdeAlBorrar(
+  groupId: string,
+): Promise<
+  { ok: true; nombre: string; tiene: LoQueTieneElGrupo } | { ok: false; mensaje: string }
+> {
+  const { grupo } = await casaPropiaDeDireccion(groupId);
+  if (!grupo) return { ok: false, mensaje: "No puedes borrar esta Casa de Fe." };
+
+  const datos = await loQueTieneElGrupo("casa-de-fe", groupId);
+  if (!datos) return { ok: false, mensaje: "No se encontró la Casa de Fe." };
+  return { ok: true, nombre: datos.nombre, tiene: datos.tiene };
 }

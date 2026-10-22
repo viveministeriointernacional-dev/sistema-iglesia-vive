@@ -15,12 +15,17 @@ import {
   casaDeFeAnadirEncargado,
   casaDeFeQuitarEncargado,
   casaDeFeCuentasQuePuedenLlevar,
+  casaDeFeRenombrar,
+  casaDeFeBorrar,
+  casaDeFeQueSePierdeAlBorrar,
 } from "../acciones";
 import { EncargadosDelGrupo } from "@/components/encargados-del-grupo";
+import { AdministrarElGrupo } from "@/components/administrar-el-grupo";
 import {
   cargarCasaDeFe,
   construirMiembros,
   puedeAdministrarCasaDeFe,
+  puedeCrearCasaDeFe,
   puedeEntrarACasaDeFe,
 } from "@/lib/casa-de-fe";
 import { CasaDeFe, type MiembroVista } from "./grupo";
@@ -131,6 +136,17 @@ export default async function PaginaCasaDeFe({
             guardar={guardarReunion.bind(null, grupo.id)}
           />
         </div>
+
+        <AdministrarElGrupo
+          clase="casa-de-fe"
+          nombre={grupo.name}
+          // Dos condiciones y no una: administrarla, **y** poder haberla
+          // abierto. Ver la nota en `casa-de-fe/acciones.ts`.
+          puedeAdministrar={puedeEditar && puedeCrearCasaDeFe(usuario)}
+          renombrar={casaDeFeRenombrar.bind(null, grupo.id)}
+          queSePierde={casaDeFeQueSePierdeAlBorrar.bind(null, grupo.id)}
+          borrar={casaDeFeBorrar.bind(null, grupo.id)}
+        />
 
         <CasaDeFe
           groupId={grupo.id}
