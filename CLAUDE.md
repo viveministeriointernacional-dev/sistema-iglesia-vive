@@ -247,6 +247,40 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   ⚠️ **Y si el campo no existe, no se toca la etiqueta**: aquí el campo **es**
   el mensaje, así que disparar sin él manda un WhatsApp vacío. (El acceso al
   taller hace lo contrario a propósito: ahí falta un dato, no el mensaje.)
+- **Cómo está armado el envío del recordatorio, de punta a punta** (montado y
+  verificado el 22-oct; esto es la lista a repetir si alguien lo rehace):
+  - **Plantilla `recordatorio_casa_de_fe`**, idioma Spanish, categoría
+    **Utility** — aprobada por Meta **en 12 minutos**. Su cuerpo lleva el texto
+    fijo: «¡Hola, {{1}}! Este es tu recordatorio de Casa de Fe.» · `{{2}}` ·
+    «Puedes ver las direcciones y los detalles en el correo que te enviamos.»
+    Sin encabezado y **sin botones** (prometer un botón que no existe es una de
+    las dos sospechas del rechazo de la otra).
+  - **Las variables se eligen del selector, no se escriben:** `{{1}}` →
+    `{{contact.first_name}}`, `{{2}}` → `{{contact.recordatorio_de_casa_de_fe}}`.
+    ⚠️ Si se teclean, **Meta aprueba igual** —para ella el texto es válido— y
+    el WhatsApp llega con `{{contact.…}}` escrito tal cual.
+  - **Flujo «Recordatorio Casa de Fe · WhatsApp»**: activador **Etiqueta de
+    contacto** → filtro **Etiqueta añadida** → `casa-de-fe-recordatorio`; una
+    sola acción **WhatsApp** con esa plantilla.
+  - **⚠️ DOS AJUSTES DEL FLUJO QUE LO APAGAN EN SILENCIO SI ESTÁN AL REVÉS**
+    (Configuración, dentro del flujo):
+    1. **«Permitir reentrada» ENCENDIDA.** Si está apagada, cada persona recibe
+       el aviso **una vez y nunca más** — y no da ningún error. Es la misma
+       trampa que la etiqueta que se quita y se vuelve a poner, un nivel más
+       arriba: de nada sirve volver a ponerla si el flujo no deja entrar.
+    2. **«Ventana de tiempo → Hora específica» APAGADA.** Retiene los mensajes
+       fuera de la franja, y **los dos disparos (6:00 a. m. y 7:00 p. m.) están
+       fuera de cualquier franja de oficina**: el aviso de las 6 llegaría a las
+       9, después de la casa de las 7. Saldría, pero inútil.
+    «Detener en respuesta» también apagada: si no, el líder que conteste el
+    WhatsApp se corta su propio flujo.
+  - **Las ramas `Undelivered` · `Ok.` · `Time Out`** las genera «Enable
+    branches» y hoy **no hacen nada** (las tres van a FINAL). **Se dejan a
+    propósito:** son el estado de entrega que el CRM devuelve, así que
+    `Undelivered` es **el sitio donde colgar el aviso de fallo** — el agujero
+    por el que se escaparon los 56 WhatsApp del taller.
+  - **No activar «Enable Marketing Messages»**: reclasifica el envío como
+    marketing y la plantilla está aprobada como Utility.
 - **⚠️ EL WHATSAPP DEL ACCESO AL TALLER NUNCA HA FUNCIONADO, pese a lo que dice
   la bitácora del 2-oct.** Su plantilla, `codigo_ingreso_escuela`, está
   **Rechazada** por Meta — y entretanto el sistema registró
@@ -254,9 +288,15 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   campos, movió la etiqueta, y Meta no mandó nada. Solo salieron los correos.
   **Nadie se enteró en tres semanas porque el sistema no puede saber qué hace el
   CRM con la etiqueta una vez puesta.** HighLevel no enseña el motivo del
-  rechazo; las dos sospechas, sin confirmar, son que un **código de 6 dígitos**
-  obliga a la categoría *Authentication* (está como *Marketing*) y que el texto
-  promete «el botón de aquí abajo» **sin que la plantilla tenga botón**.
+  rechazo; las dos sospechas son que un **código de 6 dígitos** obliga a la
+  categoría *Authentication* (está como *Marketing*) y que el texto promete «el
+  botón de aquí abajo» **sin que la plantilla tenga botón**.
+  **La comparación del 22-oct las respalda**, aunque no las demuestre: misma
+  cuenta, mismo día, mismas variables de campo personalizado —
+  `recordatorio_casa_de_fe`, **Utility**, sin código y sin botones, **aprobada
+  en 12 minutos**; `codigo_ingreso_escuela`, **Marketing**, con código de 6
+  dígitos y prometiendo un botón, **rechazada**. Es la receta para arreglarla:
+  recategorizar y sacar el código del cuerpo.
 - **Mapa de personal ↔ HighLevel:** en la lista «Mi personal» de HighLevel, el
   código bajo cada correo es el **user id de HighLevel**. Se guarda en
   `app_user.highlevel_user_id`. Sirve para: asignar el consolidador dueño de un
@@ -966,7 +1006,7 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ### `docs/bitacora/2026-10.md` — octubre de 2026 (27 entradas)
 
-- **22-oct** · ⚠️ **El WhatsApp de este CRM no manda texto libre: solo plantillas aprobadas, y el VALOR de una variable no admite ni un salto de línea** · ⚠️ **y de paso: el WhatsApp del acceso al taller NUNCA ha salido — 56 envíos en 3 semanas con la plantilla Rechazada**, y nadie se enteró porque `acceso_enviado` afirma un hecho que no es nuestro · el mensaje se parte en dos y nace `variableDeWhatsApp` · ayer eran 3 casas de madrugada y hoy son 6.
+- **22-oct** · ⚠️ **El WhatsApp de este CRM no manda texto libre: solo plantillas aprobadas, y el VALOR de una variable no admite ni un salto de línea** · ⚠️ **y de paso: el WhatsApp del acceso al taller NUNCA ha salido — 56 envíos en 3 semanas con la plantilla Rechazada**, y nadie se enteró porque `acceso_enviado` afirma un hecho que no es nuestro · el mensaje se parte en dos y nace `variableDeWhatsApp` · **cerrado el mismo día: Utility aprobada en 12 min** frente a la Marketing-con-código rechazada · ⚠️ **y dos ajustes del flujo lo habrían apagado en silencio** («Permitir reentrada» y «Ventana de tiempo») · ayer eran 3 casas de madrugada y hoy son 6.
 - **21-oct (tarde)** · ⚠️ **El disparador NO podía ser un workflow de HighLevel: esa cuenta no tiene activadores por horario** (4 búsquedas, 0 resultados) · lo mueve **un SEGUNDO worker de Cloudflare** con dos crons · huella 200 «Hello World!» → **404** · ⚠️ **Cloudflare no deja releer un secreto guardado** y buscarlo en el CRM costó una hora: los «webhooks» del flujo eran **«Go To»** · la ruta acepta dos secretos.
 - **21-oct** · **Recordatorio de Casas de Fe por correo y WhatsApp** · ⚠️ **el worker solo exporta `fetch`, no `scheduled`**: lo dispara un workflow de HighLevel, no un cron · uno por **persona y día** (hoy serían 16 y son 10) · **si se reúne antes de las 9:00, el aviso sale la noche anterior** · la etiqueta se quita y se vuelve a poner o solo funciona un día.
 - **20-oct** · **Saray y Maricela: dos «no entraron» por causas distintas** · Saray no tenía enlace al CRM (sin teléfono ni correo) · a Maricela **se la absorbió la ficha de Celina por compartir el teléfono** · ⚠️ **me equivoqué dos veces y las desmontó el dato** · Maricela creada a mano: **8 escrituras, no 3**.
