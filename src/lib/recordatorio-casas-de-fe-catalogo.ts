@@ -34,14 +34,85 @@ import { horaLegible } from "@/lib/reunion-catalogo";
 /// aviso **sesenta minutos antes** de empezar.
 export const HORA_TOPE_MANANA = "09:00";
 
-/// Los dos envíos del día. `DIA` sale temprano con las reuniones de hoy;
-/// `NOCHE_ANTES` sale por la tarde con las de mañana que empiezan de madrugada.
-export const TIPOS_DE_ENVIO = ["DIA", "NOCHE_ANTES"] as const;
+/// **Los TRES envíos.** Los dos primeros son el resumen del día; el tercero es
+/// el empujón justo antes de la reunión.
+///
+/// - `DIA` sale a las **6:00 a. m.** con las reuniones de hoy desde las 9:00.
+/// - `NOCHE_ANTES` sale a las **6:00 p. m.** con las de mañana antes de las 9:00.
+/// - `UNA_HORA_ANTES` sale **una hora antes de cada casa**, una por casa.
+///
+/// ⚠️ **Los dos primeros son un resumen POR PERSONA Y DÍA; el tercero es UNO
+/// POR CASA, y van a gente distinta a propósito.** Medido el 23-oct sobre las
+/// 58 casas con horario: si el aviso de una hora antes fuera también al mentor
+/// de la línea serían **117 avisos por semana y una persona recibiría 11 en un
+/// solo día**; yendo solo a quien tiene que estar allí —líder y encargados— son
+/// **59 por semana y 4 en el peor día**, y esos 4 son casas que de verdad lleva.
+/// Un aviso que llega 11 veces al día se silencia, y con él se pierden los
+/// otros. El mentor sigue recibiendo su resumen de las 6.
+export const TIPOS_DE_ENVIO = ["DIA", "NOCHE_ANTES", "UNA_HORA_ANTES"] as const;
 
 export type TipoDeEnvio = (typeof TIPOS_DE_ENVIO)[number];
 
+/// Los dos que resumen un día entero. `envioQueLeToca` solo puede devolver uno
+/// de estos: `UNA_HORA_ANTES` no depende de la hora de la casa sino del reloj.
+export type TipoDiario = Exclude<TipoDeEnvio, "UNA_HORA_ANTES">;
+
 export function tipoValido(valor: string | undefined | null): TipoDeEnvio | null {
   return TIPOS_DE_ENVIO.includes(valor as TipoDeEnvio) ? (valor as TipoDeEnvio) : null;
+}
+
+/// **La ventana del aviso de una hora antes**, en minutos antes de la reunión.
+///
+/// ⚠️ **Es ancha (15 minutos) aunque el cron corra cada 5, y eso es lo que lo
+/// hace resistente.** Con una ventana de 5 minutos, un disparo que Cloudflare
+/// retrase o se salte deja la casa **sin aviso ninguno**. Con 15 minutos de
+/// ventana y un disparo cada 5, cada casa tiene **tres oportunidades** y el
+/// índice único de `faith_house_reminder` (usuario · día · tipo · casa) hace
+/// que solo la primera escriba. En la práctica el aviso sale entre **55 y 60
+/// minutos antes**; si algo falla, sale hasta 15 minutos más tarde en vez de no
+/// salir.
+export const MINUTOS_ANTES_MAX = 60;
+export const MINUTOS_ANTES_MIN = 45;
+
+/// «HH:mm» → minutos desde medianoche. `null` si no es una hora.
+export function minutosDeHHmm(hora: string): number | null {
+  const partes = /^(\d{2}):(\d{2})$/.exec(hora.trim());
+  if (!partes) return null;
+  const h = Number(partes[1]);
+  const m = Number(partes[2]);
+  if (h > 23 || m > 59) return null;
+  return h * 60 + m;
+}
+
+/// **¿Le falta una hora a esta casa?** Las dos horas son «HH:mm» de Colombia.
+///
+/// ⚠️ **No cruza la medianoche, y es una limitación consciente, no un olvido.**
+/// Una casa a las 00:30 tendría su marca de «una hora antes» a las 23:30 del día
+/// anterior, y aquí la resta saldría negativa: no recibiría el aviso. Hoy la
+/// casa más temprana de las 58 empieza a las **06:00**, así que la marca más
+/// madrugadora son las 05:00 y el caso no existe. Si algún día alguien pone una
+/// casa entre medianoche y la 1:00, **no fallará: simplemente no le saldrá este
+/// aviso**, y seguirá recibiendo el de la noche anterior (que cubre todo lo de
+/// antes de las 9:00). Hay una prueba que lo deja escrito.
+export function faltaUnaHora(horaDeLaCasa: string, ahora: string): boolean {
+  const casa = minutosDeHHmm(horaDeLaCasa);
+  const reloj = minutosDeHHmm(ahora);
+  if (casa === null || reloj === null) return false;
+  const faltan = casa - reloj;
+  return faltan > MINUTOS_ANTES_MIN && faltan <= MINUTOS_ANTES_MAX;
+}
+
+/// **Cómo se nombra el momento en los tres sitios que lo escriben**: el asunto
+/// del correo, el cuerpo del correo y la variable del WhatsApp.
+///
+/// ⚠️ Vive aquí y no repetido en cada sitio porque ya pasó una vez en este mismo
+/// archivo: dos sitios armando la misma cosa es lo que se desincroniza sin que
+/// nada avise (§12.6). Encaja en las tres frases: «Hoy tienes Casa de Fe», «En
+/// una hora te reúnes con tu Casa de Fe», «Mañana tienes 2 Casas de Fe».
+export function cuandoDelEnvio(tipo: TipoDeEnvio): string {
+  if (tipo === "DIA") return "Hoy";
+  if (tipo === "NOCHE_ANTES") return "Mañana";
+  return "En una hora";
 }
 
 /// **Qué envío le corresponde a una hora.** La función que de verdad impide el
@@ -51,7 +122,7 @@ export function tipoValido(valor: string | undefined | null): TipoDeEnvio | null
 /// La hora llega como texto «HH:mm» (así se guarda, §12.1), y el orden
 /// alfabético de «HH:mm» es el orden del reloj: «06:00» < «09:00» < «19:30».
 /// Por eso se compara con `<` directo y no hay que convertir nada.
-export function envioQueLeToca(hora: string): TipoDeEnvio {
+export function envioQueLeToca(hora: string): TipoDiario {
   return hora < HORA_TOPE_MANANA ? "NOCHE_ANTES" : "DIA";
 }
 
@@ -84,6 +155,14 @@ export type Aviso = {
   propias: CasaDelAviso[];
   /// Las de su línea, que llevan otros. Solo para mentores.
   deLinea: CasaDelAviso[];
+  /// **La casa a la que pertenece este aviso, o `""` si resume el día entero.**
+  ///
+  /// Es la cuarta parte de la clave única de `faith_house_reminder`
+  /// (usuario · día · tipo · casa), y es lo que permite que los dos envíos
+  /// diarios sigan siendo **uno por persona y día** mientras el de una hora
+  /// antes es **uno por casa**. Los diarios escriben `""` —el valor por defecto
+  /// de la columna— así que su idempotencia es la de siempre.
+  grupoId: string;
 };
 
 /// El primer nombre, que es con el que se saluda.
@@ -121,6 +200,7 @@ export function armarAvisos(filas: FilaDeAviso[]): Aviso[] {
         contactoCrm: fila.contactoCrm,
         propias: [],
         deLinea: [],
+        grupoId: "",
       };
       porPersona.set(fila.usuarioId, aviso);
     }
@@ -145,6 +225,82 @@ export function armarAvisos(filas: FilaDeAviso[]): Aviso[] {
     .sort((a, b) => a.nombre.localeCompare(b.nombre));
 }
 
+/// **Un aviso por PERSONA Y HORA DE REUNIÓN**, para el envío de una hora antes.
+///
+/// `armarAvisos` junta todas las casas del día de una persona en un solo
+/// mensaje, que es lo que quiere un resumen. Aquí se agrupa más fino: por la
+/// hora a la que empieza la reunión, así que quien lleva una casa a las 10:00 y
+/// otra a las 14:30 recibe **dos avisos, cada uno a su hora**.
+///
+/// ⚠️ **Y por hora, NO por casa, y eso lo descubrió dibujarlo con los datos de
+/// verdad** (§12.5). Agrupando por casa, Alejandro Facundo —que los lunes lleva
+/// **dos casas a las 7:00 p. m.**, «Sur Casa Cristian» y «CASA DE FE GRUPAL
+/// SUR»— recibiría **dos WhatsApps en el mismo minuto**. Eso no se lee como un
+/// recordatorio: se lee como un sistema roto. Agrupado por hora, recibe uno que
+/// nombra las dos. Hoy pasa en 1 de las 58 casas con horario, pero es el peor
+/// día del líder que más casas lleva.
+///
+/// ⚠️ **`deLinea` queda siempre vacío**: este envío no va al mentor (la medida
+/// está arriba, en `TIPOS_DE_ENVIO`). Si llegara una fila con papel `MENTOR` se
+/// descarta aquí, para que la regla no dependa solo de quien llame.
+export function armarAvisosPorHora(filas: FilaDeAviso[]): Aviso[] {
+  const porPersonaYHora = new Map<string, Aviso>();
+
+  for (const fila of filas) {
+    if (fila.papel === "MENTOR") continue;
+    const clave = `${fila.usuarioId}\u0000${fila.casa.hora}`;
+    const aviso = porPersonaYHora.get(clave);
+    if (!aviso) {
+      porPersonaYHora.set(clave, {
+        usuarioId: fila.usuarioId,
+        nombre: fila.nombre,
+        correo: fila.correo,
+        contactoCrm: fila.contactoCrm,
+        propias: [fila.casa],
+        deLinea: [],
+        grupoId: fila.casa.id,
+      });
+      continue;
+    }
+    if (aviso.propias.some((c) => c.id === fila.casa.id)) continue;
+    aviso.propias.push(fila.casa);
+  }
+
+  return [...porPersonaYHora.values()]
+    .map((aviso) => {
+      const propias = [...aviso.propias].sort((a, b) => a.id.localeCompare(b.id));
+      return {
+        ...aviso,
+        propias,
+        // ⚠️ **La clave de idempotencia es el id MÁS BAJO de las casas de este
+        // aviso, no «la primera que llegó».** Tiene que ser la misma en los tres
+        // disparos de la ventana (§`MINUTOS_ANTES_*`), y el orden en que la base
+        // devuelve las filas no está garantizado: si cambiara entre un disparo y
+        // el siguiente, la clave cambiaría, el índice único no reconocería el
+        // aviso ya mandado y saldría dos veces.
+        grupoId: propias[0].id,
+      };
+    })
+    .sort(
+      (a, b) =>
+        a.propias[0].hora.localeCompare(b.propias[0].hora) ||
+        a.nombre.localeCompare(b.nombre),
+    );
+}
+
+/// **Qué armador le toca a cada envío.**
+///
+/// ⚠️ Vive aquí y no como un ternario dentro del motor de envío **porque allí no
+/// lo cubría ninguna prueba**: al romperlo a propósito el 23-oct (cambiar
+/// `armarAvisosPorCasa` por `armarAvisos` en el camino de `UNA_HORA_ANTES`),
+/// `tsc` pasaba, las 32 pruebas pasaban, y el fallo habría sido silencioso y
+/// grave — el aviso de una hora antes se agruparía por persona, escribiría
+/// `grupoId: ""`, y el índice único dejaría a quien lleva dos casas con **un
+/// solo aviso al día** en vez de uno por casa. Aquí sí tiene prueba.
+export function armadorDelEnvio(tipo: TipoDeEnvio): (filas: FilaDeAviso[]) => Aviso[] {
+  return tipo === "UNA_HORA_ANTES" ? armarAvisosPorHora : armarAvisos;
+}
+
 /// Cuántas casas lleva el aviso en total.
 export function cuantasCasas(aviso: Aviso): number {
   return aviso.propias.length + aviso.deLinea.length;
@@ -157,7 +313,7 @@ function plural(n: number, una: string, varias: string): string {
 /// **El asunto del correo.** Dice el número desde el principio porque es lo
 /// único que se ve en la lista del celular antes de abrir.
 export function asuntoDelCorreo(aviso: Aviso, tipo: TipoDeEnvio): string {
-  const cuando = tipo === "DIA" ? "Hoy" : "Mañana";
+  const cuando = cuandoDelEnvio(tipo);
   const propias = aviso.propias.length;
 
   if (propias > 0) {
@@ -193,7 +349,7 @@ export function asuntoDelCorreo(aviso: Aviso, tipo: TipoDeEnvio): string {
 /// El correo sí lleva el mensaje completo, con direcciones y «cómo llegar».
 /// Esto es el resumen que cabe en un WhatsApp.
 export function variableDeWhatsApp(aviso: Aviso, tipo: TipoDeEnvio): string {
-  const cuando = tipo === "DIA" ? "Hoy" : "Mañana";
+  const cuando = cuandoDelEnvio(tipo);
   const partes: string[] = [];
 
   if (aviso.propias.length > 0) {

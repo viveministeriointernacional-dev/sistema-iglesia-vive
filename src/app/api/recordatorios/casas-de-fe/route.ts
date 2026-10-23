@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { hoyEnColombia } from "@/lib/dominio";
+import { hoyEnColombia, horaEnColombia } from "@/lib/dominio";
 import { variableDeEntorno } from "@/lib/entorno";
 import { getPrisma } from "@/lib/prisma";
 import { mandarRecordatorios } from "@/lib/recordatorio-casas-de-fe";
@@ -27,9 +27,15 @@ export const runtime = "nodejs";
 /// parecido —«Recordatorio de fecha personalizada»— cuelga de una fecha del
 /// contacto, no de un reloj. No sirve para «todos los días a las 6».
 ///
-/// Dos llamadas al día:
-/// - `{"tipo":"DIA"}` temprano → las casas que se reúnen **hoy** desde las 9:00.
-/// - `{"tipo":"NOCHE_ANTES"}` por la tarde → las de **mañana** antes de las 9:00.
+/// Tres llamadas:
+/// - `?tipo=DIA` a las **6:00 a. m.** → las casas que se reúnen **hoy** desde
+///   las 9:00. Un aviso por persona.
+/// - `?tipo=NOCHE_ANTES` a las **6:00 p. m.** → las de **mañana** antes de las
+///   9:00, que al día siguiente ya estarían reunidas cuando saliera el de las 6.
+///   Un aviso por persona.
+/// - `?tipo=UNA_HORA_ANTES` **cada 5 minutos** → las casas a las que les falta
+///   una hora. **Un aviso por CASA, y solo a quien tiene que estar allí** (líder
+///   y encargados, no el mentor: la medida está en `TIPOS_DE_ENVIO`).
 ///
 /// `tipo` también se acepta por query (`?tipo=DIA`), que es lo más cómodo de
 /// configurar en el CRM. Sin `tipo` se asume `DIA`.
@@ -104,12 +110,22 @@ export async function POST(request: Request) {
   // El día de las REUNIONES, no el de hoy: el envío de la noche anterior
   // resume las de mañana. Se calcula en hora de Colombia (§12.1), porque el
   // worker corre en UTC y a partir de las 7 p. m. «hoy» allá ya es mañana.
+  //
+  // `UNA_HORA_ANTES` mira HOY, igual que `DIA`: la casa a la que le falta una
+  // hora se reúne hoy por definición (no cruza la medianoche, ver
+  // `faltaUnaHora`).
   const hoy = hoyEnColombia();
-  const dia = tipo === "DIA" ? hoy : sumarUnDia(hoy);
+  const dia = tipo === "NOCHE_ANTES" ? sumarUnDia(hoy) : hoy;
 
   try {
     const prisma = await getPrisma();
-    const resumen = await mandarRecordatorios(prisma, { dia, tipo });
+    const resumen = await mandarRecordatorios(prisma, {
+      dia,
+      tipo,
+      // La hora del reloj, en el mismo formato que la de la reunión. Solo la usa
+      // `UNA_HORA_ANTES`; pasarla siempre es más barato que decidir aquí.
+      ahora: horaEnColombia(),
+    });
     return NextResponse.json({ ok: true, ...resumen });
   } catch (error) {
     console.error("Falló el envío de recordatorios de Casa de Fe", error);

@@ -2,7 +2,8 @@ import { Prisma } from "@iglesia/prisma-client";
 import { correoRecordatorioCasaDeFe } from "@/lib/correo";
 import { exportarRecordatorioDeCasaDeFe } from "@/lib/highlevel-salida";
 import {
-  armarAvisos,
+  armadorDelEnvio,
+  faltaUnaHora,
   type Aviso,
   type CasaDelAviso,
   cuantasCasas,
@@ -148,13 +149,27 @@ export type ResumenDelEnvio = {
 /// el día de mañana.
 export async function mandarRecordatorios(
   prisma: ClientePrisma,
-  opciones: { dia: string; tipo: TipoDeEnvio },
+  opciones: {
+    dia: string;
+    tipo: TipoDeEnvio;
+    /// La hora de Colombia ahora mismo, «HH:mm». **Solo la usa
+    /// `UNA_HORA_ANTES`**, que es el único envío que depende del reloj y no del
+    /// horario de la casa. Sin ella, ese tipo no manda nada en vez de mandar a
+    /// destiempo.
+    ahora?: string;
+  },
 ): Promise<ResumenDelEnvio> {
-  const { dia, tipo } = opciones;
+  const { dia, tipo, ahora } = opciones;
   const filas = await filasDelDia(prisma);
 
   const delDia = filas.filter((fila) => {
-    if (envioQueLeToca(fila.meeting_time) !== tipo) return false;
+    // El aviso de una hora antes no pregunta «¿qué envío le toca a esta hora?»
+    // —eso reparte el día entre los dos resúmenes— sino «¿falta una hora?».
+    if (tipo === "UNA_HORA_ANTES") {
+      if (!ahora || !faltaUnaHora(fila.meeting_time, ahora)) return false;
+    } else if (envioQueLeToca(fila.meeting_time) !== tipo) {
+      return false;
+    }
     // La recurrencia se cuenta desde el inicio del grupo, no desde hoy: una
     // casa cada 15 días se reúne un miércoles sí y otro no, y cuál de los dos
     // depende de cuándo arrancó. `proximasReuniones` ya lo resolvía para el
@@ -167,7 +182,7 @@ export async function mandarRecordatorios(
     return primera === dia;
   });
 
-  const avisos = armarAvisos(
+  const avisos = armadorDelEnvio(tipo)(
     delDia.map((fila) => ({
       usuarioId: fila.usuario_id,
       nombre: fila.usuario_nombre,
@@ -272,6 +287,11 @@ async function reclamarTurno(
         userId: aviso.usuarioId,
         scopeDate: dia,
         kind: tipo,
+        // `""` en los dos envíos diarios (uno por persona y día) y el id de la
+        // casa en el de una hora antes (uno por casa). El índice único de la
+        // tabla es (usuario · día · tipo · casa), así que la misma escritura
+        // sirve para las dos idempotencias.
+        groupId: aviso.grupoId,
         groups: cuantasCasas(aviso),
         ownGroups: aviso.propias.length,
       },

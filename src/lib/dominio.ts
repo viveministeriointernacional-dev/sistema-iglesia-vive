@@ -90,6 +90,26 @@ export function hoyEnColombia(ahora: Date = new Date()): string {
   }).format(ahora);
 }
 
+/// **La hora de Colombia ahora mismo, «HH:mm».**
+///
+/// Pareja de `hoyEnColombia`, y por la misma razón: el worker corre en UTC, así
+/// que `getHours()` daría las 5 de la tarde cuando en Neiva es mediodía (§12.1).
+/// Se usa en el recordatorio de una hora antes, que compara esta hora con la de
+/// la reunión — y las dos tienen que estar en el mismo reloj o el aviso sale
+/// cinco horas fuera de sitio.
+///
+/// `hourCycle: "h23"` y no `hour12: false`: con el segundo, `Intl` escribe la
+/// medianoche como «24:00» en algunas versiones, y «24:00» no es una hora
+/// válida para `minutosDeHHmm`.
+export function horaEnColombia(ahora: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: ZONA_HORARIA,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(ahora);
+}
+
 /// Convierte un `AAAA-MM-DD` de un campo de fecha en una marca de tiempo real.
 /// Si es hoy, se usa la hora actual (así el hito queda en su lugar dentro de la
 /// línea de tiempo del día); si es otro día, se ancla al **mediodía en hora de

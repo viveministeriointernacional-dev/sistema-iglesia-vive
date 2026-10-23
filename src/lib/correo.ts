@@ -12,6 +12,7 @@ import { variableDeEntorno } from "@/lib/entorno";
 import type { ClientePrisma } from "@/lib/prisma";
 import {
   asuntoDelCorreo,
+  cuandoDelEnvio,
   type Aviso,
   nombreDePila,
   type TipoDeEnvio,
@@ -500,7 +501,7 @@ export async function correoRecordatorioCasaDeFe(datos: {
   tipo: TipoDeEnvio;
   registro?: RegistroDeCorreo;
 }): Promise<ResultadoCorreo> {
-  const cuando = datos.tipo === "DIA" ? "Hoy" : "Mañana";
+  const cuando = cuandoDelEnvio(datos.tipo);
   const nombre = nombreDePila(datos.aviso.nombre);
   const asunto = asuntoDelCorreo(datos.aviso, datos.tipo);
 
@@ -574,15 +575,24 @@ export async function correoRecordatorioCasaDeFe(datos: {
       : `
         <div style="margin:18px 0 0;border:1px solid #c9ccd1;border-radius:12px;padding:14px 16px;background:#f7f5ee">
           <p style="font-size:11px;font-weight:bold;letter-spacing:.1em;color:#8a929a;margin:0">
-            ${datos.tipo === "DIA" ? "SI HOY NO SE PUEDE" : "POR QUÉ TE LLEGA ESTA NOCHE"}
+            ${
+              datos.tipo === "DIA"
+                ? "SI HOY NO SE PUEDE"
+                : datos.tipo === "NOCHE_ANTES"
+                  ? "POR QUÉ TE LLEGA ESTA NOCHE"
+                  : "SI ALGO CAMBIÓ, ES AHORA"
+            }
           </p>
           <p style="font-size:12.5px;color:#4a5560;margin:7px 0 0">
             ${
               datos.tipo === "DIA"
                 ? `Avísale a tu mentor y a los miembros. El grupo no se cierra por
                    faltar un día, pero que nadie llegue a una casa que no abrió.`
-                : `Tu casa se reúne antes de las 9 de la mañana, así que el aviso
-                   de mañana temprano te llegaría cuando ya estuvieras reunida.`
+                : datos.tipo === "NOCHE_ANTES"
+                  ? `Tu casa se reúne antes de las 9 de la mañana, así que el aviso
+                     de mañana temprano te llegaría cuando ya estuvieras reunida.`
+                  : `Todavía te da tiempo de avisarles a los miembros antes de que
+                     salgan de su casa. Después ya van en camino.`
             }
           </p>
         </div>`;
@@ -605,8 +615,13 @@ export async function correoRecordatorioCasaDeFe(datos: {
       ${bloqueDeLinea}
       ${cierre}
       <p style="font-size:12px;color:#8a929a;margin-top:22px">
-        Este aviso sale solo los días que tus casas se reúnen. Si cambias el día
-        o la hora en la plataforma, el recordatorio cambia contigo.
+        ${
+          datos.tipo === "UNA_HORA_ANTES"
+            ? `Este aviso sale una hora antes de cada casa que llevas. Si cambias
+               la hora en la plataforma, el recordatorio cambia contigo.`
+            : `Este aviso sale solo los días que tus casas se reúnen. Si cambias
+               el día o la hora en la plataforma, el recordatorio cambia contigo.`
+        }
       </p>
     `),
   });
