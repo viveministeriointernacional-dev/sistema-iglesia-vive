@@ -393,6 +393,17 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   Alejandra»). ⚠️ Y **cuando falta un dato no queda un hueco ni un «null»**,
   sino una frase que dice qué va a pasar — no es un caso raro: falta la
   dirección en **24 de las 59 casas abiertas**.
+- **Un grupo creado por error se puede RENOMBRAR y BORRAR** (23-oct): tarjeta
+  «ESTA CASA DE FE» / «ESTE ALPHA» al final de la ficha, con «Cambiar el nombre»
+  y un botón rojo que abre una ventana que **dice qué desaparece y qué no** y
+  pide **escribir el nombre**. Libs: `borrar-grupo-catalogo.ts` (el texto, con
+  su prueba), `grupos-administrar.ts` (las escrituras),
+  `components/administrar-el-grupo.tsx`. **Permiso: quien podría haber abierto
+  el grupo y además lo administra** — ningún permiso nuevo. ⚠️ **Se puede borrar
+  CON gente dentro a propósito**, y el porqué está medido en §12.6. Borrar no
+  toca el expediente de nadie. **La inscripción, además, exige que la casa tenga
+  día, hora y dirección** antes de dejar inscribir (bloquea; eran 24 de 59 casas
+  el 22-oct).
 - **Recordatorio de las Casas de Fe** (21-oct): correo + WhatsApp al **líder**,
   a sus **encargados** y al **mentor de la línea**, con las casas que se reúnen
   ese día. Libs: `src/lib/recordatorio-casas-de-fe.ts` (+ catálogo), webhook
@@ -568,6 +579,20 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   con `PrismaPg max:1` no corren en paralelo aunque vayan en un `Promise.all`).
   Se pueden bajar a dos. Se aplazó a propósito para medir Hyperdrive solo; **ya
   está medido, así que esto se puede hacer cuando se quiera**.
+- **⚠️ EL RECORDATORIO DE CASAS DE FE NO HA MANDADO NADA TODAVÍA**: su primer
+  disparo (22-oct, 7 p. m.) dejó `faith_house_reminder` **vacía**. Lo que falta
+  por comprobar está **solo en el panel de Cloudflare**: que la variable del
+  worker `recordatorio-casas-de-fe` se llame exactamente **`SECRETO`** (en una
+  captura del 22-oct aparecía como `x-iglesia-webhook-se…`, que es el nombre de
+  la **cabecera**, no de la variable) y, si está bien, el **código de respuesta
+  en sus Logs**. Detalle entero en la bitácora del 23-oct.
+- **En Alpha no se puede RETIRAR a nadie**: no existe la acción (solo
+  `inscribir`), así que inscribir a la persona equivocada no se puede deshacer.
+  Casa de Fe sí tiene `retirarDeCasaDeFe`. Apuntado el 23-oct; el usuario
+  todavía no ha dicho si lo quiere.
+- **El enlace de «Cerrar Casa de Fe» no lo ha pulsado nadie: 0 de 65 grupos.**
+  Es un texto gris de 11,5 px en la cabecera de otra sección. Si cerrar importa,
+  hay que subirlo a la tarjeta «ESTA CASA DE FE», al lado de borrar.
 - **Registros de HighLevel**: si dejan de entrar, revisar que el workflow de
   registro esté activo y enviando; algunos llegan y se marcan «duplicado» (409).
 - **Tabla huérfana `inbound_registration`** en Supabase: ya no está en el modelo
@@ -727,6 +752,19 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   los flujos de HighLevel, y buscarlo ahí costó una hora sin encontrarlo (el
   flujo de registro tiene cinco ramas y lo que parecían webhooks eran «Go To»).
   Salió más barato aceptar un segundo secreto en la ruta.
+- **⚠️ UN DISPARADOR QUE VIVE EN OTRA PIEZA TIENE QUE DEJAR RASTRO DE LA
+  RESPUESTA, NO DE QUE LO INTENTÓ.** El primer disparo del recordatorio de Casas
+  de Fe (22-oct, 7 p. m.) no escribió **ni una fila**, y desde aquí las tres
+  piezas comprobables salían bien: el worker del reloj daba **404** y se le pudo
+  **leer el código** con el MCP de Cloudflare (`workers_get_worker_code`), la
+  ruta daba **401** sin secreto, y la casa del viernes a las 7:00 cumplía la
+  condición. **El fallo estaba en el apretón de manos entre los dos**, y la única
+  pieza que lo dice —el `console.log` del worker, con el código de respuesta— no
+  se puede leer desde aquí: hay que pedírsela al usuario. Dos cosas que ayudan:
+  **un 401 y no un 503 ya prueba que al menos un secreto está puesto** en el
+  worker principal (sin ninguno la ruta devuelve 503), y **si la base cierra el
+  caso, no se le pide al usuario la prueba que solo él puede ver** — si el envío
+  hubiera salido habría filas, así que preguntarle por su bandeja sobra.
 - **La migración corre al EMPEZAR el build; el worker se activa al terminarlo.**
   A los 2 minutos del merge la base puede estar migrada y la ruta todavía no
   existir. No diagnosticar con una sola de las dos señales.
@@ -945,6 +983,34 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   partir. ⚠️ Y ojo con lo que hay dentro: la ficha de Alejandro Facundo tiene
   «Pastores Alejandro & Cristina» ahí, así que es la pareja metida en el nombre
   otra vez (21-sep) — eso se arregla en la ficha, no en el código.
+- **⚠️ UN GUARDA QUE PARECE PRUDENTE PUEDE RECHAZAR JUSTO EL CASO QUE EXISTE
+  PARA ATENDER — Y LO QUE PROTEGE DE VERDAD ES DECIR QUÉ PASA, NO IMPEDIRLO.**
+  Al dar la opción de borrar un grupo creado por error, lo obvio era «solo si
+  está vacío». La medida lo tumbó por las dos puntas: **vacío no significa
+  error** (15 de 59 casas sin nadie inscrito, y 14 son casas reales con día,
+  hora, dirección y líder), **y la única que claramente era una prueba tenía un
+  miembro dentro**. El guarda habría bloqueado la única que había que borrar y
+  habría dejado pasar la duda sobre las otras 14. Lo que se puso en su sitio:
+  **la ventana dice exactamente qué desaparece y qué NO**, y pide **escribir el
+  nombre** —aplanado, sin tildes ni espacios de más, porque los nombres los
+  teclea el equipo—. Tres cosas que repetir en cualquier acción destructiva:
+  1. **Antes de poner la condición, contar cuántas filas de verdad cumplen y
+     cuántas de esas son el caso que se quiere atrapar.** Si no coinciden, la
+     condición está midiendo otra cosa.
+  2. **La mitad que quita el miedo es «qué NO se toca», y hay que leerla en las
+     claves ajenas, no suponerla.** Aquí: solo hay CASCADE desde los miembros y
+     los encargados; el taller, el código y el enlace cuelgan del aprendiz, y el
+     Focus Day está además como hito. Sin esa mitad escrita, nadie pulsa.
+  3. **Y hay consecuencias que no se ven en el esquema**: el permiso de revisar
+     el taller se lo da al líder la **pertenencia al grupo**, así que borrar la
+     casa se lo quita. Buscar en el CÓDIGO quién depende de la fila, no solo en
+     las claves ajenas.
+- **⚠️ Y LA AUDITORÍA DE UN BORRADO SE ESCRIBE ANTES DEL `delete`, CON LOS
+  NOMBRES DENTRO.** Borrada la fila no queda ni su nombre: `audit_log` es el
+  único rastro y su `entity_id` apunta a algo que ya no existe (sobrevive porque
+  no hay clave ajena). Por lo mismo, **el `case` de «Actividad del día» tiene
+  que leer el nombre del METADATO**, no del mapa de nombres — ese mapa ya no lo
+  tiene, y la línea saldría como «borró una Casa de Fe» sin decir cuál.
 - **El orden en la pantalla es la única forma de decir ciertas cosas sin un
   cartel**: lo que caduca o bloquea a alguien va **arriba del todo**.
 - **⚠️ SI UN NÚMERO SE PUEDE PULSAR PARA VER DE DÓNDE SALE, EL NÚMERO Y SU
@@ -1057,8 +1123,10 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 > archivo del mes** y su renglón **arriba de este índice**. Si de ese trabajo
 > sale una regla general, va **además** a §12.
 
-### `docs/bitacora/2026-10.md` — octubre de 2026 (29 entradas)
+### `docs/bitacora/2026-10.md` — octubre de 2026 (31 entradas)
 
+- **23-oct** · **El primer disparo del recordatorio no salió: `faith_house_reminder` VACÍA** · ⚠️ **y el diagnóstico vale porque las tres piezas comprobables están BIEN**: el worker del reloj da 404 y se le LEYÓ el código con el MCP de Cloudflare, la ruta da 401 (y 401 y no 503 prueba que algún secreto sí está puesto), y la casa del viernes a las 7:00 cumplía · el fallo está en el apretón de manos · la sospecha es el **nombre** de la variable (`x-iglesia-webhook-se…` en vez de `SECRETO`) · ⚠️ **lo que de verdad faltaba era el `console.log` del worker ajeno, que no se puede leer desde aquí**.
+- **23-oct** · **Borrar y renombrar una Casa de Fe o un Alpha creados por error** (`d62f23a`) · ⚠️ **«borrar solo si está vacío» no servía por las DOS puntas**: 15 de 59 casas vacías y **14 son reales**, y la única que es una prueba **TIENE un miembro** · lo que protege es decir qué desaparece, no un guarda · el expediente no se toca (comprobado en las claves ajenas) y **el Focus Day sobrevive como hito** · ⚠️ **dibujarla con datos reales sacó cuatro faltas**: «1 persona quedan», «de el Alpha», «la Casa de Fe de la lista» y el taller nombrado en un Alpha · **0 de 65 grupos se han cerrado nunca**.
 - **22-oct (noche)** · **El correo de Casa de Fe pasa a ser una confirmación de inscripción**: la reunión va primero, porque la persona quedaba inscrita **sin saber cuándo ni dónde presentarse** y los datos existían desde septiembre · medido: **24 de 59 casas sin dirección**, 6 de 58 sin género · ⚠️ **el nombre de pila NO es la primera palabra**: cortar se equivoca en **7 de 17 líderes** · dibujado con datos reales, y la primera vez lo presenté con el mismo nombre tres veces y confundió.
 - **22-oct (tarde)** · **El WhatsApp del taller: el daño medido son 13 personas, no 56** (42 de 56 sí recibieron el correo) · ⚠️ **y un SEGUNDO fallo nuestro: la etiqueta no se quitaba, así que los 10 reenvíos no habrían disparado ni con la plantilla aprobada** · «Actividad del día» decía «por WhatsApp» y era mentira · **la plantilla nueva va SIN el código**: el enlace ya identifica, y el código es lo que Meta trata como OTP.
 - **22-oct** · ⚠️ **El WhatsApp de este CRM no manda texto libre: solo plantillas aprobadas, y el VALOR de una variable no admite ni un salto de línea** · ⚠️ **y de paso: el WhatsApp del acceso al taller NUNCA ha salido — 56 envíos en 3 semanas con la plantilla Rechazada**, y nadie se enteró porque `acceso_enviado` afirma un hecho que no es nuestro · el mensaje se parte en dos y nace `variableDeWhatsApp` · **cerrado el mismo día: Utility aprobada en 12 min** frente a la Marketing-con-código rechazada · ⚠️ **y dos ajustes del flujo lo habrían apagado en silencio** («Permitir reentrada» y «Ventana de tiempo») · ayer eran 3 casas de madrugada y hoy son 6.
