@@ -145,8 +145,10 @@ export function FormularioPre({
             <strong className="text-[16px] font-semibold">
               {avance.respondidas} de {avance.total} respondidas
             </strong>
+            {/* ⚠️ «Se guarda solo» es FALSO en modo lectura, y es justo donde
+                más se lee: el taller aprobado ya no guarda nada. */}
             <span className="text-[11.5px] font-medium text-[#5c5648]">
-              Se guarda solo
+              {soloLectura ? "Solo lectura" : "Se guarda solo"}
             </span>
           </div>
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#e8e2d2]">

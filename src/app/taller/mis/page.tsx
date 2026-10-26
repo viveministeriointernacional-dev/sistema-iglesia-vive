@@ -323,10 +323,13 @@ function rotulo(tema: TemaEnMisTalleres): string {
 /// ejercicio — por eso lo segundo solo aparece cuando el pastor lo destapa, y
 /// aun así se ve con él, no aquí.
 function BloquePrematrimonial({ pre }: { pre: MiPrematrimonialVista }) {
+  // ⚠️ **Se enseñan TODOS los temas con material, no solo los que le faltan.**
+  // Antes la lista era `pendientes.length > 0 ? pendientes : disponibles`, así
+  // que mientras quedara uno por llenar los ya enviados **desaparecían de la
+  // pantalla**: la persona no tenía desde dónde volver a leer lo que escribió,
+  // ni prueba de haberlo enviado. El rótulo de cada renglón ya dice en qué va,
+  // que es lo que hacía falta para poder enseñarlos juntos.
   const disponibles = pre.temas.filter((t) => t.disponible);
-  const pendientes = disponibles.filter(
-    (t) => t.mio === "DEVUELTO" || (!t.yoEnvie && t.dePareja !== "APROBADO"),
-  );
 
   return (
     <section className="px-5 pt-6">
@@ -349,7 +352,7 @@ function BloquePrematrimonial({ pre }: { pre: MiPrematrimonialVista }) {
           Todavía no está el material de ningún tema. Tu pastor te avisa.
         </p>
       ) : (
-        (pendientes.length > 0 ? pendientes : disponibles).map((tema) => (
+        disponibles.map((tema) => (
           <RenglonPre key={tema.topicId} tema={tema} nombreDelOtro={pre.nombreDelOtro} />
         ))
       )}
@@ -372,15 +375,18 @@ function RenglonPre({
     tema.mio === "DEVUELTO"
       ? { texto: "Te lo devolvieron · corrige y vuelve a enviar", tono: "font-bold text-[#a63d2f]", marco: "border-[1.5px] border-[#e0b4ac] bg-[#fdf1ee]" }
       : tema.dePareja === "APROBADO"
-        ? { texto: "✓ Aprobado", tono: "font-semibold text-[#2f6f53]", marco: "border-[#cfe3d8] bg-[#edf5f0]" }
+        ? { texto: "✓ Aprobado · toca para leer lo que escribiste", tono: "font-semibold text-[#2f6f53]", marco: "border-[#cfe3d8] bg-[#edf5f0]" }
         : tema.yoEnvie && !tema.elOtroEnvio
-          ? { texto: `Ya lo enviaste · falta ${nombreDelOtro.split(" ")[0]}`, tono: "font-semibold text-[#8a5a12]", marco: "border-[#e8d7a8] bg-[#fbf4dc]" }
+          ? { texto: `Ya lo enviaste · falta ${nombreDelOtro.split(" ")[0]} · toca para leerlo`, tono: "font-semibold text-[#8a5a12]", marco: "border-[#e8d7a8] bg-[#fbf4dc]" }
           : tema.yoEnvie
             ? { texto: "Los dos lo enviaron · lo verán con su pastor", tono: "font-semibold text-[#7a3b5c]", marco: "border-[#c9a3b6] bg-[#f7eef2]" }
             : { texto: "Sin empezar", tono: "text-[#5c5648]", marco: "border-[#e3ddcd] bg-white" };
 
-  // ⚠️ Lo aprobado y lo que ya envió no abre: no se vuelve a cambiar.
-  const abre = tema.mio !== "APROBADO" && !tema.yoEnvie;
+  // ⚠️ **Todo tema con material abre, incluso el aprobado: no cambiarlo y no
+  // poder leerlo son dos cosas distintas, y antes se trataban como una.** El
+  // taller ya se pinta en modo lectura cuando está ENVIADO o APROBADO (el
+  // `soloLectura` del formulario, que deshabilita cada campo y esconde el botón
+  // de enviar), así que lo único que faltaba era el enlace para llegar.
   const clases = `mb-2.5 block rounded-xl border p-[13px_14px] ${estado.marco}`;
 
   const cuerpo = (
@@ -395,11 +401,9 @@ function RenglonPre({
             {estado.texto}
           </p>
         </div>
-        {abre ? (
-          <span aria-hidden className="flex-none text-[17px] leading-[1.5] text-[#b6ac95]">
-            ›
-          </span>
-        ) : null}
+        <span aria-hidden className="flex-none text-[17px] leading-[1.5] text-[#b6ac95]">
+          ›
+        </span>
       </div>
 
       {tema.mio === "DEVUELTO" && tema.notaDelPastor ? (
@@ -413,7 +417,6 @@ function RenglonPre({
     </>
   );
 
-  if (!abre) return <div className={clases}>{cuerpo}</div>;
   return (
     <Link href={`/taller/pre/${tema.code}`} className={clases}>
       {cuerpo}
