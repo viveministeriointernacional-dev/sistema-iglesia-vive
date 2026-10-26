@@ -16,6 +16,7 @@ import {
 import type { TallerPreAbierto } from "@/lib/prematrimonial";
 
 import { enviarPre, responderPre, salirDelTallerPre } from "./acciones";
+import { MaterialDelTema } from "./material";
 
 /// El taller del prematrimonial, tal como lo llena UNA de las dos personas.
 ///
@@ -139,6 +140,12 @@ export function FormularioPre({
             </p>
           </div>
         ) : null}
+
+        {/* ⚠️ **El material va entre el encabezado y las preguntas**, no al
+            final (decisión del usuario, 26-oct-2026): es lo que se repasa
+            MIENTRAS se responde, y debajo de las 21 preguntas no lo vería
+            nadie. Un tema sin diapositivas no pinta nada aquí. */}
+        <MaterialDelTema numeroDeTema={taller.tema.number} />
 
         <div className="px-5 pt-5">
           <div className="flex items-baseline justify-between gap-3">

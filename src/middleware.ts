@@ -11,8 +11,19 @@ export async function middleware(request: NextRequest) {
   return actualizarSesion(request);
 }
 
+/// ⚠️ **TODO TIPO DE ARCHIVO ESTÁTICO NUEVO HAY QUE AÑADIRLO AQUÍ, O EL
+/// MIDDLEWARE SE LO TRAGA CON UN 307 A `/ingresar`.** Es la misma regla que
+/// `RUTAS_PUBLICAS` para los webhooks, y falla igual de callada: el enlace se
+/// pinta, se pulsa, y la persona acaba en la pantalla de entrar sin entender
+/// nada — y encima la pareja del prematrimonial **no tiene cuenta**, así que
+/// para ella no hay forma de salir de ahí.
+///
+/// `pdf` entró el 26-oct-2026 con el material de apoyo del prematrimonial, y
+/// se vio antes de desplegar porque `material.pdf` daba **307** donde
+/// `diapositiva-01.webp` daba **404**: dos archivos que todavía no existían,
+/// con dos respuestas distintas. Esa diferencia es la señal.
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|pdf)$).*)",
   ],
 };
