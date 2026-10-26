@@ -37,6 +37,9 @@ export type MaterialDelTema = {
 /// que nombra la carpeta; el id cambia si alguien resiembra los temas.
 export const MATERIAL_POR_TEMA: Record<number, MaterialDelTema> = {
   1: { diapositivas: 18, bytes: 270481 },
+  2: { diapositivas: 20, bytes: 302866 },
+  3: { diapositivas: 21, bytes: 291740 },
+  4: { diapositivas: 21, bytes: 281538 },
 };
 
 export function materialDelTema(numero: number): MaterialDelTema | null {
