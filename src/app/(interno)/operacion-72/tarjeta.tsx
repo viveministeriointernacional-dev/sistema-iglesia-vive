@@ -1041,14 +1041,26 @@ function Etiqueta({ children }: { children: React.ReactNode }) {
   return <span className="etiqueta-campo">{children}</span>;
 }
 
+/// ⚠️ **`falta` no es cosmético: es lo que impide un botón que no hace nada.**
+/// Los formularios cuyo guardar depende de una elección (cómo salió la llamada,
+/// a qué mentor se entrega) comprobaban esa elección dentro del `onClick`, así
+/// que con el botón activo y nada marcado **pulsar Guardar no hacía
+/// absolutamente nada**: no guardaba, no avisaba y no cerraba el panel. El
+/// único aviso era un texto gris que ya estaba ahí antes de pulsar, o sea que
+/// la pantalla no cambiaba y parecía que sí se había guardado. Pasó con la
+/// llamada de Saray Barreiro el 26-oct: ni un `contact_attempt`, ni una fila de
+/// auditoría, y la tarjeta quieta en INICIADA. Si el guardar exige algo, el
+/// botón se desactiva.
 function Botones({
   enCurso,
   texto,
+  falta,
   alGuardar,
   alCancelar,
 }: {
   enCurso: boolean;
   texto: string;
+  falta?: boolean;
   alGuardar: () => void;
   alCancelar: () => void;
 }) {
@@ -1056,7 +1068,7 @@ function Botones({
     <div className="mt-3 flex gap-2">
       <button
         type="button"
-        disabled={enCurso}
+        disabled={enCurso || Boolean(falta)}
         onClick={alGuardar}
         className="boton-primario flex-1 justify-center py-[9px] text-[11.5px]"
       >
@@ -1149,6 +1161,7 @@ function FormularioDeLlamada({
       <Botones
         enCurso={enCurso}
         texto="Guardar llamada"
+        falta={!resultado}
         alCancelar={alCancelar}
         alGuardar={() =>
           resultado &&
@@ -1388,6 +1401,7 @@ function FormularioDeEntrega({
       <Botones
         enCurso={enCurso}
         texto="Entregar a mentor"
+        falta={!mentorId}
         alCancelar={alCancelar}
         alGuardar={() =>
           mentorId &&
