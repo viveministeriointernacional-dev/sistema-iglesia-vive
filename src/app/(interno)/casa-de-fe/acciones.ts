@@ -36,6 +36,7 @@ import {
   puedeVerCasaDeFe,
 } from "@/lib/casa-de-fe";
 import { paraPermiso } from "@/lib/encargados-catalogo";
+import { ROTULOS, tipoDeGrupoDelFormulario } from "@/lib/tipo-de-grupo";
 import {
   anadirEncargadoAlGrupo,
   cambiarLiderDelGrupo,
@@ -105,6 +106,10 @@ async function casaPropia(groupId: string) {
     // persona.
     select: {
       id: true,
+      // Cuál de los tres es. Manda en tres cosas: si se le exige día, hora y
+      // dirección antes de inscribir, si sale el correo con el código del
+      // taller, y cómo se le llama en cada aviso.
+      kind: true,
       // `name` lo necesita el mensaje de bienvenida: «ya entraste a Casa de fe
       // Oscar & Dana» dice mucho más que «a una Casa de Fe».
       name: true,
@@ -137,6 +142,10 @@ async function casaPropia(groupId: string) {
 /// Abrir una Casa de Fe es de dirección; llevarla, de quien tenga el permiso.
 /// Por eso se elige el líder al crearla, en vez de asignárselo a quien la abre.
 export async function crearCasaDeFe(
+  /// Cuál de los tres: Casa de Fe, Restaurados o Mentoría. **Se valida contra
+  /// la lista** y no se escribe lo que llegue: viene del navegador y acaba en
+  /// una columna de la base.
+  tipo: string,
   nombre: string,
   inicio: string,
   liderId: string,
@@ -144,8 +153,12 @@ export async function crearCasaDeFe(
 ): Promise<Resultado> {
   const usuario = await usuarioQueAbreCasas();
 
+  const kind = tipoDeGrupoDelFormulario(tipo);
+  if (!kind) return { ok: false, mensaje: "Ese tipo de grupo no existe." };
+  const r = ROTULOS[kind];
+
   if (nombre.trim().length < 3) {
-    return { ok: false, mensaje: "Ponle un nombre a la Casa de Fe." };
+    return { ok: false, mensaje: `Ponle un nombre ${r.articulo === "la" ? "a la" : "al"} ${r.singular}.` };
   }
   if (Number.isNaN(Date.parse(inicio))) {
     return { ok: false, mensaje: "La fecha de inicio no es válida." };
@@ -168,6 +181,7 @@ export async function crearCasaDeFe(
 
   const grupo = await prisma.faithHouseGroup.create({
     data: {
+      kind,
       name: nombre.trim(),
       startDate: new Date(inicio),
       leaderId: lider.id,
@@ -183,7 +197,11 @@ export async function crearCasaDeFe(
     action: "casa_de_fe.grupo_abierto",
     entityType: "faith_house_group",
     entityId: grupo.id,
-    metadata: { liderId: lider.id },
+    // ⚠️ El tipo va en el metadato, no en una acción nueva por tipo. Si no,
+    // «Actividad del día» y cualquier recuento tendrían que buscar TRES
+    // acciones donde antes había una, que es exactamente la trampa de las dos
+    // acciones de baja del 16-oct (§12.4).
+    metadata: { liderId: lider.id, kind },
   });
 
   revalidatePath("/alpha");
@@ -195,8 +213,11 @@ export async function inscribirEnCasaDeFe(
   learnerId: string,
 ): Promise<ResultadoConAviso> {
   const { usuario, grupo } = await casaPropia(groupId);
-  if (!grupo) return { ok: false, mensaje: "Esta Casa de Fe no es tuya." };
-  if (grupo.closedAt) return { ok: false, mensaje: "La Casa de Fe ya está cerrada." };
+  if (!grupo) return { ok: false, mensaje: "Este grupo no es tuyo." };
+  const r = ROTULOS[grupo.kind];
+  if (grupo.closedAt) {
+    return { ok: false, mensaje: `${r.articulo === "la" ? "La" : "El"} ${r.singular} ya está cerrad${r.articulo === "la" ? "a" : "o"}.` };
+  }
 
   // ⚠️ **No se inscribe a nadie en una casa a la que le faltan datos** (petición
   // del usuario, 22-oct). El correo de confirmación lleva el día, la hora y la
@@ -205,8 +226,17 @@ export async function inscribirEnCasaDeFe(
   //
   // El guardia va en la ACCIÓN y además en la pantalla (§12.6): avisar solo en
   // la pantalla sería cosmético.
-  const avisoDeDatos = avisoDeDatosQueFaltan(loQueFaltaDeLaCasa(grupo));
-  if (avisoDeDatos) return { ok: false, mensaje: avisoDeDatos };
+  //
+  // ⚠️ **Y solo donde hay correo que mandar.** Restaurados y Mentorías no
+  // mandan nada al inscribir (decisión del usuario, 27-oct-2026), así que
+  // exigirles la dirección sería un guarda que no protege de nada: la trampa
+  // del 23-oct, el guarda prudente que bloquea justo el caso que existe para
+  // atender. En una mentoría que se acuerda por teléfono, la dirección puede
+  // llegar después.
+  if (r.conTaller) {
+    const avisoDeDatos = avisoDeDatosQueFaltan(loQueFaltaDeLaCasa(grupo));
+    if (avisoDeDatos) return { ok: false, mensaje: avisoDeDatos };
+  }
 
   const prisma = await getPrisma();
   const aprendiz = await prisma.learnerProfile.findUnique({
@@ -224,8 +254,9 @@ export async function inscribirEnCasaDeFe(
   await prisma.faithHouseGroupMember.create({ data: { groupId, learnerId } });
 
   // Estar en una Casa de Fe **es** estar en Fortalecer (regla del usuario,
-  // 27-oct-2026): la etapa se mueve sola y no pide requisitos.
-  await ponerEnEtapaPorInscripcion(prisma, learnerId, "CASA_DE_FE", usuario.id);
+  // 27-oct-2026): la etapa se mueve sola y no pide requisitos. Vale igual para
+  // Restaurados y para las mentorías, que también son discipulado.
+  await ponerEnEtapaPorInscripcion(prisma, learnerId, grupo.kind, usuario.id);
 
   await auditar(prisma, {
     actorId: usuario.id,
@@ -243,6 +274,16 @@ export async function inscribirEnCasaDeFe(
   //
   // Y **nunca deshace la inscripción**: la persona ya está en la casa. Si el
   // mensaje no salió, se dice y alguien le dicta el código.
+  //
+  // ⚠️ **Solo Casa de Fe manda algo.** Lo que se reparte aquí es el código y
+  // los 12 talleres, y Restaurados y Mentorías no tienen taller: mandarles ese
+  // correo sería entregarles una cartilla que no les toca. Decisión del
+  // usuario del 27-oct-2026, con lo de WhatsApp apuntado para después.
+  if (!r.conTaller) {
+    revalidatePath(`/casa-de-fe/${groupId}`);
+    return { ok: true };
+  }
+
   const acceso = await enviarAccesoAlTaller(learnerId, {
     casa: casaParaElCorreo(grupo),
     actorId: usuario.id,
@@ -271,14 +312,20 @@ export async function reenviarAccesoAlTaller(
   learnerId: string,
 ): Promise<ResultadoConAviso> {
   const { grupo } = await casaPropia(groupId);
-  if (!grupo) return { ok: false, mensaje: "Esta Casa de Fe no es tuya." };
+  if (!grupo) return { ok: false, mensaje: "Este grupo no es tuyo." };
+  // El taller es de Casa de Fe. En los otros dos ni se enseña el botón, pero
+  // el guardia va también en la acción: esconderlo y dejar la acción abierta
+  // es cosmético (§12.6).
+  if (!ROTULOS[grupo.kind].conTaller) {
+    return { ok: false, mensaje: "Este tipo de grupo no tiene taller." };
+  }
 
   const prisma = await getPrisma();
   const esMiembro = await prisma.faithHouseGroupMember.findUnique({
     where: { groupId_learnerId: { groupId, learnerId } },
     select: { id: true },
   });
-  if (!esMiembro) return { ok: false, mensaje: "Esa persona no está en esta Casa de Fe." };
+  if (!esMiembro) return { ok: false, mensaje: "Esa persona no está en este grupo." };
 
   const usuario = await obtenerUsuarioActual();
   const acceso = await enviarAccesoAlTaller(learnerId, {
@@ -344,7 +391,7 @@ export async function retirarDeCasaDeFe(
   membershipId: string,
 ): Promise<Resultado> {
   const { usuario, grupo } = await casaPropia(groupId);
-  if (!grupo) return { ok: false, mensaje: "Esta Casa de Fe no es tuya." };
+  if (!grupo) return { ok: false, mensaje: "Este grupo no es tuyo." };
 
   const prisma = await getPrisma();
   const miembro = await prisma.faithHouseGroupMember.findUnique({
@@ -354,7 +401,7 @@ export async function retirarDeCasaDeFe(
   // Se comprueba contra el grupo pedido: sin esto, el líder de una Casa podría
   // retirar a alguien de otra.
   if (!miembro || miembro.groupId !== groupId) {
-    return { ok: false, mensaje: "Esa persona no está en esta Casa de Fe." };
+    return { ok: false, mensaje: "Esa persona no está en este grupo." };
   }
 
   await prisma.faithHouseGroupMember.delete({ where: { id: membershipId } });
@@ -378,7 +425,7 @@ export async function alternarCierreCasaDeFe(
   cerrar: boolean,
 ): Promise<Resultado> {
   const { usuario, grupo } = await casaPropia(groupId);
-  if (!grupo) return { ok: false, mensaje: "Esta Casa de Fe no es tuya." };
+  if (!grupo) return { ok: false, mensaje: "Este grupo no es tuyo." };
 
   const prisma = await getPrisma();
   await prisma.faithHouseGroup.update({
@@ -504,7 +551,7 @@ export async function casaDeFeCambiarLider(
   nota: string,
 ): Promise<Resultado> {
   const { usuario, grupo } = await casaPropia(groupId);
-  if (!grupo) return { ok: false, mensaje: "Esta Casa de Fe no es tuya." };
+  if (!grupo) return { ok: false, mensaje: "Este grupo no es tuyo." };
 
   const resultado = await cambiarLiderDelGrupo(
     "casa-de-fe",
@@ -526,7 +573,7 @@ export async function casaDeFeAnadirEncargado(
   userId: string,
 ): Promise<Resultado> {
   const { usuario, grupo } = await casaPropia(groupId);
-  if (!grupo) return { ok: false, mensaje: "Esta Casa de Fe no es tuya." };
+  if (!grupo) return { ok: false, mensaje: "Este grupo no es tuyo." };
 
   const resultado = await anadirEncargadoAlGrupo(
     "casa-de-fe",
@@ -548,7 +595,7 @@ export async function casaDeFeQuitarEncargado(
   userId: string,
 ): Promise<Resultado> {
   const { usuario, grupo } = await casaPropia(groupId);
-  if (!grupo) return { ok: false, mensaje: "Esta Casa de Fe no es tuya." };
+  if (!grupo) return { ok: false, mensaje: "Este grupo no es tuyo." };
 
   const resultado = await quitarEncargadoDelGrupo(
     "casa-de-fe",
@@ -600,7 +647,7 @@ export async function casaDeFeRenombrar(
 ): Promise<Resultado> {
   const { usuario, grupo } = await casaPropiaDeDireccion(groupId);
   if (!grupo) {
-    return { ok: false, mensaje: "No puedes cambiarle el nombre a esta Casa de Fe." };
+    return { ok: false, mensaje: "No puedes cambiarle el nombre a este grupo." };
   }
 
   const resultado = await renombrarGrupo("casa-de-fe", groupId, usuario.id, nombre);
@@ -618,7 +665,7 @@ export async function casaDeFeBorrar(
   nombreEscrito: string,
 ): Promise<Resultado> {
   const { usuario, grupo } = await casaPropiaDeDireccion(groupId);
-  if (!grupo) return { ok: false, mensaje: "No puedes borrar esta Casa de Fe." };
+  if (!grupo) return { ok: false, mensaje: "No puedes borrar este grupo." };
 
   const resultado = await borrarGrupo("casa-de-fe", groupId, usuario.id, nombreEscrito);
   if (!resultado.ok) return resultado;
@@ -635,9 +682,9 @@ export async function casaDeFeQueSePierdeAlBorrar(
   { ok: true; nombre: string; tiene: LoQueTieneElGrupo } | { ok: false; mensaje: string }
 > {
   const { grupo } = await casaPropiaDeDireccion(groupId);
-  if (!grupo) return { ok: false, mensaje: "No puedes borrar esta Casa de Fe." };
+  if (!grupo) return { ok: false, mensaje: "No puedes borrar este grupo." };
 
   const datos = await loQueTieneElGrupo("casa-de-fe", groupId);
-  if (!datos) return { ok: false, mensaje: "No se encontró la Casa de Fe." };
+  if (!datos) return { ok: false, mensaje: "No se encontró el grupo." };
   return { ok: true, nombre: datos.nombre, tiene: datos.tiene };
 }

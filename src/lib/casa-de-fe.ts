@@ -103,6 +103,11 @@ export async function cargarCasasDeFe(usuario: UsuarioSesion) {
     select: {
       id: true,
       name: true,
+      // El tipo de grupo: la pantalla pinta un bloque por cada uno. Las tres
+      // consultas de este archivo traen los TRES tipos juntos a propósito —
+      // son la misma tabla y el mismo alcance, y partirlas en tres daría tres
+      // viajes a la base donde hoy hay uno (§12.5).
+      kind: true,
       startDate: true,
       weekday: true,
       meetingTime: true,
@@ -127,6 +132,7 @@ export async function cargarCasaDeFe(groupId: string) {
     select: {
       id: true,
       name: true,
+      kind: true,
       startDate: true,
       weekday: true,
       meetingTime: true,

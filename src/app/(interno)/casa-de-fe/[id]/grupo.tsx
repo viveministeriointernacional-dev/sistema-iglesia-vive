@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { codigoLegible } from "@/lib/taller-catalogo";
+import type { RotulosDeGrupo } from "@/lib/tipo-de-grupo";
 import {
   alternarCierreCasaDeFe,
   buscarCandidatosCasaDeFe,
@@ -23,12 +24,18 @@ export type MiembroVista = {
   codigo: string | null;
 };
 
+/// **La ficha de un grupo de `faith_house_group`**: sus personas, el botón de
+/// cerrarlo y el buscador para inscribir. Sirve para los tres tipos, y lo
+/// único de Casa de Fe que queda escondido en los otros dos es el taller — el
+/// código, «Ver temas» y «Mandarle su código» —, porque no lo tienen. Lo que
+/// no abre, no se enseña (§12.6).
 export function CasaDeFe({
   groupId,
   miembros,
   cerrada,
   puedeEditar,
   avisoDeDatos,
+  rotulos,
 }: {
   groupId: string;
   miembros: MiembroVista[];
@@ -36,6 +43,7 @@ export function CasaDeFe({
   puedeEditar: boolean;
   /// Lo que falta por completar antes de poder inscribir. `null` si no falta nada.
   avisoDeDatos: string | null;
+  rotulos: RotulosDeGrupo;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +72,7 @@ export function CasaDeFe({
     <div className="mt-6 flex flex-col gap-[14px]">
       <section className="tarjeta p-5">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <h2 className="etiqueta-seccion">PERSONAS EN LA CASA DE FE</h2>
+          <h2 className="etiqueta-seccion">PERSONAS · {rotulos.seccion}</h2>
           {puedeEditar ? (
             <button
               type="button"
@@ -74,7 +82,8 @@ export function CasaDeFe({
               }
               className="cursor-pointer border-0 bg-transparent p-0 text-[11.5px] leading-none font-semibold text-[rgba(19,28,36,.5)] underline hover:text-tinta"
             >
-              {cerrada ? "Reabrir Casa de Fe" : "Cerrar Casa de Fe"}
+              {cerrada ? "Reabrir" : "Cerrar"} {rotulos.articulo}{" "}
+              {rotulos.singular}
             </button>
           ) : null}
         </div>
@@ -96,7 +105,7 @@ export function CasaDeFe({
                   {miembro.fase}
                   {miembro.telefono ? ` · ${miembro.telefono}` : ""}
                 </p>
-                {puedeEditar ? (
+                {puedeEditar && rotulos.conTaller ? (
                   <p className="mt-2 flex flex-wrap items-baseline gap-2">
                     <span className="text-[10px] leading-none font-semibold tracking-[.1em] text-[rgba(19,28,36,.4)] uppercase">
                       Código del taller
@@ -120,9 +129,9 @@ export function CasaDeFe({
                 href={`/expediente/${miembro.learnerId}`}
                 className="text-[11.5px] leading-none font-semibold text-azul-700"
               >
-                Ver temas
+                {rotulos.conTaller ? "Ver temas" : "Ver expediente"}
               </Link>
-              {puedeEditar ? (
+              {puedeEditar && rotulos.conTaller ? (
                 <button
                   type="button"
                   disabled={enCurso}
@@ -154,7 +163,8 @@ export function CasaDeFe({
           ))}
           {miembros.length === 0 ? (
             <li className="text-[12.5px] leading-[1.5] font-medium text-[rgba(19,28,36,.5)]">
-              Todavía no hay nadie en esta Casa de Fe.
+              Todavía no hay nadie en {rotulos.articulo === "la" ? "esta" : "este"}{" "}
+              {rotulos.singular}.
             </li>
           ) : null}
         </ul>

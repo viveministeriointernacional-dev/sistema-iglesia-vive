@@ -25,10 +25,23 @@ export const ORDEN_DE_FASES: readonly Phase[] = [
 ];
 
 /// Qué inscripción arrastra a qué etapa.
-export type MotivoDeEtapa = "CASA_DE_FE" | "ALFA" | "ESCUELA";
+/// ⚠️ **RESTAURADOS y MENTORIA entraron el 27-oct-2026 con los dos tipos de
+/// grupo nuevos**, y van a FORTALECER por la misma razón que Casa de Fe: son
+/// discipulado, y estar en discipulado **es** estar en Fortalecer. Como la
+/// regla es solo hacia adelante, a quien ya esté en ENTRENAR o MULTIPLICAR no
+/// lo devuelve nadie — que es el caso frecuente en una mentoría, donde quien
+/// la recibe suele ir por delante del promedio.
+export type MotivoDeEtapa =
+  | "CASA_DE_FE"
+  | "RESTAURADOS"
+  | "MENTORIA"
+  | "ALFA"
+  | "ESCUELA";
 
 export const ETAPA_POR_MOTIVO: Record<MotivoDeEtapa, Phase> = {
   CASA_DE_FE: Phase.FORTALECER,
+  RESTAURADOS: Phase.FORTALECER,
+  MENTORIA: Phase.FORTALECER,
   ALFA: Phase.FORTALECER,
   ESCUELA: Phase.ENTRENAR,
 };
@@ -38,6 +51,8 @@ export const ETAPA_POR_MOTIVO: Record<MotivoDeEtapa, Phase> = {
 /// una decisión pastoral que nadie tomó (§12.6).
 export const NOTA_POR_MOTIVO: Record<MotivoDeEtapa, string> = {
   CASA_DE_FE: "Entró a una Casa de Fe",
+  RESTAURADOS: "Entró a un grupo de Restaurados",
+  MENTORIA: "Entró a una mentoría",
   ALFA: "Entró a un Alfa",
   ESCUELA: "Entró a la Escuela Ser Líder",
 };

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { diaLargo } from "@/lib/dominio";
 import { SESIONES_DE_ALPHA } from "@/lib/alpha";
+import type { RotulosDeGrupo } from "@/lib/tipo-de-grupo";
 
 /// **Las listas de grupos, y el bloque que las parte en dos.**
 ///
@@ -119,11 +120,18 @@ export function ListaDeAlpha({
   );
 }
 
+/// Sirve para los **tres** tipos que viven en `faith_house_group`: Casa de Fe,
+/// Restaurados y Mentorías. El renglón es el mismo —nombre, desde cuándo,
+/// quién lo lleva y cuánta gente—; lo único que cambia es la etiqueta de
+/// cerrado, que lleva género («CERRADA» una casa, «CERRADO» un grupo de
+/// Restaurados), y por eso viene del catálogo y no escrita aquí.
 export function ListaDeCasas({
   casas,
+  rotulos,
   conLider = true,
 }: {
   casas: RenglonDeCasa[];
+  rotulos: RotulosDeGrupo;
   conLider?: boolean;
 }) {
   return (
@@ -141,7 +149,7 @@ export function ListaDeCasas({
           cifras={[
             `${c._count.members} ${c._count.members === 1 ? "persona" : "personas"}`,
           ]}
-          cerrado={c.closedAt ? "CERRADA" : null}
+          cerrado={c.closedAt ? rotulos.etiquetaCerrado : null}
         />
       ))}
     </ul>
@@ -181,5 +189,70 @@ export function ListaPartida<T>({
       <Rotulo texto={rotulos.deSuLinea} cuantos={deSuLinea.length} />
       {pintar(deSuLinea, true)}
     </>
+  );
+}
+
+/// **Un bloque de la pantalla: su título, su coletilla, su botón de abrir uno
+/// nuevo, y la lista o el hueco.**
+///
+/// Nació el 27-oct-2026 con Restaurados y Mentorías. Hasta ese día la página
+/// tenía dos bloques escritos a mano, casi idénticos salvo el género de las
+/// palabras. Con cuatro, copiar el mismo `<section>` dos veces más era la
+/// receta del «de el Alpha» que el usuario cazó el 23-oct: la falta no está en
+/// la primera copia, está en la cuarta.
+///
+/// No decide nada: recibe los textos ya resueltos. Quién puede crear, qué
+/// está filtrado y cómo se parte la lista se calcula en la página, que es
+/// donde están los permisos.
+export function BloqueDeGrupos<T>({
+  rotulos,
+  coletilla,
+  crear,
+  hueco,
+  items,
+  partida,
+  conLider,
+  pintar,
+  className,
+}: {
+  rotulos: RotulosDeGrupo;
+  coletilla: string;
+  /// El botón de abrir uno nuevo, o nada si esta cuenta no puede.
+  crear: React.ReactNode | null;
+  /// Qué decir cuando no hay ninguno. Se usa **solo** si `items` está vacío.
+  hueco: string;
+  items: T[];
+  /// Los dos lados del reparto por línea, o `null` cuando no hay que partir.
+  partida: { directas: T[]; deSuLinea: T[]; rotulos: { directas: string; deSuLinea: string } } | null;
+  conLider: boolean;
+  pintar: (items: T[], conLider: boolean) => React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={className ?? "mt-9"}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="etiqueta-seccion">{rotulos.seccion}</h2>
+        <p className="text-[11.5px] leading-none font-medium text-[rgba(19,28,36,.5)]">
+          {coletilla}
+        </p>
+      </div>
+
+      {crear ? <div className="mt-4">{crear}</div> : null}
+
+      {items.length === 0 ? (
+        <p className="mt-4 rounded-[13px] border border-dashed border-[rgba(19,28,36,.16)] p-6 text-[12.5px] leading-[1.6] font-medium text-[rgba(19,28,36,.5)]">
+          {hueco}
+        </p>
+      ) : partida ? (
+        <ListaPartida
+          directas={partida.directas}
+          deSuLinea={partida.deSuLinea}
+          rotulos={partida.rotulos}
+          pintar={pintar}
+        />
+      ) : (
+        pintar(items, conLider)
+      )}
+    </section>
   );
 }

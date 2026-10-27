@@ -895,9 +895,32 @@ model FaithHouseProgress {
 /// (pastor o mentor) y se elige el líder al abrirla. El avance de los 12 temas
 /// sigue viviendo en cada expediente (FaithHouseProgress); este modelo solo
 /// agrupa quién la lleva y con quiénes.
+/// **Qué clase de grupo es.** Los tres comparten tabla a propósito: lo que
+/// cambia entre ellos es el contenido y el nombre, no la forma. Un grupo tiene
+/// un líder, unos encargados, unos miembros, un día, una hora, una dirección y
+/// un punto en el mapa, y eso vale igual para una Casa de Fe, para un grupo de
+/// Restaurados y para una mentoría.
+///
+/// Nació el 27-oct-2026, cuando el usuario los pidió. La medida que decidió
+/// que fueran la misma tabla: el equipo **ya los llevaba**, escribiendo
+/// «(MENTORIA)» dentro del nombre de una Casa de Fe — tres grupos, cinco
+/// personas. Es el mismo apaño de las parejas metidas en el nombre
+/// (21-sep-2026), y la señal de que la forma ya servía.
+enum GroupKind {
+  CASA_DE_FE
+  /// Discipulado para parejas.
+  RESTAURADOS
+  /// Discipulado personalizado, normalmente de una o dos personas.
+  MENTORIA
+}
+
 model FaithHouseGroup {
   id              String    @id @default(uuid())
   name            String
+  /// ⚠️ **Por defecto CASA_DE_FE, y eso es lo que hace que las 55 filas que ya
+  /// existían no se muevan.** Un tipo sin defecto habría dejado la columna en
+  /// nulo y cada consulta tendría que decidir qué hacer con eso.
+  kind            GroupKind @default(CASA_DE_FE)
   startDate       DateTime  @map("start_date") @db.Date
   /// **Cuándo se reúne**: el día de la semana, en la convención de JavaScript
   /// (0 = domingo … 6 = sábado), y la hora como **texto «HH:mm» en hora de
@@ -939,6 +962,8 @@ model FaithHouseGroup {
   coLeaders FaithHouseCoLeader[]
 
   @@index([leaderId, closedAt])
+  /// La pantalla pinta un bloque por tipo, y el calendario filtra por tipo.
+  @@index([kind, closedAt])
   @@map("faith_house_group")
 }
 

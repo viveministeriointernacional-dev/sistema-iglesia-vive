@@ -21,6 +21,7 @@ import {
 /// `EncargadosDelGrupo`: es la misma tarjeta con otro sustantivo.
 export function AdministrarElGrupo({
   clase,
+  rotulos,
   nombre,
   puedeAdministrar,
   renombrar,
@@ -28,6 +29,9 @@ export function AdministrarElGrupo({
   borrar,
 }: {
   clase: ClaseDeGrupo;
+  /// Cómo se llama este grupo en concreto. Sin esto, la ventana de borrar una
+  /// mentoría diría «esta Casa de Fe».
+  rotulos: { singular: string; articulo: "la" | "el"; seccionSingular: string };
   nombre: string;
   /// Falso para quien solo puede mirar, y también para quien lleva el grupo sin
   /// ser de dirección: la tarjeta entera no se pinta. Lo que no abre no se
@@ -57,7 +61,7 @@ export function AdministrarElGrupo({
   return (
     <section className="tarjeta mb-[14px] p-5">
       <h2 className="etiqueta-seccion">
-        {clase === "alpha" ? "ESTE ALPHA" : "ESTA CASA DE FE"}
+        {rotulos.articulo === "la" ? "ESTA" : "ESTE"} {rotulos.seccionSingular}
       </h2>
 
       {editando ? (
@@ -166,7 +170,7 @@ export function AdministrarElGrupo({
             >
               {ventana.estado === "cargando"
                 ? "Un momento…"
-                : `Borrar ${clase === "alpha" ? "este Alpha" : "esta Casa de Fe"}`}
+                : `Borrar ${rotulos.articulo === "la" ? "esta" : "este"} ${rotulos.singular}`}
             </button>
           </div>
 
@@ -186,6 +190,7 @@ export function AdministrarElGrupo({
         key={ventana.estado === "abierta" ? "abierta" : "cerrada"}
         abierta={ventana.estado === "abierta"}
         clase={clase}
+        rotulos={rotulos}
         nombre={nombre}
         tiene={ventana.estado === "abierta" ? ventana.tiene : null}
         alCerrar={() => setVentana({ estado: "cerrada" })}
@@ -211,6 +216,7 @@ export function AdministrarElGrupo({
 function VentanaDeBorrado({
   abierta,
   clase,
+  rotulos,
   nombre,
   tiene,
   alCerrar,
@@ -219,6 +225,9 @@ function VentanaDeBorrado({
 }: {
   abierta: boolean;
   clase: ClaseDeGrupo;
+  /// Cómo se llama este grupo en concreto. Sin esto, la ventana de borrar una
+  /// mentoría diría «esta Casa de Fe».
+  rotulos: { singular: string; articulo: "la" | "el"; seccionSingular: string };
   nombre: string;
   tiene: LoQueTieneElGrupo | null;
   alCerrar: () => void;
@@ -275,7 +284,7 @@ function VentanaDeBorrado({
                   QUÉ DESAPARECE
                 </h3>
                 <ul className="mt-[9px] flex flex-col gap-[7px]">
-                  {loQueSeBorra(clase, tiene).map((linea) => (
+                  {loQueSeBorra(clase, tiene, rotulos).map((linea) => (
                     <li
                       key={linea}
                       className="text-[12.5px] leading-[1.5] font-medium text-tinta"
@@ -291,7 +300,7 @@ function VentanaDeBorrado({
                   QUÉ NO SE TOCA
                 </h3>
                 <ul className="mt-[9px] flex flex-col gap-[7px]">
-                  {loQueSeQueda(clase, tiene).map((linea) => (
+                  {loQueSeQueda(clase, tiene, rotulos).map((linea) => (
                     <li
                       key={linea}
                       className="text-[12.5px] leading-[1.5] font-medium text-tinta"
@@ -308,7 +317,7 @@ function VentanaDeBorrado({
                   className="text-[12.5px] leading-[1.5] font-semibold text-tinta"
                 >
                   Para confirmar, escribe el nombre de{" "}
-                  {clase === "alpha" ? "este Alpha" : "esta Casa de Fe"}:{" "}
+                  {rotulos.articulo === "la" ? "esta" : "este"} {rotulos.singular}:{" "}
                   <span className="font-mono text-[12px] font-semibold">{nombre}</span>
                 </label>
                 <input
@@ -352,7 +361,7 @@ function VentanaDeBorrado({
           >
             {borrando
               ? "Borrando…"
-              : `Sí, borrar ${clase === "alpha" ? "el Alpha" : "la Casa de Fe"}`}
+              : `Sí, borrar ${rotulos.articulo} ${rotulos.singular}`}
           </button>
           <button type="button" onClick={alCerrar} className="boton-secundario">
             Mejor no

@@ -1,4 +1,4 @@
-import type { OpcionDeLinea } from "@/lib/lineas-catalogo";
+import { renglonDeLinea, type OpcionDeLinea } from "@/lib/lineas-catalogo";
 
 /// **El filtro por mentor y su línea.**
 ///
@@ -45,15 +45,10 @@ export function FiltroDeLinea({
         <option value="">Toda la iglesia</option>
         {opciones.map((o) => (
           <option key={o.id} value={o.id}>
-            {o.nombre} · {o.casas} {o.casas === 1 ? "casa" : "casas"}
-            {/* ⚠️ Las directas solo se dicen cuando NO son todas: en 9 de las
-                20 líneas medidas el mentor lleva él mismo todo lo suyo, y
-                «5 casas (5 directas)» es ruido en el renglón. */}
-            {o.casasDirectas < o.casas ? ` (${o.casasDirectas} suyas)` : ""}
-            {o.alpha > 0 ? ` · ${o.alpha} Alpha` : ""}
-            {o.alpha > 0 && o.alphaDirectas < o.alpha
-              ? ` (${o.alphaDirectas} suyos)`
-              : ""}
+            {/* El renglón se arma en el catálogo: con cuatro tipos de grupo,
+                escribirlo aquí a mano era repetir cuatro veces la misma regla
+                de «suyas» y de singular/plural. */}
+            {renglonDeLinea(o)}
           </option>
         ))}
       </select>
