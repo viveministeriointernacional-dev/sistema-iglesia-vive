@@ -16,6 +16,7 @@ import {
 } from "@/lib/grupos-administrar";
 import type { LoQueTieneElGrupo } from "@/lib/borrar-grupo-catalogo";
 import { nombreCompleto } from "@/lib/dominio";
+import { ponerEnEtapaPorInscripcion } from "@/lib/etapa-automatica";
 import { auditar } from "@/lib/audit";
 import {
   avisoDeDatosQueFaltan,
@@ -221,6 +222,10 @@ export async function inscribirEnCasaDeFe(
   if (yaEsta) return { ok: false, mensaje: "Ya está en la Casa de Fe." };
 
   await prisma.faithHouseGroupMember.create({ data: { groupId, learnerId } });
+
+  // Estar en una Casa de Fe **es** estar en Fortalecer (regla del usuario,
+  // 27-oct-2026): la etapa se mueve sola y no pide requisitos.
+  await ponerEnEtapaPorInscripcion(prisma, learnerId, "CASA_DE_FE", usuario.id);
 
   await auditar(prisma, {
     actorId: usuario.id,
