@@ -4,6 +4,7 @@ import { test } from "node:test";
 import {
   enLaLinea,
   opcionesDeLinea,
+  repartirPorLinea,
   type GrupoConLider,
   type LineasDeLosLideres,
 } from "./lineas-catalogo";
@@ -58,18 +59,24 @@ test("las líneas se solapan: la de arriba contiene a la de abajo", () => {
     nombre: "Juan Felipe Carvajal",
     casas: 3,
     alpha: 1,
+    casasDirectas: 1,
+    alphaDirectas: 0,
   });
   assert.deepEqual(por("paola"), {
     id: "paola",
     nombre: "Paola Viveros",
     casas: 2,
     alpha: 1,
+    casasDirectas: 1,
+    alphaDirectas: 1,
   });
   assert.deepEqual(por("harold"), {
     id: "harold",
     nombre: "Hárold Narváez",
     casas: 1,
     alpha: 0,
+    casasDirectas: 1,
+    alphaDirectas: 0,
   });
 });
 
@@ -77,7 +84,14 @@ test("quien lleva un grupo y no tiene a nadie debajo también se puede elegir", 
   const ops = opcionesDeLinea(GRUPOS, LINEAS, NOMBRES);
   assert.deepEqual(
     ops.find((o) => o.id === "ruth"),
-    { id: "ruth", nombre: "Ruth Bonilla", casas: 1, alpha: 0 },
+    {
+      id: "ruth",
+      nombre: "Ruth Bonilla",
+      casas: 1,
+      alpha: 0,
+      casasDirectas: 1,
+      alphaDirectas: 0,
+    },
   );
 });
 
@@ -93,4 +107,44 @@ test("no se ofrece a nadie sin grupos en su línea", () => {
 test("ordena de más grupos a menos, y a empate por nombre", () => {
   const ops = opcionesDeLinea(GRUPOS, LINEAS, NOMBRES);
   assert.deepEqual(ops.map((o) => o.id), ["felipe", "paola", "harold", "ruth"]);
+});
+
+// ⚠️ `repartirPorLinea` **no filtra por línea**: reparte lo que ya se filtró.
+// Se le pasa lo mismo que la pantalla le pasa —lo de la línea elegida— porque
+// darle la iglesia entera metería en «de su línea» a quien no cuelga de él
+// (aquí Ruth, que no es de nadie).
+const DE_LA_LINEA_DE_FELIPE = GRUPOS.filter(
+  (g) => g.tipo === "casa-de-fe" && enLaLinea("felipe", g.liderId, LINEAS),
+);
+
+test("el reparto separa lo que lleva el mentor de lo que llevan los suyos", () => {
+  const { directas, deSuLinea } = repartirPorLinea(
+    DE_LA_LINEA_DE_FELIPE,
+    (g) => g.liderId,
+    "felipe",
+  );
+  assert.deepEqual(directas.map((g) => g.liderId), ["felipe"]);
+  // Harold cuelga de Paola, que cuelga de Felipe: a cualquier profundidad es
+  // «de su línea», no suya.
+  assert.deepEqual(deSuLinea.map((g) => g.liderId), ["paola", "harold"]);
+});
+
+test("quien lleva toda su línea no deja nada en el otro lado", () => {
+  const { directas, deSuLinea } = repartirPorLinea(
+    [{ tipo: "casa-de-fe" as const, liderId: "ruth" }],
+    (g) => g.liderId,
+    "ruth",
+  );
+  assert.equal(directas.length, 1);
+  assert.equal(deSuLinea.length, 0);
+});
+
+test("quien no lleva ninguna la deja toda en el otro lado", () => {
+  const { directas, deSuLinea } = repartirPorLinea(
+    GRUPOS.filter((g) => g.tipo === "casa-de-fe"),
+    (g) => g.liderId,
+    "administracion",
+  );
+  assert.equal(directas.length, 0);
+  assert.equal(deSuLinea.length, 4);
 });
