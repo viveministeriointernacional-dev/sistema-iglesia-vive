@@ -43,7 +43,16 @@ export type ClaseDeGrupo = "alpha" | "casa-de-fe";
 
 /// Cómo se llama cada cosa, para no escribir «grupo» donde el equipo dice
 /// «casa».
-export function comoSeLlama(clase: ClaseDeGrupo): {
+/// ⚠️ **`rotulos` llegó el 27-oct-2026 con Restaurados y Mentorías.** La
+/// `clase` sigue diciendo qué tabla se toca —y eso no cambió: los tres tipos
+/// nuevos viven en `faith_house_group`—, pero ya no alcanza para NOMBRAR el
+/// grupo: «esta Casa de Fe» sería falso en la ventana de borrar una mentoría,
+/// y esa ventana es justo donde el usuario cazó el 23-oct cuatro faltas por
+/// dibujarla con datos de verdad. Sin `rotulos` se comporta como antes.
+export function comoSeLlama(
+  clase: ClaseDeGrupo,
+  rotulos?: { singular: string; articulo: "la" | "el" },
+): {
   /// «esta Casa de Fe» / «este Alpha».
   este: string;
   /// «la Casa de Fe» / «el Alpha».
@@ -51,6 +60,17 @@ export function comoSeLlama(clase: ClaseDeGrupo): {
   /// Cómo se llama a quien está dentro.
   miembros: { uno: string; varios: string };
 } {
+  if (rotulos) {
+    return {
+      este: `${rotulos.articulo === "la" ? "esta" : "este"} ${rotulos.singular}`,
+      el: `${rotulos.articulo} ${rotulos.singular}`,
+      miembros:
+        clase === "alpha"
+          ? { uno: "persona inscrita", varios: "personas inscritas" }
+          : { uno: "persona", varios: "personas" },
+    };
+  }
+
   return clase === "alpha"
     ? {
         este: "este Alpha",
@@ -92,8 +112,9 @@ export const GRUPO_VACIO: LoQueTieneElGrupo = {
 export function loQueSeBorra(
   clase: ClaseDeGrupo,
   tiene: LoQueTieneElGrupo,
+  rotulos?: { singular: string; articulo: "la" | "el" },
 ): string[] {
-  const nombres = comoSeLlama(clase);
+  const nombres = comoSeLlama(clase, rotulos);
   const lineas: string[] = [];
 
   if (tiene.personas.length > 0) {
@@ -154,6 +175,7 @@ export function loQueSeBorra(
 export function loQueSeQueda(
   clase: ClaseDeGrupo,
   tiene: LoQueTieneElGrupo,
+  rotulos?: { singular: string; articulo: "la" | "el" },
 ): string[] {
   const lineas: string[] = [];
 
@@ -161,10 +183,15 @@ export function loQueSeQueda(
     // ⚠️ El taller de los 12 temas es de CASA DE FE, no de Alpha: nombrarlo en
     // la ventana de un Alpha confunde, aunque la persona tenga uno por otra
     // casa.
+    // ⚠️ **El taller es de CASA DE FE, no de todos los grupos de su tabla.**
+    // Nombrarlo al borrar una mentoría prometería algo que esa gente no tiene,
+    // igual que nombrarlo en un Alpha. Es la misma falta que el usuario cazó
+    // el 23-oct cuando la ventana de un Alpha hablaba del taller.
+    const conTaller = clase !== "alpha" && (!rotulos || rotulos.singular === "Casa de Fe");
     lineas.push(
-      clase === "alpha"
-        ? "El expediente de cada persona queda igual: no pierde ningún hito ni nada de su proceso."
-        : "El expediente de cada persona queda igual: nadie pierde lo que ya respondió del taller, ni su código, ni su enlace.",
+      conTaller
+        ? "El expediente de cada persona queda igual: nadie pierde lo que ya respondió del taller, ni su código, ni su enlace."
+        : "El expediente de cada persona queda igual: no pierde ningún hito ni nada de su proceso.",
     );
     if (clase === "alpha") {
       lineas.push(
@@ -172,7 +199,13 @@ export function loQueSeQueda(
       );
     }
     lineas.push(
-      `Se pueden volver a inscribir en ${clase === "alpha" ? "otro Alpha" : "otra Casa de Fe"} cuando quieras.`,
+      `Se pueden volver a inscribir en ${
+        clase === "alpha"
+          ? "otro Alpha"
+          : rotulos
+            ? `${rotulos.articulo === "la" ? "otra" : "otro"} ${rotulos.singular}`
+            : "otra Casa de Fe"
+      } cuando quieras.`,
     );
   }
 

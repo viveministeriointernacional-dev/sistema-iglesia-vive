@@ -9,6 +9,7 @@ import {
   repartirEnColumnas,
   type SemanaCivil,
 } from "@/lib/reunion-catalogo";
+import { ROTULOS, SECCIONES, type ClaveDeSeccion } from "@/lib/tipo-de-grupo";
 
 /// **La semana de los grupos, como un calendario.**
 ///
@@ -24,7 +25,7 @@ const ALTO_HORA = 64;
 
 export type GrupoDelCalendario = {
   id: string;
-  tipo: "alpha" | "casa-de-fe";
+  tipo: ClaveDeSeccion;
   nombre: string;
   lider: string;
   personas: number;
@@ -52,10 +53,25 @@ type Colocada = {
   deCuantas: number;
 };
 
-const TONO = {
-  "casa-de-fe": { barra: "border-l-azul-700", fondo: "bg-azul-100", hora: "text-azul-900" },
-  alpha: { barra: "border-l-verde-700", fondo: "bg-verde-100", hora: "text-verde-700" },
-} as const;
+/// ⚠️ **Los cuatro se distinguen también por lo claro y lo oscuro, no solo
+/// por el tono.** Azul medio, verde oliva, ámbar y verde muy oscuro: así el
+/// calendario sigue sirviendo a quien no separa bien los colores, y sigue
+/// sirviendo impreso. Un cuarto tono cualquiera habría sido lo fácil y lo
+/// ilegible.
+const TONO: Record<ClaveDeSeccion, { barra: string; fondo: string; hora: string }> = {
+  CASA_DE_FE: { barra: "border-l-azul-700", fondo: "bg-azul-100", hora: "text-azul-900" },
+  ALPHA: { barra: "border-l-verde-700", fondo: "bg-verde-100", hora: "text-verde-700" },
+  RESTAURADOS: {
+    barra: "border-l-ambar-barra",
+    fondo: "bg-ambar-chip",
+    hora: "text-ambar-texto",
+  },
+  MENTORIA: {
+    barra: "border-l-bosque-900",
+    fondo: "bg-bosque-100",
+    hora: "text-bosque-900",
+  },
+};
 
 const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
                "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
@@ -118,12 +134,14 @@ export function CalendarioSemanal({
   hoy: string;
   /// Qué día se está mirando en el celular.
   diaElegido: string;
-  tipo: "todos" | "alpha" | "casa-de-fe";
+  /// El tipo elegido, o `null` para «todos».
+  tipo: ClaveDeSeccion | null;
   enlaceDeSemana: (inicio: string) => string;
   enlaceDeDia: (dia: string) => string;
-  enlaceDeTipo: (t: "todos" | "alpha" | "casa-de-fe") => string;
+  /// `null` quiere decir «todos».
+  enlaceDeTipo: (t: ClaveDeSeccion | null) => string;
 }) {
-  const visibles = grupos.filter((g) => tipo === "todos" || g.tipo === tipo);
+  const visibles = grupos.filter((g) => tipo === null || g.tipo === tipo);
   const porDia = semana.dias.map((dia) => delDia(visibles, dia));
 
   const { desde, hasta } = franjaDeLasHoras(porDia.flat());
@@ -131,7 +149,7 @@ export function CalendarioSemanal({
   const horas = Array.from({ length: hasta - desde }, (_, i) => desde + i);
 
   const sinDia = grupos.filter((g) => g.weekday === null || !g.meetingTime);
-  const cuantos = (t: "alpha" | "casa-de-fe") =>
+  const cuantos = (t: ClaveDeSeccion) =>
     grupos.filter((g) => g.tipo === t && g.weekday !== null && g.meetingTime).length;
 
   const indiceElegido = Math.max(0, semana.dias.indexOf(diaElegido));
@@ -169,25 +187,27 @@ export function CalendarioSemanal({
 
         <span className="grow" />
 
-        {(
-          [
-            ["casa-de-fe", "Casa de Fe", "bg-azul-700"],
-            ["alpha", "Alpha", "bg-verde-700"],
-          ] as const
-        ).map(([clave, nombre, punto]) => {
+        {/* ⚠️ **Un tipo del que no hay ni un grupo con día y hora no se
+            enseña.** El 27-oct no existía todavía ningún grupo de
+            Restaurados: un chip «Restaurados · 0» que al pulsarlo deja el
+            calendario en blanco es la peor forma de un filtro, la que deja
+            dudando si no hay nada o si está roto (§12.6). Casa de Fe y Alpha
+            se quedan siempre, porque siempre hay. */}
+        {SECCIONES.filter((c) => cuantos(c) > 0 || tipo === c).map((clave) => {
+          const r = ROTULOS[clave];
           const activo = tipo === clave;
           return (
             <Link
               key={clave}
-              href={enlaceDeTipo(activo ? "todos" : clave)}
+              href={enlaceDeTipo(activo ? null : clave)}
               className={`flex items-center gap-[6px] rounded-[20px] px-[13px] py-2 text-[11.5px] leading-none ${
                 activo
                   ? "border-[1.5px] border-azul-900 bg-azul-050 font-bold text-tinta"
                   : "border border-[rgba(19,28,36,.18)] bg-white font-semibold text-[rgba(19,28,36,.55)]"
               }`}
             >
-              <span className={`h-[9px] w-[9px] rounded-[3px] ${punto}`} />
-              {nombre} · {cuantos(clave)}
+              <span className={`h-[9px] w-[9px] rounded-[3px] ${r.punto}`} />
+              {r.chip} · {cuantos(clave)}
             </Link>
           );
         })}
@@ -258,7 +278,7 @@ export function CalendarioSemanal({
                   return (
                     <Link
                       key={g.id}
-                      href={`/${g.tipo}/${g.id}`}
+                      href={`${ROTULOS[g.tipo].ruta}/${g.id}`}
                       className={`absolute overflow-hidden rounded-[7px] border-l-[3px] px-[7px] ${tono.barra} ${tono.fondo} ${apretada ? "py-[5px]" : "py-[6px]"}`}
                       style={{
                         top: (r.inicio / 60 - desde) * ALTO_HORA,
@@ -338,7 +358,7 @@ export function CalendarioSemanal({
           {delDiaElegido.map(({ grupo: g }) => (
             <Link
               key={g.id}
-              href={`/${g.tipo}/${g.id}`}
+              href={`${ROTULOS[g.tipo].ruta}/${g.id}`}
               className={`block rounded-[9px] border border-[rgba(19,28,36,.09)] border-l-[3px] bg-white px-[13px] py-[11px] ${TONO[g.tipo].barra}`}
             >
               <div className="flex items-baseline gap-2">
@@ -380,7 +400,7 @@ export function CalendarioSemanal({
             {sinDia.map((g) => (
               <Link
                 key={g.id}
-                href={`/${g.tipo}/${g.id}`}
+                href={`${ROTULOS[g.tipo].ruta}/${g.id}`}
                 className="rounded-[20px] border border-[rgba(201,123,44,.35)] bg-white px-[10px] py-[5px] text-[11px] leading-none font-semibold text-ambar-texto"
               >
                 {g.nombre} · {g.lider}

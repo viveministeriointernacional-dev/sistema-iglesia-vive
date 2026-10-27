@@ -1,3 +1,4 @@
+import { ROTULOS } from "@/lib/tipo-de-grupo";
 import { notFound } from "next/navigation";
 import { diaLargo } from "@/lib/dominio";
 import { requerirVista } from "@/lib/auth";
@@ -41,7 +42,9 @@ export async function generateMetadata({
   const { id } = await params;
   const grupo = await cargarCasaDeFe(id);
   return {
-    title: grupo ? `${grupo.name} · Casa de Fe` : "Casa de Fe · Iglesia Vive",
+    title: grupo
+      ? `${grupo.name} · ${ROTULOS[grupo.kind].singular}`
+      : "Grupo · Iglesia Vive",
   };
 }
 
@@ -55,6 +58,11 @@ export default async function PaginaCasaDeFe({
   const grupo = await cargarCasaDeFe(id);
 
   if (!grupo) notFound();
+
+  // Cuál de los tres es. La misma ruta sirve para Casa de Fe, Restaurados y
+  // Mentorías: es la misma tabla, el mismo permiso y la misma pantalla, y
+  // abrir tres rutas gemelas habría triplicado los guardias (§12.6).
+  const r = ROTULOS[grupo.kind];
 
   // Entra quien la lleva, quien la abrió, la administración, el líder que tiene
   // al líder del grupo en su rama — y, **solo a mirar**, quien tiene el permiso
@@ -90,9 +98,13 @@ export default async function PaginaCasaDeFe({
             {grupo.name}
           </h1>
           <p className="mt-2 text-[13px] leading-none font-medium text-[rgba(19,28,36,.55)]">
-            {grupo.leader.fullName} · desde {diaLargo(grupo.startDate)} ·{" "}
-            {miembros.length} {miembros.length === 1 ? "persona" : "personas"}
-            {grupo.closedAt ? " · cerrada" : ""}
+            {/* El tipo va PRIMERO: con cuatro clases de grupo en la misma
+                lista, abrir una ficha y no saber de cuál es sería lo primero
+                que se pregunta. */}
+            {r.singular} · {grupo.leader.fullName} · desde{" "}
+            {diaLargo(grupo.startDate)} · {miembros.length}{" "}
+            {miembros.length === 1 ? "persona" : "personas"}
+            {grupo.closedAt ? ` · cerrad${r.articulo === "la" ? "a" : "o"}` : ""}
           </p>
         </header>
 
@@ -139,6 +151,7 @@ export default async function PaginaCasaDeFe({
 
         <AdministrarElGrupo
           clase="casa-de-fe"
+          rotulos={r}
           nombre={grupo.name}
           // Dos condiciones y no una: administrarla, **y** poder haberla
           // abierto. Ver la nota en `casa-de-fe/acciones.ts`.
@@ -154,7 +167,14 @@ export default async function PaginaCasaDeFe({
           // Lo que le falta a la casa para que su confirmación salga entera. Se
           // pinta ARRIBA del buscador, para que el líder lo vea antes de buscar
           // a nadie y no después de pulsar un nombre.
-          avisoDeDatos={avisoDeDatosQueFaltan(loQueFaltaDeLaCasa(grupo))}
+          rotulos={r}
+          // Lo que le falta para que su confirmación salga entera. **Solo
+          // donde hay confirmación que mandar**: Restaurados y Mentorías no
+          // mandan correo al inscribir, así que pedirles la dirección sería un
+          // aviso sobre un problema que no tienen.
+          avisoDeDatos={
+            r.conTaller ? avisoDeDatosQueFaltan(loQueFaltaDeLaCasa(grupo)) : null
+          }
           cerrada={grupo.closedAt !== null}
           puedeEditar={puedeEditar}
         />

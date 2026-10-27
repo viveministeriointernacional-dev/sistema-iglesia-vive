@@ -1,3 +1,4 @@
+import { ROTULOS } from "@/lib/tipo-de-grupo";
 import { notFound } from "next/navigation";
 import { diaLargo, momentoLargo } from "@/lib/dominio";
 import { requerirVista } from "@/lib/auth";
@@ -161,6 +162,7 @@ export default async function PaginaGrupoDeAlpha({
 
         <AdministrarElGrupo
           clase="alpha"
+          rotulos={ROTULOS.ALPHA}
           nombre={grupo.name}
           // Dos condiciones y no una: administrarlo, **y** poder haberlo
           // abierto. Ver la nota en `alpha/acciones.ts`.

@@ -393,6 +393,23 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   Alejandra»). ⚠️ Y **cuando falta un dato no queda un hueco ni un «null»**,
   sino una frase que dice qué va a pasar — no es un caso raro: falta la
   dirección en **24 de las 59 casas abiertas**.
+- **La etapa del recorrido se mueve SOLA al inscribir** (27-oct): entrar a una
+  **Casa de Fe** o a un **Alfa** pasa a **FORTALECER**, y entrar a la **Escuela
+  Ser Líder** pasa a **ENTRENAR**, **sin pedir los requisitos de
+  `requisitosDeFase`** (decisión del usuario: la etapa refleja dónde está la
+  persona, no el trámite). Libs: `etapa-automatica-catalogo.ts` (orden del
+  recorrido, motivo → etapa, y la nota; con prueba) y `etapa-automatica.ts` (la
+  escritura). Enganchado en los **cinco** sitios de inscripción: Casa de Fe,
+  Alfa (inscribir y registrar desde el grupo) y Escuela (botón del líder y QR).
+  ⚠️ **Solo hacia adelante**: retirar a alguien de un grupo **no** lo devuelve a
+  GANAR, y quien acompaña una casa desde ENTRENAR o MULTIPLICAR no retrocede
+  (eran 8 personas el 27-oct). ⚠️ **No escribe el hito de transición**
+  (`VALIDACION_PASTORAL`, `GRADUACION`): afirman que alguien validó o graduó a
+  la persona y aquí no lo hizo nadie. `phase_change.decided_by_id` es opcional
+  desde entonces (el QR lo llena la persona) y los dos sitios que lo pintan
+  dicen **«El sistema»**. ✅ **Mover a alguien a FORTALECER no lo saca del
+  tablero de Operación 72**, que no filtra por etapa; solo deja de contarlo en
+  la carga del consolidador.
 - **Un grupo creado por error se puede RENOMBRAR y BORRAR** (23-oct): tarjeta
   «ESTA CASA DE FE» / «ESTE ALPHA» al final de la ficha, con «Cambiar el nombre»
   y un botón rojo que abre una ventana que **dice qué desaparece y qué no** y
@@ -1011,6 +1028,25 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   no hay clave ajena). Por lo mismo, **el `case` de «Actividad del día» tiene
   que leer el nombre del METADATO**, no del mapa de nombres — ese mapa ya no lo
   tiene, y la línea saldría como «borró una Casa de Fe» sin decir cuál.
+- **⚠️ CUANDO UNA REGLA DE NEGOCIO CHOCA CON LOS REQUISITOS QUE YA PIDE EL
+  SISTEMA, ESO ES LA PREGUNTA — NO UN DETALLE DE IMPLEMENTACIÓN.** El 27-oct el
+  usuario dictó que estar en una Casa de Fe o un Alfa **es** estar en
+  Fortalecer. Pero salir de GANAR exigía mentor asignado y **22 de las 55
+  personas afectadas no lo tenían**, y llegar a Entrenar exigía bautismo,
+  Encuentro y los 12 temas, así que 7 fichas darían un **salto de dos etapas**
+  que el botón de la ficha no permite ni a un pastor. Aplicar la regla sin
+  preguntar habría cambiado en silencio lo que significa la etapa: de aprobación
+  pastoral a reflejo de dónde está la persona. **Medir a quién deja fuera el
+  requisito ES la forma de plantear la pregunta**, y con el número delante se
+  responde en un toque.
+- **⚠️ Y ANTES DE ADVERTIR DE UN DAÑO, COMPROBAR EN EL CÓDIGO QUE EL DAÑO
+  EXISTE.** Parecía que mover 13 tarjetas de «Lista para entrega» a Fortalecer
+  las sacaría del tablero de Operación 72 — la memoria decía que al pasar a
+  Fortalecer «la persona deja de ser de consolidación». **Era falso para el
+  tablero**: eso solo vale para la **carga** del consolidador
+  (`consolidadoresDisponibles`), y el tablero **no mira `phase`**. Una
+  advertencia falsa pesa igual que un dato en una decisión, y la habría tomado
+  con miedo de algo que no pasa.
 - **El orden en la pantalla es la única forma de decir ciertas cosas sin un
   cartel**: lo que caduca o bloquea a alguien va **arriba del todo**.
 - **⚠️ SI UN NÚMERO SE PUEDE PULSAR PARA VER DE DÓNDE SALE, EL NÚMERO Y SU
@@ -1125,6 +1161,9 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ### `docs/bitacora/2026-10.md` — octubre de 2026 (31 entradas)
 
+- **27-oct** · **El reparto pasa a ser un botón arriba (Todas · Las que lleva él · Las de su línea) y manda también en el CALENDARIO** · lo que faltaba de verdad era el calendario, que seguía mezclando las 60 · vive fuera de las dos pestañas y viaja por la URL (`?lleva=`) · ⚠️ **con «directas» una sección vacía deja de ser rara**: Alejandro tiene 4 Alpha en su línea y no lleva ninguno, y el texto viejo («cambia de línea») era falso · el botón solo sale cuando hay algo que elegir, igual que el reparto.
+- **27-oct** · **El filtro de línea ahora distingue lo que lleva el mentor de lo que llevan los suyos** · **Alejandro Facundo lleva 15 de las 60 Casas de Fe de su línea**; Juan Felipe, 8 de 17 · ⚠️ **la lista solo se parte cuando los dos lados tienen algo**: 9 de las 20 líneas las lleva el mentor enteras y otras no tienen ninguna propia (Administración 0 de 60) · el desplegable dice «60 casas (15 suyas)» · dentro del bloque de las directas **se quita el nombre del líder**, que sería el mismo 15 veces · ⚠️ `repartirPorLinea` **no filtra por línea**, reparte lo ya filtrado — la primera prueba se equivocó en eso.
+- **27-oct** · **La etapa del recorrido pasa a reflejar dónde está la persona, no el trámite** (`364e13f`) · **64 fichas estaban mal**: 55 en GANAR estando ya en una Casa de Fe o un Alfa, y 11 con la Escuela marcada por debajo de ENTRENAR · ⚠️ **la regla CHOCA con los requisitos** y eso era la pregunta: 22 de las 55 sin mentor, y las 7 de GANAR serían un salto de dos etapas · ✅ **el tablero de Op72 NO filtra por etapa**, así que mover a nadie lo saca de él · ⚠️ **solo hacia adelante**, porque 8 personas acompañaban una casa desde ENTRENAR o MULTIPLICAR · **no se escribe el hito de transición** (nadie validó a nadie) · ⚠️ **los totales no cuadraban en uno: alguien movió una ficha a mano mientras yo medía**.
 - **23-oct** · **El primer disparo del recordatorio no salió: `faith_house_reminder` VACÍA** · ⚠️ **y el diagnóstico vale porque las tres piezas comprobables están BIEN**: el worker del reloj da 404 y se le LEYÓ el código con el MCP de Cloudflare, la ruta da 401 (y 401 y no 503 prueba que algún secreto sí está puesto), y la casa del viernes a las 7:00 cumplía · el fallo está en el apretón de manos · la sospecha es el **nombre** de la variable (`x-iglesia-webhook-se…` en vez de `SECRETO`) · ⚠️ **lo que de verdad faltaba era el `console.log` del worker ajeno, que no se puede leer desde aquí**.
 - **23-oct** · **Borrar y renombrar una Casa de Fe o un Alpha creados por error** (`d62f23a`) · ⚠️ **«borrar solo si está vacío» no servía por las DOS puntas**: 15 de 59 casas vacías y **14 son reales**, y la única que es una prueba **TIENE un miembro** · lo que protege es decir qué desaparece, no un guarda · el expediente no se toca (comprobado en las claves ajenas) y **el Focus Day sobrevive como hito** · ⚠️ **dibujarla con datos reales sacó cuatro faltas**: «1 persona quedan», «de el Alpha», «la Casa de Fe de la lista» y el taller nombrado en un Alpha · **0 de 65 grupos se han cerrado nunca**.
 - **22-oct (noche)** · **El correo de Casa de Fe pasa a ser una confirmación de inscripción**: la reunión va primero, porque la persona quedaba inscrita **sin saber cuándo ni dónde presentarse** y los datos existían desde septiembre · medido: **24 de 59 casas sin dirección**, 6 de 58 sin género · ⚠️ **el nombre de pila NO es la primera palabra**: cortar se equivoca en **7 de 17 líderes** · dibujado con datos reales, y la primera vez lo presenté con el mismo nombre tres veces y confundió.

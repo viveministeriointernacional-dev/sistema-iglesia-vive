@@ -520,8 +520,15 @@ export async function puedeRevisarTaller(
   if (acceso.puedeEscribir) return true;
 
   const prisma = await getPrisma();
+  // ⚠️ **Solo las Casas de Fe, no los otros dos tipos de su tabla.** El
+  // permiso de revisar el taller se lo da al líder la pertenencia al grupo, y
+  // desde el 27-oct-2026 `faith_house_group` guarda también Restaurados y
+  // mentorías. Sin este filtro, abrirle una mentoría a alguien le daría a su
+  // mentor permiso de revisar y devolver el taller de su Casa de Fe, que es
+  // de otro líder. Es un permiso que se ensancharía solo, sin que nadie lo
+  // pidiera (§12.6).
   const grupos = await prisma.faithHouseGroupMember.findMany({
-    where: { learnerId, group: { closedAt: null } },
+    where: { learnerId, group: { closedAt: null, kind: "CASA_DE_FE" } },
     select: {
       group: {
         select: {
@@ -755,8 +762,11 @@ export async function cargarPorRevisar(
       learner: {
         select: {
           person: { select: { firstName: true, lastName: true } },
+          // El nombre que se enseña en la cola es el de SU Casa de Fe: el
+          // taller es de ahí, y nombrar su mentoría no le diría al revisor de
+          // dónde viene lo que está revisando.
           faithHouseGroups: {
-            where: { group: { closedAt: null } },
+            where: { group: { closedAt: null, kind: "CASA_DE_FE" } },
             select: { group: { select: { name: true } } },
             take: 1,
           },

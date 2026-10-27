@@ -23,6 +23,7 @@ import {
 import type { LoQueTieneElGrupo } from "@/lib/borrar-grupo-catalogo";
 import { colaDeTelefono, nombreCompleto } from "@/lib/dominio";
 import { auditar, encolarEventoIntegracion } from "@/lib/audit";
+import { ponerEnEtapaPorInscripcion } from "@/lib/etapa-automatica";
 import {
   ErrorDePermiso,
   obtenerUsuarioActual,
@@ -179,7 +180,7 @@ export async function inscribir(
   programId: string,
   learnerId: string,
 ): Promise<Resultado> {
-  const { grupo } = await grupoPropio(programId);
+  const { usuario, grupo } = await grupoPropio(programId);
   if (!grupo) return { ok: false, mensaje: "Este grupo no es tuyo." };
 
   const prisma = await getPrisma();
@@ -196,6 +197,9 @@ export async function inscribir(
   if (yaEsta) return { ok: false, mensaje: "Ya está en el grupo." };
 
   await prisma.alphaEnrollment.create({ data: { programId, learnerId } });
+
+  // Estar en un Alfa **es** estar en Fortalecer (regla del usuario, 27-oct-2026).
+  await ponerEnEtapaPorInscripcion(prisma, learnerId, "ALFA", usuario.id);
 
   revalidatePath(`/alpha/${programId}`);
   return { ok: true };
@@ -622,6 +626,8 @@ export async function crearEInscribir(
     await tx.alphaEnrollment.create({
       data: { programId, learnerId: aprendiz.id },
     });
+
+    await ponerEnEtapaPorInscripcion(tx, aprendiz.id, "ALFA", usuario.id);
 
     await auditar(tx, {
       actorId: usuario.id,

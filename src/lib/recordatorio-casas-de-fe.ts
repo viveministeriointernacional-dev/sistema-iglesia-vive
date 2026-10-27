@@ -70,6 +70,18 @@ type FilaCruda = {
 /// Una fila por (casa, destinatario). El `UNION ALL` de los tres orígenes es lo
 /// que convierte «quién tiene que enterarse» en algo que se puede juntar
 /// después sin más viajes a la base.
+///
+/// ⚠️ **Trae SOLO las Casas de Fe, y es una decisión, no un olvido.** Desde el
+/// 27-oct-2026 `faith_house_group` guarda también los grupos de Restaurados y
+/// las mentorías, pero cada frase del aviso dice «Casa de Fe»: «Hoy tienes
+/// Casa de Fe», «Mañana tienes 2 Casas de Fe». Dejarlos entrar le mandaría al
+/// mentor de una mentoría un recordatorio que nombra un grupo que no es el
+/// suyo, y juntar tipos distintos en «2 Casas de Fe» sería contar una cosa por
+/// otra. Lo que falta para abrirlo es solo el texto del catálogo.
+///
+/// ⚠️ Y el filtro va en el `WHERE` **sin backticks en su comentario**: dentro
+/// de un `$queryRaw` un backtick en un comentario `--` cierra la plantilla y
+/// el error que sale no habla de SQL (§12.4). Ya pasó al escribir esto.
 async function filasDelDia(prisma: ClientePrisma): Promise<FilaCruda[]> {
   return prisma.$queryRaw<FilaCruda[]>`
     WITH abiertas AS (
@@ -85,6 +97,9 @@ async function filasDelDia(prisma: ClientePrisma): Promise<FilaCruda[]> {
       WHERE g."closed_at" IS NULL
         AND g."weekday" IS NOT NULL
         AND g."meeting_time" IS NOT NULL
+        -- Solo Casas de Fe, y es una decision, no un olvido. Lo explica
+        -- entero el comentario de arriba de esta funcion.
+        AND g."kind" = 'CASA_DE_FE'::"GroupKind"
     ), destinatarios AS (
       SELECT a.*, a."leader_id" AS usuario_id, 'LIDER'::text AS papel FROM abiertas a
       UNION ALL

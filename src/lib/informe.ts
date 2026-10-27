@@ -1062,7 +1062,7 @@ export async function cargarDetallePersonas(
     agregar(cambio.learnerId, {
       cuando: cambio.decidedAt,
       titulo: `Cambio de fase · ${cambio.fromPhase} → ${cambio.toPhase}`,
-      quien: cambio.decidedBy.fullName,
+      quien: cambio.decidedBy?.fullName ?? "El sistema",
       observacion: cambio.note?.trim() || null,
     });
   }

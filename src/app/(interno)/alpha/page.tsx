@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { headers } from "next/headers";
-import { diaLargo, hoyEnColombia } from "@/lib/dominio";
+import { hoyEnColombia } from "@/lib/dominio";
 import { requerirVista } from "@/lib/auth";
 import { getPrisma } from "@/lib/prisma";
 import {
@@ -21,13 +20,30 @@ import { CalendarioSemanal, type GrupoDelCalendario } from "./calendario-semanal
 import { PestanasDeGrupos } from "./pestanas";
 import { cargarPorRevisar } from "@/lib/taller";
 import { mentoresDeCadaLider } from "@/lib/red";
-import { enLaLinea, opcionesDeLinea } from "@/lib/lineas-catalogo";
+import { enLaLinea, opcionesDeLinea, repartirPorLinea } from "@/lib/lineas-catalogo";
+import { BloqueDeGrupos, ListaDeAlpha, ListaDeCasas } from "./listas-de-grupos";
+import {
+  fraseDelAlcance,
+  fraseDelHueco,
+  fraseSoloLaLinea,
+  fraseSoloLasQueLleva,
+  ROTULOS,
+  TIPOS_DE_GRUPO,
+  tipoDeLaUrl,
+  type ClaveDeSeccion,
+  type RotulosDeGrupo,
+  type TipoDeGrupo,
+} from "@/lib/tipo-de-grupo";
+import {
+  FiltroDeDirectas,
+  quienLaLlevaDeLaUrl,
+} from "./filtro-de-directas";
 import { FiltroDeLinea } from "./filtro-de-linea";
 import { MiCalendario } from "./mi-calendario";
 import { NuevoGrupo } from "./nuevo-grupo";
 import { NuevaCasaDeFe } from "../casa-de-fe/nuevo-grupo";
 
-export const metadata = { title: "Alpha y Casa de Fe · Iglesia Vive" };
+export const metadata = { title: "Grupos · Iglesia Vive" };
 export const dynamic = "force-dynamic";
 
 
@@ -40,6 +56,7 @@ export default async function PaginaAlpha({
     dia?: string;
     tipo?: string;
     mentor?: string;
+    lleva?: string;
   }>;
 }) {
   const usuario = await requerirVista("grupos");
@@ -54,10 +71,10 @@ export default async function PaginaAlpha({
   const semana = semanaDe(
     parametros.semana && FECHA.test(parametros.semana) ? parametros.semana : hoy,
   );
-  const tipo =
-    parametros.tipo === "alpha" || parametros.tipo === "casa-de-fe"
-      ? parametros.tipo
-      : "todos";
+  // `null` quiere decir «todos». Un valor inventado en la URL cae en `null` en
+  // vez de dejar el calendario en blanco, igual que el filtro de línea.
+  const tipo = tipoDeLaUrl(parametros.tipo);
+  const tipoEnLaUrl = tipo ? ROTULOS[tipo].enLaUrl : null;
   // En el celular se mira un día: hoy si la semana que se ve lo contiene, y si
   // no el lunes — nunca un día suelto de otra semana.
   const diaElegido =
@@ -68,12 +85,16 @@ export default async function PaginaAlpha({
         : semana.inicio;
 
   const mentorPedido = (parametros.mentor ?? "").trim();
+  const quienLaLleva = quienLaLlevaDeLaUrl(parametros.lleva);
 
   const conVista = (cambios: Record<string, string>) => {
     const p = new URLSearchParams({ vista: "calendario", ...cambios });
     // El filtro de línea se conserva al moverse: sin esto, pasar a la semana
     // siguiente devolvería a toda la iglesia sin que nadie lo pidiera.
     if (mentorElegido) p.set("mentor", mentorElegido);
+    // Y lo mismo con «directas»: cambiar de semana no puede devolver en
+    // silencio a la línea entera.
+    if (quienLaLleva !== "todas") p.set("lleva", quienLaLleva);
     return `/alpha?${p.toString()}`;
   };
 
@@ -122,11 +143,14 @@ export default async function PaginaAlpha({
   // desplegable de alguien que lleva una casa.
   const abiertos = [
     ...grupos.filter((g) => !g.closedAt).map((g) => ({
-      tipo: "alpha" as const,
+      tipo: "ALPHA" as const,
       liderId: g.leaderId,
     })),
+    // Las tres clases de `faith_house_group` viajan juntas y cada una dice
+    // cuál es: así el desplegable cuenta «52 casas · 2 mentorías» en vez de
+    // meterlas todas en el saco de las casas.
     ...casas.filter((c) => !c.closedAt).map((c) => ({
-      tipo: "casa-de-fe" as const,
+      tipo: c.kind,
       liderId: c.leaderId,
     })),
   ];
@@ -161,8 +185,132 @@ export default async function PaginaAlpha({
   const deLaLinea = (liderId: string) =>
     !mentorElegido || enLaLinea(mentorElegido, liderId, lineas);
 
-  const gruposVisibles = grupos.filter((g) => deLaLinea(g.leaderId));
-  const casasVisibles = casas.filter((c) => deLaLinea(c.leaderId));
+  // ------------------------------- las que lleva él y las de los suyos
+  // ⚠️ **El filtro de línea no contestaba «cuáles lleva ÉL»**, que es lo que
+  // se pidió el 27-oct-2026: con la línea de Alejandro Facundo puesta salían
+  // **60 Casas de Fe y 15 son suyas**; en la de Juan Felipe, 17 y 8. El
+  // nombre del líder iba en cada renglón, pero buscar 15 entre 60 renglones
+  // no es distinguir.
+  //
+  // Se reparte **solo con una línea elegida**: sin filtro no hay nadie
+  // respecto a quien «directa» signifique algo, y partir «lo tuyo / lo de los
+  // demás» en la vista de toda la iglesia sería otra pregunta.
+  const nombreDeLaLinea = mentorElegido ? (nombres[mentorElegido] ?? "—") : "";
+
+  // El botón de arriba (Todas · Las que lleva él · Las de su línea). **Manda
+  // sobre las dos pestañas**, que es lo que se pidió: el calendario también
+  // tenía el mismo problema de mezclar, y un filtro que solo valiera para la
+  // lista obligaría a elegir dos veces lo mismo.
+  const elegir = <T,>(reparto: { directas: T[]; deSuLinea: T[] } | null, todos: T[]) =>
+    !reparto || quienLaLleva === "todas"
+      ? todos
+      : quienLaLleva === "directas"
+        ? reparto.directas
+        : reparto.deSuLinea;
+
+  /// **Todo lo que un bloque de la pantalla necesita saber de sí mismo.**
+  ///
+  /// Se calcula igual para los cuatro. Antes esto estaba escrito dos veces,
+  /// una por sección, y con cuatro tipos habrían sido cuatro copias del mismo
+  /// filtro y de las mismas seis frases — que es donde se cuela la falta que
+  /// nadie ve (§12.6).
+  function prepararBloque<T extends { leaderId: string; closedAt: Date | null }>(
+    clave: ClaveDeSeccion,
+    todos: T[],
+    vistaCompleta: boolean,
+  ) {
+    const rotulos: RotulosDeGrupo = ROTULOS[clave];
+    const visibles = todos.filter((g) => deLaLinea(g.leaderId));
+    const reparto = mentorElegido
+      ? repartirPorLinea(visibles, (g) => g.leaderId, mentorElegido)
+      : null;
+    const elegidos = elegir(reparto, visibles);
+
+    const alcance = !mentorElegido
+      ? fraseDelAlcance(rotulos, vistaCompleta)
+      : quienLaLleva === "directas"
+        ? fraseSoloLasQueLleva(rotulos, nombreDeLaLinea)
+        : quienLaLleva === "linea"
+          ? fraseSoloLaLinea(rotulos, nombreDeLaLinea)
+          : `Solo la línea de ${nombreDeLaLinea}`;
+
+    const hueco = !mentorElegido
+      ? fraseDelHueco(rotulos, {
+          filtro: "sin-linea",
+          puedeCrear: clave === "ALPHA" ? puedeCrearAlpha(usuario) : puedeCrearCasaDeFe(usuario),
+        })
+      : quienLaLleva === "directas"
+        ? fraseDelHueco(rotulos, { filtro: "directas", nombre: nombreDeLaLinea })
+        : quienLaLleva === "linea"
+          ? fraseDelHueco(rotulos, { filtro: "linea" })
+          : fraseDelHueco(rotulos, { filtro: "todas", nombre: nombreDeLaLinea });
+
+    return {
+      rotulos,
+      visibles,
+      elegidos,
+      // ⚠️ El reparto se devuelve **aparte de `partida`**: los contadores del
+      // botón de arriba («Las que lleva él · 17») tienen que seguir diciendo
+      // la verdad con el filtro puesto, y `partida` se apaga justo entonces.
+      reparto,
+      coletilla: `${alcance} · ${rotulos.referencia}`,
+      hueco,
+      // La lista se parte en dos bloques **solo cuando se están viendo las dos
+      // mitades**: con «directas» puesto ya no hay nada que separar, y el
+      // botón de arriba, encendido, dice qué se está mirando mejor que un
+      // rótulo.
+      partida:
+        quienLaLleva === "todas" && reparto
+          ? {
+              directas: reparto.directas,
+              deSuLinea: reparto.deSuLinea,
+              rotulos: {
+                directas: `${rotulos.articuloPlural === "las" ? "Las" : "Los"} que lleva ${nombreDeLaLinea}`,
+                deSuLinea: `${rotulos.articuloPlural === "las" ? "Las" : "Los"} que llevan los de su línea`,
+              },
+            }
+          : null,
+      conLider: quienLaLleva !== "directas",
+    };
+  }
+
+  const bloqueDeAlpha = prepararBloque(
+    "ALPHA",
+    grupos,
+    esVistaCompletaDeAlpha(usuario),
+  );
+  const bloquesDeCasas = TIPOS_DE_GRUPO.map((t) =>
+    prepararBloque(
+      t,
+      casas.filter((c) => c.kind === t),
+      esVistaCompletaDeCasaDeFe(usuario),
+    ),
+  );
+
+  // Los contadores del botón de arriba suman **los cuatro**: es un filtro de
+  // toda la pantalla, no de un bloque.
+  const todosLosBloques = [bloqueDeAlpha, ...bloquesDeCasas];
+  const cuantasDirectas = todosLosBloques.reduce(
+    (n, b) => n + (b.reparto?.directas.length ?? 0),
+    0,
+  );
+  const cuantasDeSuLinea = todosLosBloques.reduce(
+    (n, b) => n + (b.reparto?.deSuLinea.length ?? 0),
+    0,
+  );
+
+  const enlaceDeDirectas = (quien: "todas" | "directas" | "linea") => {
+    const p = new URLSearchParams();
+    if (enCalendario) {
+      p.set("vista", "calendario");
+      p.set("semana", semana.inicio);
+      p.set("dia", diaElegido);
+    }
+    if (tipoEnLaUrl) p.set("tipo", tipoEnLaUrl);
+    if (mentorElegido) p.set("mentor", mentorElegido);
+    if (quien !== "todas") p.set("lleva", quien);
+    return `/alpha?${p.toString()}`;
+  };
 
   // ⚠️ El calendario NO hace ni una consulta nueva: se arma con lo que la
   // página ya trajo para las listas, que además ya viene con el alcance
@@ -172,11 +320,11 @@ export default async function PaginaAlpha({
   // Los cerrados se quedan fuera: un calendario es lo que va a pasar, y un
   // grupo cerrado ya no se reúne.
   const gruposDelCalendario: GrupoDelCalendario[] = [
-    ...gruposVisibles
+    ...bloqueDeAlpha.elegidos
       .filter((g) => !g.closedAt)
       .map((g) => ({
         id: g.id,
-        tipo: "alpha" as const,
+        tipo: "ALPHA" as const,
         nombre: g.name,
         lider: g.leader.fullName,
         personas: g._count.enrollments,
@@ -187,11 +335,14 @@ export default async function PaginaAlpha({
         inicio: diaISO(g.startDate),
         tienePunto: g.latitude !== null && g.longitude !== null,
       })),
-    ...casasVisibles
+    // Los tres tipos de `faith_house_group`, cada uno con el suyo: es lo que
+    // le da al calendario sus cuatro colores y sus cuatro chips.
+    ...bloquesDeCasas
+      .flatMap((b) => b.elegidos)
       .filter((c) => !c.closedAt)
       .map((c) => ({
         id: c.id,
-        tipo: "casa-de-fe" as const,
+        tipo: c.kind,
         nombre: c.name,
         lider: c.leader.fullName,
         personas: c._count.members,
@@ -215,13 +366,16 @@ export default async function PaginaAlpha({
       <div className="mx-auto max-w-[1240px]">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
+            {/* ⚠️ Dejó de llamarse «Alpha y Casa de Fe» el 27-oct-2026, al
+                aparecer Restaurados y Mentorías: con cuatro bloques dentro,
+                ese título nombraba la mitad de lo que hay en la pantalla. */}
             <h1 className="font-serif text-[30px] leading-[1.1] font-normal text-tinta">
-              Alpha y Casa de Fe
+              Grupos
             </h1>
             <p className="mt-2 text-[13px] leading-none font-medium text-[rgba(19,28,36,.55)]">
               {enCalendario
                 ? "Cuántos grupos hay cada día de la semana"
-                : "Los grupos de Alpha y las Casas de Fe · elige quién lleva cada uno"}
+                : "Alpha, Casas de Fe, Restaurados y Mentorías · elige quién lleva cada uno"}
             </p>
           </div>
 
@@ -234,16 +388,30 @@ export default async function PaginaAlpha({
         {/* El filtro vale para las dos pestañas, por eso vive aquí y no dentro
             del calendario: la pregunta «¿qué hay en mi línea?» es la misma se
             mire como rejilla o como lista. */}
-        <div className="mt-5">
+        <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3">
           <FiltroDeLinea
             opciones={opciones}
             elegido={mentorElegido}
             ocultos={{
               ...(enCalendario ? { vista: "calendario" } : {}),
               ...(enCalendario ? { semana: semana.inicio, dia: diaElegido } : {}),
-              ...(tipo === "todos" ? {} : { tipo }),
+              ...(tipoEnLaUrl ? { tipo: tipoEnLaUrl } : {}),
+              // Sin esto, cambiar de línea apagaría «directas» sin decirlo.
+              ...(quienLaLleva === "todas" ? {} : { lleva: quienLaLleva }),
             }}
           />
+
+          {/* Va aquí, fuera de las dos pestañas, porque manda en las dos.
+              Y cuenta los CUATRO tipos: es el filtro de la pantalla entera. */}
+          {mentorElegido ? (
+            <FiltroDeDirectas
+              elegido={quienLaLleva}
+              nombre={nombreDeLaLinea}
+              directas={cuantasDirectas}
+              deSuLinea={cuantasDeSuLinea}
+              enlace={enlaceDeDirectas}
+            />
+          ) : null}
         </div>
 
         {enCalendario ? (
@@ -254,158 +422,75 @@ export default async function PaginaAlpha({
             diaElegido={diaElegido}
             tipo={tipo}
             enlaceDeSemana={(inicio) =>
-              conVista({ semana: inicio, ...(tipo === "todos" ? {} : { tipo }) })
+              conVista({ semana: inicio, ...(tipoEnLaUrl ? { tipo: tipoEnLaUrl } : {}) })
             }
             enlaceDeDia={(dia) =>
               conVista({
                 semana: semana.inicio,
                 dia,
-                ...(tipo === "todos" ? {} : { tipo }),
+                ...(tipoEnLaUrl ? { tipo: tipoEnLaUrl } : {}),
               })
             }
             enlaceDeTipo={(t) =>
               conVista({
                 semana: semana.inicio,
-                ...(t === "todos" ? {} : { tipo: t }),
+                ...(t ? { tipo: ROTULOS[t].enLaUrl } : {}),
               })
             }
           />
         ) : (
           <>
-        {veAlpha ? (
-          <section className="mt-8">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="etiqueta-seccion">ALPHA</h2>
-              <p className="text-[11.5px] leading-none font-medium text-[rgba(19,28,36,.5)]">
-                {mentorElegido
-                  ? `Solo la línea de ${nombres[mentorElegido]}`
-                  : esVistaCompletaDeAlpha(usuario)
-                    ? "Todos los grupos de la iglesia"
-                    : "Los que llevas y los de tu red"}{" "}
-                · {SESIONES_DE_ALPHA} sesiones de referencia
-              </p>
-            </div>
+            {/* **Los cuatro bloques salen del mismo molde.** Hasta el
+                27-oct-2026 eran dos `<section>` escritas a mano, casi iguales
+                salvo el género de las palabras; con cuatro, copiar otras dos
+                era la forma segura de que a la cuarta se le olvidara algo. Lo
+                que cambia entre ellos —cómo se llaman, qué botón abren y qué
+                lista pintan— viene del catálogo. */}
+            <BloqueDeGrupos
+              className="mt-8"
+              rotulos={bloqueDeAlpha.rotulos}
+              coletilla={bloqueDeAlpha.coletilla}
+              crear={
+                puedeCrearAlpha(usuario) ? (
+                  <NuevoGrupo lideres={lideresAlpha} hoy={hoy} />
+                ) : null
+              }
+              hueco={bloqueDeAlpha.hueco}
+              items={bloqueDeAlpha.elegidos}
+              partida={bloqueDeAlpha.partida}
+              conLider={bloqueDeAlpha.conLider}
+              pintar={(items, conLider) => (
+                <ListaDeAlpha grupos={items} conLider={conLider} />
+              )}
+            />
 
-            {puedeCrearAlpha(usuario) ? (
-              <div className="mt-4">
-                <NuevoGrupo lideres={lideresAlpha} hoy={hoy} />
-              </div>
-            ) : null}
-
-            {gruposVisibles.length === 0 ? (
-              <p className="mt-4 rounded-[13px] border border-dashed border-[rgba(19,28,36,.16)] p-6 text-[12.5px] leading-[1.6] font-medium text-[rgba(19,28,36,.5)]">
-                {mentorElegido
-                  ? "En esta línea no hay ningún Alpha. Cambia de línea o elige «Toda la iglesia»."
-                  : "Todavía no hay grupos de Alpha."}{" "}
-                {!mentorElegido && puedeCrearAlpha(usuario)
-                  ? "Crea el primero y elige quién lo lleva."
-                  : "Cuando te asignen uno, aparecerá aquí."}
-              </p>
-            ) : (
-              <ul className="mt-4 flex flex-col gap-[10px]">
-                {gruposVisibles.map((grupo) => (
-                  <li key={grupo.id} className="tarjeta p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <Link
-                          href={`/alpha/${grupo.id}`}
-                          className="text-[14px] leading-[1.2] font-semibold text-tinta hover:text-azul-700 hover:underline"
-                        >
-                          {grupo.name}
-                        </Link>
-                        <p className="mt-1 text-[11.5px] leading-[1.3] font-medium text-[rgba(19,28,36,.5)]">
-                          Desde {diaLargo(grupo.startDate)} ·{" "}
-                          {grupo.leader.fullName}
-                        </p>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-4 text-[12px] leading-none font-semibold text-[rgba(19,28,36,.6)]">
-                        <span>
-                          {grupo._count.enrollments}{" "}
-                          {grupo._count.enrollments === 1 ? "persona" : "personas"}
-                        </span>
-                        <span>
-                          {grupo._count.sessions} / {SESIONES_DE_ALPHA} sesiones
-                        </span>
-                        {grupo.closedAt ? (
-                          <span className="rounded-[20px] bg-[rgba(19,28,36,.06)] px-2 py-1 text-[9.5px] font-bold text-[rgba(19,28,36,.5)]">
-                            CERRADO
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        ) : null}
-
-        {veCasaDeFe ? (
-          <section className="mt-9">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="etiqueta-seccion">CASA DE FE</h2>
-              <p className="text-[11.5px] leading-none font-medium text-[rgba(19,28,36,.5)]">
-                {mentorElegido
-                  ? `Solo la línea de ${nombres[mentorElegido]}`
-                  : esVistaCompletaDeCasaDeFe(usuario)
-                    ? "Todas las Casas de Fe de la iglesia"
-                    : "Las que llevas y las de tu red"}{" "}
-                · 12 temas de referencia
-              </p>
-            </div>
-
-            {puedeCrearCasaDeFe(usuario) ? (
-              <div className="mt-4">
-                <NuevaCasaDeFe lideres={lideresCasa} hoy={hoy} />
-              </div>
-            ) : null}
-
-            {casasVisibles.length === 0 ? (
-              <p className="mt-4 rounded-[13px] border border-dashed border-[rgba(19,28,36,.16)] p-6 text-[12.5px] leading-[1.6] font-medium text-[rgba(19,28,36,.5)]">
-                {mentorElegido
-                  ? "En esta línea no hay ninguna Casa de Fe. Cambia de línea o elige «Toda la iglesia»."
-                  : "Todavía no hay Casas de Fe."}{" "}
-                {!mentorElegido && puedeCrearCasaDeFe(usuario)
-                  ? "Abre la primera y elige quién la lleva."
-                  : "Cuando te asignen una, aparecerá aquí."}
-              </p>
-            ) : (
-              <ul className="mt-4 flex flex-col gap-[10px]">
-                {casasVisibles.map((casa) => (
-                  <li key={casa.id} className="tarjeta p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <Link
-                          href={`/casa-de-fe/${casa.id}`}
-                          className="text-[14px] leading-[1.2] font-semibold text-tinta hover:text-azul-700 hover:underline"
-                        >
-                          {casa.name}
-                        </Link>
-                        <p className="mt-1 text-[11.5px] leading-[1.3] font-medium text-[rgba(19,28,36,.5)]">
-                          Desde {diaLargo(casa.startDate)} ·{" "}
-                          {casa.leader.fullName}
-                        </p>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-4 text-[12px] leading-none font-semibold text-[rgba(19,28,36,.6)]">
-                        <span>
-                          {casa._count.members}{" "}
-                          {casa._count.members === 1 ? "persona" : "personas"}
-                        </span>
-                        {casa.closedAt ? (
-                          <span className="rounded-[20px] bg-[rgba(19,28,36,.06)] px-2 py-1 text-[9.5px] font-bold text-[rgba(19,28,36,.5)]">
-                            CERRADA
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        ) : null}
+            {bloquesDeCasas.map((bloque) => (
+              <BloqueDeGrupos
+                key={bloque.rotulos.clave}
+                rotulos={bloque.rotulos}
+                coletilla={bloque.coletilla}
+                crear={
+                  puedeCrearCasaDeFe(usuario) ? (
+                    <NuevaCasaDeFe
+                      tipo={bloque.rotulos.clave as TipoDeGrupo}
+                      lideres={lideresCasa}
+                      hoy={hoy}
+                    />
+                  ) : null
+                }
+                hueco={bloque.hueco}
+                items={bloque.elegidos}
+                partida={bloque.partida}
+                conLider={bloque.conLider}
+                pintar={(items, conLider) => (
+                  <ListaDeCasas
+                    casas={items}
+                    rotulos={bloque.rotulos}
+                    conLider={conLider}
+                  />
+                )}
+              />
+            ))}
           </>
         )}
 

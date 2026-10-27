@@ -7,9 +7,11 @@
 /// Todo lo de aquí es **puro**: recibe los grupos ya cargados y el mapa de
 /// líneas, y no toca la base. Por eso se puede probar.
 
+import { ROTULOS, SECCIONES, type ClaveDeSeccion } from "@/lib/tipo-de-grupo";
+
 /// Un grupo, reducido a lo que el filtro necesita.
 export type GrupoConLider = {
-  tipo: "alpha" | "casa-de-fe";
+  tipo: ClaveDeSeccion;
   liderId: string;
 };
 
@@ -17,12 +19,31 @@ export type GrupoConLider = {
 /// en la mentoría, de la más cercana a la más lejana.
 export type LineasDeLosLideres = Record<string, string[]>;
 
+/// Cuántos grupos de UN tipo tiene una línea.
+export type CuentaDeTipo = {
+  clave: ClaveDeSeccion;
+  todos: number;
+  /// De esos, los que lleva **él mismo**. El resto los llevan los suyos. Va en
+  /// el desplegable porque es lo que dice de un tirón si merece la pena mirar
+  /// la línea entera o solo las suyas.
+  directas: number;
+};
+
 /// Un renglón del desplegable.
+///
+/// ⚠️ **Desde el 27-oct-2026 los tipos no son dos sino cuatro**, y por eso
+/// esto dejó de tener un par de campos por tipo. Con Restaurados y Mentorías,
+/// `casas`/`alpha`/`casasDirectas`/`alphaDirectas` habrían sido ocho campos, y
+/// una línea que solo lleva mentorías habría salido en el desplegable como
+/// «0 casas» — que es exactamente la opción que parece rota.
 export type OpcionDeLinea = {
   id: string;
   nombre: string;
-  casas: number;
-  alpha: number;
+  /// El total de la línea, de todos los tipos. Es por lo que se ordena.
+  total: number;
+  /// **Solo los tipos de los que esta línea tiene algo.** Un «0 mentorías» en
+  /// el renglón no informa de nada y alarga una lista que ya tiene 20 opciones.
+  porTipo: CuentaDeTipo[];
 };
 
 /// ¿El grupo que lleva `liderId` cae dentro de la línea de `mentorId`?
@@ -71,11 +92,18 @@ export function opcionesDeLinea(
   const opciones: OpcionDeLinea[] = [];
   for (const id of candidatas) {
     const suyos = grupos.filter((g) => enLaLinea(id, g.liderId, lineas));
+    const propios = suyos.filter((g) => g.liderId === id);
     opciones.push({
       id,
       nombre: nombres[id] ?? "—",
-      casas: suyos.filter((g) => g.tipo === "casa-de-fe").length,
-      alpha: suyos.filter((g) => g.tipo === "alpha").length,
+      total: suyos.length,
+      // Se recorre `SECCIONES` y no las claves que aparezcan, para que el
+      // orden del renglón sea siempre el mismo que el de la pantalla.
+      porTipo: SECCIONES.map((clave) => ({
+        clave,
+        todos: suyos.filter((g) => g.tipo === clave).length,
+        directas: propios.filter((g) => g.tipo === clave).length,
+      })).filter((c) => c.todos > 0),
     });
   }
 
@@ -83,8 +111,59 @@ export function opcionesDeLinea(
   // empieza a mirar. A igual tamaño, por nombre, para que el orden no baile
   // entre dos cargas de la misma pantalla.
   return opciones.sort(
-    (a, b) =>
-      b.casas + b.alpha - (a.casas + a.alpha) ||
-      a.nombre.localeCompare(b.nombre, "es"),
+    (a, b) => b.total - a.total || a.nombre.localeCompare(b.nombre, "es"),
   );
+}
+
+/// **El reparto de una línea en dos: lo que lleva el mentor con sus propias
+/// manos y lo que llevan los suyos.**
+///
+/// Es la pregunta que el filtro de línea no contestaba (27-oct-2026): con la
+/// línea de Alejandro Facundo puesta salían **60 Casas de Fe** y **15 son
+/// suyas**; en la de Juan Felipe, 17 y 8. El nombre del líder va en cada
+/// renglón, pero leer 60 renglones para encontrar los 15 no es distinguir.
+///
+/// ⚠️ **No vale para todas las líneas, y eso decide cuándo se parte la lista:**
+/// de los 20 mentores medidos, **9 llevan ellas mismas todo lo de su línea**
+/// (Paola 6 de 6, Ruth 5 de 5, Yuli 4 de 4…). Partir ahí dejaría un bloque
+/// con todo y otro vacío, que es ruido — por eso la pantalla solo parte cuando
+/// los dos lados tienen algo.
+export function repartirPorLinea<T>(
+  items: T[],
+  liderDe: (item: T) => string,
+  mentorId: string,
+): { directas: T[]; deSuLinea: T[] } {
+  const directas: T[] = [];
+  const deSuLinea: T[] = [];
+  for (const item of items) {
+    (liderDe(item) === mentorId ? directas : deSuLinea).push(item);
+  }
+  return { directas, deSuLinea };
+}
+
+/// **Cómo se lee un renglón del desplegable**: «Alejandro Facundo · 52 casas
+/// (15 suyas) · 4 Alpha · 2 mentorías (2 suyas)».
+///
+/// ⚠️ Las directas solo se dicen **cuando no son todas**: en 9 de las 20
+/// líneas medidas el mentor lleva él mismo todo lo suyo, y «5 casas
+/// (5 suyas)» es ruido en el renglón.
+export function renglonDeLinea(opcion: OpcionDeLinea): string {
+  const partes = opcion.porTipo.map((c) => {
+    const r = ROTULOS[c.clave];
+    const nombre = c.todos === 1 ? r.enElFiltro : r.enElFiltroPlural;
+    // ⚠️ «1 suya», no «1 suyas». El renglón de antes decía siempre el plural y
+    // nadie lo había visto porque las líneas medidas tenían 15, 8 o 5 propias;
+    // con mentorías de una sola, el caso del uno aparece enseguida.
+    const suyas =
+      c.directas === 1
+        ? r.articuloPlural === "las"
+          ? "suya"
+          : "suyo"
+        : r.articuloPlural === "las"
+          ? "suyas"
+          : "suyos";
+    const directas = c.directas < c.todos ? ` (${c.directas} ${suyas})` : "";
+    return `${c.todos} ${nombre}${directas}`;
+  });
+  return [opcion.nombre, ...partes].join(" · ");
 }

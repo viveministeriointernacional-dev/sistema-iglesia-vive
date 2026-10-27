@@ -5,16 +5,25 @@ import { useRouter } from "next/navigation";
 import { CamposDeReunion } from "@/components/campos-de-reunion";
 import { REUNION_VACIA, type DatosDeReunion } from "@/lib/reunion-catalogo";
 import { crearCasaDeFe } from "./acciones";
+import { ROTULOS, type TipoDeGrupo } from "@/lib/tipo-de-grupo";
 
 export type LiderPosible = { id: string; fullName: string; role: string };
 
+/// **Abre un grupo de los tres que viven en `faith_house_group`.** El
+/// formulario es el mismo para los tres —nombre, primer encuentro, quién lo
+/// lleva y la reunión—; lo único que cambia son los rótulos, que salen del
+/// catálogo. Un formulario por tipo habría sido la misma pantalla copiada tres
+/// veces, con sus tres validaciones que se van separando sin que nadie lo vea.
 export function NuevaCasaDeFe({
+  tipo,
   lideres,
   hoy,
 }: {
+  tipo: TipoDeGrupo;
   lideres: LiderPosible[];
   hoy: string;
 }) {
+  const r = ROTULOS[tipo];
   const router = useRouter();
   const [abierto, setAbierto] = useState(false);
   const [nombre, setNombre] = useState("");
@@ -31,7 +40,7 @@ export function NuevaCasaDeFe({
         onClick={() => setAbierto(true)}
         className="boton-primario"
       >
-        + Nueva Casa de Fe
+        {r.botonNuevo}
       </button>
     );
   }
@@ -40,11 +49,11 @@ export function NuevaCasaDeFe({
     <div className="tarjeta max-w-[640px] p-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block">
-          <span className="etiqueta-campo">Nombre de la Casa de Fe</span>
+          <span className="etiqueta-campo">Nombre {r.articulo === "la" ? "de la" : "del"} {r.singular}</span>
           <input
             value={nombre}
             onChange={(evento) => setNombre(evento.target.value)}
-            placeholder="Casa de Fe · Familia Pérez"
+            placeholder={r.ejemploDeNombre}
             className="campo"
           />
         </label>
@@ -58,13 +67,13 @@ export function NuevaCasaDeFe({
           />
         </label>
         <label className="block sm:col-span-2">
-          <span className="etiqueta-campo">¿Quién la lleva?</span>
+          <span className="etiqueta-campo">¿Quién {r.articulo === "la" ? "la" : "lo"} lleva?</span>
           <select
             value={liderId}
             onChange={(evento) => setLiderId(evento.target.value)}
             className="campo"
           >
-            <option value="">Elige a quien la lleva…</option>
+            <option value="">Elige a quien {r.articulo === "la" ? "la" : "lo"} lleva…</option>
             {lideres.map((lider) => (
               <option key={lider.id} value={lider.id}>
                 {lider.fullName}
@@ -84,7 +93,8 @@ export function NuevaCasaDeFe({
       {lideres.length === 0 ? (
         <p className="mt-3 text-[11.5px] leading-[1.5] font-medium text-ambar-texto">
           Todavía nadie tiene el permiso de liderar Casa de Fe. Habilítalo desde
-          administración o desde Mi red y vuelve.
+          administración o desde Mi red y vuelve. Es el mismo permiso para los
+          tres tipos de grupo.
         </p>
       ) : null}
 
@@ -95,7 +105,7 @@ export function NuevaCasaDeFe({
           onClick={() => {
             setError(null);
             iniciar(async () => {
-              const resultado = await crearCasaDeFe(nombre, inicio, liderId, reunion);
+              const resultado = await crearCasaDeFe(tipo, nombre, inicio, liderId, reunion);
               if (!resultado.ok) {
                 setError(resultado.mensaje);
                 return;
@@ -110,7 +120,7 @@ export function NuevaCasaDeFe({
           }}
           className="boton-primario"
         >
-          {enCurso ? "Creando…" : "Crear Casa de Fe"}
+          {enCurso ? "Creando…" : `Crear ${r.articulo === "la" ? "la" : "el"} ${r.singular}`}
         </button>
         <button
           type="button"

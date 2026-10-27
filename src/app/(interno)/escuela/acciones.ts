@@ -11,6 +11,7 @@ import {
 import { getPrisma } from "@/lib/prisma";
 import { auditar, encolarEventoIntegracion } from "@/lib/audit";
 import { ErrorDePermiso, obtenerUsuarioActual } from "@/lib/auth";
+import { ponerEnEtapaPorInscripcion } from "@/lib/etapa-automatica";
 import { accesoAExpediente } from "@/lib/expediente";
 import { nombreCompleto } from "@/lib/dominio";
 import {
@@ -195,6 +196,10 @@ export async function inscribirEnEscuela(
 
   await prisma.$transaction(async (tx) => {
     await tx.trainingEnrollment.create({ data: { programId, learnerId } });
+
+    // Estar en la Escuela Ser Líder **es** estar en Entrenar (regla del
+    // usuario, 27-oct-2026).
+    await ponerEnEtapaPorInscripcion(tx, learnerId, "ESCUELA", usuario.id);
 
     if (!yaLaCompleto) {
       await tx.milestone.upsert({
