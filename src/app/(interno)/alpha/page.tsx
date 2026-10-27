@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { headers } from "next/headers";
-import { diaLargo, hoyEnColombia } from "@/lib/dominio";
+import { hoyEnColombia } from "@/lib/dominio";
 import { requerirVista } from "@/lib/auth";
 import { getPrisma } from "@/lib/prisma";
 import {
@@ -21,7 +20,8 @@ import { CalendarioSemanal, type GrupoDelCalendario } from "./calendario-semanal
 import { PestanasDeGrupos } from "./pestanas";
 import { cargarPorRevisar } from "@/lib/taller";
 import { mentoresDeCadaLider } from "@/lib/red";
-import { enLaLinea, opcionesDeLinea } from "@/lib/lineas-catalogo";
+import { enLaLinea, opcionesDeLinea, repartirPorLinea } from "@/lib/lineas-catalogo";
+import { ListaDeAlpha, ListaDeCasas, ListaPartida } from "./listas-de-grupos";
 import { FiltroDeLinea } from "./filtro-de-linea";
 import { MiCalendario } from "./mi-calendario";
 import { NuevoGrupo } from "./nuevo-grupo";
@@ -164,6 +164,24 @@ export default async function PaginaAlpha({
   const gruposVisibles = grupos.filter((g) => deLaLinea(g.leaderId));
   const casasVisibles = casas.filter((c) => deLaLinea(c.leaderId));
 
+  // ------------------------------- las que lleva él y las de los suyos
+  // ⚠️ **El filtro de línea no contestaba «cuáles lleva ÉL»**, que es lo que
+  // se pidió el 27-oct-2026: con la línea de Alejandro Facundo puesta salían
+  // **60 Casas de Fe y 15 son suyas**; en la de Juan Felipe, 17 y 8. El
+  // nombre del líder iba en cada renglón, pero buscar 15 entre 60 renglones
+  // no es distinguir.
+  //
+  // Se reparte **solo con una línea elegida**: sin filtro no hay nadie
+  // respecto a quien «directa» signifique algo, y partir «lo tuyo / lo de los
+  // demás» en la vista de toda la iglesia sería otra pregunta.
+  const repartoDeCasas = mentorElegido
+    ? repartirPorLinea(casasVisibles, (c) => c.leaderId, mentorElegido)
+    : null;
+  const repartoDeAlpha = mentorElegido
+    ? repartirPorLinea(gruposVisibles, (g) => g.leaderId, mentorElegido)
+    : null;
+  const nombreDeLaLinea = mentorElegido ? (nombres[mentorElegido] ?? "—") : "";
+
   // ⚠️ El calendario NO hace ni una consulta nueva: se arma con lo que la
   // página ya trajo para las listas, que además ya viene con el alcance
   // aplicado —cada líder los suyos y los de su rama, administración todos—.
@@ -301,42 +319,20 @@ export default async function PaginaAlpha({
                   ? "Crea el primero y elige quién lo lleva."
                   : "Cuando te asignen uno, aparecerá aquí."}
               </p>
+            ) : repartoDeAlpha ? (
+              <ListaPartida
+                directas={repartoDeAlpha.directas}
+                deSuLinea={repartoDeAlpha.deSuLinea}
+                rotulos={{
+                  directas: `Los que lleva ${nombreDeLaLinea}`,
+                  deSuLinea: "Los que llevan los de su línea",
+                }}
+                pintar={(items, conLider) => (
+                  <ListaDeAlpha grupos={items} conLider={conLider} />
+                )}
+              />
             ) : (
-              <ul className="mt-4 flex flex-col gap-[10px]">
-                {gruposVisibles.map((grupo) => (
-                  <li key={grupo.id} className="tarjeta p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <Link
-                          href={`/alpha/${grupo.id}`}
-                          className="text-[14px] leading-[1.2] font-semibold text-tinta hover:text-azul-700 hover:underline"
-                        >
-                          {grupo.name}
-                        </Link>
-                        <p className="mt-1 text-[11.5px] leading-[1.3] font-medium text-[rgba(19,28,36,.5)]">
-                          Desde {diaLargo(grupo.startDate)} ·{" "}
-                          {grupo.leader.fullName}
-                        </p>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-4 text-[12px] leading-none font-semibold text-[rgba(19,28,36,.6)]">
-                        <span>
-                          {grupo._count.enrollments}{" "}
-                          {grupo._count.enrollments === 1 ? "persona" : "personas"}
-                        </span>
-                        <span>
-                          {grupo._count.sessions} / {SESIONES_DE_ALPHA} sesiones
-                        </span>
-                        {grupo.closedAt ? (
-                          <span className="rounded-[20px] bg-[rgba(19,28,36,.06)] px-2 py-1 text-[9.5px] font-bold text-[rgba(19,28,36,.5)]">
-                            CERRADO
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <ListaDeAlpha grupos={gruposVisibles} />
             )}
           </section>
         ) : null}
@@ -370,39 +366,20 @@ export default async function PaginaAlpha({
                   ? "Abre la primera y elige quién la lleva."
                   : "Cuando te asignen una, aparecerá aquí."}
               </p>
+            ) : repartoDeCasas ? (
+              <ListaPartida
+                directas={repartoDeCasas.directas}
+                deSuLinea={repartoDeCasas.deSuLinea}
+                rotulos={{
+                  directas: `Las que lleva ${nombreDeLaLinea}`,
+                  deSuLinea: "Las que llevan los de su línea",
+                }}
+                pintar={(items, conLider) => (
+                  <ListaDeCasas casas={items} conLider={conLider} />
+                )}
+              />
             ) : (
-              <ul className="mt-4 flex flex-col gap-[10px]">
-                {casasVisibles.map((casa) => (
-                  <li key={casa.id} className="tarjeta p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <Link
-                          href={`/casa-de-fe/${casa.id}`}
-                          className="text-[14px] leading-[1.2] font-semibold text-tinta hover:text-azul-700 hover:underline"
-                        >
-                          {casa.name}
-                        </Link>
-                        <p className="mt-1 text-[11.5px] leading-[1.3] font-medium text-[rgba(19,28,36,.5)]">
-                          Desde {diaLargo(casa.startDate)} ·{" "}
-                          {casa.leader.fullName}
-                        </p>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-4 text-[12px] leading-none font-semibold text-[rgba(19,28,36,.6)]">
-                        <span>
-                          {casa._count.members}{" "}
-                          {casa._count.members === 1 ? "persona" : "personas"}
-                        </span>
-                        {casa.closedAt ? (
-                          <span className="rounded-[20px] bg-[rgba(19,28,36,.06)] px-2 py-1 text-[9.5px] font-bold text-[rgba(19,28,36,.5)]">
-                            CERRADA
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <ListaDeCasas casas={casasVisibles} />
             )}
           </section>
         ) : null}

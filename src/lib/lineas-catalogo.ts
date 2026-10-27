@@ -23,6 +23,11 @@ export type OpcionDeLinea = {
   nombre: string;
   casas: number;
   alpha: number;
+  /// De esas `casas`, las que lleva **él mismo**. El resto las llevan los
+  /// suyos. Va en el desplegable porque es lo que dice de un tirón si merece
+  /// la pena mirar la línea entera o solo las suyas.
+  casasDirectas: number;
+  alphaDirectas: number;
 };
 
 /// ¿El grupo que lleva `liderId` cae dentro de la línea de `mentorId`?
@@ -71,11 +76,14 @@ export function opcionesDeLinea(
   const opciones: OpcionDeLinea[] = [];
   for (const id of candidatas) {
     const suyos = grupos.filter((g) => enLaLinea(id, g.liderId, lineas));
+    const propios = suyos.filter((g) => g.liderId === id);
     opciones.push({
       id,
       nombre: nombres[id] ?? "—",
       casas: suyos.filter((g) => g.tipo === "casa-de-fe").length,
       alpha: suyos.filter((g) => g.tipo === "alpha").length,
+      casasDirectas: propios.filter((g) => g.tipo === "casa-de-fe").length,
+      alphaDirectas: propios.filter((g) => g.tipo === "alpha").length,
     });
   }
 
@@ -87,4 +95,30 @@ export function opcionesDeLinea(
       b.casas + b.alpha - (a.casas + a.alpha) ||
       a.nombre.localeCompare(b.nombre, "es"),
   );
+}
+
+/// **El reparto de una línea en dos: lo que lleva el mentor con sus propias
+/// manos y lo que llevan los suyos.**
+///
+/// Es la pregunta que el filtro de línea no contestaba (27-oct-2026): con la
+/// línea de Alejandro Facundo puesta salían **60 Casas de Fe** y **15 son
+/// suyas**; en la de Juan Felipe, 17 y 8. El nombre del líder va en cada
+/// renglón, pero leer 60 renglones para encontrar los 15 no es distinguir.
+///
+/// ⚠️ **No vale para todas las líneas, y eso decide cuándo se parte la lista:**
+/// de los 20 mentores medidos, **9 llevan ellas mismas todo lo de su línea**
+/// (Paola 6 de 6, Ruth 5 de 5, Yuli 4 de 4…). Partir ahí dejaría un bloque
+/// con todo y otro vacío, que es ruido — por eso la pantalla solo parte cuando
+/// los dos lados tienen algo.
+export function repartirPorLinea<T>(
+  items: T[],
+  liderDe: (item: T) => string,
+  mentorId: string,
+): { directas: T[]; deSuLinea: T[] } {
+  const directas: T[] = [];
+  const deSuLinea: T[] = [];
+  for (const item of items) {
+    (liderDe(item) === mentorId ? directas : deSuLinea).push(item);
+  }
+  return { directas, deSuLinea };
 }

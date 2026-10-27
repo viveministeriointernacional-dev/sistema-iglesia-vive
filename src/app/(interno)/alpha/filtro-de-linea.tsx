@@ -46,7 +46,14 @@ export function FiltroDeLinea({
         {opciones.map((o) => (
           <option key={o.id} value={o.id}>
             {o.nombre} · {o.casas} {o.casas === 1 ? "casa" : "casas"}
+            {/* ⚠️ Las directas solo se dicen cuando NO son todas: en 9 de las
+                20 líneas medidas el mentor lleva él mismo todo lo suyo, y
+                «5 casas (5 directas)» es ruido en el renglón. */}
+            {o.casasDirectas < o.casas ? ` (${o.casasDirectas} suyas)` : ""}
             {o.alpha > 0 ? ` · ${o.alpha} Alpha` : ""}
+            {o.alpha > 0 && o.alphaDirectas < o.alpha
+              ? ` (${o.alphaDirectas} suyos)`
+              : ""}
           </option>
         ))}
       </select>
