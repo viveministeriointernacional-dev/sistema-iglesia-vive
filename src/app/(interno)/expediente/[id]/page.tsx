@@ -106,7 +106,9 @@ export default async function PaginaExpediente({
         desde: paso.fromPhase,
         hasta: paso.toPhase,
         fecha: momentoCorto(paso.decidedAt),
-        decidio: paso.decidedBy.fullName,
+        // Nulo cuando la etapa se movió sola al inscribir a la persona en un
+        // grupo (`src/lib/etapa-automatica.ts`): no lo decidió nadie.
+        decidio: paso.decidedBy?.fullName ?? "El sistema",
         nota: paso.note,
       }))
     : [];

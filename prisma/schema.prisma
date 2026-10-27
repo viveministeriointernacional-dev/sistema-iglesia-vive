@@ -1249,13 +1249,18 @@ model PhaseChange {
   fromPhase   Phase    @map("from_phase")
   toPhase     Phase    @map("to_phase")
   /// Quién aprobó: su mentor o el pastor de la línea.
-  decidedById String   @map("decided_by_id")
+  ///
+  /// ⚠️ **Nulo cuando no lo decidió nadie**: la etapa también se mueve sola al
+  /// inscribir a alguien en una Casa de Fe, en un Alfa o en la Escuela
+  /// (`src/lib/etapa-automatica.ts`), y por el QR de la Escuela se inscribe la
+  /// persona misma desde su celular.
+  decidedById String?  @map("decided_by_id")
   decidedAt   DateTime @default(now()) @map("decided_at")
   note        String?
   createdAt   DateTime @default(now()) @map("created_at")
 
   learner   LearnerProfile @relation(fields: [learnerId], references: [id])
-  decidedBy AppUser        @relation("DecidioCambioDeFase", fields: [decidedById], references: [id])
+  decidedBy AppUser?       @relation("DecidioCambioDeFase", fields: [decidedById], references: [id])
 
   @@index([learnerId, decidedAt])
   /// Los cambios de fase de un periodo.

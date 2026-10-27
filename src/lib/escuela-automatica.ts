@@ -5,6 +5,7 @@ import {
 } from "@iglesia/prisma-client";
 
 import { auditar } from "@/lib/audit";
+import { ponerEnEtapaPorInscripcion } from "@/lib/etapa-automatica";
 
 export type InscripcionAutomatica = {
   nombre: string;
@@ -75,6 +76,10 @@ export async function inscribirPorFormulario(
       update: { status: MilestoneStatus.EN_CURSO },
     });
   }
+
+  // Estar en la Escuela Ser Líder **es** estar en Entrenar (regla del usuario,
+  // 27-oct-2026). Sin actor: la persona se inscribió sola con el QR.
+  await ponerEnEtapaPorInscripcion(tx, learnerId, "ESCUELA", null);
 
   // ⚠️ **Sin actor a propósito**: no lo inscribió nadie del equipo, lo hizo la
   // persona desde su celular con el QR. Es la misma decisión que el taller de
