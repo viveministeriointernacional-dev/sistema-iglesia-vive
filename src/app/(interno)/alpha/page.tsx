@@ -22,6 +22,10 @@ import { cargarPorRevisar } from "@/lib/taller";
 import { mentoresDeCadaLider } from "@/lib/red";
 import { enLaLinea, opcionesDeLinea, repartirPorLinea } from "@/lib/lineas-catalogo";
 import { ListaDeAlpha, ListaDeCasas, ListaPartida } from "./listas-de-grupos";
+import {
+  FiltroDeDirectas,
+  quienLaLlevaDeLaUrl,
+} from "./filtro-de-directas";
 import { FiltroDeLinea } from "./filtro-de-linea";
 import { MiCalendario } from "./mi-calendario";
 import { NuevoGrupo } from "./nuevo-grupo";
@@ -40,6 +44,7 @@ export default async function PaginaAlpha({
     dia?: string;
     tipo?: string;
     mentor?: string;
+    lleva?: string;
   }>;
 }) {
   const usuario = await requerirVista("grupos");
@@ -68,12 +73,16 @@ export default async function PaginaAlpha({
         : semana.inicio;
 
   const mentorPedido = (parametros.mentor ?? "").trim();
+  const quienLaLleva = quienLaLlevaDeLaUrl(parametros.lleva);
 
   const conVista = (cambios: Record<string, string>) => {
     const p = new URLSearchParams({ vista: "calendario", ...cambios });
     // El filtro de línea se conserva al moverse: sin esto, pasar a la semana
     // siguiente devolvería a toda la iglesia sin que nadie lo pidiera.
     if (mentorElegido) p.set("mentor", mentorElegido);
+    // Y lo mismo con «directas»: cambiar de semana no puede devolver en
+    // silencio a la línea entera.
+    if (quienLaLleva !== "todas") p.set("lleva", quienLaLleva);
     return `/alpha?${p.toString()}`;
   };
 
@@ -182,6 +191,39 @@ export default async function PaginaAlpha({
     : null;
   const nombreDeLaLinea = mentorElegido ? (nombres[mentorElegido] ?? "—") : "";
 
+  // El botón de arriba (Todas · Las que lleva él · Las de su línea). **Manda
+  // sobre las dos pestañas**, que es lo que se pidió: el calendario también
+  // tenía el mismo problema de mezclar, y un filtro que solo valiera para la
+  // lista obligaría a elegir dos veces lo mismo.
+  const elegir = <T,>(reparto: { directas: T[]; deSuLinea: T[] } | null, todos: T[]) =>
+    !reparto || quienLaLleva === "todas"
+      ? todos
+      : quienLaLleva === "directas"
+        ? reparto.directas
+        : reparto.deSuLinea;
+
+  const casasElegidas = elegir(repartoDeCasas, casasVisibles);
+  const gruposElegidos = elegir(repartoDeAlpha, gruposVisibles);
+
+  // La lista se parte en dos bloques **solo cuando se están viendo las dos
+  // mitades**: con «directas» puesto ya no hay nada que separar, y el botón
+  // de arriba, encendido, dice qué se está mirando mejor que un rótulo.
+  const partirCasas = quienLaLleva === "todas" ? repartoDeCasas : null;
+  const partirAlpha = quienLaLleva === "todas" ? repartoDeAlpha : null;
+
+  const enlaceDeDirectas = (quien: "todas" | "directas" | "linea") => {
+    const p = new URLSearchParams();
+    if (enCalendario) {
+      p.set("vista", "calendario");
+      p.set("semana", semana.inicio);
+      p.set("dia", diaElegido);
+    }
+    if (tipo !== "todos") p.set("tipo", tipo);
+    if (mentorElegido) p.set("mentor", mentorElegido);
+    if (quien !== "todas") p.set("lleva", quien);
+    return `/alpha?${p.toString()}`;
+  };
+
   // ⚠️ El calendario NO hace ni una consulta nueva: se arma con lo que la
   // página ya trajo para las listas, que además ya viene con el alcance
   // aplicado —cada líder los suyos y los de su rama, administración todos—.
@@ -190,7 +232,7 @@ export default async function PaginaAlpha({
   // Los cerrados se quedan fuera: un calendario es lo que va a pasar, y un
   // grupo cerrado ya no se reúne.
   const gruposDelCalendario: GrupoDelCalendario[] = [
-    ...gruposVisibles
+    ...gruposElegidos
       .filter((g) => !g.closedAt)
       .map((g) => ({
         id: g.id,
@@ -205,7 +247,7 @@ export default async function PaginaAlpha({
         inicio: diaISO(g.startDate),
         tienePunto: g.latitude !== null && g.longitude !== null,
       })),
-    ...casasVisibles
+    ...casasElegidas
       .filter((c) => !c.closedAt)
       .map((c) => ({
         id: c.id,
@@ -252,7 +294,7 @@ export default async function PaginaAlpha({
         {/* El filtro vale para las dos pestañas, por eso vive aquí y no dentro
             del calendario: la pregunta «¿qué hay en mi línea?» es la misma se
             mire como rejilla o como lista. */}
-        <div className="mt-5">
+        <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3">
           <FiltroDeLinea
             opciones={opciones}
             elegido={mentorElegido}
@@ -260,8 +302,25 @@ export default async function PaginaAlpha({
               ...(enCalendario ? { vista: "calendario" } : {}),
               ...(enCalendario ? { semana: semana.inicio, dia: diaElegido } : {}),
               ...(tipo === "todos" ? {} : { tipo }),
+              // Sin esto, cambiar de línea apagaría «directas» sin decirlo.
+              ...(quienLaLleva === "todas" ? {} : { lleva: quienLaLleva }),
             }}
           />
+
+          {/* Va aquí, fuera de las dos pestañas, porque manda en las dos. */}
+          {repartoDeCasas && repartoDeAlpha ? (
+            <FiltroDeDirectas
+              elegido={quienLaLleva}
+              nombre={nombreDeLaLinea}
+              directas={
+                repartoDeCasas.directas.length + repartoDeAlpha.directas.length
+              }
+              deSuLinea={
+                repartoDeCasas.deSuLinea.length + repartoDeAlpha.deSuLinea.length
+              }
+              enlace={enlaceDeDirectas}
+            />
+          ) : null}
         </div>
 
         {enCalendario ? (
@@ -296,7 +355,11 @@ export default async function PaginaAlpha({
               <h2 className="etiqueta-seccion">ALPHA</h2>
               <p className="text-[11.5px] leading-none font-medium text-[rgba(19,28,36,.5)]">
                 {mentorElegido
-                  ? `Solo la línea de ${nombres[mentorElegido]}`
+                  ? quienLaLleva === "directas"
+                    ? `Solo los que lleva ${nombreDeLaLinea}`
+                    : quienLaLleva === "linea"
+                      ? `Solo los de la línea de ${nombreDeLaLinea}, sin los suyos`
+                      : `Solo la línea de ${nombreDeLaLinea}`
                   : esVistaCompletaDeAlpha(usuario)
                     ? "Todos los grupos de la iglesia"
                     : "Los que llevas y los de tu red"}{" "}
@@ -310,19 +373,32 @@ export default async function PaginaAlpha({
               </div>
             ) : null}
 
-            {gruposVisibles.length === 0 ? (
+            {gruposElegidos.length === 0 ? (
               <p className="mt-4 rounded-[13px] border border-dashed border-[rgba(19,28,36,.16)] p-6 text-[12.5px] leading-[1.6] font-medium text-[rgba(19,28,36,.5)]">
+                {/* ⚠️ Con «directas» puesto este hueco es frecuente, no raro:
+                    Alejandro Facundo tiene 4 Alpha en su línea y no lleva
+                    ninguno. Decir «en esta línea no hay ningún Alpha» sería
+                    falso y mandaría a cambiar de línea, que no es el problema. */}
                 {mentorElegido
-                  ? "En esta línea no hay ningún Alpha. Cambia de línea o elige «Toda la iglesia»."
+                  ? quienLaLleva === "directas"
+                    ? `${nombreDeLaLinea} no lleva ningún Alpha. Pulsa «Todas» para ver los de su línea.`
+                    : quienLaLleva === "linea"
+                      ? "En su línea nadie más lleva un Alpha. Pulsa «Todas» para verlos todos."
+                      : "En esta línea no hay ningún Alpha. Cambia de línea o elige «Toda la iglesia»."
                   : "Todavía no hay grupos de Alpha."}{" "}
-                {!mentorElegido && puedeCrearAlpha(usuario)
-                  ? "Crea el primero y elige quién lo lleva."
-                  : "Cuando te asignen uno, aparecerá aquí."}
+                {/* La coletilla es para cuando NO hay filtro puesto: con una
+                    línea elegida el hueco lo explica el filtro, y «cuando te
+                    asignen uno» sobra debajo de «pulsa Todas». */}
+                {mentorElegido
+                  ? null
+                  : puedeCrearAlpha(usuario)
+                    ? "Crea el primero y elige quién lo lleva."
+                    : "Cuando te asignen uno, aparecerá aquí."}
               </p>
-            ) : repartoDeAlpha ? (
+            ) : partirAlpha ? (
               <ListaPartida
-                directas={repartoDeAlpha.directas}
-                deSuLinea={repartoDeAlpha.deSuLinea}
+                directas={partirAlpha.directas}
+                deSuLinea={partirAlpha.deSuLinea}
                 rotulos={{
                   directas: `Los que lleva ${nombreDeLaLinea}`,
                   deSuLinea: "Los que llevan los de su línea",
@@ -332,7 +408,10 @@ export default async function PaginaAlpha({
                 )}
               />
             ) : (
-              <ListaDeAlpha grupos={gruposVisibles} />
+              <ListaDeAlpha
+                grupos={gruposElegidos}
+                conLider={quienLaLleva !== "directas"}
+              />
             )}
           </section>
         ) : null}
@@ -343,7 +422,11 @@ export default async function PaginaAlpha({
               <h2 className="etiqueta-seccion">CASA DE FE</h2>
               <p className="text-[11.5px] leading-none font-medium text-[rgba(19,28,36,.5)]">
                 {mentorElegido
-                  ? `Solo la línea de ${nombres[mentorElegido]}`
+                  ? quienLaLleva === "directas"
+                    ? `Solo las que lleva ${nombreDeLaLinea}`
+                    : quienLaLleva === "linea"
+                      ? `Solo las de la línea de ${nombreDeLaLinea}, sin las suyas`
+                      : `Solo la línea de ${nombreDeLaLinea}`
                   : esVistaCompletaDeCasaDeFe(usuario)
                     ? "Todas las Casas de Fe de la iglesia"
                     : "Las que llevas y las de tu red"}{" "}
@@ -357,19 +440,25 @@ export default async function PaginaAlpha({
               </div>
             ) : null}
 
-            {casasVisibles.length === 0 ? (
+            {casasElegidas.length === 0 ? (
               <p className="mt-4 rounded-[13px] border border-dashed border-[rgba(19,28,36,.16)] p-6 text-[12.5px] leading-[1.6] font-medium text-[rgba(19,28,36,.5)]">
                 {mentorElegido
-                  ? "En esta línea no hay ninguna Casa de Fe. Cambia de línea o elige «Toda la iglesia»."
+                  ? quienLaLleva === "directas"
+                    ? `${nombreDeLaLinea} no lleva ninguna Casa de Fe. Pulsa «Todas» para ver las de su línea.`
+                    : quienLaLleva === "linea"
+                      ? "En su línea nadie más lleva una Casa de Fe. Pulsa «Todas» para verlas todas."
+                      : "En esta línea no hay ninguna Casa de Fe. Cambia de línea o elige «Toda la iglesia»."
                   : "Todavía no hay Casas de Fe."}{" "}
-                {!mentorElegido && puedeCrearCasaDeFe(usuario)
-                  ? "Abre la primera y elige quién la lleva."
-                  : "Cuando te asignen una, aparecerá aquí."}
+                {mentorElegido
+                  ? null
+                  : puedeCrearCasaDeFe(usuario)
+                    ? "Abre la primera y elige quién la lleva."
+                    : "Cuando te asignen una, aparecerá aquí."}
               </p>
-            ) : repartoDeCasas ? (
+            ) : partirCasas ? (
               <ListaPartida
-                directas={repartoDeCasas.directas}
-                deSuLinea={repartoDeCasas.deSuLinea}
+                directas={partirCasas.directas}
+                deSuLinea={partirCasas.deSuLinea}
                 rotulos={{
                   directas: `Las que lleva ${nombreDeLaLinea}`,
                   deSuLinea: "Las que llevan los de su línea",
@@ -379,7 +468,10 @@ export default async function PaginaAlpha({
                 )}
               />
             ) : (
-              <ListaDeCasas casas={casasVisibles} />
+              <ListaDeCasas
+                casas={casasElegidas}
+                conLider={quienLaLleva !== "directas"}
+              />
             )}
           </section>
         ) : null}
