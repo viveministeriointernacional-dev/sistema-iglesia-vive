@@ -152,7 +152,7 @@ panel; antes este archivo decía «Paid» y era falso — de ahí parte de la le
 
 ## 5. Convención de ramas / git
 
-- Desarrollar en la rama de trabajo (actual: `claude/operacion-72-dashboard-4wj0p3`)
+- Desarrollar en la rama de trabajo (actual: `claude/project-thread-stgv39`)
   y **fusionar a `main` yo mismo, con la autorización del usuario y sin abrir PR**
   (§2, cambiado el 22-oct-2026).
 - Tras fusionar, **reiniciar la rama desde `main`**
@@ -410,6 +410,25 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   dicen **«El sistema»**. ✅ **Mover a alguien a FORTALECER no lo saca del
   tablero de Operación 72**, que no filtra por etapa; solo deja de contarlo en
   la carga del consolidador.
+- **Alpha, Casa de Fe, Restaurados y Mentorías son los CUATRO tipos de grupo**
+  (27-oct): Restaurados es discipulado para parejas y Mentoría es discipulado
+  personalizado. Los tres últimos viven en **la misma tabla**
+  (`faith_house_group` + columna `kind`, enum `GroupKind`), así que comparten
+  líder, encargados, miembros, día/hora/dirección, pin del mapa, calendario
+  semanal, filtros de línea y la tarjeta de renombrar/borrar. Los rótulos de
+  los cuatro (singular, plural, artículos, ejemplo de nombre, color del
+  calendario…) salen de **un solo sitio**: `src/lib/tipo-de-grupo.ts`, con
+  pruebas de la gramática que genera. Se crean desde la misma pantalla
+  (`/alpha`, titulada «Grupos»), con `?tipo=restaurados|mentoria`.
+  ⚠️ **SOLO CASA DE FE TIENE TALLER, Y ESO GOBIERNA CUATRO COSAS**
+  (`rotulos.conTaller`): el **correo** de inscripción y el **código del
+  taller** solo salen ahí (decisión del usuario, 27-oct), el guarda de «falta
+  día, hora y dirección» **tampoco corre** en los otros tipos (bloquearía sin
+  proteger nada), el **recordatorio diario** filtra `kind = 'CASA_DE_FE'`, y
+  el **permiso de revisar el taller** se acota igual — sin eso, abrir una
+  mentoría se lo habría dado a su líder **en silencio**, porque ese permiso lo
+  da la pertenencia al grupo. Entrar a Restaurados o a una mentoría **sí**
+  mueve la etapa a FORTALECER.
 - **Un grupo creado por error se puede RENOMBRAR y BORRAR** (23-oct): tarjeta
   «ESTA CASA DE FE» / «ESTE ALPHA» al final de la ficha, con «Cambiar el nombre»
   y un botón rojo que abre una ventana que **dice qué desaparece y qué no** y
@@ -1047,6 +1066,31 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   (`consolidadoresDisponibles`), y el tablero **no mira `phase`**. Una
   advertencia falsa pesa igual que un dato en una decisión, y la habría tomado
   con miedo de algo que no pasa.
+- **⚠️ CUANDO EL EQUIPO ESCRIBE ALGO DENTRO DE UN CAMPO QUE NO ES PARA ESO,
+  ESTÁ PIDIENDO UN CAMPO — Y DE PASO TE DICE QUÉ FORMA DARLE.** Antes de
+  construir Restaurados y Mentorías medí cómo se llevaban hoy: **tres grupos
+  tenían «(MENTORÍA)» pegado al final del nombre** de una Casa de Fe, con su
+  líder, sus miembros y su día de reunión. Eso contestó solo la pregunta de
+  diseño —no hacía falta ningún modelo nuevo, bastaba una columna `kind` en
+  `faith_house_group`— y los cuatro tipos heredaron gratis nueve cosas que un
+  modelo aparte habría obligado a duplicar. Es la misma señal que los 7 grupos
+  con la pareja metida en el nombre (21-sep). **La forma ya estaba probada por
+  el uso; lo único que faltaba era el sitio donde decirla.**
+- **⚠️ AL AÑADIR UN TIPO A UNA TABLA QUE YA EXISTE, BUSCAR QUIÉN DA PERMISOS
+  POR PERTENENCIA A ESA FILA.** `puedeRevisarElTaller` concede revisar el
+  taller por **estar en el grupo**, así que la columna `kind` nueva, que no
+  tiene nada que ver con talleres, habría dado ese permiso al líder de
+  cualquier mentoría **sin que nadie lo concediera y sin que `tsc` dijera
+  nada**. Lo mismo valía para el recordatorio y el correo. **Un tipo nuevo en
+  una tabla compartida amplía en silencio todo lo que consultaba esa tabla sin
+  filtrar** — hay que recorrer cada consulta y decidir una por una, no suponer
+  que lo que servía para una fila sirve para todas.
+- **⚠️ EL ARTÍCULO INDEFINIDO DELANTE DE UN SUSTANTIVO NO ES EL QUE VA SOLO.**
+  «un grupo» pero «asignen **uno**». El catálogo de rótulos guardaba un solo
+  campo para las dos cosas y la pantalla decía «Cuando te asignen un,
+  aparecerá aquí». No lo vio nadie leyendo el código: salió al **imprimir
+  juntas todas las frases generadas**, que es la prueba que hay que hacer
+  siempre que un texto se arme por plantilla con género y número.
 - **El orden en la pantalla es la única forma de decir ciertas cosas sin un
   cartel**: lo que caduca o bloquea a alguien va **arriba del todo**.
 - **⚠️ SI UN NÚMERO SE PUEDE PULSAR PARA VER DE DÓNDE SALE, EL NÚMERO Y SU
@@ -1161,6 +1205,7 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ### `docs/bitacora/2026-10.md` — octubre de 2026 (31 entradas)
 
+- **27-oct** · **Restaurados y Mentorías: dos tipos de grupo más, del mismo molde** (`53838e5`) · ⚠️ **la medida dijo que no hacía falta modelo nuevo: el equipo YA llevaba 3 mentorías escritas dentro del NOMBRE de una Casa de Fe** —`faith_house_group` gana `kind` y los tres tipos heredan gratis líder, encargados, miembros, día/hora/dirección, mapa, calendario y filtros de línea · los rótulos de los cuatro bloques salen de **un solo molde** (`tipo-de-grupo.ts`), porque la falta no está en la primera copia sino en la cuarta · ⚠️ **el permiso de revisar el taller se habría ampliado EN SILENCIO** (lo da la pertenencia al grupo) · correo, código del taller y recordatorio siguen siendo **solo de Casa de Fe** · ⚠️ «asignen **un**» (el artículo delante de sustantivo no es el que va solo) · **el panel de sesiones de Alpha está muerto: 2 sesiones y 0 observaciones en 14 inscritos**.
 - **27-oct** · **El reparto pasa a ser un botón arriba (Todas · Las que lleva él · Las de su línea) y manda también en el CALENDARIO** · lo que faltaba de verdad era el calendario, que seguía mezclando las 60 · vive fuera de las dos pestañas y viaja por la URL (`?lleva=`) · ⚠️ **con «directas» una sección vacía deja de ser rara**: Alejandro tiene 4 Alpha en su línea y no lleva ninguno, y el texto viejo («cambia de línea») era falso · el botón solo sale cuando hay algo que elegir, igual que el reparto.
 - **27-oct** · **El filtro de línea ahora distingue lo que lleva el mentor de lo que llevan los suyos** · **Alejandro Facundo lleva 15 de las 60 Casas de Fe de su línea**; Juan Felipe, 8 de 17 · ⚠️ **la lista solo se parte cuando los dos lados tienen algo**: 9 de las 20 líneas las lleva el mentor enteras y otras no tienen ninguna propia (Administración 0 de 60) · el desplegable dice «60 casas (15 suyas)» · dentro del bloque de las directas **se quita el nombre del líder**, que sería el mismo 15 veces · ⚠️ `repartirPorLinea` **no filtra por línea**, reparte lo ya filtrado — la primera prueba se equivocó en eso.
 - **27-oct** · **La etapa del recorrido pasa a reflejar dónde está la persona, no el trámite** (`364e13f`) · **64 fichas estaban mal**: 55 en GANAR estando ya en una Casa de Fe o un Alfa, y 11 con la Escuela marcada por debajo de ENTRENAR · ⚠️ **la regla CHOCA con los requisitos** y eso era la pregunta: 22 de las 55 sin mentor, y las 7 de GANAR serían un salto de dos etapas · ✅ **el tablero de Op72 NO filtra por etapa**, así que mover a nadie lo saca de él · ⚠️ **solo hacia adelante**, porque 8 personas acompañaban una casa desde ENTRENAR o MULTIPLICAR · **no se escribe el hito de transición** (nadie validó a nadie) · ⚠️ **los totales no cuadraban en uno: alguien movió una ficha a mano mientras yo medía**.
