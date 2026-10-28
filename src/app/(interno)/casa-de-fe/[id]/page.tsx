@@ -30,6 +30,16 @@ import {
   puedeEntrarACasaDeFe,
 } from "@/lib/casa-de-fe";
 import { CasaDeFe, type MiembroVista } from "./grupo";
+import { EncuentrosDelGrupo } from "@/components/encuentros-del-grupo";
+import {
+  cargarEncuentros,
+  personasDeLaRejilla,
+  temasDeLaCartilla,
+} from "@/lib/encuentros";
+import {
+  registrarEncuentro,
+  quitarEncuentro,
+} from "../../encuentros/acciones";
 
 export const dynamic = "force-dynamic";
 
@@ -89,6 +99,19 @@ export default async function PaginaCasaDeFe({
     telefono: miembro.telefono,
     codigo: puedeEditar ? miembro.codigo : null,
   }));
+
+  // Los encuentros y sus marcas. Van EN FILA y no en un `Promise.all`: con
+  // `PrismaPg max: 1` las consultas se serializan igual (§12.5), y la segunda
+  // necesita la primera para saber a quién más pintar en la rejilla.
+  const encuentros = await cargarEncuentros({ groupId: grupo.id });
+  const personasDeEncuentros = await personasDeLaRejilla(
+    { groupId: grupo.id },
+    miembros.map((m) => ({ learnerId: m.learnerId, nombre: m.nombre, fase: m.fase })),
+    encuentros,
+  );
+  // Los 12 temas solo donde hay cartilla: en Restaurados y en las mentorías
+  // sería un viaje a la base para llenar un desplegable que no se pinta.
+  const temas = r.conTaller ? await temasDeLaCartilla() : [];
 
   return (
     <main className="px-5 py-7 pb-16 sm:px-[26px]">
@@ -177,6 +200,23 @@ export default async function PaginaCasaDeFe({
           }
           cerrada={grupo.closedAt !== null}
           puedeEditar={puedeEditar}
+        />
+
+        <EncuentrosDelGrupo
+          rotulos={r}
+          personas={personasDeEncuentros}
+          encuentros={encuentros}
+          temas={temas}
+          reunion={{
+            weekday: grupo.weekday,
+            everyNWeeks: grupo.everyNWeeks,
+            inicio: diaISO(grupo.startDate),
+          }}
+          hoy={hoyEnColombia()}
+          puedeEditar={puedeEditar}
+          cerrado={grupo.closedAt !== null}
+          registrar={registrarEncuentro.bind(null, { groupId: grupo.id })}
+          quitar={quitarEncuentro.bind(null, { groupId: grupo.id })}
         />
       </div>
     </main>

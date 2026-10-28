@@ -123,6 +123,7 @@ model AppUser {
   casasQueEncargo           FaithHouseCoLeader[]        @relation("PusoEncargadoDeCasaFe")
   validacionesAlpha         AlphaEnrollment[]           @relation("ValidacionAlpha")
   asistenciasAlpha          AlphaAttendance[]
+  encuentrosRegistrados     GroupMeeting[]            @relation("RegistroElEncuentro")
   registrosCreados          LearnerProfile[]            @relation("RegistradaPor")
   escuelasLideradas         TrainingProgram[]           @relation("LiderDeEscuela")
   cierresDeEscuela          TrainingEnrollment[]        @relation("CerroEscuela")
@@ -407,6 +408,7 @@ model LearnerProfile {
   prematrimonialComoB    PremaritalCouple[]      @relation("NoviaB")
   prematrimonialTalleres PremaritalWorkshop[]
   cuestionariosDeLider   LeaderQuiz[]
+  encuentros             GroupAttendance[]
 
   @@index([phase, status])
   /// El alcance «solo mis personas» del tablero y el cálculo de carga.
@@ -591,6 +593,7 @@ model AlphaProgram {
   sessions    AlphaSession[]
   enrollments AlphaEnrollment[]
   coLeaders   AlphaCoLeader[]
+  meetings    GroupMeeting[]
 
   @@index([leaderId, closedAt])
   @@map("alpha_program")
@@ -960,6 +963,7 @@ model FaithHouseGroup {
   team      Team?                   @relation(fields: [teamId], references: [id])
   members   FaithHouseGroupMember[]
   coLeaders FaithHouseCoLeader[]
+  meetings  GroupMeeting[]
 
   @@index([leaderId, closedAt])
   /// La pantalla pinta un bloque por tipo, y el calendario filtra por tipo.
@@ -2034,4 +2038,88 @@ model FaithHouseReminder {
   @@index([scopeDate], map: "faith_house_reminder_scope_date_idx")
   @@index([groupId], map: "faith_house_reminder_group_id_idx")
   @@map("faith_house_reminder")
+}
+
+// ------------------------------------------------- Encuentros de los grupos
+
+/// **Un encuentro de un grupo: cuándo se dio, qué tema se llevó y quién vino.**
+///
+/// Pedido por el usuario el 27-oct-2026 para los CUATRO procesos a la vez
+/// —Alpha, Casa de Fe, Restaurados y Mentorías— porque hasta hoy no había
+/// forma de registrar que una reunión ocurrió: «una forma práctica de
+/// registrar en qué casa de fe se va, qué tema se llevó, quién asistió».
+///
+/// ⚠️ **Una sola tabla para los cuatro, con DOS claves ajenas de las que viaja
+/// exactamente una.** Alpha vive en `alpha_program` y los otros tres en
+/// `faith_house_group`, así que partirla en dos habría duplicado el modelo, la
+/// consulta del historial y la pantalla. Un CHECK obliga a que haya una y solo
+/// una: sin él, una fila suelta no pertenecería a ningún grupo y no habría
+/// ninguna consulta que la encontrara.
+///
+/// ⚠️ **NO reemplaza `alpha_session`.** La cartilla de Alpha, su Focus Day y su
+/// validación se quedan como están (decisión del usuario, 27-oct: «no quiero
+/// reemplazar la cartilla en alpha»). Lo que sí hace es **sumar**: el cálculo
+/// del 60 % de asistencia cuenta las sesiones viejas y los encuentros nuevos,
+/// porque si no el porcentaje diría una cosa y la rejilla otra.
+model GroupMeeting {
+  id          String    @id @default(uuid())
+  programId   String?   @map("program_id")
+  groupId     String?   @map("group_id")
+  /// Su puesto en la lista del grupo, desde 1. Es lo que numera las casillas.
+  number      Int
+  /// El día en que se dio, **sin hora y sin zona**: «se dieron el martes» no
+  /// es un instante (§12.1). Por eso `@db.Date` y por eso se pinta con `diaLargo`.
+  date        DateTime  @db.Date
+  /// Qué se llevó, escrito a mano. Nulo cuando el tema salió de la cartilla.
+  topic       String?
+  /// El número del tema de la cartilla de Casa de Fe (1..12), cuando se eligió
+  /// de la lista en vez de escribirlo. Se guarda el NÚMERO y no el texto para
+  /// que renombrar un tema no deje encuentros hablando del nombre viejo.
+  topicNumber Int?      @map("topic_number")
+  /// **Si el encuentro se dio.** En un grupo de una sola persona la casilla no
+  /// pregunta quién vino sino si hubo reunión, y un «no se pudo» con su
+  /// observación vale tanto como un sí: es la diferencia entre una semana sin
+  /// dato y una semana que alguien miró.
+  happened    Boolean   @default(true)
+  /// La observación del encuentro entero. La de cada persona va en su fila de
+  /// `group_attendance`.
+  note        String?
+  recordedById String?  @map("recorded_by_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  program    AlphaProgram?     @relation(fields: [programId], references: [id], onDelete: Cascade)
+  group      FaithHouseGroup?  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  recordedBy AppUser?          @relation("RegistroElEncuentro", fields: [recordedById], references: [id])
+  attendance GroupAttendance[]
+
+  @@unique([programId, number])
+  @@unique([groupId, number])
+  @@index([groupId, date])
+  @@index([programId, date])
+  @@map("group_meeting")
+}
+
+/// **Quién vino a un encuentro, y la observación de esa persona.**
+///
+/// ⚠️ **Cuelga del APRENDIZ, no de su inscripción al grupo.** Retirar a alguien
+/// del grupo borra su fila de `faith_house_group_member`, y con la inscripción
+/// como clave se habría llevado por delante el historial de los meses en que
+/// sí vino. Lo que pasó pasó: las marcas se apilan, no se pisan (§12.6).
+model GroupAttendance {
+  id        String   @id @default(uuid())
+  meetingId String   @map("meeting_id")
+  learnerId String   @map("learner_id")
+  present   Boolean  @default(true)
+  /// Observación de esta persona en este encuentro. Es la del globito.
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  meeting GroupMeeting   @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  learner LearnerProfile @relation(fields: [learnerId], references: [id])
+
+  @@unique([meetingId, learnerId])
+  @@index([learnerId])
+  @@map("group_attendance")
 }
