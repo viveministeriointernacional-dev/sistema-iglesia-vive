@@ -93,6 +93,12 @@ export type LoQueTieneElGrupo = {
   /// Solo Alpha.
   sesiones: number;
   asistencias: number;
+  /// **Los encuentros registrados y sus marcas.** Entró el 28-oct-2026 con el
+  /// registro de encuentros, y sin decirlo la ventana mentiría por omisión:
+  /// `group_meeting` cuelga del grupo con CASCADE, así que borrar la casa se
+  /// lleva por delante meses de «quién vino» que no están en ningún otro
+  /// sitio. Vale para los cuatro procesos, no solo para Alpha.
+  encuentros: number;
   /// Solo Alpha: cuántas notas escribió el líder al validar. Es lo ÚNICO del
   /// recorrido de Alpha que no está también en el hito del expediente, así que
   /// es lo único que de verdad se pierde.
@@ -102,6 +108,7 @@ export type LoQueTieneElGrupo = {
 export const GRUPO_VACIO: LoQueTieneElGrupo = {
   personas: [],
   encargados: 0,
+  encuentros: 0,
   sesiones: 0,
   asistencias: 0,
   notasDeValidacion: 0,
@@ -143,6 +150,14 @@ export function loQueSeBorra(
       tiene.encargados === 1
         ? "El encargado deja de tenerlo a su cargo."
         : `Los ${tiene.encargados} encargados dejan de tenerlo a su cargo.`,
+    );
+  }
+
+  if (tiene.encuentros > 0) {
+    lineas.push(
+      tiene.encuentros === 1
+        ? "El encuentro que hay apuntado, con quién vino y las observaciones que se dejaron."
+        : `Los ${tiene.encuentros} encuentros apuntados, con quién vino a cada uno y las observaciones que se dejaron.`,
     );
   }
 

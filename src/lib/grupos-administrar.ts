@@ -36,7 +36,7 @@ export async function loQueTieneElGrupo(
       where: { id: grupoId },
       select: {
         name: true,
-        _count: { select: { sessions: true, coLeaders: true } },
+        _count: { select: { sessions: true, coLeaders: true, meetings: true } },
         enrollments: {
           select: {
             validationNote: true,
@@ -57,6 +57,7 @@ export async function loQueTieneElGrupo(
           nombreCompleto(inscripcion.learner.person),
         ),
         encargados: grupo._count.coLeaders,
+        encuentros: grupo._count.meetings,
         sesiones: grupo._count.sessions,
         asistencias: grupo.enrollments.reduce(
           (total, inscripcion) => total + inscripcion._count.attendance,
@@ -73,7 +74,7 @@ export async function loQueTieneElGrupo(
     where: { id: grupoId },
     select: {
       name: true,
-      _count: { select: { coLeaders: true } },
+      _count: { select: { coLeaders: true, meetings: true } },
       members: {
         select: {
           learner: {
@@ -91,6 +92,7 @@ export async function loQueTieneElGrupo(
       ...GRUPO_VACIO,
       personas: grupo.members.map((miembro) => nombreCompleto(miembro.learner.person)),
       encargados: grupo._count.coLeaders,
+      encuentros: grupo._count.meetings,
     },
   };
 }

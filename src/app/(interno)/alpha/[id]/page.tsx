@@ -28,6 +28,9 @@ import {
   SESIONES_DE_ALPHA,
 } from "@/lib/alpha";
 import { Grupo, type ParticipanteVista, type SesionVista } from "./grupo";
+import { EncuentrosDelGrupo } from "@/components/encuentros-del-grupo";
+import { cargarEncuentros, personasDeLaRejilla } from "@/lib/encuentros";
+import { registrarEncuentro, quitarEncuentro } from "../../encuentros/acciones";
 
 export const dynamic = "force-dynamic";
 
@@ -104,6 +107,17 @@ export default async function PaginaGrupoDeAlpha({
 
   const validados = vistas.filter((v) => v.validado).length;
 
+  // ⚠️ **Los encuentros NO reemplazan la cartilla de Alpha** (decisión del
+  // usuario, 27-oct-2026). Las sesiones numeradas, el Focus Day y la
+  // validación se quedan donde estaban; esto es la forma práctica de apuntar
+  // que una reunión se dio, la misma de los otros tres procesos.
+  const encuentros = await cargarEncuentros({ programId: grupo.id });
+  const personasDeEncuentros = await personasDeLaRejilla(
+    { programId: grupo.id },
+    vistas.map((v) => ({ learnerId: v.learnerId, nombre: v.nombre, fase: "Alpha" })),
+    encuentros,
+  );
+
   return (
     <main className="px-5 py-7 pb-16 sm:px-[26px]">
       <div className="mx-auto max-w-[1240px]">
@@ -178,6 +192,23 @@ export default async function PaginaGrupoDeAlpha({
           participantes={vistas}
           asistenciaMinima={ASISTENCIA_MINIMA * 100}
           puedeEditar={puedeEditar}
+        />
+
+        <EncuentrosDelGrupo
+          rotulos={ROTULOS.ALPHA}
+          personas={personasDeEncuentros}
+          encuentros={encuentros}
+          temas={[]}
+          reunion={{
+            weekday: grupo.weekday,
+            everyNWeeks: grupo.everyNWeeks,
+            inicio: diaISO(grupo.startDate),
+          }}
+          hoy={hoyEnColombia()}
+          puedeEditar={puedeEditar}
+          cerrado={grupo.closedAt !== null}
+          registrar={registrarEncuentro.bind(null, { programId: grupo.id })}
+          quitar={quitarEncuentro.bind(null, { programId: grupo.id })}
         />
       </div>
     </main>

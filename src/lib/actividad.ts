@@ -829,6 +829,36 @@ export async function cargarActividad(
       // ⚠️ El nombre sale del METADATO, no de `nombreCasa`: el grupo ya no
       // existe, así que el mapa no lo tiene. Es justo el caso en que la
       // auditoría es el único rastro que queda.
+      case "encuentro.registrado":
+      case "encuentro.corregido": {
+        tipo = "grupos"; etiqueta = "GRUPOS"; tono = "verde";
+        const corregido = fila.action === "encuentro.corregido";
+        const seDio = m.seDio !== false;
+        const vinieron = typeof m.vinieron === "number" ? m.vinieron : 0;
+        const deCuantos = typeof m.deCuantos === "number" ? m.deCuantos : 0;
+        // ⚠️ Se dice lo que de verdad hizo esta persona —apuntar el encuentro—
+        // y no «se reunieron»: lo segundo es un hecho del grupo, no nuestro.
+        frase = [
+          A(),
+          t(corregido ? " corrigió el encuentro de " : " apuntó el encuentro de "),
+          b(texto(m.dia) ?? "sin fecha"),
+          t(
+            !seDio
+              ? " · no se pudo dar"
+              : deCuantos === 0
+                ? ""
+                : ` · ${vinieron === 1 ? "vino 1" : `vinieron ${vinieron}`} de ${deCuantos}`,
+          ),
+        ];
+        break;
+      }
+      case "encuentro.borrado": {
+        tipo = "grupos"; etiqueta = "GRUPOS"; tono = "rojo";
+        // El día va del METADATO y no de ningún mapa de nombres: borrada la
+        // fila, no queda de dónde sacarlo (§12.6).
+        frase = [A(), t(" borró el encuentro de "), b(texto(m.dia) ?? "sin fecha")];
+        break;
+      }
       case "casa_de_fe.grupo_borrado":
       case "alpha.grupo_borrado": {
         tipo = "grupos"; etiqueta = "GRUPOS"; tono = "rojo";
