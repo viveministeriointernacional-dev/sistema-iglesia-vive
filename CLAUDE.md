@@ -410,6 +410,28 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   dicen **«El sistema»**. ✅ **Mover a alguien a FORTALECER no lo saca del
   tablero de Operación 72**, que no filtra por etapa; solo deja de contarlo en
   la carga del consolidador.
+- **Registro de encuentros de los cuatro tipos de grupo** (28-oct): en la ficha
+  de cualquier Casa de Fe, Alfa, Restaurados o mentoría hay una **rejilla de
+  casillas numeradas** —una por encuentro— con la fecha, el tema y una marca por
+  persona, más una **observación general** y otra **por persona** (el bocadillo
+  que dibujó el usuario). **La cartilla de Alpha NO se tocó**: `alpha_session`,
+  `alpha_attendance`, el Focus Day y la regla del 60 % siguen igual; esto se
+  suma. **Una sola tabla para los cuatro**: `group_meeting` con `program_id`
+  (Alpha) o `group_id` (los tres de `faith_house_group`) y un CHECK que exige
+  exactamente uno, más `group_attendance`. Libs:
+  `encuentros-catalogo.ts` (textos y cuentas, con 16 pruebas), `encuentros.ts`
+  (la base) y `(interno)/encuentros/acciones.ts` (el permiso es el del grupo:
+  `puedeAdministrarGrupo` / `puedeAdministrarCasaDeFe`). Pantalla **«Cómo va mi
+  línea»** en `/alpha/encuentros`, con 8 barritas por grupo y arriba los más
+  quietos. ⚠️ **La asistencia cuelga del APRENDIZ, no de la inscripción**, así
+  que retirar a alguien no borra su historial y la rejilla sigue enseñando a
+  quien ya no está pero sí vino. ⚠️ **«Sin ningún encuentro» no cuenta como
+  atraso** (el día uno lo dirían los 62 grupos abiertos). ⚠️ **Lo individual lo
+  decide cuánta gente hay** (`esIndividual`, media 1,4 personas por grupo), no
+  el tipo: con una sola persona la rejilla dice «SE DIO». ⚠️ **El tema sale de
+  la cartilla solo en Casa de Fe** (`rotulos.conTaller`); en los otros tres se
+  escribe a mano y el rótulo es «DE QUÉ SE HABLÓ». ⚠️ **Ningún permiso nuevo**:
+  «Cómo va mi línea» reusa `cargarGrupos` y `cargarCasasDeFe`.
 - **Alpha, Casa de Fe, Restaurados y Mentorías son los CUATRO tipos de grupo**
   (27-oct): Restaurados es discipulado para parejas y Mentoría es discipulado
   personalizado. Los tres últimos viven en **la misma tabla**
@@ -1091,6 +1113,24 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   aparecerá aquí». No lo vio nadie leyendo el código: salió al **imprimir
   juntas todas las frases generadas**, que es la prueba que hay que hacer
   siempre que un texto se arme por plantilla con género y número.
+- **⚠️ UN INDICADOR QUE NACE HOY EMPIEZA VACÍO PARA TODO EL MUNDO, Y SI SE PINTA
+  COMO FALTA ACUSA AL EQUIPO DE LO QUE NO HIZO.** El día que salió el registro de
+  encuentros, **los 62 grupos abiertos** decían «Sin ningún encuentro»: no es que
+  no se reúnan, es que hasta ese día no había dónde apuntarlo. Pintarlos en rojo
+  y sacar un aviso de abandono habría sido un reproche falso, y el equipo
+  aprende en un día a no mirar un aviso que sale siempre. Por eso «nunca» tiene
+  **su propia frase y no cuenta como atraso**. La regla general: **antes de
+  encender una medida, contar qué dirá de todas las filas el primer día**, y si
+  la respuesta es «lo mismo de todas», ese valor es «todavía no se sabe», no
+  «mal».
+- **⚠️ UN HISTORIAL CUELGA DE LA PERSONA, NO DE SU PERTENENCIA AL GRUPO.** Si la
+  asistencia hubiera colgado de la fila de inscripción, retirar a alguien le
+  habría borrado las marcas y **los encuentros pasados dirían que vino menos
+  gente de la que vino** — un dato que se corrompe hacia atrás sin que nadie
+  toque ese dato. Va contra `learner_id`, con `ON DELETE RESTRICT`, y la pantalla
+  **sigue enseñando a quien ya no está pero sí vino**, marcado como que ya no
+  sigue. Lo mismo valdría para cualquier registro de lo que pasó: lo que ocurrió
+  no depende de si la relación sigue viva.
 - **El orden en la pantalla es la única forma de decir ciertas cosas sin un
   cartel**: lo que caduca o bloquea a alguien va **arriba del todo**.
 - **⚠️ SI UN NÚMERO SE PUEDE PULSAR PARA VER DE DÓNDE SALE, EL NÚMERO Y SU
@@ -1205,6 +1245,7 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 
 ### `docs/bitacora/2026-10.md` — octubre de 2026 (31 entradas)
 
+- **28-oct** · **Registro de encuentros: chulear qué sesión se dio, quién vino y de qué se habló** (`b472951`) · **una sola tabla para los cuatro procesos** (`group_meeting`, dos claves ajenas anulables y un CHECK que exige una) porque dos modelos serían dos rejillas y **dos sitios donde olvidarse el guardia** · ⚠️ **la asistencia cuelga del APRENDIZ, no de la inscripción**, o retirar a alguien haría que los encuentros pasados dijeran que vino menos gente · ⚠️ **«Sin ningún encuentro» NO es atraso**: el día uno lo dirían los 62 grupos abiertos y pintarlos en rojo sería acusar al equipo de lo que no hizo · **lo individual lo decide cuánta gente hay** (media 1,4), no el tipo · el tema de la cartilla **solo en Casa de Fe** · «Cómo va mi línea» **sin ningún permiso nuevo** · la migración probada al revés: borrar un aprendiz con asistencia está RESTRINGIDO · **la cartilla de Alpha no se tocó**.
 - **27-oct** · **Restaurados y Mentorías: dos tipos de grupo más, del mismo molde** (`53838e5`) · ⚠️ **la medida dijo que no hacía falta modelo nuevo: el equipo YA llevaba 3 mentorías escritas dentro del NOMBRE de una Casa de Fe** —`faith_house_group` gana `kind` y los tres tipos heredan gratis líder, encargados, miembros, día/hora/dirección, mapa, calendario y filtros de línea · los rótulos de los cuatro bloques salen de **un solo molde** (`tipo-de-grupo.ts`), porque la falta no está en la primera copia sino en la cuarta · ⚠️ **el permiso de revisar el taller se habría ampliado EN SILENCIO** (lo da la pertenencia al grupo) · correo, código del taller y recordatorio siguen siendo **solo de Casa de Fe** · ⚠️ «asignen **un**» (el artículo delante de sustantivo no es el que va solo) · **el panel de sesiones de Alpha está muerto: 2 sesiones y 0 observaciones en 14 inscritos**.
 - **27-oct** · **El reparto pasa a ser un botón arriba (Todas · Las que lleva él · Las de su línea) y manda también en el CALENDARIO** · lo que faltaba de verdad era el calendario, que seguía mezclando las 60 · vive fuera de las dos pestañas y viaja por la URL (`?lleva=`) · ⚠️ **con «directas» una sección vacía deja de ser rara**: Alejandro tiene 4 Alpha en su línea y no lleva ninguno, y el texto viejo («cambia de línea») era falso · el botón solo sale cuando hay algo que elegir, igual que el reparto.
 - **27-oct** · **El filtro de línea ahora distingue lo que lleva el mentor de lo que llevan los suyos** · **Alejandro Facundo lleva 15 de las 60 Casas de Fe de su línea**; Juan Felipe, 8 de 17 · ⚠️ **la lista solo se parte cuando los dos lados tienen algo**: 9 de las 20 líneas las lleva el mentor enteras y otras no tienen ninguna propia (Administración 0 de 60) · el desplegable dice «60 casas (15 suyas)» · dentro del bloque de las directas **se quita el nombre del líder**, que sería el mismo 15 veces · ⚠️ `repartirPorLinea` **no filtra por línea**, reparte lo ya filtrado — la primera prueba se equivocó en eso.
