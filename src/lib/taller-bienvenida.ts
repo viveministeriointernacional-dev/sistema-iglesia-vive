@@ -1,6 +1,10 @@
 import { auditar } from "@/lib/audit";
 import { URL_SISTEMA, correoTalleresDeCasaDeFe } from "@/lib/correo";
-import type { CasaDeLaInscripcion } from "@/lib/casa-de-fe-bienvenida-catalogo";
+import {
+  CONFIRMACION_SIN_CASA,
+  type CasaDeLaInscripcion,
+  variableDeConfirmacion,
+} from "@/lib/casa-de-fe-bienvenida-catalogo";
 import { exportarAccesoAlTaller } from "@/lib/highlevel-salida";
 import { getPrisma } from "@/lib/prisma";
 import { cargarMisTalleres, tokenDeRegreso } from "@/lib/taller";
@@ -94,9 +98,21 @@ export async function enviarAccesoAlTaller(
       : { enviado: false, motivo: resultado.motivo };
   }
 
+  // ⚠️ **El WhatsApp lleva ahora la MISMA confirmación que el correo, no solo
+  // el código y el enlace** (30-oct-2026). Es lo que pidió el usuario, y el
+  // dato lo justifica: de los 21 miembros medidos el 2-oct, **los 21 tienen
+  // celular y solo 11 tienen correo**, así que la mitad del grupo recibía un
+  // mensaje con un enlace y sin saber cuándo ni dónde presentarse — el mismo
+  // fallo que el correo tenía antes del 22-oct, un canal más abajo.
+  //
+  // El texto va **en una sola línea**: es el valor de una variable de plantilla
+  // de Meta, no el mensaje (§6).
   const crm = await exportarAccesoAlTaller(learnerId, {
     codigo: mis.codigo,
     enlace,
+    confirmacion: datos.casa
+      ? variableDeConfirmacion(datos.casa)
+      : CONFIRMACION_SIN_CASA,
   });
 
   // ⚠️ **El enlace y el código NO se escriben en la auditoría**, igual que el
