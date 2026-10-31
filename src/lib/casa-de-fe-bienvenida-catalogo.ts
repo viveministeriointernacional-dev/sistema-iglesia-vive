@@ -21,6 +21,7 @@ import {
   horaLegible,
   puntoDe,
 } from "@/lib/reunion-catalogo";
+import { enUnaLinea } from "@/lib/whatsapp-variable";
 
 /// Lo que guarda la ficha. `null` cuando nadie lo llenó.
 export type GeneroDePersona = "HOMBRE" | "MUJER" | null | undefined;
@@ -180,3 +181,78 @@ export function avisoDeDatosQueFaltan(falta: string[]): string | null {
   const lista = falta.length === 1 ? falta[0] : falta.join(" y ");
   return `Antes de inscribir a alguien, completa ${lista} de esta casa, arriba en «La reunión». El correo de confirmación los lleva, y sin ellos la persona queda inscrita sin saber cuándo ni dónde presentarse.`;
 }
+
+// ---------------------------------------------------------------------------
+// La misma confirmación, por WhatsApp
+// ---------------------------------------------------------------------------
+
+/// **El centro del WhatsApp de confirmación: UNA SOLA LÍNEA.**
+///
+/// ⚠️ **No es el mensaje: es el valor de `{{2}}` de la plantilla
+/// `confirmacion_casa_de_fe`.** El WhatsApp de este CRM solo manda plantillas
+/// aprobadas por Meta, y **el valor de una variable no admite ni un salto de
+/// línea** (§6). El saludo y el cierre viven en la plantilla, fijos; de aquí
+/// solo viaja el centro. Termina en `enUnaLinea`, así que si alguien mete un
+/// `\n` en cualquiera de los trozos **se aplana aquí** en vez de llegar a Meta
+/// y hacer que el envío falle sin explicación.
+///
+/// ## Qué lleva y qué NO, y por qué
+///
+/// Lleva lo mismo que el bloque «TU CASA DE FE» del correo: la casa, cuándo,
+/// dónde, quién la lleva y qué llevar. **El enlace va aparte, en `{{3}}`**, para
+/// que la plantilla lo pueda presentar como lo que es.
+///
+/// **NO lleva el código de 6 dígitos**, y es la decisión del 22-oct: ese dato es
+/// justo lo que Meta trata como código de verificación y lo que obliga a la
+/// categoría *Authentication* — es la sospecha principal del rechazo de
+/// `codigo_ingreso_escuela`. El enlace **ya identifica a la persona**, así que
+/// el código es redundante en este canal; sigue en el correo, en su campo del
+/// CRM y visible para el líder en la ficha de la casa.
+///
+/// **NO lleva la lista de los 12 temas.** Doce títulos en una sola línea son
+/// unos 300 caracteres de ruido delante del único dato que hay que pulsar, y
+/// están todos detrás del enlace.
+export function variableDeConfirmacion(casa: CasaDeLaInscripcion): string {
+  const cuando = cuandoSeReune(casa);
+  const direccion = (casa.address ?? "").trim();
+
+  const partes = [
+    `Tu Casa de Fe es «${casa.nombre}»`,
+    cuando ? `Se reúnen ${cuando.largo.toLowerCase()}` : SIN_DIA_NI_HORA,
+    direccion ? `La dirección es ${direccion}` : SIN_DIRECCION,
+    // ⚠️ **El líder se nombra UNA sola vez, y con su papel delante.** La
+    // primera versión decía «La lleva Santiago Viveros Artunduaga» y acababa
+    // con el `queLlevar` del correo, que lo vuelve a nombrar: el mismo nombre
+    // dos veces en un mensaje de tres líneas, y 331 caracteres. Se vio al
+    // dibujarlo con las casas de verdad, no leyendo el código (§12.5).
+    //
+    // Va el nombre **completo**, no el de pila: aquí es la presentación de
+    // alguien a quien la persona quizá no conoce todavía.
+    `La lleva tu líder de Casa de Fe, ${casa.lider}; avísale si algún día no puedes ir`,
+    QUE_LLEVAR_CORTO,
+  ];
+
+  return enUnaLinea(partes.map(frase).join(" "));
+}
+
+/// **Qué llevar, sin el aviso al líder**, que en el WhatsApp ya va arriba.
+const QUE_LLEVAR_CORTO =
+  "Lleva un corazón dispuesto, y una agenda y un lapicero para anotar";
+
+/// Cierra una frase con un punto **y solo uno**.
+///
+/// ⚠️ Existe por «a las 5:00 p. m..»: la hora legible ya termina en punto, así
+/// que añadirle otro deja un doble punto en medio del mensaje. Salió al
+/// dibujarlo con datos reales, y afecta a **todas** las casas de la tarde.
+function frase(texto: string): string {
+  const limpio = texto.trim();
+  return limpio.endsWith(".") ? limpio : `${limpio}.`;
+}
+
+/// **Lo que se escribe cuando se perdió el grupo.** `casa` es `null` en la
+/// confirmación del correo cuando la inscripción no pudo recuperar la casa, y
+/// el campo del CRM no se puede quedar vacío: Meta rechaza también la cadena
+/// vacía, y el WhatsApp saldría con un hueco en medio.
+export const CONFIRMACION_SIN_CASA = enUnaLinea(
+  "Ya estás en una Casa de Fe. Tu líder te confirmará el día, la hora y la dirección.",
+);

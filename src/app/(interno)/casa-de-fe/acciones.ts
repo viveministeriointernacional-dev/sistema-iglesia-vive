@@ -346,7 +346,11 @@ export async function reenviarAccesoAlTaller(
     ok: true,
     aviso:
       aviso ??
-      `Listo: le volvió a salir por correo y por WhatsApp. Su código es ${acceso.codigo.slice(0, 3)} ${acceso.codigo.slice(3)}.`,
+      // ⚠️ **«por WhatsApp» era mentira y aquí quedaba el último sitio que lo
+      // decía.** Que el CRM acepte la escritura y la etiqueta no significa que
+      // Meta mandara nada: eso fue lo que tapó 56 envíos durante tres semanas
+      // (22-oct). Se afirma lo que sí es nuestro.
+      `Listo: le volvió a salir el correo, y el WhatsApp quedó encargado en HighLevel. Su código es ${acceso.codigo.slice(0, 3)} ${acceso.codigo.slice(3)}.`,
   };
 }
 

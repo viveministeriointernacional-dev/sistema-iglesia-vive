@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   asuntoDeInscripcion,
   type CasaDeLaInscripcion,
+  CONFIRMACION_SIN_CASA,
   cuandoSeReune,
   dondeSeReune,
   fraseDeInscripcion,
@@ -12,6 +13,7 @@ import {
   queLlevar,
   SIN_DIA_NI_HORA,
   SIN_DIRECCION,
+  variableDeConfirmacion,
 } from "./casa-de-fe-bienvenida-catalogo";
 
 function casa(parcial: Partial<CasaDeLaInscripcion> = {}): CasaDeLaInscripcion {
@@ -145,4 +147,84 @@ test("sin nada que falte no hay aviso, y con algo lo nombra", () => {
 
   const dos = avisoDeDatosQueFaltan(["el día y la hora", "la dirección"]);
   assert.ok(dos?.includes("el día y la hora y la dirección"));
+});
+
+// ---------------------------------------------------------------------------
+// La misma confirmación, por WhatsApp
+// ---------------------------------------------------------------------------
+
+// ⚠️ **LA PRUEBA QUE DE VERDAD IMPORTA.** Meta rechaza un valor de variable que
+// lleve un salto de línea, un tabulador, cuatro espacios seguidos o la cadena
+// vacía, y el rechazo no explica nada: el mensaje simplemente no sale, que es
+// exactamente lo que pasó 56 veces durante tres semanas sin que nadie lo
+// supiera. Se recorren también los casos a los que les falta un dato, porque
+// son los que arman el texto por ramas distintas.
+test("la variable del WhatsApp cabe siempre en una sola línea", () => {
+  const casos = [
+    casa(),
+    casa({ address: null }),
+    casa({ weekday: null }),
+    casa({ meetingTime: null }),
+    casa({ weekday: null, address: "   " }),
+    casa({ everyNWeeks: 2 }),
+  ];
+
+  for (const una of casos) {
+    const texto = variableDeConfirmacion(una);
+    assert.ok(texto.length > 0, "Meta rechaza también la cadena vacía");
+    assert.ok(!texto.includes("\n"), texto);
+    assert.ok(!texto.includes("\t"), texto);
+    assert.ok(!texto.includes("  "), `dos espacios seguidos: ${texto}`);
+    assert.equal(texto, texto.trim());
+  }
+
+  assert.ok(CONFIRMACION_SIN_CASA.length > 0);
+  assert.ok(!CONFIRMACION_SIN_CASA.includes("\n"));
+});
+
+// Probar al revés es lo que hace valer la prueba: se mete un salto de línea a
+// propósito donde el equipo lo puede escribir —el nombre de la casa y la
+// dirección se teclean a mano— y se comprueba que sale aplanado en vez de
+// llegar a Meta y fallar sin explicación.
+test("un salto de línea escrito a mano sale aplanado", () => {
+  const texto = variableDeConfirmacion(
+    casa({ nombre: "CASA\nDEL SUR", address: "Carrera 9\n#21-14" }),
+  );
+  assert.ok(!texto.includes("\n"));
+  assert.ok(texto.includes("CASA DEL SUR"));
+  assert.ok(texto.includes("Carrera 9 #21-14"));
+});
+
+// Lo que la persona tiene que poder leer sin abrir nada: dónde, cuándo, quién
+// la lleva y qué llevar. Es el bloque «TU CASA DE FE» del correo.
+test("la confirmación por WhatsApp dice casa, cuándo, dónde, quién y qué llevar", () => {
+  const texto = variableDeConfirmacion(casa());
+  assert.ok(texto.includes("«CASA DE FE GRUPAL SUR»"));
+  assert.ok(texto.includes("los jueves a las 4:00 p. m."), texto);
+  assert.ok(texto.includes("Carrera 9 #21-14"));
+  assert.ok(
+    texto.includes("tu líder de Casa de Fe, Paola Alejandra Viveros de Carvajal"),
+    texto,
+  );
+  assert.ok(texto.includes("una agenda y un lapicero"));
+
+  // ⚠️ El líder se nombra UNA vez. Con el `queLlevar` del correo salía dos
+  // veces en tres líneas, y eso solo se vio al dibujarlo con datos reales.
+  assert.equal(texto.split("Paola Alejandra").length - 1, 1, texto);
+
+  // ⚠️ «a las 4:00 p. m..»: la hora ya termina en punto. Afecta a todas las
+  // casas de la tarde, que son la mayoría.
+  assert.ok(!texto.includes(".."), texto);
+  // ⚠️ El código de 6 dígitos NO viaja por WhatsApp: es la sospecha principal
+  // del rechazo de la plantilla anterior (22-oct). Si alguien lo vuelve a
+  // meter, esta prueba lo dice.
+  assert.ok(!/\d{6}/.test(texto), texto);
+});
+
+// Cuando falta un dato no queda un hueco ni un «null»: queda una frase que
+// dice qué va a pasar. Falta la dirección en 24 de las 59 casas abiertas.
+test("si falta el día o la dirección, lo dice con palabras", () => {
+  assert.ok(variableDeConfirmacion(casa({ address: null })).includes(SIN_DIRECCION));
+  assert.ok(variableDeConfirmacion(casa({ weekday: null })).includes(SIN_DIA_NI_HORA));
+  assert.ok(!variableDeConfirmacion(casa({ address: null })).includes("null"));
 });

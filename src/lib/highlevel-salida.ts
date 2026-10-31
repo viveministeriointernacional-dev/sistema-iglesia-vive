@@ -449,6 +449,18 @@ export const ETIQUETA_TALLER = "casa-de-fe-taller";
 const NOMBRES_DE_CAMPO = {
   codigo: ["codigo de miembro", "código de miembro"],
   enlace: ["enlace de talleres", "enlace de los talleres"],
+  /// El centro de la confirmación de inscripción, **en una sola línea** (la
+  /// casa, el día, la hora, la dirección, quién la lleva y qué llevar).
+  ///
+  /// Uno solo y no seis campos, por lo mismo que el recordatorio: así la
+  /// plantilla manda `{{contact.…}}` tal cual y el mensaje lo arma el sistema,
+  /// que es el único que sabe qué datos tiene esa casa y qué decir cuando falta
+  /// alguno.
+  confirmacion: [
+    "confirmacion de casa de fe",
+    "confirmación de casa de fe",
+    "confirmacion casa de fe",
+  ],
   /// El texto completo del recordatorio del día. **Uno solo y no varios
   /// campos**: así el workflow de HighLevel manda `{{contact.…}}` tal cual y
   /// el mensaje lo arma el sistema, que es el único que sabe cuántas casas
@@ -522,13 +534,19 @@ async function buscarIdsDeCampos<Clave extends string>(
   return salida;
 }
 
-/// Los dos campos del taller, por su nombre.
+/// Los tres campos que la confirmación necesita, por su nombre.
+///
+/// ⚠️ **`codigo` sigue escribiéndose aunque el WhatsApp ya no lo lleve.** Está
+/// en el CRM para quien lo necesite —el líder que tiene que dictárselo a quien
+/// perdió el enlace— y quitarlo de aquí sería perder un dato que ya está puesto
+/// en 46 contactos.
 async function camposDelTaller(
   cred: Credenciales,
-): Promise<{ codigo: string | null; enlace: string | null }> {
+): Promise<{ codigo: string | null; enlace: string | null; confirmacion: string | null }> {
   return buscarIdsDeCampos(cred, {
     codigo: NOMBRES_DE_CAMPO.codigo,
     enlace: NOMBRES_DE_CAMPO.enlace,
+    confirmacion: NOMBRES_DE_CAMPO.confirmacion,
   });
 }
 
@@ -542,7 +560,14 @@ async function camposDelTaller(
 /// que nunca se enviaron y nadie supo.
 export async function exportarAccesoAlTaller(
   learnerId: string,
-  datos: { codigo: string; enlace: string },
+  datos: {
+    codigo: string;
+    enlace: string;
+    /// El centro del mensaje, **en una sola línea** (`variableDeConfirmacion`).
+    /// Es lo que de verdad convierte esto en una confirmación: sin él el
+    /// WhatsApp solo llevaba un código y un enlace.
+    confirmacion: string;
+  },
 ): Promise<{ ok: boolean; motivo?: string }> {
   const cred = await credenciales();
   if (!cred) {
@@ -568,6 +593,9 @@ export async function exportarAccesoAlTaller(
     const aEscribir = [
       ...(campos.codigo ? [{ id: campos.codigo, valor: datos.codigo }] : []),
       ...(campos.enlace ? [{ id: campos.enlace, valor: datos.enlace }] : []),
+      ...(campos.confirmacion
+        ? [{ id: campos.confirmacion, valor: datos.confirmacion }]
+        : []),
     ];
 
     if (aEscribir.length > 0) {
@@ -616,10 +644,16 @@ export async function exportarAccesoAlTaller(
 
     // Faltan los campos: la etiqueta ya está puesta y el workflow va a
     // disparar, así que hay que decir que el mensaje va a salir incompleto.
-    if (aEscribir.length < 2) {
+    //
+    // ⚠️ **Se miran los campos que VIAJAN en el mensaje, no los tres.** El
+    // código se escribe pero ya no sale por WhatsApp (22-oct), así que que
+    // falte su campo no deja el mensaje cojo: avisar de él sería un aviso que
+    // no hay que atender, y los avisos que no hay que atender se dejan de leer
+    // (§12.6).
+    if (!campos.enlace || !campos.confirmacion) {
       const faltan = [
-        campos.codigo ? null : "«Código de miembro»",
         campos.enlace ? null : "«Enlace de talleres»",
+        campos.confirmacion ? null : "«Confirmación de casa de fe»",
       ]
         .filter(Boolean)
         .join(" y ");

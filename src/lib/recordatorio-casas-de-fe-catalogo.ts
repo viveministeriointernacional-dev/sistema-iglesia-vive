@@ -24,6 +24,7 @@
 /// de las de su línea.
 
 import { horaLegible } from "@/lib/reunion-catalogo";
+import { enUnaLinea } from "@/lib/whatsapp-variable";
 
 /// **La hora que parte el día.** Una casa que se reúne antes de esto se avisa
 /// la noche anterior, porque el resumen de la mañana le llegaría tarde.
@@ -382,11 +383,4 @@ export function variableDeWhatsApp(aviso: Aviso, tipo: TipoDeEnvio): string {
   }
 
   return enUnaLinea(partes.join(" — "));
-}
-
-/// Aplana cualquier espacio en blanco a un solo espacio. Es la garantía de que
-/// lo que sale de aquí cabe en una variable de plantilla, escriba lo que escriba
-/// quien toque las funciones de arriba.
-function enUnaLinea(texto: string): string {
-  return texto.replace(/\s+/g, " ").trim();
 }
