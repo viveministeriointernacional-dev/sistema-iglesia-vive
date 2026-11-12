@@ -1,37 +1,31 @@
 "use server";
 
-import { pedirOracionDesdeElCelular } from "@/lib/oracion";
+import {
+  buscarPorCelular,
+  pedirAcompanamiento,
+  type ResultadoAcompanamiento,
+} from "@/lib/oracion";
 
-/// ⚠️ `"use server"`: solo funciones async (el guardián de `use-server.test.ts`).
+/// **Paso 1.** Devuelve solo el nombre de pila: este link es público y
+/// cualquiera puede teclear un número (ver `buscarPorCelular`).
+export async function reconocerCelular(celular: string): Promise<
+  | { encontrada: true; personId: string; nombre: string }
+  | { encontrada: false; motivo: "sin-numero" | "no-esta" | "varias" }
+> {
+  return buscarPorCelular(celular);
+}
 
-export type EstadoDePeticion =
-  | { fase: "vacio" }
-  | { fase: "error"; mensaje: string; noEncontrada?: boolean }
-  | { fase: "listo"; nombre: string };
-
-const texto = (formulario: FormData, clave: string) =>
-  (formulario.get(clave) as string | null)?.trim() ?? "";
-
-export async function enviarPeticionDeOracion(
-  _anterior: EstadoDePeticion,
-  formulario: FormData,
-): Promise<EstadoDePeticion> {
-  const resultado = await pedirOracionDesdeElCelular({
-    callPhone: texto(formulario, "callPhone"),
-    email: texto(formulario, "email"),
-    birthDate: texto(formulario, "birthDate"),
-    texto: texto(formulario, "peticion"),
-    // La casilla viaja en el FormData, así que esto **funciona sin
-    // JavaScript** — igual que el `?escuela=1` del 3-oct.
-    reservada: formulario.get("reservada") === "on",
-  });
-
-  if (!resultado.ok) {
-    return {
-      fase: "error",
-      mensaje: resultado.mensaje,
-      noEncontrada: resultado.noEncontrada,
-    };
-  }
-  return { fase: "listo", nombre: resultado.nombre };
+/// **Paso 3.** Guarda lo que pidió y, si lo marcó, abre su Operación 72.
+export async function enviarAcompanamiento(datos: {
+  personId: string | null;
+  celular: string;
+  nombres: string;
+  apellidos: string;
+  correo: string;
+  tipos: string[];
+  quiereProceso: boolean;
+  texto: string;
+  reservada: boolean;
+}): Promise<ResultadoAcompanamiento> {
+  return pedirAcompanamiento(datos);
 }

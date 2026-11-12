@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  esTipo,
+  OPCIONES_DE_SERVICIO,
+  pestanaValida,
+  tiposConRespaldo,
+  tiposValidos,
   DIAS_DE_LA_SEMANA,
   DIAS_DEL_MES,
   ETIQUETA_ORIGEN,
@@ -203,4 +208,48 @@ test("una petición justo en el borde cuenta igual en el recuadro que en el filt
 
   assert.equal(dentro.estaSemana, 1, "justo en el borde SÍ entra, como el gte de la consulta");
   assert.equal(fuera.estaSemana, 0, "un milisegundo antes queda fuera");
+});
+
+// ------------------------------------ tipos de petición y proceso (11-nov-2026)
+
+test("los tipos que llegan del formulario se filtran contra la lista cerrada", () => {
+  assert.deepEqual(tiposValidos(["ORACION"]), ["ORACION"]);
+  assert.deepEqual(tiposValidos(["CONSEJERIA", "ORACION"]), ["ORACION", "CONSEJERIA"]);
+  // Lo que llega de un formulario público no tiene ninguna garantía.
+  assert.deepEqual(tiposValidos(["oracion"]), []);
+  assert.deepEqual(tiposValidos(["PROCESO"]), []);
+  assert.deepEqual(tiposValidos(["<script>"]), []);
+  assert.deepEqual(tiposValidos([]), []);
+});
+
+test("el orden sale del catálogo, no del orden en que los marcó", () => {
+  assert.deepEqual(tiposValidos(["CONSEJERIA", "ORACION"]), ["ORACION", "CONSEJERIA"]);
+  assert.deepEqual(tiposValidos(["ORACION", "CONSEJERIA"]), ["ORACION", "CONSEJERIA"]);
+});
+
+// ⚠️ Una petición sin tipo quedaría guardada y a la vez invisible: no saldría
+// en ninguna pestaña ni en ningún recuadro. Peor que no guardarla.
+test("sin ningún tipo marcado, la petición cae en ORACION y no queda huérfana", () => {
+  assert.deepEqual(tiposConRespaldo([]), ["ORACION"]);
+  assert.deepEqual(tiposConRespaldo(["PROCESO"]), ["ORACION"]);
+  assert.deepEqual(tiposConRespaldo(["basura"]), ["ORACION"]);
+  // Pero si marcó algo válido, se respeta tal cual.
+  assert.deepEqual(tiposConRespaldo(["CONSEJERIA"]), ["CONSEJERIA"]);
+});
+
+test("la pestaña de la URL se valida contra la lista cerrada", () => {
+  assert.equal(pestanaValida("CONSEJERIA"), "CONSEJERIA");
+  assert.equal(pestanaValida("proceso"), "proceso");
+  assert.equal(pestanaValida("todo"), "todo");
+  assert.equal(pestanaValida("otra cosa"), "todo");
+  assert.equal(pestanaValida(null), "todo");
+  assert.equal(pestanaValida(undefined), "todo");
+});
+
+// Las tres opciones que ve la persona, y que «proceso» NO es un tipo guardable.
+test("el formulario ofrece tres opciones y solo dos son tipos de petición", () => {
+  assert.equal(OPCIONES_DE_SERVICIO.length, 3);
+  const guardables = OPCIONES_DE_SERVICIO.filter((o) => esTipo(o.id));
+  assert.deepEqual(guardables.map((o) => o.id), ["ORACION", "CONSEJERIA"]);
+  assert.ok(!esTipo("PROCESO"));
 });

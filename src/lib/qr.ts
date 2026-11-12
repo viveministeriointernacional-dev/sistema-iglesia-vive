@@ -48,3 +48,13 @@ export function qrComoSvg(texto: string, opciones?: { celda?: number; margen?: n
 export function enlaceDelTaller(origen: string, qrCode: string): string {
   return `${origen.replace(/\/+$/, "")}/taller/${qrCode}`;
 }
+
+/// La dirección del formulario público de oración y consejería.
+///
+/// ⚠️ **El dominio sale de la petición, no de una constante**, por la misma
+/// razón que el del taller: el sistema se abre por varias direcciones, y un
+/// dominio fijo haría que un QR impreso desde la vista previa llevara a la
+/// otra.
+export function enlaceDePedirOracion(origen: string): string {
+  return `${origen.replace(/\/+$/, "")}/pedir-oracion`;
+}

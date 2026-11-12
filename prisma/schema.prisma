@@ -1960,6 +1960,17 @@ model PrayerRequest {
   /// acompañarla. Un anónimo de verdad dejaría a la persona sola justo cuando
   /// más necesita que alguien la busque.
   reserved Boolean @default(false)
+  /// **Qué pidió: oración, consejería, o las dos.**
+  ///
+  /// ⚠️ Es un ARREGLO y no un valor suelto porque la persona puede marcar las
+  /// dos a la vez —«oren por mi matrimonio y quiero hablar con alguien»— y
+  /// partirlo en dos filas duplicaría el texto: atender una dejaría la otra
+  /// colgando, con lo mismo escrito. Valores en `TIPOS` (`oracion-catalogo`).
+  types    String[] @default([])
+  /// **«Quiero iniciar un proceso».** No es un tipo de petición: es lo que pone
+  /// a la persona en Operación 72 con su consolidador. Vive aparte para que la
+  /// lista de intercesión no se llene de filas que no son para orar.
+  wantsProcess Boolean @default(false) @map("wants_process")
   /// Quién la escribió en el sistema. **Nulo cuando la escribió la persona
   /// desde su celular**: ahí no hay nadie del equipo a quien atribuírsela, y
   /// poner su propio nombre haría pensar que alguien la atendió.

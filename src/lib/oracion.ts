@@ -3,6 +3,13 @@ import { auditar } from "@/lib/audit";
 import { colaDeTelefono, nombreCompleto } from "@/lib/dominio";
 import { ETIQUETA_FASE } from "@/lib/procesos-catalogo";
 import {
+  esTipo,
+  type PestanaDePeticion,
+  tiposConRespaldo,
+} from "@/lib/oracion-catalogo";
+import { crearRegistroEnTransaccion } from "@/lib/registro";
+import { esquemaRegistro } from "@/lib/validacion-registro";
+import {
   type FiltroDeOracion,
   type OrigenDeLaPeticion,
   type PeticionParaPintar,
@@ -96,6 +103,10 @@ export type ListadoDeOracion = {
 
 export async function cargarPeticiones(opciones: {
   filtro: FiltroDeOracion;
+  /// Qué clase de petición se está mirando. Va aparte del filtro porque son dos
+  /// cosas distintas: la pestaña dice QUÉ se pidió y el filtro en qué ESTADO
+  /// está, así que se combinan («consejería pendiente», «consejería todas»).
+  pestana?: PestanaDePeticion;
   busqueda?: string | null;
   ahora?: Date;
 }): Promise<ListadoDeOracion> {
@@ -124,6 +135,12 @@ export async function cargarPeticiones(opciones: {
     // fuera a «José» cuando se escribe «jose».
     ...(busqueda
       ? { person: { searchText: { contains: busqueda.toLowerCase() } } }
+      : {}),
+    // La pestaña. `todo` no añade nada; «proceso» mira la columna aparte, no
+    // los tipos, porque querer empezar no es una clase de petición.
+    ...(opciones.pestana === "proceso" ? { wantsProcess: true } : {}),
+    ...(opciones.pestana && esTipo(opciones.pestana)
+      ? { types: { has: opciones.pestana } }
       : {}),
   };
 
@@ -171,6 +188,12 @@ export async function registrarPeticion(datos: {
   origen: OrigenDeLaPeticion;
   reservada?: boolean;
   recordedById?: string | null;
+  /// Qué pidió. Si no se pasa nada, cae en ORACION: una petición sin tipo
+  /// quedaría guardada y a la vez invisible en todas las pestañas.
+  tipos?: readonly string[];
+  /// «Quiero iniciar un proceso». Solo marca la petición; quien abre la
+  /// Operación 72 es `pedirAcompanamiento`, que es la que tiene la transacción.
+  quiereProceso?: boolean;
 }): Promise<{ ok: true; id: string } | { ok: false; mensaje: string }> {
   const validacion = peticionValida(datos.texto);
   if (!validacion.ok) return validacion;
@@ -183,8 +206,10 @@ export async function registrarPeticion(datos: {
       origin: datos.origen,
       reserved: datos.reservada ?? false,
       recordedById: datos.recordedById ?? null,
+      types: tiposConRespaldo(datos.tipos ?? []),
+      wantsProcess: datos.quiereProceso ?? false,
     },
-    select: { id: true },
+    select: { id: true, types: true },
   });
 
   // ⚠️ **El TEXTO de la petición NO entra en la auditoría.** «Actividad del
@@ -198,7 +223,14 @@ export async function registrarPeticion(datos: {
     action: "oracion.peticion_registrada",
     entityType: "prayer_request",
     entityId: creada.id,
-    metadata: { origen: datos.origen, reservada: datos.reservada ?? false },
+    // ⚠️ El TEXTO sigue sin entrar (ver arriba). Los tipos sí: dicen QUÉ se
+    // pidió sin decir nada de lo que la persona contó.
+    metadata: {
+      origen: datos.origen,
+      reservada: datos.reservada ?? false,
+      tipos: creada.types,
+      quiereProceso: datos.quiereProceso ?? false,
+    },
   });
 
   return { ok: true, id: creada.id };
@@ -342,4 +374,142 @@ export async function pedirOracionDesdeElCelular(datos: {
   if (!resultado.ok) return resultado;
 
   return { ok: true, nombre: persona.firstName };
+}
+
+// ---------------------------------------------------------------------------
+// El formulario público: oración, consejería y «quiero iniciar un proceso»
+// (11-nov-2026)
+// ---------------------------------------------------------------------------
+
+/// **Paso 1: ¿te conocemos por este celular?**
+///
+/// ⚠️ **Devuelve solo el NOMBRE DE PILA, nunca el completo ni el correo.** Este
+/// link es público: cualquiera puede teclear un número. Con el nombre de pila,
+/// quien es la dueña se reconoce («¿eres tú, Luz Mary?») y quien no lo es se
+/// lleva un dato que ya tenía o que no le sirve de nada.
+export async function buscarPorCelular(celular: string): Promise<
+  | { encontrada: true; personId: string; nombre: string }
+  | { encontrada: false; motivo: "sin-numero" | "no-esta" | "varias" }
+> {
+  const cola = colaDeTelefono(celular);
+  if (!cola || cola.length < 10) return { encontrada: false, motivo: "sin-numero" };
+
+  const prisma = await getPrisma();
+  const candidatas = await prisma.person.findMany({
+    where: {
+      OR: [{ callPhone: { endsWith: cola } }, { whatsappPhone: { endsWith: cola } }],
+    },
+    select: { id: true, firstName: true },
+    take: 2,
+  });
+
+  // Dos fichas con el mismo número: no se adivina. Sigue por el camino de
+  // «cuéntanos quién eres», que crea la suya.
+  if (candidatas.length !== 1) {
+    return { encontrada: false, motivo: candidatas.length === 0 ? "no-esta" : "varias" };
+  }
+  return {
+    encontrada: true,
+    personId: candidatas[0].id,
+    nombre: candidatas[0].firstName,
+  };
+}
+
+export type ResultadoAcompanamiento =
+  | { ok: true; nombre: string; abrioProceso: boolean }
+  | { ok: false; mensaje: string };
+
+/// **Paso 3: guardar lo que pidió.**
+///
+/// Las tres cosas que puede pedir van por caminos distintos a propósito:
+/// oración y consejería son **tipos de la petición**, y «quiero iniciar un
+/// proceso» es lo que abre su **Operación 72**.
+///
+/// ⚠️ **Operación 72 se abre solo para quien NO estaba.** Si la persona ya tiene
+/// ficha puede estar ya en un proceso, en Fortalecer o hasta en el equipo:
+/// abrirle una tarjeta nueva duplicaría su recorrido. En ese caso se marca
+/// `wantsProcess` y la petición sale en la pestaña «Quieren iniciar proceso»,
+/// que es donde consolidación decide qué hacer con alguien que ya conocen.
+export async function pedirAcompanamiento(datos: {
+  /// Puesto cuando confirmó «sí, soy yo» en el paso 2.
+  personId?: string | null;
+  celular: string;
+  nombres?: string;
+  apellidos?: string;
+  correo?: string;
+  tipos: readonly string[];
+  quiereProceso: boolean;
+  texto: string;
+  reservada: boolean;
+}): Promise<ResultadoAcompanamiento> {
+  const validacion = peticionValida(datos.texto);
+  if (!validacion.ok) return validacion;
+
+  const tipos = tiposConRespaldo(datos.tipos);
+  const prisma = await getPrisma();
+
+  // --- Ya la conocíamos: solo se guarda la petición.
+  if (datos.personId) {
+    const persona = await prisma.person.findUnique({
+      where: { id: datos.personId },
+      select: { id: true, firstName: true },
+    });
+    if (!persona) {
+      return { ok: false, mensaje: "No encontramos tu ficha. Vuelve a empezar, por favor." };
+    }
+    const guardada = await registrarPeticion({
+      personId: persona.id,
+      texto: datos.texto,
+      origen: "PERSONA",
+      reservada: datos.reservada,
+      // ⚠️ Nulo a propósito: la escribió ella, no el equipo.
+      recordedById: null,
+      tipos,
+      quiereProceso: datos.quiereProceso,
+    });
+    if (!guardada.ok) return guardada;
+    return { ok: true, nombre: persona.firstName, abrioProceso: false };
+  }
+
+  // --- No estaba: se le crea la ficha, y la Operación 72 solo si la pidió.
+  const nombres = (datos.nombres ?? "").trim();
+  if (!nombres) {
+    return { ok: false, mensaje: "Escribe tu nombre para saber por quién orar." };
+  }
+
+  const validados = esquemaRegistro.safeParse({
+    firstName: nombres,
+    lastName: (datos.apellidos ?? "").trim(),
+    callPhone: datos.celular,
+    email: (datos.correo ?? "").trim(),
+    entryPoint: null,
+  });
+  if (!validados.success) {
+    return { ok: false, mensaje: "Revisa tus datos: alguno no quedó bien escrito." };
+  }
+
+  const resultado = await prisma.$transaction(async (tx) => {
+    const creado = await crearRegistroEnTransaccion(tx, validados.data, {
+      // Nadie del equipo la registró: la persona llegó sola por el link.
+      actorId: null,
+      // ⚠️ Esto es lo que separa «solo quiero oración» de «quiero empezar»: sin
+      // la marca no se abre tarjeta ni se reparte consolidador.
+      sinOperacion72: !datos.quiereProceso,
+      metadata: { origen: "pedir-oracion", tipos, quiereProceso: datos.quiereProceso },
+    });
+    return creado;
+  });
+
+  const guardada = await registrarPeticion({
+    personId: resultado.personId,
+    texto: datos.texto,
+    origen: "PERSONA",
+    reservada: datos.reservada,
+    recordedById: null,
+    tipos,
+    quiereProceso: datos.quiereProceso,
+  });
+  if (!guardada.ok) return guardada;
+
+  return { ok: true, nombre: nombres, abrioProceso: datos.quiereProceso };
 }

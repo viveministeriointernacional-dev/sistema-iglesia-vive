@@ -5,6 +5,8 @@ import { cargarPeticiones } from "@/lib/oracion";
 import {
   FILTRO_DEL_RECUADRO,
   FILTROS,
+  PESTANAS,
+  pestanaValida,
   type FiltroDeOracion,
   esDePersonaNueva,
   filtroValido,
@@ -24,15 +26,17 @@ export const dynamic = "force-dynamic";
 export default async function PaginaDeOracion({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; filtro?: string }>;
+  searchParams: Promise<{ q?: string; filtro?: string; pide?: string }>;
 }) {
   await requerirVista("oracion");
   const parametros = await searchParams;
   const busqueda = (parametros.q ?? "").trim();
   const filtro = filtroValido(parametros.filtro);
+  const pestana = pestanaValida(parametros.pide);
 
   const { peticiones, resumen, recortado } = await cargarPeticiones({
     filtro,
+    pestana,
     busqueda,
   });
 
@@ -51,13 +55,19 @@ export default async function PaginaDeOracion({
     ? peticiones.filter((p) => !esDePersonaNueva(p))
     : peticiones;
 
-  const enlace = (f: string) => {
+  // ⚠️ Los dos conservan lo del otro. Si pulsar una pestaña borrara el filtro
+  // —o al revés— la pantalla saltaría sola a «pendientes» cada vez, y nadie
+  // podría ver «consejería atendida».
+  const direccion = (f: string, p: string) => {
     const destino = new URLSearchParams();
     if (busqueda) destino.set("q", busqueda);
     if (f !== "pendientes") destino.set("filtro", f);
+    if (p !== "todo") destino.set("pide", p);
     const consulta = destino.toString();
     return consulta ? `/oracion?${consulta}` : "/oracion";
   };
+  const enlace = (f: string) => direccion(f, pestana);
+  const enlaceDePestana = (p: string) => direccion(filtro, p);
 
   return (
     <main className="px-5 py-7 pb-16 sm:px-[26px]">
@@ -121,6 +131,37 @@ export default async function PaginaDeOracion({
             </button>
           </div>
         </form>
+
+        <p className="mt-4">
+          <Link
+            href="/oracion/qr"
+            className="text-[11.5px] leading-none font-semibold text-azul-700 underline"
+          >
+            Ver el enlace y el QR para compartir →
+          </Link>
+        </p>
+
+        {/* La pestaña dice QUÉ se pidió; la fila de abajo, en qué estado está.
+            Van separadas porque se combinan. */}
+        <div className="mt-4 flex flex-wrap overflow-hidden rounded-[10px] border border-[rgba(19,28,36,.18)]">
+          {PESTANAS.map((opcion) => {
+            const esta = opcion.id === pestana;
+            return (
+              <Link
+                key={opcion.id}
+                href={enlaceDePestana(opcion.id)}
+                aria-current={esta ? "page" : undefined}
+                className={`px-4 py-[10px] text-[12.5px] leading-none ${
+                  esta
+                    ? "bg-azul-900 font-bold text-white"
+                    : "font-semibold text-[rgba(19,28,36,.6)] hover:text-tinta"
+                }`}
+              >
+                {opcion.etiqueta}
+              </Link>
+            );
+          })}
+        </div>
 
         <div className="mt-3 flex flex-wrap gap-2">
           {FILTROS.map((opcion) => {

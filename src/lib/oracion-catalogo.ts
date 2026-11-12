@@ -4,6 +4,63 @@
 /// ⚠️ Lo que viva aquí lo puede importar el navegador. Lo que consulte la base
 /// o salga a la red va en `oracion.ts` (la regla del 6-sep-2026).
 
+/// **Qué pidió la persona.** Oración y consejería se marcan por separado y se
+/// pueden marcar las dos; «quiero iniciar un proceso» NO está aquí porque no es
+/// una petición que se atiende orando, sino lo que abre su Operación 72.
+export type TipoDePeticion = "ORACION" | "CONSEJERIA";
+
+export const TIPOS: readonly TipoDePeticion[] = ["ORACION", "CONSEJERIA"] as const;
+
+/// Lo que lee la persona en el formulario público.
+export const OPCIONES_DE_SERVICIO: readonly {
+  id: TipoDePeticion | "PROCESO";
+  titulo: string;
+  ayuda: string;
+}[] = [
+  {
+    id: "ORACION",
+    titulo: "Oración",
+    ayuda: "Que el equipo de intercesión ore por ti",
+  },
+  {
+    id: "CONSEJERIA",
+    titulo: "Consejería",
+    ayuda: "Hablar con un pastor o un consejero",
+  },
+  {
+    id: "PROCESO",
+    titulo: "Quiero iniciar un proceso",
+    ayuda: "Que alguien te acompañe de aquí en adelante",
+  },
+] as const;
+
+/// El distintivo de cada renglón de la lista.
+export const ETIQUETA_TIPO: Record<TipoDePeticion, string> = {
+  ORACION: "Oración",
+  CONSEJERIA: "Consejería",
+};
+
+export function esTipo(valor: string): valor is TipoDePeticion {
+  return (TIPOS as readonly string[]).includes(valor);
+}
+
+/// **Los tipos que marcó, limpios.** Lo que llega de un formulario público es
+/// texto sin garantías: se filtra contra la lista cerrada y se quitan los
+/// repetidos, en el orden del catálogo para que la lista no baile.
+export function tiposValidos(valores: readonly string[]): TipoDePeticion[] {
+  return TIPOS.filter((t) => valores.includes(t));
+}
+
+/// ⚠️ **Una petición sin ningún tipo no existe.** Si alguien manda el
+/// formulario sin marcar nada —o marca solo «quiero iniciar un proceso»—, lo
+/// que pide es que lo acompañen, y eso lleva oración de todos modos. Dejarla
+/// sin tipo la escondería de las dos pestañas y de los recuadros: estaría
+/// guardada y sería invisible, que es peor que no guardarla.
+export function tiposConRespaldo(valores: readonly string[]): TipoDePeticion[] {
+  const limpios = tiposValidos(valores);
+  return limpios.length > 0 ? limpios : ["ORACION"];
+}
+
 /// De dónde salió una petición. Decide cómo se pinta y, sobre todo, qué hay que
 /// hacer con ella.
 export type OrigenDeLaPeticion =
@@ -54,6 +111,24 @@ export type FiltroDeOracion =
   | "oradas-mes"
   | "atendidas"
   | "todas";
+
+/// **La pestaña de arriba: qué clase de petición se está mirando.** Es
+/// independiente de `FiltroDeOracion` —que es el estado— y por eso viaja en su
+/// propio parámetro: se puede pedir «consejería pendiente» o «consejería todas».
+export type PestanaDePeticion = "todo" | TipoDePeticion | "proceso";
+
+export const PESTANAS: readonly { id: PestanaDePeticion; etiqueta: string }[] = [
+  { id: "todo", etiqueta: "Todo" },
+  { id: "ORACION", etiqueta: "Oración" },
+  { id: "CONSEJERIA", etiqueta: "Consejería" },
+  { id: "proceso", etiqueta: "Quieren iniciar proceso" },
+] as const;
+
+export function pestanaValida(valor: string | null | undefined): PestanaDePeticion {
+  return PESTANAS.some((p) => p.id === valor)
+    ? (valor as PestanaDePeticion)
+    : "todo";
+}
 
 export const FILTROS: readonly { id: FiltroDeOracion; etiqueta: string }[] = [
   { id: "pendientes", etiqueta: "Pendientes" },
