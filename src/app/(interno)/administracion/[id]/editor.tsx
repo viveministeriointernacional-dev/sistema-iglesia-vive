@@ -75,6 +75,7 @@ type Cuenta = {
   canSeeAllGroups: boolean;
   canLeadGi: boolean;
   coordinatesGi: boolean;
+  receivesPrayerAlerts: boolean;
 };
 
 export type BajaInfo = { motivo: string | null; fecha: string; por: string };
@@ -551,6 +552,7 @@ function PermisosCampos({
     canSeeAllGroups: boolean;
     canLeadGi: boolean;
     coordinatesGi: boolean;
+    receivesPrayerAlerts: boolean;
   };
   onChange: (parcial: Partial<typeof valores>) => void;
 }) {
@@ -617,6 +619,11 @@ function PermisosCampos({
           onChange={(v) => onChange({ coordinatesGi: v })}
         />
         <Interruptor
+          etiqueta="Recibe los avisos de oración y consejería"
+          activo={valores.receivesPrayerAlerts}
+          onChange={(v) => onChange({ receivesPrayerAlerts: v })}
+        />
+        <Interruptor
           etiqueta="Cuenta activa"
           activo={valores.active}
           onChange={(v) => onChange({ active: v })}
@@ -638,6 +645,7 @@ function SeccionRol({ cuenta }: { cuenta: Cuenta }) {
     canSeeAllGroups: cuenta.canSeeAllGroups,
     canLeadGi: cuenta.canLeadGi,
     coordinatesGi: cuenta.coordinatesGi,
+    receivesPrayerAlerts: cuenta.receivesPrayerAlerts,
   });
   const [estado, setEstado] = useState<null | EstadoAviso>(null);
   const [guardando, iniciar] = useTransition();
@@ -828,6 +836,7 @@ function SeccionCrearAcceso({ personId }: { personId: string }) {
     canSeeAllGroups: false,
     canLeadGi: false,
     coordinatesGi: false,
+    receivesPrayerAlerts: false,
   });
   const [estado, setEstado] = useState<null | EstadoAviso>(null);
   const [guardando, iniciar] = useTransition();

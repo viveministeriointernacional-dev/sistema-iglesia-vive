@@ -81,6 +81,16 @@ model AppUser {
   /// líder de GI y sigue siendo discípula de Paola Viveros. GI y la mentoría
   /// son dos estructuras que conviven.
   canLeadGi                Boolean  @default(false) @map("can_lead_gi")
+
+  /// **Recibe los avisos de una petición nueva** (oración, consejería, o
+  /// «quiero iniciar un proceso») que alguien pide desde el link público.
+  ///
+  /// ⚠️ **No es un permiso de vista: no abre ni cierra ninguna pantalla.** Vive
+  /// en la cuenta y no se deriva del rol porque la mesa ministerial no coincide
+  /// con el rol — Jairo, Ruth y Yuli son MENTOR y reciben igual (12-nov-2026).
+  /// Derivarlo del rol obligaría a hacerlos pastores solo para que les llegue
+  /// el correo.
+  receivesPrayerAlerts    Boolean  @default(false) @map("receives_prayer_alerts")
   /// **Coordina GI**: los pastores del movimiento juvenil. Ven a todos los
   /// líderes de GI y a todos los jóvenes, lleven o no un grupo ellos mismos.
   /// Es a GI lo que `coordinatesConsolidation` es a la consolidación.
