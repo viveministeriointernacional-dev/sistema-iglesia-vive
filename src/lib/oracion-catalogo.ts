@@ -9,6 +9,11 @@
 /// una petición que se atiende orando, sino lo que abre su Operación 72.
 export type TipoDePeticion = "ORACION" | "CONSEJERIA";
 
+/// El tipo con el que se guarda una petición cuando no se eligió ninguno: la
+/// del formulario de registro, y el respaldo de `tiposConRespaldo`. Vive como
+/// constante para que los dos sitios no puedan separarse.
+export const TIPO_ORACION: TipoDePeticion = "ORACION";
+
 export const TIPOS: readonly TipoDePeticion[] = ["ORACION", "CONSEJERIA"] as const;
 
 /// Lo que lee la persona en el formulario público.
@@ -58,7 +63,7 @@ export function tiposValidos(valores: readonly string[]): TipoDePeticion[] {
 /// guardada y sería invisible, que es peor que no guardarla.
 export function tiposConRespaldo(valores: readonly string[]): TipoDePeticion[] {
   const limpios = tiposValidos(valores);
-  return limpios.length > 0 ? limpios : ["ORACION"];
+  return limpios.length > 0 ? limpios : [TIPO_ORACION];
 }
 
 /// De dónde salió una petición. Decide cómo se pinta y, sobre todo, qué hay que
