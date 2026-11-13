@@ -1140,19 +1140,37 @@ export async function cargarActividad(
         const enviados = typeof m.enviados === "number" ? m.enviados : 0;
         const total = typeof m.destinatarios === "number" ? m.destinatarios : 0;
         const fallaron = Array.isArray(m.fallos) ? m.fallos.length : 0;
+        const encargados =
+          typeof m.whatsappEncargados === "number" ? m.whatsappEncargados : 0;
+        const bloqueo =
+          typeof m.whatsappBloqueo === "string" ? m.whatsappBloqueo : null;
         tipo = "eventos"; etiqueta = "ORACIÓN"; tono = "verde";
+
+        // ⚠️ **«Los dejó encargados por WhatsApp», nunca «se les envió».** Lo
+        // único que sabemos es que el CRM aceptó nuestra escritura; si Meta
+        // manda el mensaje no nos lo cuenta nadie. La frase que afirmaba el
+        // envío es la que tapó 56 WhatsApp fantasma del taller durante tres
+        // semanas (§12.6).
+        const correos =
+          enviados === 1
+            ? "Salió 1 correo avisando de la petición"
+            : `Salieron ${enviados} correos avisando de la petición`;
         frase = [
           t(
-            enviados === 1
-              ? "Salió 1 correo avisando de la petición"
-              : `Salieron ${enviados} correos avisando de la petición`,
+            encargados > 0
+              ? `${correos}, y ${encargados} quedaron encargados por WhatsApp`
+              : correos,
           ),
         ];
-        // Solo se dice algo cuando hay algo que hacer: un aviso que sale
-        // siempre se deja de leer (§12.6).
-        observacion =
-          fallaron > 0
-            ? `${fallaron} de ${total} no se pudieron enviar`
+
+        // Solo se dice algo cuando hay algo que hacer (§12.6) — pero un canal
+        // bloqueado SIEMPRE es algo que hacer, y es justo lo que no se vio en
+        // tres semanas. Va delante de los correos fallidos porque apaga un
+        // canal entero, no un destinatario.
+        observacion = bloqueo
+          ? `El WhatsApp no salió: ${bloqueo}`
+          : fallaron > 0
+            ? `${fallaron} de ${total} correos no se pudieron enviar`
             : null;
         break;
       }

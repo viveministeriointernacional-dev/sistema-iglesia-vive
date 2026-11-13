@@ -4,7 +4,12 @@ import { nombreCompleto as armarNombre } from "@/lib/dominio";
 import { correoPeticionNueva, URL_SISTEMA } from "@/lib/correo";
 import { vistaHabilitada } from "@/lib/vistas";
 import type { OrigenDeLaPeticion } from "@/lib/oracion-catalogo";
-import { debeAvisar } from "@/lib/aviso-de-peticion-catalogo";
+import {
+  debeAvisar,
+  urgeLlamar,
+  variableDeWhatsAppDeLaPeticion,
+} from "@/lib/aviso-de-peticion-catalogo";
+import { exportarAvisoDePeticion } from "@/lib/highlevel-salida";
 
 // ---------------------------------------------------------------------------
 // Avisar de una petición nueva (12-nov-2026)
@@ -23,9 +28,24 @@ export type ResultadoDelAviso = {
   fallos: { nombre: string; motivo: string }[];
   /// Cuántas cuentas tenían el aviso encendido pero no tienen correo.
   sinCorreo: number;
+  /// **A cuántos se les dejó el WhatsApp encargado en HighLevel.**
+  ///
+  /// ⚠️ «Encargado» y no «enviado», y la palabra importa: lo único que sabemos
+  /// es que el CRM aceptó nuestra escritura. Si Meta manda el mensaje o no, no
+  /// nos lo cuenta nadie — es exactamente lo que tapó tres semanas de WhatsApp
+  /// del taller sin enviar (§12.6).
+  whatsappEncargados: number;
+  /// Por qué no se intentó el WhatsApp. `null` cuando sí se intentó.
+  whatsappBloqueo: string | null;
 };
 
-const VACIO: ResultadoDelAviso = { enviados: 0, fallos: [], sinCorreo: 0 };
+const VACIO: ResultadoDelAviso = {
+  enviados: 0,
+  fallos: [],
+  sinCorreo: 0,
+  whatsappEncargados: 0,
+  whatsappBloqueo: null,
+};
 
 /// **Avisa de una petición recién guardada.**
 ///
@@ -71,7 +91,15 @@ export async function avisarDePeticionNueva(datos: {
           canSeeAllGroups: true,
           canLeadGi: true,
           coordinatesGi: true,
-          person: { select: { firstName: true } },
+          person: {
+            select: {
+              firstName: true,
+              // El contacto del CRM es lo que hace posible el WhatsApp. Puede
+              // no estar: la cuenta compartida «Administración Iglesia Vive»
+              // no tiene ficha ni teléfono, así que recibe solo el correo.
+              highLevelContacts: { select: { contactId: true }, take: 1 },
+            },
+          },
           vistasPropias: { select: { view: true, enabled: true } },
         },
       }),
@@ -136,6 +164,43 @@ export async function avisarDePeticionNueva(datos: {
       .filter((r): r is { nombre: string; motivo: string } => "motivo" in r)
       .map((r) => ({ nombre: r.nombre, motivo: r.motivo }));
 
+    // --- El WhatsApp, **solo cuando pide que alguien llame.**
+    //
+    // Una petición de oración va solo por correo a propósito. Un WhatsApp es
+    // una interrupción: suena en el bolsillo, en la pantalla de bloqueo, a
+    // cualquier hora. Quince teléfonos sonando por «oren por mi trabajo» es
+    // como se silencia el canal, y entonces no suena tampoco el día que
+    // alguien escribe que se quiere matar. Una consejería o un «quiero
+    // empezar» sí piden que alguien llame hoy.
+    const porWhatsapp = urgeLlamar(datos.tipos, datos.quiereProceso);
+    let whatsappEncargados = 0;
+    let whatsappBloqueo: string | null = null;
+    let whatsappFallos: { nombre: string; motivo: string }[] = [];
+
+    if (porWhatsapp) {
+      const conCrm = destinatarios
+        .map((d) => ({
+          contactId: d.person?.highLevelContacts[0]?.contactId ?? null,
+          nombre: d.fullName,
+        }))
+        .filter(
+          (d): d is { contactId: string; nombre: string } => d.contactId !== null,
+        );
+
+      const salida = await exportarAvisoDePeticion(
+        conCrm,
+        variableDeWhatsAppDeLaPeticion({
+          nombreCompleto: nombreDeQuienPidio,
+          reservada: datos.reservada,
+          tipos: datos.tipos,
+          quiereProceso: datos.quiereProceso,
+        }),
+      );
+      whatsappEncargados = salida.encargados;
+      whatsappBloqueo = salida.bloqueo;
+      whatsappFallos = salida.fallos;
+    }
+
     // ⚠️ **Se audita lo que de verdad pasó, no lo que se intentó** (§12.6): el
     // WhatsApp del taller se llamaba `acceso_enviado` y llevaba tres semanas sin
     // mandar nada. Aquí «enviados» significa que Resend los aceptó.
@@ -153,13 +218,21 @@ export async function avisarDePeticionNueva(datos: {
         destinatarios: destinatarios.length,
         sinCorreo,
         fallos,
+        // ⚠️ El WhatsApp deja su rastro SIEMPRE, también cuando no se intentó y
+        // cuando se bloqueó. Un canal cuya última milla la hace otro sistema y
+        // que no deja rastro de la RESPUESTA es el que falla en silencio
+        // durante semanas (§12.6).
+        porWhatsapp,
+        whatsappEncargados,
+        whatsappBloqueo,
+        whatsappFallos,
         tipos: datos.tipos,
         quiereProceso: datos.quiereProceso,
         reservada: datos.reservada,
       },
     });
 
-    return { enviados, fallos, sinCorreo };
+    return { enviados, fallos, sinCorreo, whatsappEncargados, whatsappBloqueo };
   } catch (error) {
     // La petición ya está guardada. Que el aviso falle no se la quita a nadie.
     console.error("No se pudo avisar de la petición nueva", error);

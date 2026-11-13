@@ -470,6 +470,15 @@ const NOMBRES_DE_CAMPO = {
     "recordatorio casa de fe",
     "recordatorio de casas de fe",
   ],
+  /// El aviso de una petición nueva para los pastores y la mesa ministerial,
+  /// **en una sola línea** (quién pidió y qué pidió, sin el texto). Igual que
+  /// los otros dos: uno solo, porque el mensaje lo arma el sistema.
+  avisoPeticion: [
+    "aviso de peticion",
+    "aviso de petición",
+    "aviso de peticion de oracion",
+    "aviso de petición de oración",
+  ],
 } as const;
 
 /// Sin tildes, sin mayúsculas y sin espacios de sobra: así «Código de Miembro»
@@ -750,4 +759,123 @@ export async function exportarRecordatorioDeCasaDeFe(
       motivo: "HighLevel rechazó la escritura. Revisa el registro del Worker.",
     };
   }
+}
+
+/// La etiqueta que dispara el flujo del aviso de una petición nueva.
+export const ETIQUETA_AVISO_PETICION = "peticion-aviso";
+
+/// **Deja listo el WhatsApp del aviso de una petición, para VARIOS destinatarios.**
+///
+/// ⚠️ **Resuelve el id del campo UNA sola vez, no uno por persona.** Un aviso va
+/// a 15 contactos; con la forma de `exportarRecordatorioDeCasaDeFe` serían 15
+/// consultas idénticas al catálogo de campos de HighLevel antes de escribir
+/// nada. Aquí es una, y las escrituras van en paralelo.
+///
+/// ⚠️ **Si el campo no existe en HighLevel, NO se toca ninguna etiqueta.** Aquí
+/// el campo **es** el mensaje: disparar sin él mandaría 15 WhatsApp vacíos. Es
+/// la misma regla del recordatorio, y lo contrario de lo que hace el acceso al
+/// taller a propósito (allí falta un dato, no el mensaje).
+///
+/// ⚠️ **Y la etiqueta se QUITA y se vuelve a poner.** El workflow escucha «se
+/// añadió esta etiqueta»; de la segunda petición en adelante ya está puesta, y
+/// volver a añadirla no es un cambio: el mensaje no saldría. Sin esto el aviso
+/// funciona una vez y nunca más — es el segundo fallo del acceso al taller,
+/// que solo añadía (22-oct).
+export async function exportarAvisoDePeticion(
+  destinatarios: readonly { contactId: string; nombre: string }[],
+  texto: string,
+): Promise<{
+  encargados: number;
+  fallos: { nombre: string; motivo: string }[];
+  /// Por qué no se intentó nada. Vacío cuando sí se intentó.
+  bloqueo: string | null;
+}> {
+  if (destinatarios.length === 0) {
+    return { encargados: 0, fallos: [], bloqueo: null };
+  }
+
+  const cred = await credenciales();
+  if (!cred) {
+    return {
+      encargados: 0,
+      fallos: [],
+      bloqueo: "sin credenciales de HighLevel",
+    };
+  }
+
+  let campoId: string | null = null;
+  try {
+    const campos = await buscarIdsDeCampos(cred, {
+      avisoPeticion: NOMBRES_DE_CAMPO.avisoPeticion,
+    });
+    campoId = campos.avisoPeticion;
+  } catch (error) {
+    console.error("No se pudo leer el catálogo de campos de HighLevel", error);
+    return {
+      encargados: 0,
+      fallos: [],
+      bloqueo: "HighLevel no devolvió el catálogo de campos personalizados",
+    };
+  }
+
+  if (!campoId) {
+    return {
+      encargados: 0,
+      fallos: [],
+      bloqueo:
+        "en HighLevel todavía no existe el campo «Aviso de petición», así que el WhatsApp saldría vacío y no se disparó",
+    };
+  }
+
+  const resultados = await Promise.all(
+    destinatarios.map(async (destino) => {
+      try {
+        await pedir(
+          `/contacts/${destino.contactId}`,
+          "PUT",
+          {
+            customFields: [
+              { id: campoId, field_value: texto, value: texto },
+            ],
+          },
+          cred.token,
+        );
+
+        // Quitarla puede fallar porque no estaba (la primera vez): eso no es un
+        // error, es el estado inicial. Lo que no puede fallar es ponerla.
+        await pedir(
+          `/contacts/${destino.contactId}/tags`,
+          "DELETE",
+          { tags: [ETIQUETA_AVISO_PETICION] },
+          cred.token,
+        ).catch(() => undefined);
+
+        await pedir(
+          `/contacts/${destino.contactId}/tags`,
+          "POST",
+          { tags: [ETIQUETA_AVISO_PETICION] },
+          cred.token,
+        );
+
+        return { ok: true as const };
+      } catch (error) {
+        console.error(
+          `No se pudo dejar listo el aviso de ${destino.nombre} en HighLevel`,
+          error,
+        );
+        return {
+          nombre: destino.nombre,
+          motivo: "HighLevel rechazó la escritura",
+        };
+      }
+    }),
+  );
+
+  return {
+    encargados: resultados.filter((r) => "ok" in r).length,
+    fallos: resultados.filter(
+      (r): r is { nombre: string; motivo: string } => "motivo" in r,
+    ),
+    bloqueo: null,
+  };
 }

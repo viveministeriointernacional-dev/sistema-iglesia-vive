@@ -203,3 +203,29 @@ test("el pie no manda a una pantalla que la mitad no puede abrir", () => {
   });
   assert.ok(cuerpo.includes("pídele al"), cuerpo.slice(-320));
 });
+
+test("urgeLlamar es la MISMA regla para el asunto y para el WhatsApp", () => {
+  // Si estas dos cosas se separaran en dos reglas parecidas, un día el asunto
+  // diría «Pide consejería» y el WhatsApp no saldría, sin que nada avisara.
+  const casos: { tipos: string[]; proceso: boolean; wa: boolean }[] = [
+    { tipos: ["ORACION"], proceso: false, wa: false },
+    { tipos: ["CONSEJERIA"], proceso: false, wa: true },
+    { tipos: ["ORACION", "CONSEJERIA"], proceso: false, wa: true },
+    { tipos: ["ORACION"], proceso: true, wa: true },
+  ];
+  for (const caso of casos) {
+    assert.equal(urgeLlamar(caso.tipos, caso.proceso), caso.wa);
+    // Y el asunto cambia exactamente en los mismos casos.
+    const asunto = asuntoDelAviso({
+      nombres: "Sandra",
+      reservada: false,
+      tipos: caso.tipos,
+      quiereProceso: caso.proceso,
+    });
+    assert.equal(
+      asunto !== "Petición de oración: Sandra",
+      caso.wa,
+      `${asunto} no concuerda con urgeLlamar`,
+    );
+  }
+});
