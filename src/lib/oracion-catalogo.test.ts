@@ -15,7 +15,7 @@ import {
   FILTROS,
   desdeHace,
   LARGO_MAXIMO_PETICION,
-  NOMBRE_RESERVADO,
+  SIN_NOMBRE,
   ORIGENES,
   esDePersonaNueva,
   esOrigen,
@@ -50,20 +50,17 @@ test("el filtro cae en «pendientes» cuando llega cualquier cosa", () => {
   assert.equal(filtroValido("inventado"), "pendientes");
 });
 
-test("una reservada enseña «Reservada» y nunca el nombre", () => {
-  assert.equal(
-    nombreVisible({ nombre: "María Gómez", reservada: true }),
-    NOMBRE_RESERVADO,
-  );
-  assert.equal(
-    nombreVisible({ nombre: "María Gómez", reservada: false }),
-    "María Gómez",
-  );
+test("el nombre SIEMPRE se enseña, también en las reservadas", () => {
+  // Decisión del usuario, 13-nov-2026: «sí se tiene que identificar quién pide
+  // oración […] porque de lo contrario no serviría». La prueba vieja afirmaba
+  // lo contrario y se cambió a propósito, no se borró por estorbar.
+  assert.equal(nombreVisible({ nombre: "María Gómez" }), "María Gómez");
 });
 
-test("sin nombre tampoco se deja el renglón en blanco", () => {
+test("sin nombre no se deja el renglón en blanco", () => {
   // Un hueco donde va el nombre parece un error del sistema.
-  assert.equal(nombreVisible({ nombre: null, reservada: false }), NOMBRE_RESERVADO);
+  assert.equal(nombreVisible({ nombre: null }), SIN_NOMBRE);
+  assert.equal(nombreVisible({ nombre: "   " }), SIN_NOMBRE);
 });
 
 test("pendiente es no tener fecha de oración", () => {

@@ -1,5 +1,7 @@
 "use client";
 
+import { enlaceAUnaPersona } from "@/lib/whatsapp-enlaces-catalogo";
+
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -40,6 +42,10 @@ export function Peticion({
 
   const pendiente = peticion.oradaEl === null;
   const nombre = nombreVisible(peticion);
+  // `null` cuando el número no se puede llevar al formato de wa.me (un fijo,
+  // otro país, a medio escribir). Entonces no se pinta el botón: abrir el chat
+  // equivocado haría creer que se le escribió a la persona.
+  const enlaceWhatsapp = enlaceAUnaPersona(peticion.celular);
 
   function confirmar() {
     setError(null);
@@ -62,13 +68,15 @@ export function Peticion({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            {/* ⚠️ El enlace a la ficha se conserva AUNQUE sea reservada: lo que
-                la persona pidió fue que no se publique su nombre en la lista,
-                no quedarse sin que nadie la acompañe. */}
+            {/* ⚠️ **Subrayado y en azul, no solo al pasar el ratón.** Antes
+                estaba pintado igual que el texto normal y nadie hacía clic: la
+                ficha —con el teléfono, el mentor y la historia— quedaba a la
+                vista y a la vez escondida. Un enlace que no parece enlace es lo
+                mismo que no tenerlo. */}
             {peticion.learnerId ? (
               <Link
                 href={`/expediente/${peticion.learnerId}`}
-                className="text-[14px] leading-none font-semibold text-tinta hover:text-azul-700 hover:underline"
+                className="text-[14px] leading-none font-semibold text-azul-700 underline decoration-[rgba(31,59,87,.35)] underline-offset-2 hover:decoration-azul-700"
               >
                 {nombre}
               </Link>
@@ -77,9 +85,12 @@ export function Peticion({
                 {nombre}
               </span>
             )}
+            {/* ⚠️ Ya NO esconde el nombre (13-nov): avisa de que esa persona
+                pidió que se llevara con discreción, que es lo que el equipo
+                tiene que saber para tratarla bien. */}
             {peticion.reservada ? (
               <span className="rounded-full border border-[rgba(19,28,36,.16)] px-2 py-0.5 text-[10px] font-bold tracking-[.06em] text-[rgba(19,28,36,.5)] uppercase">
-                Pidió reserva
+                Pidió discreción
               </span>
             ) : null}
             <span
@@ -94,6 +105,26 @@ export function Peticion({
             {peticion.fase ?? "Sin expediente"} · {fechaPedida}
             {peticion.registradaPor ? ` · la registró ${peticion.registradaPor}` : ""}
           </p>
+          {/* El teléfono, en el renglón. Una consejería o un «quiero empezar»
+              se atienden llamando, y hasta hoy el número estaba dentro de la
+              ficha, a dos clics de donde se decide a quién llamar. */}
+          {peticion.celular ? (
+            <p className="mt-1.5 flex flex-wrap items-center gap-2">
+              <span className="text-[12.5px] leading-none font-semibold text-tinta">
+                {peticion.celular}
+              </span>
+              {enlaceWhatsapp ? (
+                <a
+                  href={enlaceWhatsapp}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-full border border-[rgba(63,159,122,.4)] bg-[rgba(63,159,122,.09)] px-2 py-0.5 text-[10.5px] font-bold tracking-[.04em] text-[#2f7a5c] uppercase hover:bg-[rgba(63,159,122,.16)]"
+                >
+                  WhatsApp
+                </a>
+              ) : null}
+            </p>
+          ) : null}
         </div>
 
         {pendiente ? (

@@ -166,12 +166,18 @@ export type PeticionParaPintar = {
   id: string;
   texto: string;
   origen: OrigenDeLaPeticion;
-  /// `null` cuando la persona pidió reservar su nombre.
+  /// `null` solo si la ficha no tiene nombre, que no debería pasar.
   nombre: string | null;
+  /// **Lo que la persona marcó en su día, no lo que la pantalla hace.** Se
+  /// conserva como dato histórico —es lo que ella pidió— pero **ya no esconde
+  /// el nombre** (decisión del usuario, 13-nov-2026: ver `nombreVisible`).
   reservada: boolean;
-  /// El expediente al que lleva el renglón. **Se conserva aunque sea
-  /// reservada**: quien la acompaña tiene que poder acompañarla.
+  /// El expediente al que lleva el renglón.
   learnerId: string | null;
+  /// Para poder llamar o escribir sin salir de la pantalla. Es lo que faltaba:
+  /// una consejería o un «quiero empezar» se atienden llamando, y el teléfono
+  /// estaba a dos clics dentro de la ficha.
+  celular: string | null;
   fase: string | null;
   pedidaEl: Date;
   registradaPor: string | null;
@@ -180,18 +186,31 @@ export type PeticionParaPintar = {
   notaDeOracion: string | null;
 };
 
-/// ⚠️ **Lo que se enseña en lugar del nombre cuando la petición es reservada.**
-/// No se inventa un apodo ni se deja en blanco: un renglón sin nada donde va el
-/// nombre parece un error del sistema, y quien lo lee acaba abriendo la ficha
-/// para ver quién es — que es justo lo que la persona pidió evitar.
-export const NOMBRE_RESERVADO = "Reservada";
+/// Lo que se enseña cuando la ficha no tiene nombre. No se deja en blanco: un
+/// renglón vacío donde va el nombre parece un error del sistema.
+export const SIN_NOMBRE = "Sin nombre en la ficha";
 
-export function nombreVisible(peticion: {
-  nombre: string | null;
-  reservada: boolean;
-}): string {
-  if (peticion.reservada || !peticion.nombre) return NOMBRE_RESERVADO;
-  return peticion.nombre;
+/// **El nombre SIEMPRE se enseña, también en las reservadas.**
+///
+/// ⚠️ **Esto cambió el 13-nov-2026 y es una decisión del usuario, no un
+/// descuido.** Antes una petición reservada salía como «Reservada» y el nombre
+/// no aparecía. El motivo de cambiarlo, con sus palabras: «sí se tiene que
+/// identificar quién pide oración, la que pide consejería, como la que quiere
+/// iniciar proceso, porque necesitamos identificar a esas personas, porque
+/// entonces de lo contrario no serviría».
+///
+/// **Lo que «reservado» significa ahora** es que la petición **no aparece en el
+/// historial de la persona** —los hitos y cambios de fase que ve su mentor: 
+/// Operación 72, Casa de Fe, Encuentro, bautismo— sino solo en esta pantalla,
+/// que es de pastores y administradores. Y eso **ya era cierto para todas**: la
+/// tabla `prayer_request` solo se lee aquí; el expediente no la toca.
+///
+/// ⚠️ **Por eso la casilla «Que sea reservada» se quitó del formulario
+/// público**: prometía «no se muestra tu nombre en la lista», y eso dejó de ser
+/// verdad. Una casilla que promete algo que el sistema no hace es peor que no
+/// tenerla (§12.6).
+export function nombreVisible(peticion: { nombre: string | null }): string {
+  return peticion.nombre?.trim() || SIN_NOMBRE;
 }
 
 /// ¿Sigue esperando que alguien ore por ella?
