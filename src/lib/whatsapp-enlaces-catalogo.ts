@@ -76,3 +76,43 @@ export function enlaceDeWhatsApp(mensaje: string, numero = WHATSAPP_IGLESIA): st
   const limpio = mensaje.trim();
   return limpio ? `${base}?text=${encodeURIComponent(limpio)}` : base;
 }
+
+/// **Pasa un celular de la base al formato que `wa.me` entiende.**
+///
+/// En la base conviven «+573116665492», «3102214808» y «+57 322 7065179»: unos
+/// con indicativo, otros sin él, y con espacios. `wa.me` solo acepta dígitos y
+/// **exige el indicativo del país**, así que sin esto la mitad de los enlaces
+/// abriría un chat con un número inventado.
+///
+/// ⚠️ **Devuelve `null` en vez de adivinar.** Un enlace que abre el chat
+/// equivocado es peor que no pintarlo: el pastor creería que le escribió a la
+/// persona (§12.6).
+export function celularParaWhatsApp(crudo: string | null): string | null {
+  if (!crudo) return null;
+  const digitos = crudo.replace(/\D/g, "");
+  if (digitos.length === 0) return null;
+
+  // ⚠️ **Un «+» delante significa que ya está en formato internacional, y se
+  // respeta tal cual.** Sin esta regla se perdían los de fuera de Colombia: hay
+  // una petición desde España (+34) y otra desde Estados Unidos (+1), y
+  // ponerles «57» delante abriría un chat con un número inventado mientras que
+  // descartarlos deja a dos personas sin forma de contestarles.
+  if (crudo.trim().startsWith("+")) {
+    return digitos.length >= 8 ? digitos : null;
+  }
+
+  // Sin indicativo: un celular colombiano son 10 dígitos y empieza por 3.
+  if (/^3\d{9}$/.test(digitos)) return `57${digitos}`;
+  // Escrito con el 57 pero sin el «+».
+  if (/^573\d{9}$/.test(digitos)) return digitos;
+  // Un fijo, o algo a medio escribir: no se adivina.
+  return null;
+}
+
+/// El enlace para escribirle a UNA persona desde la pantalla de Oración, sin
+/// mensaje escrito: lo que se le diga a quien acaba de pedir consejería no lo
+/// puede redactar el sistema.
+export function enlaceAUnaPersona(celular: string | null): string | null {
+  const numero = celularParaWhatsApp(celular);
+  return numero ? `https://wa.me/${numero}` : null;
+}

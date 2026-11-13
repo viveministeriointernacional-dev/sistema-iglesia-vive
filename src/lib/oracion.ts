@@ -49,6 +49,10 @@ const CAMPOS = {
     select: {
       firstName: true,
       lastName: true,
+      // Para poder llamar o escribir sin entrar a la ficha. `callPhone`
+      // primero: es el que usa el discador del CRM.
+      callPhone: true,
+      whatsappPhone: true,
       learnerProfile: { select: { id: true, phase: true } },
     },
   },
@@ -67,6 +71,8 @@ type FilaDePeticion = {
   person: {
     firstName: string;
     lastName: string | null;
+    callPhone: string | null;
+    whatsappPhone: string | null;
     learnerProfile: { id: string; phase: string } | null;
   };
 };
@@ -81,6 +87,7 @@ function aPintar(fila: FilaDePeticion): PeticionParaPintar {
     nombre: nombreCompleto(fila.person),
     reservada: fila.reserved,
     learnerId: fila.person.learnerProfile?.id ?? null,
+    celular: fila.person.callPhone ?? fila.person.whatsappPhone ?? null,
     fase: fila.person.learnerProfile
       ? (ETIQUETA_FASE[
           fila.person.learnerProfile.phase as keyof typeof ETIQUETA_FASE

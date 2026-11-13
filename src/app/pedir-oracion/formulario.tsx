@@ -27,7 +27,6 @@ export function FormularioDeOracion() {
   const [tipos, setTipos] = useState<TipoDePeticion[]>(["ORACION"]);
   const [proceso, setProceso] = useState(false);
   const [texto, setTexto] = useState("");
-  const [reservada, setReservada] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [enCurso, iniciar] = useTransition();
 
@@ -261,22 +260,26 @@ export function FormularioDeOracion() {
             className="campo mt-1.5 w-full"
           />
 
-          <label className="mt-4 flex cursor-pointer items-start gap-2.5">
-            <input
-              type="checkbox"
-              checked={reservada}
-              onChange={() => setReservada((v) => !v)}
-              className="mt-0.5"
-            />
-            <span className="min-w-0">
-              <span className="block text-[13px] leading-none font-bold text-tinta">
-                Que sea reservada
-              </span>
-              <span className="mt-1 block text-[11.5px] leading-[1.4] font-medium text-[rgba(19,28,36,.6)]">
-                No se muestra tu nombre en la lista.
-              </span>
-            </span>
-          </label>
+          {/* ⚠️ **Aquí había una casilla «Que sea reservada — No se muestra tu
+              nombre en la lista», y se quitó el 13-nov-2026.**
+
+              Esa frase era una promesa, y dejó de ser verdad: el equipo
+              necesita saber quién pide consejería o quién quiere empezar un
+              proceso, porque si no, no hay a quién llamar y la petición no
+              sirve de nada (decisión del usuario). Una casilla que promete algo
+              que el sistema no hace es peor que no tenerla (§12.6).
+
+              En su lugar va lo que SÍ es cierto, y que es casi todo lo que la
+              persona quería al marcarla: lo lee poca gente, y no queda pegado a
+              su historial para que lo vea su líder. Comprobado el 13-nov: son
+              13 cuentas (4 administradores y 9 pastores), ningún permiso
+              acumulable abre esa pantalla, y la tabla de peticiones no se lee
+              en el expediente. */}
+          <p className="mt-4 rounded-xl border border-[rgba(19,28,36,.12)] bg-[rgba(19,28,36,.03)] px-3.5 py-3 text-[11.5px] leading-[1.5] font-medium text-[rgba(19,28,36,.65)]">
+            Esto lo leen solo los pastores y los administradores de la iglesia,
+            para poder acompañarte. <strong className="font-bold text-tinta">No
+            queda en tu historial</strong> ni lo ve tu líder.
+          </p>
 
           <button
             type="button"
@@ -293,7 +296,8 @@ export function FormularioDeOracion() {
                   tipos,
                   quiereProceso: proceso,
                   texto,
-                  reservada,
+                  // Ya no se pide: ver la nota de arriba.
+                  reservada: false,
                 });
                 if (!r.ok) {
                   setError(r.mensaje);
