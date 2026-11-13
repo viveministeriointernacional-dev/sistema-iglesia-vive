@@ -322,6 +322,17 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   en 12 minutos**; `codigo_ingreso_escuela`, **Marketing**, con código de 6
   dígitos y prometiendo un botón, **rechazada**. Es la receta para arreglarla:
   recategorizar y sacar el código del cuerpo.
+- **El aviso de una petición, por WhatsApp** (13-nov): campo **«Aviso de
+  petición»** + etiqueta **`peticion-aviso`**, con la misma mecánica del
+  recordatorio (el campo **es** el mensaje, así que si no existe **no se toca la
+  etiqueta**; y la etiqueta **se quita y se vuelve a poner**). ⚠️ **El id del
+  campo se resuelve UNA vez para los 15 destinatarios**, no uno por persona.
+  ⚠️ **PENDIENTE DEL USUARIO**: la plantilla `aviso_peticion` (Spanish,
+  **Utility**, sin código de dígitos y **sin botones**) y su flujo
+  (Etiqueta añadida → `peticion-aviso`, con **«Permitir reentrada» ENCENDIDA** y
+  **«Ventana de tiempo» APAGADA**). Mientras no existan, los correos salen igual
+  y **«Actividad del día» dice que el WhatsApp no salió y por qué** — es el
+  agujero por el que se escaparon los 56 del taller.
 - **Mapa de personal ↔ HighLevel:** en la lista «Mi personal» de HighLevel, el
   código bajo cada correo es el **user id de HighLevel**. Se guarda en
   `app_user.highlevel_user_id`. Sirve para: asignar el consolidador dueño de un
@@ -459,6 +470,25 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   tipo), así que el disparo se puede reintentar; y **las direcciones van solo
   al correo**. El WhatsApp sale por **etiqueta + campo personalizado**, igual
   que el acceso al taller.
+- **Cada petición nueva avisa a los pastores y a la mesa ministerial** (13-nov):
+  correo a las cuentas activas con **`app_user.receives_prayer_alerts`**, que es
+  un interruptor en Administración y **NO un permiso de vista** (no abre ni
+  cierra pantallas). Hoy son **16**: los 9 pastores y 4 administradores activos
+  más **Jairo Esquivel, Yuli Perdomo y Ruth Bonilla** (mentores de la mesa
+  ministerial; el usuario dijo explícitamente «no son pastores» y «no quiero
+  cambiar los permisos»). ⚠️ **No se deriva del rol a propósito**: derivarlo
+  obligaría a hacerlos pastores solo para que les llegue el correo.
+  ⚠️ **Solo avisa de las de origen `PERSONA`** (las del link público), y está
+  medido: **22 de las 24 peticiones de noviembre vinieron del formulario de
+  REGISTRO**, que ya reparte consolidador y llama — avisar de todas serían ~960
+  correos al mes y nadie los abriría. El **botón «Verla en la plataforma» se
+  pinta solo a quien puede abrir Oración** (Jairo, Yuli y Ruth no la tienen).
+  **Una reservada no lleva ni el nombre ni el celular al correo**, que es el
+  sitio por donde eso se escaparía. El **WhatsApp sale solo cuando pide que
+  alguien llame** (consejería o proceso), por `urgeLlamar`, la misma función que
+  decide el asunto; llega a 15 de los 16. Libs: `aviso-de-peticion-catalogo.ts`
+  (texto y decisiones, 11 pruebas), `aviso-de-peticion.ts`,
+  `correoPeticionNueva`, `exportarAvisoDePeticion`.
 - **El tablero de Operación 72 dice cuánto se movió** (16-oct): encima de cada
   contador de «Ver solo» va un **⊕ con cuántas entraron** a esa lista en el
   periodo, y al final un **⊖ rojo con cuántas salieron** de Operación 72; los
@@ -622,6 +652,22 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   captura del 22-oct aparecía como `x-iglesia-webhook-se…`, que es el nombre de
   la **cabecera**, no de la variable) y, si está bien, el **código de respuesta
   en sus Logs**. Detalle entero en la bitácora del 23-oct.
+- **⚠️ FALTA LA PLANTILLA DEL AVISO DE PETICIÓN EN HIGHLEVEL** (13-nov): el
+  campo «Aviso de petición», la plantilla `aviso_peticion` y su flujo (§6). El
+  código está vivo y **no falla en silencio**: lo dice en «Actividad del día».
+- **«Quiero iniciar un proceso» de alguien YA REGISTRADO no abre tarjeta**
+  (13-nov): `pedirAcompanamiento` solo abre Operación 72 y reparte consolidador
+  cuando la persona es **nueva** (devuelve `abrioProceso: false` si viene con
+  `personId`). A los ya registrados les queda solo la marca en la petición. Por
+  eso el correo dice «quiere iniciar un proceso» y no afirma que alguien lo
+  atienda. El usuario todavía no ha dicho si lo quiere.
+- **⚠️ El recordatorio de Casas de Fe saluda con medio nombre** (13-nov,
+  comprobado en el código): `correo.ts:505` hace `nombreDePila(aviso.nombre)` y
+  `aviso.nombre` sale de `u."full_name"` (`recordatorio-casas-de-fe.ts:119`), así
+  que dice «Hola, Paola» a Paola Alejandra — el fallo de 7 de 17 líderes
+  (§12.6). No ha hecho daño porque **ese recordatorio no ha mandado nada
+  todavía**. Se arregla pasando `person.first_name` entero, como
+  `taller-bienvenida.ts`.
 - **En Alpha no se puede RETIRAR a nadie**: no existe la acción (solo
   `inscribir`), así que inscribir a la persona equivocada no se puede deshacer.
   Casa de Fe sí tiene `retirarDeCasaDeFe`. Apuntado el 23-oct; el usuario
@@ -990,6 +1036,36 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   si el grupo mezcla causas que el dato no separa, el rótulo nombra **el hecho**
   y el pie dice las causas **avisando que no las distingue** — partirlo en un
   grupo más solo vale si su número puede cuadrar con su propia lista.
+- **⚠️ «A QUIÉN SE LE AVISA» NO ES «QUIÉN PUEDE VER»: SON DOS LISTAS, Y
+  CONFUNDIRLAS CAMBIA PERMISOS QUE NADIE PIDIÓ.** El 13-nov el usuario pidió
+  incluir a tres mentores «en la lista de los pastores para que el sistema
+  también los notifique», y yo arranqué midiendo qué **vistas** tiene un PASTOR
+  para dárselas. Me paró: «No quiero cambiar los permisos, me parecen que están
+  bien.» Un aviso es una lista de destinatarios; una vista es una llave. La
+  solución fue una columna propia (`receives_prayer_alerts`) que **no abre ni
+  cierra ninguna pantalla** — y **no derivarla del rol**, porque la mesa
+  ministerial no coincide con el rol y derivarla habría obligado a hacer
+  pastores a tres mentores solo para que les llegara un correo.
+- **⚠️ AL CAMBIARLE EL ROL A ALGUIEN, MIRAR SUS EXCEPCIONES POR CUENTA: EL ROL
+  NUEVO NO LAS BORRA, Y LE GANAN.** Nora pasó a ADMIN y arrastró cinco
+  excepciones de cuando era CONSOLIDADOR; una tenía `bajas = false`, así que
+  **era administradora y no podía ver «Dados de baja»** mientras Nini y Laura
+  sí. Las otras cuatro no hacían nada (el rol ya le daba esas vistas), que es
+  justo lo que hace difícil ver la que sí importa. Son invisibles desde la
+  pantalla de la persona: se ven en `view_user_access`, y la diferencia se mide
+  **corriendo `vistasHabilitadas()`** con sus datos contra un perfil del mismo
+  rol sin excepciones. Dio 13 contra 14.
+- **⚠️ UN TEXTO QUE HABLA DE UNA PERSONA CUYO GÉNERO NO SABES NO DEBE
+  SUPONERLO — Y ESO NO SE VE LEYENDO EL CÓDIGO, SE VE DIBUJÁNDOLO.** El aviso
+  de una petición decía «Esto pide que alguien **la** llame, no solo que oremos
+  **por ella**» y «para que quien la acompañe pueda buscar**la**». El primer
+  caso real dibujado fue **Juan Felipe**. Y en una petición **reservada** el
+  género **no se puede saber sin destapar quién es**, así que no hay dato que
+  consultar: la salida es **escribir la frase de manera que no haga falta**
+  («que alguien llame», «que el equipo pueda buscar a la persona»). Es la misma
+  familia que el artículo de «asignen un» — el castellano mete el género en
+  sitios donde el dato no está, y las dos salieron al **imprimir las frases
+  generadas**, nunca leyendo el código.
 - **⚠️ UN ENVÍO CUYA ÚLTIMA MILLA LA HACE OTRO SISTEMA NO ESTÁ HECHO HASTA QUE
   ESE SISTEMA LO CONFIRME — Y SI NO, FALLA EN SILENCIO DURANTE SEMANAS.** El
   WhatsApp del acceso al taller llevaba **56 envíos y tres semanas sin mandar
@@ -1016,7 +1092,13 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   «Harold», «Yuli Katherine» sale «Yuli». En Colombia los dos nombres **son** el
   nombre, y llamar a alguien por la mitad se nota. El dato bueno está en
   `person.first_name`, que guarda los NOMBRES; `app_user.full_name` no se puede
-  partir. ⚠️ Y ojo con lo que hay dentro: la ficha de Alejandro Facundo tiene
+  partir. ⚠️ **Y el patrón bueno es NO llamar a `nombreDePila()`, que corta por
+  el primer espacio: se pasa `person.first_name` ENTERO**, como hace
+  `taller-bienvenida.ts`. Por eso los parámetros se llaman `nombres` y no
+  `nombre` — el nombre del parámetro dice de dónde sale el dato, y con `nombre`
+  cualquiera le mete el completo. ⚠️ **El recordatorio de Casas de Fe tiene este
+  fallo VIVO** (`correo.ts:505` sobre `full_name`): saluda «Hola, Paola» a Paola
+  Alejandra. No ha hecho daño porque ese recordatorio no ha mandado nada. ⚠️ Y ojo con lo que hay dentro: la ficha de Alejandro Facundo tiene
   «Pastores Alejandro & Cristina» ahí, así que es la pareja metida en el nombre
   otra vez (21-sep) — eso se arregla en la ficha, no en el código.
 - **⚠️ UN GUARDA QUE PARECE PRUDENTE PUEDE RECHAZAR JUSTO EL CASO QUE EXISTE
@@ -1202,6 +1284,10 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 > **Al terminar un trabajo importante**, la entrada nueva va **arriba del
 > archivo del mes** y su renglón **arriba de este índice**. Si de ese trabajo
 > sale una regla general, va **además** a §12.
+
+### `docs/bitacora/2026-11.md` — noviembre de 2026 (1 entrada)
+
+- **13-nov** · **Los pastores y la mesa ministerial reciben cada petición nueva** (`ad086fb` + `702c590`) · ⚠️ **lo que pedía NO era un permiso, y arranqué midiendo el equivocado**: «la lista de a quién avisa el sistema» y «la lista de quién ve qué» son dos cosas distintas · **22 de las 24 peticiones de noviembre vienen del REGISTRO**, que ya reparte consolidador: avisar de todas serían ~960 correos al mes, así que solo avisa de las que llegan por el link (2 al mes) · quién recibe es una columna de la cuenta y **no se deriva del rol**, porque derivarlo obligaría a hacer pastores a tres mentores solo para que les llegue un correo · ⚠️ **dibujarlo con las dos peticiones reales sacó cuatro faltas**, y la primera suponía el género («que alguien **la** llame») con Juan Felipe delante · ⚠️ **el patrón bueno es NO llamar a `nombreDePila`**: `person.first_name` ya guarda los NOMBRES · ⚠️ **y el recordatorio de Casas de Fe sí tiene ese fallo, vivo** · el WhatsApp sale solo cuando pide que alguien llame, y **el bloqueo se audita y se pinta** · ⚠️ **al cambiarle el rol a Nora quedaron cinco excepciones por cuenta que le ganan al rol**: era administradora sin ver «Dados de baja».
 
 ### `docs/bitacora/2026-10.md` — octubre de 2026 (31 entradas)
 
