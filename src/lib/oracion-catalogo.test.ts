@@ -6,6 +6,7 @@ import {
   pestanaValida,
   tiposConRespaldo,
   tiposValidos,
+  TIPO_ORACION,
   DIAS_DE_LA_SEMANA,
   DIAS_DEL_MES,
   ETIQUETA_ORIGEN,
@@ -252,4 +253,16 @@ test("el formulario ofrece tres opciones y solo dos son tipos de petición", () 
   const guardables = OPCIONES_DE_SERVICIO.filter((o) => esTipo(o.id));
   assert.deepEqual(guardables.map((o) => o.id), ["ORACION", "CONSEJERIA"]);
   assert.ok(!esTipo("PROCESO"));
+});
+
+// ⚠️ ESTA PRUEBA NACE DE UN FALLO REAL EN PRODUCCIÓN (11-nov-2026). La petición
+// que crea el formulario de registro se inserta en `crearRegistroEnTransaccion`
+// y NO pasa por `registrarPeticion`, así que no heredaba el respaldo: tres
+// peticiones de verdad quedaron con el arreglo vacío, guardadas y a la vez
+// invisibles en las pestañas. La constante existe para que los dos sitios no
+// puedan separarse.
+test("el tipo de respaldo es una constante compartida, no un literal suelto", () => {
+  assert.equal(TIPO_ORACION, "ORACION");
+  assert.ok(esTipo(TIPO_ORACION));
+  assert.deepEqual(tiposConRespaldo([]), [TIPO_ORACION]);
 });

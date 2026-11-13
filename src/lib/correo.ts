@@ -18,6 +18,10 @@ import {
   type TipoDeEnvio,
 } from "@/lib/recordatorio-casas-de-fe-catalogo";
 import { horaLegible } from "@/lib/reunion-catalogo";
+import {
+  asuntoDelAviso,
+  cuerpoDelAviso,
+} from "@/lib/aviso-de-peticion-catalogo";
 
 /// Dónde guardar la copia del correo, para poder previsualizarlo después desde
 /// la actividad del día. Es opcional y best-effort: si la tabla no existe o el
@@ -624,5 +628,51 @@ export async function correoRecordatorioCasaDeFe(datos: {
         }
       </p>
     `),
+  });
+}
+
+/// **El aviso de una petición nueva a los pastores y la mesa ministerial.**
+///
+/// El asunto y el cuerpo salen los dos del mismo catálogo
+/// (`aviso-de-peticion-catalogo.ts`) y de los mismos datos, por la lección del
+/// recordatorio: dos sitios armando la misma cosa se desincronizan sin que nada
+/// avise.
+///
+/// ⚠️ **No guarda copia en `email_sent` a propósito.** Una petición dispara 16
+/// correos idénticos; dieciséis copias por petición llenarían la previsualización
+/// de «Actividad del día» de lo mismo repetido. Lo que queda es **una** fila de
+/// auditoría con cuántos salieron y cuántos fallaron, que es el dato que sirve.
+export async function correoPeticionNueva(datos: {
+  to: string;
+  paraNombres: string;
+  nombreCompleto: string;
+  nombresDeQuienPidio: string;
+  reservada: boolean;
+  tipos: readonly string[];
+  quiereProceso: boolean;
+  texto: string;
+  enlace?: string | null;
+  celular?: string | null;
+}): Promise<ResultadoCorreo> {
+  return enviarCorreo({
+    to: datos.to,
+    subject: asuntoDelAviso({
+      nombres: datos.nombresDeQuienPidio,
+      reservada: datos.reservada,
+      tipos: datos.tipos,
+      quiereProceso: datos.quiereProceso,
+    }),
+    html: MARCO(
+      cuerpoDelAviso({
+        paraNombres: datos.paraNombres,
+        nombreCompleto: datos.nombreCompleto,
+        reservada: datos.reservada,
+        tipos: datos.tipos,
+        quiereProceso: datos.quiereProceso,
+        texto: datos.texto,
+        enlace: datos.enlace,
+        celular: datos.celular,
+      }),
+    ),
   });
 }

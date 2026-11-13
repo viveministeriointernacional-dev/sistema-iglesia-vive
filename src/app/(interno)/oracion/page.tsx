@@ -137,7 +137,7 @@ export default async function PaginaDeOracion({
             href="/oracion/qr"
             className="text-[11.5px] leading-none font-semibold text-azul-700 underline"
           >
-            Ver el enlace y el QR para compartir →
+            Ver los enlaces y QR para compartir →
           </Link>
         </p>
 

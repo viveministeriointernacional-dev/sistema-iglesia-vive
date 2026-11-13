@@ -212,6 +212,7 @@ export default async function PaginaPersonaAdmin({
                   canSeeAllGroups: persona.user.canSeeAllGroups,
                   canLeadGi: persona.user.canLeadGi,
                   coordinatesGi: persona.user.coordinatesGi,
+                  receivesPrayerAlerts: persona.user.receivesPrayerAlerts,
                 }
               : null
           }

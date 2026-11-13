@@ -14,6 +14,7 @@ import { DURACION_OPERACION_72_HORAS, ETIQUETA_LLAMADA } from "@/lib/op72";
 import { generarCodigoDeMiembro } from "@/lib/taller-catalogo";
 import type { VisitaDesdeCrm } from "@/lib/highlevel";
 import type { DatosRegistroValidados } from "@/lib/validacion-registro";
+import { TIPO_ORACION } from "@/lib/oracion-catalogo";
 
 const FORMATO_VISITA = new Intl.DateTimeFormat("es-CO", {
   day: "2-digit",
@@ -400,6 +401,13 @@ export async function crearRegistroEnTransaccion(
         // Origen REGISTRO: es lo que hace que salga en el bloque de arriba del
         // módulo de oración, el de «acaban de llegar a la iglesia».
         origin: "REGISTRO",
+        // ⚠️ **El tipo NO se puede omitir.** Esta fila se inserta aquí y no por
+        // `registrarPeticion`, así que no hereda su respaldo: sin esto cae en
+        // el `DEFAULT` de la columna, que es el arreglo vacío, y la petición
+        // queda guardada y a la vez INVISIBLE —no sale ni en «Oración» ni en
+        // «Consejería», solo en «Todo»—. Pasó con tres peticiones reales el
+        // 11-nov-2026, el día que se estrenaron los tipos.
+        types: [TIPO_ORACION],
         // Sin actor: lo escribió la persona en el formulario público, no
         // alguien del equipo.
         recordedById: null,

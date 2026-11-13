@@ -85,6 +85,9 @@ export type AccionAuditada =
   | "operacion72.regresa_tras_baja"
   | "oracion.peticion_registrada"
   | "oracion.peticion_orada"
+  /// Se avisó por correo a los pastores y la mesa ministerial de una petición
+  /// nueva. El metadato dice cuántos salieron y a quién no se le pudo mandar.
+  | "oracion.aviso_enviado"
   | "escuela.cerrada"
   | "cuestionario.enviado"
   | "cuestionario.aprobado"

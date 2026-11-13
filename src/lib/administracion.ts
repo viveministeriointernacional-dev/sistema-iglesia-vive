@@ -568,6 +568,7 @@ export async function cargarPersonaAdmin(personId: string) {
           canSeeAllGroups: true,
           canLeadGi: true,
           coordinatesGi: true,
+          receivesPrayerAlerts: true,
         },
       },
     },

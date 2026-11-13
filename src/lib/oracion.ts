@@ -1,5 +1,6 @@
 import { getPrisma } from "@/lib/prisma";
 import { auditar } from "@/lib/audit";
+import { avisarDePeticionNueva } from "@/lib/aviso-de-peticion";
 import { colaDeTelefono, nombreCompleto } from "@/lib/dominio";
 import { ETIQUETA_FASE } from "@/lib/procesos-catalogo";
 import {
@@ -231,6 +232,22 @@ export async function registrarPeticion(datos: {
       tipos: creada.types,
       quiereProceso: datos.quiereProceso ?? false,
     },
+  });
+
+  // **El aviso a los pastores y a la mesa ministerial.**
+  //
+  // ⚠️ Va DESPUÉS de guardar y de auditar, y nunca lanza: la petición ya está
+  // a salvo, así que un correo caído no se la quita a nadie. Y filtra por
+  // origen ella misma (`debeAvisar`): solo avisa de las que la persona pidió
+  // por el link, no de las 22 de cada 24 que llegan del formulario de registro.
+  await avisarDePeticionNueva({
+    peticionId: creada.id,
+    personId: datos.personId,
+    origen: datos.origen,
+    reservada: datos.reservada ?? false,
+    tipos: creada.types,
+    quiereProceso: datos.quiereProceso ?? false,
+    texto: datos.texto,
   });
 
   return { ok: true, id: creada.id };
