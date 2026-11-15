@@ -470,6 +470,13 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   tipo), así que el disparo se puede reintentar; y **las direcciones van solo
   al correo**. El WhatsApp sale por **etiqueta + campo personalizado**, igual
   que el acceso al taller.
+- **Testimonios de milagros** (15-nov): enlace público **`/milagros`** («Cuéntanos
+  tu milagro»: nombre, celular, edad y testimonio; el diseño lo hizo el usuario)
+  y la vista **«Testimonios»** (`/testimonios`, PASTOR y ADMIN de entrada), con
+  «Ya nos comunicamos», búsqueda, WhatsApp, QR y descarga a Excel. Tabla
+  `testimony`, **sin `person_id` a propósito** (no se enlaza a ninguna ficha) y
+  **sin aviso**: las dos cosas las decidió el usuario. Libs:
+  `testimonios-catalogo.ts` (con prueba) y `testimonios.ts`.
 - **Cada petición nueva avisa a los pastores y a la mesa ministerial** (13-nov):
   correo a las cuentas activas con **`app_user.receives_prayer_alerts`**, que es
   un interruptor en Administración y **NO un permiso de vista** (no abre ni
@@ -1265,6 +1272,11 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   como texto crudo, y su entrada en el catálogo de `audit.ts` o no compila.
 - **Todo webhook público nuevo va en `RUTAS_PUBLICAS`** o el middleware lo
   redirige con 307.
+- **⚠️ `npm run cf:build` puede fallar EN ESTE CONTENEDOR por las fuentes de
+  Google** (`Can't resolve '@vercel/turbopack-next/internal/font/google/font'`)
+  **aunque el código esté bien**: el 15-nov la rama sin cambios fallaba igual.
+  Antes de culpar al código, `git stash` y compilar. Para verificar: `next build
+  --webpack` con `NEXT_FONT_GOOGLE_MOCKED_RESPONSES` (bitácora del 15-nov).
 - En este entorno: `pdftoppm`, `pypdf` y `pdfminer` fallan (el `cryptography` de
   Debian está roto); sirve **`pypdfium2` + `pillow`**, y `pip install --upgrade
   cffi` lo arregla.
@@ -1285,8 +1297,9 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 > archivo del mes** y su renglón **arriba de este índice**. Si de ese trabajo
 > sale una regla general, va **además** a §12.
 
-### `docs/bitacora/2026-11.md` — noviembre de 2026 (1 entrada)
+### `docs/bitacora/2026-11.md` — noviembre de 2026 (2 entradas)
 
+- **15-nov** · **«Cuéntanos tu milagro» pasa a la plataforma**: `/milagros` (pública, el diseño del usuario tal cual) y la vista **«Testimonios»** (PASTOR y ADMIN de entrada) · ⚠️ **la clave «Equipo» de su página original no protegía nada**: la lista se leía con la llave pública de la página · no se enlaza a ninguna ficha ni avisa a nadie (decisión del usuario) · la descarga a Excel lleva **su propio guardia** y el CSV **neutraliza fórmulas** · ⚠️ **`cf:build` local falla por las fuentes de Google también SIN el cambio**: se verificó con `next build --webpack` y fuentes simuladas.
 - **13-nov** · **Los pastores y la mesa ministerial reciben cada petición nueva** (`ad086fb` + `702c590`) · ⚠️ **lo que pedía NO era un permiso, y arranqué midiendo el equivocado**: «la lista de a quién avisa el sistema» y «la lista de quién ve qué» son dos cosas distintas · **22 de las 24 peticiones de noviembre vienen del REGISTRO**, que ya reparte consolidador: avisar de todas serían ~960 correos al mes, así que solo avisa de las que llegan por el link (2 al mes) · quién recibe es una columna de la cuenta y **no se deriva del rol**, porque derivarlo obligaría a hacer pastores a tres mentores solo para que les llegue un correo · ⚠️ **dibujarlo con las dos peticiones reales sacó cuatro faltas**, y la primera suponía el género («que alguien **la** llame») con Juan Felipe delante · ⚠️ **el patrón bueno es NO llamar a `nombreDePila`**: `person.first_name` ya guarda los NOMBRES · ⚠️ **y el recordatorio de Casas de Fe sí tiene ese fallo, vivo** · el WhatsApp sale solo cuando pide que alguien llame, y **el bloqueo se audita y se pinta** · ⚠️ **al cambiarle el rol a Nora quedaron cinco excepciones por cuenta que le ganan al rol**: era administradora sin ver «Dados de baja».
 
 ### `docs/bitacora/2026-10.md` — octubre de 2026 (31 entradas)

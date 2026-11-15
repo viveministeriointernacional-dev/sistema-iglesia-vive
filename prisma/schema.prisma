@@ -167,6 +167,7 @@ model AppUser {
   cuestionarioRevisiones    LeaderQuizReview[]          @relation("RevisoCuestionario")
   peticionesRegistradas     PrayerRequest[]             @relation("PeticionRegistrada")
   peticionesOradas          PrayerRequest[]             @relation("PeticionOrada")
+  testimoniosContactados    Testimony[]                 @relation("TestimonioContactado")
   recordatoriosDeCasa       FaithHouseReminder[]
 
   @@index([role, active])
@@ -2143,4 +2144,38 @@ model GroupAttendance {
   @@unique([meetingId, learnerId])
   @@index([learnerId])
   @@map("group_attendance")
+}
+
+/// **Un testimonio de milagro**, de los que llegan por el enlace público
+/// `/milagros` («Cuéntanos tu milagro»).
+///
+/// ⚠️ **No se enlaza a ninguna ficha, y es decisión del usuario (15-nov-2026):**
+/// se guarda tal cual lo escribieron —nombre, celular, edad y el testimonio— sin
+/// buscar a la persona en la base. Por eso no hay `person_id`: quien lo cuenta
+/// puede no estar registrado, y crear una ficha por cada testimonio llenaría la
+/// base de personas sin proceso.
+model Testimony {
+  id        String   @id @default(uuid())
+  name      String
+  phone     String
+  age       Int
+  /// Lo que escribió, tal cual. No se resume ni se corrige.
+  text      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  /// Cuándo alguien del equipo se comunicó con la persona. **Nulo = falta
+  /// llamarla**, que es lo que la página pública promete («nuestro equipo se
+  /// contactará contigo»).
+  contactedAt   DateTime? @map("contacted_at")
+  /// ⚠️ **Puede quedar nulo con `contactedAt` puesto, y es a propósito**: si se
+  /// borra la cuenta, el `ON DELETE SET NULL` lo vacía. Por eso NO hay un CHECK
+  /// que exija los dos juntos — con él la base se negaría a borrar la cuenta
+  /// (la trampa de `prayer_request`, 13-oct, §12.3).
+  contactedById String?   @map("contacted_by_id")
+
+  contactedBy AppUser? @relation("TestimonioContactado", fields: [contactedById], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([contactedAt])
+  @@map("testimony")
 }

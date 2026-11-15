@@ -7,6 +7,9 @@ const RUTAS_PUBLICAS = [
   // Pedir oración: se llega por un QR pegado en la iglesia o por WhatsApp, sin
   // cuenta. Sin este renglón el middleware la redirige a /ingresar con un 307.
   "/pedir-oracion",
+  // «Cuéntanos tu milagro»: se comparte por enlace y QR, y quien lo llena no
+  // tiene cuenta. Sin este renglón el middleware lo manda a /ingresar (307).
+  "/milagros",
   "/ingresar",
   "/recuperar",
   "/nueva-clave",

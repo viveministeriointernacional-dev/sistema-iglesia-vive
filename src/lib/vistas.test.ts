@@ -49,6 +49,10 @@ function perfil(role: Role, extra: Partial<PerfilParaVistas> = {}): PerfilParaVi
 /// desde Administración, no por su rol. Si alguien la añade a PASTOR aquí,
 /// estará repartiendo las peticiones de toda la iglesia entre los siete
 /// pastores — que es justo lo que el usuario descartó al elegir.
+///
+/// ⚠️ **«testimonios» es la tercera, y tampoco reconstruye nada**: el módulo
+/// nació el 15-nov-2026, y el usuario eligió que lo vieran de entrada los
+/// pastores y la administración.
 const LO_QUE_VEIA_CADA_ROL: Record<Role, VistaId[]> = {
   [Role.APRENDIZ]: ["mi-proceso"],
   [Role.CONSOLIDADOR]: ["operacion-72", "registro-interno", "eventos"],
@@ -62,6 +66,7 @@ const LO_QUE_VEIA_CADA_ROL: Record<Role, VistaId[]> = {
     "escuela",
     "eventos",
     "procesos",
+    "testimonios",
   ],
   [Role.ADMIN]: [
     "mi-red",
@@ -78,6 +83,7 @@ const LO_QUE_VEIA_CADA_ROL: Record<Role, VistaId[]> = {
     "asistentes",
     "bajas",
     "oracion",
+    "testimonios",
   ],
 };
 
