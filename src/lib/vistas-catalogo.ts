@@ -54,7 +54,8 @@ export type VistaId =
   | "llamadas"
   | "asistentes"
   | "bajas"
-  | "oracion";
+  | "oracion"
+  | "testimonios";
 
 export type DefinicionDeVista = {
   id: VistaId;
@@ -117,6 +118,15 @@ export const VISTAS: readonly DefinicionDeVista[] = [
     alcance: "todo",
     alcanceDetalle:
       "Todas las peticiones de oración de la iglesia, con quién la pidió y sobre qué",
+    grupo: "menu",
+  },
+  {
+    id: "testimonios",
+    nombre: "Testimonios",
+    ruta: "/testimonios",
+    alcance: "todo",
+    alcanceDetalle:
+      "Los milagros que la gente cuenta desde el enlace público, con nombre y celular",
     grupo: "menu",
   },
   {
@@ -247,6 +257,10 @@ export const POR_DEFECTO_SEGUN_ROL: Record<VistaId, readonly Role[]> = {
   // Esta vista NO reconstruye nada: el módulo no existía antes, así que este
   // renglón es una decisión, no una foto — como pasó con GI.
   oracion: [Role.ADMIN],
+  // Testimonios de milagros (15-nov-2026). Tampoco reconstruye nada: el
+  // módulo no existía. Pastores y administradores de entrada, por decisión del
+  // usuario; a cualquier otra persona se le enciende desde Administración.
+  testimonios: [Role.PASTOR, Role.ADMIN],
   escuela: [Role.MENTOR, Role.PASTOR, Role.ADMIN],
   eventos: [
     Role.CONSOLIDADOR,

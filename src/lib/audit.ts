@@ -88,6 +88,10 @@ export type AccionAuditada =
   /// Se avisó por correo a los pastores y la mesa ministerial de una petición
   /// nueva. El metadato dice cuántos salieron y a quién no se le pudo mandar.
   | "oracion.aviso_enviado"
+  // Testimonios de milagros (15-nov-2026): lo que llega por el enlace público
+  // /milagros, y quién se comunicó con la persona.
+  | "testimonio.recibido"
+  | "testimonio.contactado"
   | "escuela.cerrada"
   | "cuestionario.enviado"
   | "cuestionario.aprobado"

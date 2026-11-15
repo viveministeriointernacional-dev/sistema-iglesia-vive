@@ -1127,6 +1127,17 @@ export async function cargarActividad(
             ? "La persona pidió que no se sepa quién la pidió"
             : null;
         break;
+      case "testimonio.recibido":
+        // Sin actor: lo escribió la persona desde el enlace público /milagros.
+        // El nombre sale del METADATO: el testimonio no cuelga de ninguna ficha,
+        // así que el mapa de nombres no lo conoce.
+        tipo = "eventos"; etiqueta = "TESTIMONIO"; tono = "verde";
+        frase = [b(texto(m.nombre) ?? "Alguien"), t(" contó su milagro desde el enlace")];
+        break;
+      case "testimonio.contactado":
+        tipo = "eventos"; etiqueta = "TESTIMONIO"; tono = "verde";
+        frase = [A(), t(" marcó como contactado el testimonio de "), b(texto(m.nombre) ?? "alguien")];
+        break;
       case "oracion.peticion_orada":
         tipo = "eventos"; etiqueta = "ORACIÓN"; tono = "verde";
         frase = [A(), t(" marcó una petición como orada")];

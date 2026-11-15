@@ -58,3 +58,8 @@ export function enlaceDelTaller(origen: string, qrCode: string): string {
 export function enlaceDePedirOracion(origen: string): string {
   return `${origen.replace(/\/+$/, "")}/pedir-oracion`;
 }
+
+/// El enlace público de «Cuéntanos tu milagro».
+export function enlaceDeMilagros(origen: string): string {
+  return `${origen.replace(/\/+$/, "")}/milagros`;
+}
