@@ -137,6 +137,105 @@ async function enviarPorResend(datos: {
   }
 }
 
+/// **Manda VARIOS correos en UNA sola petición a Resend.**
+///
+/// ⚠️ **Esto existe por un fallo real de producción, no por elegancia.** El
+/// 13-nov-2026 el primer aviso de petición de verdad salió a 16 personas con
+/// un `Promise.all` de 16 `fetch` simultáneos, y **Resend rechazó 6 con un
+/// error 429**: «You can only make 10 requests per second». Seis pastores no
+/// se enteraron de una consejería, y desde fuera no se vio nada — solo quedó
+/// escrito en la auditoría, que es lo único que lo delató.
+///
+/// El endpoint de lote admite hasta 100 correos y **cuenta como UNA sola
+/// petición** contra el límite, así que el problema desaparece de raíz en vez
+/// de aliviarse con pausas.
+///
+/// ⚠️ **Devuelve un resultado por correo, EN EL MISMO ORDEN que entraron, y
+/// también por los que no llevan dirección** — a esos se les pone su propio
+/// motivo aunque no viajen en la petición. Quien lo use casa los resultados por
+/// índice, así que devolver solo los del lote correría los índices y haría
+/// decir que le llegó a quien ni se intentó. La prueba que fija este contrato
+/// está en `aviso-de-peticion-catalogo.test.ts` («cada resultado del lote
+/// vuelve a SU destinatario»).
+async function enviarLotePorResend(
+  correos: readonly { to: string; subject: string; html: string }[],
+): Promise<ResultadoCorreo[]> {
+  if (correos.length === 0) return [];
+
+  const apiKey = await variableDeEntorno("RESEND_API_KEY");
+  const from = await variableDeEntorno("EMAIL_FROM");
+  if (!apiKey || !from) {
+    const faltan = [apiKey ? null : "RESEND_API_KEY", from ? null : "EMAIL_FROM"]
+      .filter(Boolean)
+      .join(" y ");
+    return correos.map(() => ({
+      enviado: false as const,
+      motivo: `el sistema de correo no está configurado (falta ${faltan} en el Worker).`,
+    }));
+  }
+
+  // El tope del endpoint es 100. Hoy son 16, pero la lista la decide una
+  // columna de la base y puede crecer sin que nadie se acuerde de esto.
+  const TOPE = 100;
+  const salida: ResultadoCorreo[] = [];
+
+  for (let i = 0; i < correos.length; i += TOPE) {
+    const tanda = correos.slice(i, i + TOPE);
+    const vacios = tanda.map((c) => !c.to);
+
+    const conDireccion = tanda.filter((c) => c.to);
+    let resultado: ResultadoCorreo = { enviado: true };
+
+    if (conDireccion.length > 0) {
+      try {
+        const respuesta = await fetch("https://api.resend.com/emails/batch", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(
+            conDireccion.map((c) => ({
+              from,
+              to: c.to,
+              subject: c.subject,
+              html: c.html,
+            })),
+          ),
+        });
+        if (!respuesta.ok) {
+          const detalle = await respuesta.text().catch(() => "");
+          console.error(
+            "Resend rechazó el lote",
+            respuesta.status,
+            detalle.slice(0, 300),
+          );
+          resultado = {
+            enviado: false,
+            motivo: `Resend rechazó el envío (error ${respuesta.status}): ${motivoDeResend(detalle)}`,
+          };
+        }
+      } catch (error) {
+        console.error("No se pudo enviar el lote de correos", error);
+        resultado = {
+          enviado: false,
+          motivo: "no se pudo conectar con el servicio de correo.",
+        };
+      }
+    }
+
+    for (const sinDireccion of vacios) {
+      salida.push(
+        sinDireccion
+          ? { enviado: false, motivo: "no hay una dirección de correo a la cual enviarlo." }
+          : resultado,
+      );
+    }
+  }
+
+  return salida;
+}
+
 /// Saca el mensaje de la respuesta de error de Resend (viene como JSON con
 /// `message`). Si no se puede leer, se devuelve el texto crudo recortado.
 function motivoDeResend(cuerpo: string): string {
@@ -638,41 +737,57 @@ export async function correoRecordatorioCasaDeFe(datos: {
 /// recordatorio: dos sitios armando la misma cosa se desincronizan sin que nada
 /// avise.
 ///
+/// ⚠️ **Va EN LOTE, una sola petición a Resend para los 16.** Antes mandaba uno
+/// por persona en paralelo y el primer aviso real (13-nov-2026) perdió **6 de
+/// 16 con error 429**: «You can only make 10 requests per second». Seis
+/// pastores no se enteraron de una consejería.
+///
 /// ⚠️ **No guarda copia en `email_sent` a propósito.** Una petición dispara 16
 /// correos idénticos; dieciséis copias por petición llenarían la previsualización
 /// de «Actividad del día» de lo mismo repetido. Lo que queda es **una** fila de
 /// auditoría con cuántos salieron y cuántos fallaron, que es el dato que sirve.
-export async function correoPeticionNueva(datos: {
-  to: string;
-  paraNombres: string;
-  nombreCompleto: string;
-  nombresDeQuienPidio: string;
-  reservada: boolean;
-  tipos: readonly string[];
-  quiereProceso: boolean;
-  texto: string;
-  enlace?: string | null;
-  celular?: string | null;
-}): Promise<ResultadoCorreo> {
-  return enviarCorreo({
-    to: datos.to,
-    subject: asuntoDelAviso({
-      nombres: datos.nombresDeQuienPidio,
-      reservada: datos.reservada,
-      tipos: datos.tipos,
-      quiereProceso: datos.quiereProceso,
-    }),
-    html: MARCO(
-      cuerpoDelAviso({
-        paraNombres: datos.paraNombres,
-        nombreCompleto: datos.nombreCompleto,
-        reservada: datos.reservada,
-        tipos: datos.tipos,
-        quiereProceso: datos.quiereProceso,
-        texto: datos.texto,
-        enlace: datos.enlace,
-        celular: datos.celular,
-      }),
-    ),
+///
+/// Devuelve **un resultado por destinatario, en el mismo orden**.
+export async function correosDePeticionNueva(
+  destinatarios: readonly {
+    to: string;
+    paraNombres: string;
+    enlace?: string | null;
+  }[],
+  peticion: {
+    nombreCompleto: string;
+    nombresDeQuienPidio: string;
+    reservada: boolean;
+    tipos: readonly string[];
+    quiereProceso: boolean;
+    texto: string;
+    celular?: string | null;
+  },
+): Promise<ResultadoCorreo[]> {
+  // El asunto es el mismo para todos: no depende de quién lo recibe.
+  const subject = asuntoDelAviso({
+    nombres: peticion.nombresDeQuienPidio,
+    reservada: peticion.reservada,
+    tipos: peticion.tipos,
+    quiereProceso: peticion.quiereProceso,
   });
+
+  return enviarLotePorResend(
+    destinatarios.map((destino) => ({
+      to: destino.to,
+      subject,
+      html: MARCO(
+        cuerpoDelAviso({
+          paraNombres: destino.paraNombres,
+          nombreCompleto: peticion.nombreCompleto,
+          reservada: peticion.reservada,
+          tipos: peticion.tipos,
+          quiereProceso: peticion.quiereProceso,
+          texto: peticion.texto,
+          enlace: destino.enlace,
+          celular: peticion.celular,
+        }),
+      ),
+    })),
+  );
 }

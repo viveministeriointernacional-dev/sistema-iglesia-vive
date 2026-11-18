@@ -8,6 +8,7 @@ import {
   resumenDeLoQuePidio,
   urgeLlamar,
   variableDeWhatsAppDeLaPeticion,
+  repartirEnvios,
 } from "./aviso-de-peticion-catalogo";
 
 test("solo avisa de las que pidió la persona por el link", () => {
@@ -228,4 +229,45 @@ test("urgeLlamar es la MISMA regla para el asunto y para el WhatsApp", () => {
       `${asunto} no concuerda con urgeLlamar`,
     );
   }
+});
+
+test("cada resultado del lote vuelve a SU destinatario", () => {
+  const destinatarios = [
+    { nombre: "Luis Alberto", to: "a@x.test" },
+    // La cuenta compartida «Administración Iglesia Vive» no tiene correo.
+    { nombre: "Administración", to: "" },
+    { nombre: "Paola Alejandra", to: "c@x.test" },
+  ];
+  // ⚠️ **El contrato que hay que respetar:** `enviarLotePorResend` devuelve
+  // **un resultado por destinatario y en el mismo orden**, también por los que
+  // no tienen dirección —a esos les pone su propio motivo— aunque no entren en
+  // la petición a Resend. Si algún día devolviera solo los del lote, los
+  // índices se correrían y el resultado del tercero caería sobre el segundo:
+  // diríamos que le llegó a quien ni se intentó. Esta prueba fija ese contrato.
+  const envios = [
+    { enviado: true },
+    { enviado: false, motivo: "no hay una dirección de correo a la cual enviarlo." },
+    { enviado: false, motivo: "Resend rechazó el envío (error 429)" },
+  ];
+  const r = repartirEnvios(destinatarios, envios);
+  assert.equal(r.sinCorreo, 1, "quien no tiene correo no cuenta como fallo");
+  assert.equal(r.enviados, 1);
+  assert.deepEqual(r.fallos, [
+    { nombre: "Paola Alejandra", motivo: "Resend rechazó el envío (error 429)" },
+  ]);
+});
+
+test("si el lote devuelve menos resultados que destinatarios, no se da por enviado", () => {
+  // La trampa silenciosa: una lista corta haría `envios[i]` undefined, y un
+  // `?.enviado` optimista contaría esos como salidos.
+  const r = repartirEnvios(
+    [
+      { nombre: "Uno", to: "1@x.test" },
+      { nombre: "Dos", to: "2@x.test" },
+    ],
+    [{ enviado: true }],
+  );
+  assert.equal(r.enviados, 1);
+  assert.equal(r.fallos.length, 1);
+  assert.equal(r.fallos[0]?.nombre, "Dos");
 });

@@ -215,3 +215,41 @@ export function cuerpoDelAviso(datos: {
       </p>
     </div>`;
 }
+
+/// **Devuelve cada resultado del lote a su destinatario.**
+///
+/// ⚠️ **Esto se separa para poder probarlo, y no es paranoia.** El envío pasó a
+/// ir en lote porque el 13-nov-2026 seis de dieciséis correos murieron con un
+/// 429 de Resend; el lote lo arregla, pero introduce un riesgo nuevo: la
+/// respuesta viene como una lista y **casar mal los índices haría decir que le
+/// llegó a quien no le llegó**. Quien no tiene correo no entra en el lote, así
+/// que su hueco hay que respetarlo contando sobre la lista original.
+export function repartirEnvios<T extends { nombre: string; to: string }>(
+  destinatarios: readonly T[],
+  envios: readonly { enviado: boolean; motivo?: string }[],
+): {
+  enviados: number;
+  sinCorreo: number;
+  fallos: { nombre: string; motivo: string }[];
+} {
+  let enviados = 0;
+  let sinCorreo = 0;
+  const fallos: { nombre: string; motivo: string }[] = [];
+
+  destinatarios.forEach((destino, i) => {
+    if (!destino.to) {
+      sinCorreo += 1;
+      return;
+    }
+    const envio = envios[i];
+    if (envio?.enviado) enviados += 1;
+    else {
+      fallos.push({
+        nombre: destino.nombre,
+        motivo: envio?.motivo ?? "el servicio de correo no devolvió nada para esta persona",
+      });
+    }
+  });
+
+  return { enviados, sinCorreo, fallos };
+}

@@ -1,11 +1,12 @@
 import { getPrisma } from "@/lib/prisma";
 import { auditar } from "@/lib/audit";
 import { nombreCompleto as armarNombre } from "@/lib/dominio";
-import { correoPeticionNueva, URL_SISTEMA } from "@/lib/correo";
+import { correosDePeticionNueva, URL_SISTEMA } from "@/lib/correo";
 import { vistaHabilitada } from "@/lib/vistas";
 import type { OrigenDeLaPeticion } from "@/lib/oracion-catalogo";
 import {
   debeAvisar,
+  repartirEnvios,
   urgeLlamar,
   variableDeWhatsAppDeLaPeticion,
 } from "@/lib/aviso-de-peticion-catalogo";
@@ -111,58 +112,53 @@ export async function avisarDePeticionNueva(datos: {
     const nombreDeQuienPidio = armarNombre(persona);
     const celular = persona.callPhone ?? persona.whatsappPhone ?? null;
 
-    const resultados = await Promise.all(
-      destinatarios.map(async (destinatario) => {
-        const nombre = destinatario.fullName;
-        if (!destinatario.email) return { nombre, sinCorreo: true as const };
+    // ⚠️ **Quién recibe el botón se decide ANTES de mandar nada**, porque el
+    // lote va de una vez y cada cuerpo lleva su enlace o no lo lleva.
+    //
+    // El botón solo se pinta a quien de verdad puede abrir Oración. Jairo, Ruth
+    // y Yuli reciben el aviso y NO tienen esa vista (el usuario decidió el
+    // 12-nov no tocarles los permisos). Un enlace que los mandaría a
+    // «sin permiso» es peor que no ponerlo (§12.6), y el correo ya lleva dentro
+    // todo lo que hace falta para orar por la petición.
+    const preparados = destinatarios.map((destinatario) => {
+      const puedeAbrir = vistaHabilitada(
+        "oracion",
+        {
+          role: destinatario.role,
+          canLeadAlpha: destinatario.canLeadAlpha,
+          canLeadFaithHouse: destinatario.canLeadFaithHouse,
+          canMentor: destinatario.canMentor,
+          coordinaConsolidacion: destinatario.coordinatesConsolidation,
+          veTodosLosGrupos: destinatario.canSeeAllGroups,
+          llevaGi: destinatario.canLeadGi,
+          coordinaGi: destinatario.coordinatesGi,
+        },
+        { porRol, porCuenta: destinatario.vistasPropias },
+      );
+      return {
+        nombre: destinatario.fullName,
+        to: destinatario.email ?? "",
+        // `person.first_name` entero, que es lo que guarda los NOMBRES. Si la
+        // cuenta no tiene ficha enganchada queda el nombre de la cuenta: no es
+        // ideal, pero es mejor que un saludo vacío.
+        paraNombres: destinatario.person?.firstName ?? destinatario.fullName,
+        enlace: puedeAbrir ? `${URL_SISTEMA}/oracion` : null,
+      };
+    });
 
-        // ⚠️ **El botón solo se pinta a quien puede abrir Oración.** Jairo, Ruth
-        // y Yuli reciben el aviso y NO tienen esa vista (el usuario decidió el
-        // 12-nov no tocarles los permisos). Un enlace que los mandaría a
-        // «sin permiso» es peor que no ponerlo (§12.6), y el correo ya lleva
-        // dentro todo lo que hace falta para orar por la petición.
-        const puedeAbrir = vistaHabilitada(
-          "oracion",
-          {
-            role: destinatario.role,
-            canLeadAlpha: destinatario.canLeadAlpha,
-            canLeadFaithHouse: destinatario.canLeadFaithHouse,
-            canMentor: destinatario.canMentor,
-            coordinaConsolidacion: destinatario.coordinatesConsolidation,
-            veTodosLosGrupos: destinatario.canSeeAllGroups,
-            llevaGi: destinatario.canLeadGi,
-            coordinaGi: destinatario.coordinatesGi,
-          },
-          { porRol, porCuenta: destinatario.vistasPropias },
-        );
+    // ⚠️ **UNA sola petición a Resend para los 16**, no 16 en paralelo. Ver
+    // `correosDePeticionNueva`: así fue como se perdieron 6 de 16 el 13-nov.
+    const envios = await correosDePeticionNueva(preparados, {
+      nombreCompleto: nombreDeQuienPidio,
+      nombresDeQuienPidio: persona.firstName,
+      reservada: datos.reservada,
+      tipos: datos.tipos,
+      quiereProceso: datos.quiereProceso,
+      texto: datos.texto,
+      celular,
+    });
 
-        const envio = await correoPeticionNueva({
-          to: destinatario.email,
-          // `person.first_name` entero, que es lo que guarda los NOMBRES. Si la
-          // cuenta no tiene ficha enganchada queda el nombre de la cuenta: no es
-          // ideal, pero es mejor que un saludo vacío.
-          paraNombres: destinatario.person?.firstName ?? nombre,
-          nombreCompleto: nombreDeQuienPidio,
-          nombresDeQuienPidio: persona.firstName,
-          reservada: datos.reservada,
-          tipos: datos.tipos,
-          quiereProceso: datos.quiereProceso,
-          texto: datos.texto,
-          enlace: puedeAbrir ? `${URL_SISTEMA}/oracion` : null,
-          celular,
-        });
-
-        return envio.enviado
-          ? { nombre, ok: true as const }
-          : { nombre, motivo: envio.motivo };
-      }),
-    );
-
-    const enviados = resultados.filter((r) => "ok" in r).length;
-    const sinCorreo = resultados.filter((r) => "sinCorreo" in r).length;
-    const fallos = resultados
-      .filter((r): r is { nombre: string; motivo: string } => "motivo" in r)
-      .map((r) => ({ nombre: r.nombre, motivo: r.motivo }));
+    const { enviados, sinCorreo, fallos } = repartirEnvios(preparados, envios);
 
     // --- El WhatsApp, **solo cuando pide que alguien llame.**
     //
