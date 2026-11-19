@@ -293,8 +293,21 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
     por el que se escaparon los 56 WhatsApp del taller.
   - **No activar «Enable Marketing Messages»**: reclasifica el envío como
     marketing y la plantilla está aprobada como Utility.
-- **⚠️ EL WHATSAPP DEL ACCESO AL TALLER NUNCA HA FUNCIONADO, pese a lo que dice
-  la bitácora del 2-oct.** Su plantilla, `codigo_ingreso_escuela`, está
+- **✅ CORREGIDO EL 19-NOV: EL RECHAZO DEL TALLER YA NO EXISTE.** Leído por la
+  API de Meta con el token nuevo: la cuenta tiene **76 plantillas y las 76
+  están APROBADAS**. `codigo_ingreso_escuela` **ya no existe**; en su lugar hay
+  **`acceso_taller_casa_de_fe` · APPROVED · UTILITY**, hecha con la receta que
+  se dedujo el 22-oct (sin código de dígitos, el enlace como variable `{{2}}`).
+  Desde el 22-oct el sistema lleva **13 `casa_de_fe.acceso_enviado`**.
+  ⚠️ **Lo que esto NO prueba:** que esos 13 WhatsApp llegaran. La plantilla
+  está aprobada, pero **qué plantilla usa el flujo de la etiqueta
+  `casa-de-fe-taller` no se puede leer por la API** —los flujos de HighLevel no
+  se exponen—, así que sigue siendo la última milla ajena de siempre. Lo que sí
+  está descartado es la causa que llevábamos un mes dando por buena.
+  **Lo de abajo queda como historia de lo que pasó entre el 2 y el 21-oct**, que
+  es donde está la lección:
+- **⚠️ EL WHATSAPP DEL ACCESO AL TALLER NO FUNCIONÓ DURANTE TRES SEMANAS** (del
+  2 al 21-oct). Su plantilla de entonces, `codigo_ingreso_escuela`, estaba
   **Rechazada** por Meta — y entretanto el sistema registró
   **`casa_de_fe.acceso_enviado` 56 veces** entre el 2 y el 21-oct: escribió los
   campos, movió la etiqueta, y Meta no mandó nada. Solo salieron los correos.
@@ -327,17 +340,43 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   recordatorio (el campo **es** el mensaje, así que si no existe **no se toca la
   etiqueta**; y la etiqueta **se quita y se vuelve a poner**). ⚠️ **El id del
   campo se resuelve UNA vez para los 15 destinatarios**, no uno por persona.
-  ⚠️ **PENDIENTE DEL USUARIO**: la plantilla `aviso_peticion` (Spanish,
-  **Utility**, sin código de dígitos y **sin botones**) y su flujo
-  (Etiqueta añadida → `peticion-aviso`, con **«Permitir reentrada» ENCENDIDA** y
-  **«Ventana de tiempo» APAGADA**). Mientras no existan, los correos salen igual
-  y **«Actividad del día» dice que el WhatsApp no salió y por qué** — es el
-  agujero por el que se escaparon los 56 del taller.
+  **La plantilla `aviso_peticion` la creé YO por la API de Meta el 19-nov**
+  (id `3363707660685411`, Utility, idioma `es`), copiando la forma exacta de
+  `acceso_taller_casa_de_fe`, que ya estaba aprobada en esa cuenta.
+  ⚠️ **PENDIENTE DEL USUARIO: el FLUJO, que la API no alcanza** — activador
+  Etiqueta añadida → `peticion-aviso`, acción WhatsApp con `aviso_peticion`,
+  **mapear las variables en HighLevel** (`{{1}}` → Contact First Name, `{{2}}` →
+  Aviso de peticion), **«Permitir reentrada» ENCENDIDA** y **«Ventana de
+  tiempo» APAGADA** (decisión del usuario, 19-nov: el aviso sale en el instante
+  en que se pide, sea la hora que sea). Mientras el flujo no exista, los correos
+  salen igual y **«Actividad del día» dice que el WhatsApp no salió y por qué**.
 - **Mapa de personal ↔ HighLevel:** en la lista «Mi personal» de HighLevel, el
   código bajo cada correo es el **user id de HighLevel**. Se guarda en
   `app_user.highlevel_user_id`. Sirve para: asignar el consolidador dueño de un
   contacto, y mapear quién hizo cada llamada. Sin ese id, la persona **no aparece**
   en el tablero de llamadas.
+- **⚠️ LAS PLANTILLAS DE WHATSAPP NO SE TOCAN POR LA API DE HIGHLEVEL: SE TOCAN
+  POR LA DE META.** Comprobado el 13-nov: en el catálogo oficial de la API de
+  HighLevel (204 KB) **no hay ni una mención de WhatsApp**, y
+  `/locations/{id}/templates` es de correo y SMS (devuelve vacío con 68
+  plantillas en la cuenta). Lo que sí funciona es **Meta**, desde el 19-nov:
+  - **WABA de la iglesia: `1174921127750383`.** ⚠️ **NO es el id que sale en la
+    URL de Business Manager** (`selected_asset_id=1725287195428748`, que es el
+    del número y da «This API is not supported for this WhatsApp Business
+    Account»). El bueno sale de
+    `GET /{business-id}/owned_whatsapp_business_accounts`.
+  - **business_id `510555821658469`** · app propia **`Iglesia Vive API`**
+    (`1595709018907873`) · usuario del sistema **`Claude`**
+    (`122096989161559437`), con permiso **solo `whatsapp_business_management``**.
+  - El token vive como **secreto de red del entorno** (`graph.facebook.com`), así
+    que **el proxy lo inyecta y yo nunca lo veo**. `GET /me` sirve para saber si
+    está puesto.
+  - ⚠️ **Para crear un usuario del sistema hace falta que el portfolio tenga una
+    app propia**, y Meta lo dice en un globo sobre el botón desactivado. Y
+    asignar la app como «activo» **no basta**: hay que darle el **rol** dentro de
+    la app, o el paso de permisos sale «No hay permisos disponibles».
+  - ⚠️ **LeadConnector figura como SOCIO con acceso total sobre la WABA**, pero
+    **la dueña es la iglesia** — por eso este camino funciona.
 - **La API de HighLevel SÍ se puede usar** desde este entorno (esto antes decía lo
   contrario y era falso). `services.leadconnectorhq.com` responde con `curl`;
   `urllib` de Python recibe 403 del proxy, así que usar `curl`. El token PIT vive
@@ -659,9 +698,9 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   captura del 22-oct aparecía como `x-iglesia-webhook-se…`, que es el nombre de
   la **cabecera**, no de la variable) y, si está bien, el **código de respuesta
   en sus Logs**. Detalle entero en la bitácora del 23-oct.
-- **⚠️ FALTA LA PLANTILLA DEL AVISO DE PETICIÓN EN HIGHLEVEL** (13-nov): el
-  campo «Aviso de petición», la plantilla `aviso_peticion` y su flujo (§6). El
-  código está vivo y **no falla en silencio**: lo dice en «Actividad del día».
+- **⚠️ FALTA EL FLUJO DEL AVISO DE PETICIÓN EN HIGHLEVEL** (19-nov): el campo
+  y la plantilla **ya están** (los creé yo por API); lo que falta es el flujo,
+  que la API no alcanza (§6). El código está vivo y **no falla en silencio**.
 - **«Quiero iniciar un proceso» de alguien YA REGISTRADO no abre tarjeta**
   (13-nov): `pedirAcompanamiento` solo abre Operación 72 y reparte consolidador
   cuando la persona es **nueva** (devuelve `abrioProceso: false` si viene con
@@ -978,6 +1017,19 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 - El truco que funciona: **un par de rutas hermanas que devuelven el mismo
   404**, una tocando la base y otra no. **La resta es el viaje a la base,
   aislado.**
+- **⚠️ UN ABANICO DE N PETICIONES EN PARALELO A UN SERVICIO AJENO CHOCA CON SU
+  LÍMITE POR SEGUNDO, Y FALLA SOLO EN PRODUCCIÓN.** El aviso de petición mandaba
+  16 correos con un `Promise.all` de 16 `fetch`; Resend admite **10 por
+  segundo** y rechazó **6 con un 429**. En pruebas nunca salió: con un
+  destinatario no hay abanico. **Antes de abrir en paralelo contra una API
+  ajena, mirar su límite y mandar en lote si lo tiene** — el de Resend
+  (`/emails/batch`, hasta 100) **cuenta como UNA sola petición**, así que el
+  problema desaparece en vez de aliviarse con pausas.
+  ⚠️ **Y el lote trae su propio riesgo: los resultados vuelven como una lista y
+  hay que casarlos por índice.** Casarlos mal **dice que le llegó a quien no le
+  llegó**, que es peor que el fallo original. El reparto va en una función
+  aparte, con pruebas, y el contrato escrito en los dos lados — incluido qué
+  pasa con los que no tienen dirección y por tanto no viajan en el lote.
 - **⚠️ Una consulta que vale para el informe puede no valer para una pantalla
   que se abre todo el día.** La cadena de `audit_log` del informe recorre la
   tabla entera: 115 ms y subiendo para siempre. Para el tablero se reescribió
@@ -1073,6 +1125,17 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   familia que el artículo de «asignen un» — el castellano mete el género en
   sitios donde el dato no está, y las dos salieron al **imprimir las frases
   generadas**, nunca leyendo el código.
+- **⚠️ UNA AFIRMACIÓN DE ESTA MEMORIA SOBRE UN SISTEMA AJENO CADUCA SIN AVISAR,
+  Y SE SIGUE LEYENDO COMO VERDAD.** §6 llevaba **un mes** diciendo que el
+  WhatsApp del acceso al taller «nunca ha funcionado» porque su plantilla estaba
+  rechazada. El 19-nov, al poder leer por fin la API de Meta: **las 76 plantillas
+  de la cuenta están aprobadas** y `codigo_ingreso_escuela` ni existe — alguien
+  la rehízo siguiendo la receta del 22-oct y nadie lo apuntó. Un mes de
+  decisiones tomadas sobre un hecho falso. **Lo que describe el estado de otra
+  herramienta —una plantilla aprobada, un flujo activo, un permiso concedido— es
+  una FOTO con fecha, no una regla**, y hay que escribirla con la fecha dentro y
+  volver a mirarla antes de apoyarse en ella. Las reglas de este archivo
+  envejecen bien; los estados ajenos, no.
 - **⚠️ UN ENVÍO CUYA ÚLTIMA MILLA LA HACE OTRO SISTEMA NO ESTÁ HECHO HASTA QUE
   ESE SISTEMA LO CONFIRME — Y SI NO, FALLA EN SILENCIO DURANTE SEMANAS.** El
   WhatsApp del acceso al taller llevaba **56 envíos y tres semanas sin mandar
@@ -1261,6 +1324,19 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   que falta encima de lo ya fusionado, así que **se abre un PR nuevo** —
   `git log --oneline origin/main..origin/<rama>` dice exactamente qué quedó
   fuera, y si sale un solo commit, eso es todo lo que hay que fusionar.
+- **⚠️ AL REEMPLAZAR UNA PRUEBA POR SU NOMBRE, COMPROBAR QUE NO TE LLEVASTE LAS
+  VECINAS.** El 19-nov reescribí una prueba cortando «desde su nombre hasta el
+  final del archivo» y me llevé **las dos siguientes**, que eran justo las que
+  vigilan el reparto del lote. **382 en verde se ve exactamente igual de bien
+  que 384**: lo delató un **aviso de lint por un import sin usar**, no las
+  pruebas. Mirar el número de pruebas antes y después, o cortar por el final
+  exacto del bloque.
+- **⚠️ EL CONTENEDOR PUEDE ARRANCAR EN UNA RAMA VIEJA, Y ENTONCES EL `CLAUDE.md`
+  QUE SE CARGA ES VIEJO TAMBIÉN.** El 19-nov la memoria salió sin nada del
+  13-nov y parecía trabajo perdido; estaba todo en `main`, pero el árbol estaba
+  en una rama de octubre. **Antes de alarmarse: `git branch --show-current` y
+  `git log origin/main`.** Y acordarse de `npm install` + `npx prisma generate`,
+  que en un contenedor nuevo no están.
 - **Squash sobre historia ya fusionada duplica código**: al reiniciar la rama
   desde `main`, verificar que no quedó nada duplicado.
 - **⚠️ `execute_sql` del MCP se cuelga 60 s** con `do $$ … raise notice`, con
@@ -1297,7 +1373,9 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 > archivo del mes** y su renglón **arriba de este índice**. Si de ese trabajo
 > sale una regla general, va **además** a §12.
 
-### `docs/bitacora/2026-11.md` — noviembre de 2026 (2 entradas)
+### `docs/bitacora/2026-11.md` — noviembre de 2026 (3 entradas)
+
+- **19-nov** · **El aviso perdía 6 correos de 16, y el token de Meta destapó que el taller ya está arreglado** (`0619325` + `664eae6`) · ⚠️ **el primer aviso real mandó 16 `fetch` a la vez y Resend rechazó 6 con un 429** («10 requests per second»): seis pastores sin enterarse de una consejería, y **lo único que lo delató fue la fila de auditoría** · se pasa a `/emails/batch`, que **cuenta como UNA petición** · el lote obliga a casar por índice, así que nace `repartirEnvios` con su contrato escrito · ⚠️ **las plantillas NO se tocan por la API de HighLevel** (204 KB de catálogo, cero menciones de WhatsApp): se tocan por **Meta**, y montarlo costó cuatro tropiezos —app propia, rol dentro de la app, **el id de la URL no es el de la WABA**, y el formulario de credenciales no sirve en una conversación larga— · ✅ **y lo primero que se leyó corrige §6: las 76 plantillas están APROBADAS y `codigo_ingreso_escuela` ya no existe** · `aviso_peticion` creada por API · el WhatsApp pasa a salir **en las tres** porque la medida (2 peticiones al mes) tumbó mi argumento · ⚠️ **al reescribir una prueba me llevé las dos siguientes, y lo cazó el lint, no las pruebas**.
 
 - **15-nov** · **«Cuéntanos tu milagro» pasa a la plataforma**: `/milagros` (pública, el diseño del usuario tal cual) y la vista **«Testimonios»** (PASTOR y ADMIN de entrada) · ⚠️ **la clave «Equipo» de su página original no protegía nada**: la lista se leía con la llave pública de la página · no se enlaza a ninguna ficha ni avisa a nadie (decisión del usuario) · la descarga a Excel lleva **su propio guardia** y el CSV **neutraliza fórmulas** · ⚠️ **`cf:build` local falla por las fuentes de Google también SIN el cambio**: se verificó con `next build --webpack` y fuentes simuladas.
 - **13-nov** · **Los pastores y la mesa ministerial reciben cada petición nueva** (`ad086fb` + `702c590`) · ⚠️ **lo que pedía NO era un permiso, y arranqué midiendo el equivocado**: «la lista de a quién avisa el sistema» y «la lista de quién ve qué» son dos cosas distintas · **22 de las 24 peticiones de noviembre vienen del REGISTRO**, que ya reparte consolidador: avisar de todas serían ~960 correos al mes, así que solo avisa de las que llegan por el link (2 al mes) · quién recibe es una columna de la cuenta y **no se deriva del rol**, porque derivarlo obligaría a hacer pastores a tres mentores solo para que les llegue un correo · ⚠️ **dibujarlo con las dos peticiones reales sacó cuatro faltas**, y la primera suponía el género («que alguien **la** llame») con Juan Felipe delante · ⚠️ **el patrón bueno es NO llamar a `nombreDePila`**: `person.first_name` ya guarda los NOMBRES · ⚠️ **y el recordatorio de Casas de Fe sí tiene ese fallo, vivo** · el WhatsApp sale solo cuando pide que alguien llame, y **el bloqueo se audita y se pinta** · ⚠️ **al cambiarle el rol a Nora quedaron cinco excepciones por cuenta que le ganan al rol**: era administradora sin ver «Dados de baja».
