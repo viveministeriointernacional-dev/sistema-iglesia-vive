@@ -52,12 +52,12 @@ export function resumenDeLoQuePidio(
 /// alguien llame; una petición de oración, que alguien ore. El asunto lo dice
 /// para que se sepa desde la lista del celular, sin abrir.
 ///
-/// ⚠️ **Y esto mismo decide si sale WhatsApp o solo correo.** Un WhatsApp es
-/// una interrupción: suena en el bolsillo y en la pantalla de bloqueo, a
-/// cualquier hora. Quince teléfonos sonando por «oren por mi trabajo» es como
-/// se silencia el canal — y entonces no suena tampoco el día que alguien
-/// escriba algo grave. Las dos cosas salen de esta función y no de dos reglas
-/// parecidas en dos sitios, que es lo que se desincroniza sin que nada avise.
+/// ⚠️ **Esto NO decide si sale WhatsApp: desde el 19-nov-2026 sale en las
+/// tres.** Lo decidió el usuario con la medida delante — por el link entran
+/// unas 2 peticiones al mes, así que el miedo a silenciar el canal no se
+/// sostenía. Lo que esta función sigue decidiendo es **el asunto del correo y
+/// la frase «esto pide que alguien llame»**, que es otra cosa: una petición de
+/// solo oración recibe el aviso y no pide ninguna llamada.
 export function urgeLlamar(tipos: readonly string[], quiereProceso: boolean): boolean {
   return quiereProceso || tipos.includes("CONSEJERIA");
 }

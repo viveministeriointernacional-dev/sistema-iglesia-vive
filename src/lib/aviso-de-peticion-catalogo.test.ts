@@ -205,18 +205,21 @@ test("el pie no manda a una pantalla que la mitad no puede abrir", () => {
   assert.ok(cuerpo.includes("pídele al"), cuerpo.slice(-320));
 });
 
-test("urgeLlamar es la MISMA regla para el asunto y para el WhatsApp", () => {
-  // Si estas dos cosas se separaran en dos reglas parecidas, un día el asunto
-  // diría «Pide consejería» y el WhatsApp no saldría, sin que nada avisara.
-  const casos: { tipos: string[]; proceso: boolean; wa: boolean }[] = [
-    { tipos: ["ORACION"], proceso: false, wa: false },
-    { tipos: ["CONSEJERIA"], proceso: false, wa: true },
-    { tipos: ["ORACION", "CONSEJERIA"], proceso: false, wa: true },
-    { tipos: ["ORACION"], proceso: true, wa: true },
+test("urgeLlamar decide la urgencia del asunto, NO si sale WhatsApp", () => {
+  // ⚠️ La versión anterior de esta prueba fijaba que `urgeLlamar` gobernaba las
+  // dos cosas. Dejó de ser cierto el 19-nov-2026 por decisión del usuario: el
+  // WhatsApp sale en las tres. La prueba se cambió a propósito, no se borró
+  // por estorbar, y lo que fija ahora es que **una petición de solo oración no
+  // pide ninguna llamada** aunque sí reciba el aviso.
+  const casos: { tipos: string[]; proceso: boolean; pideLlamada: boolean }[] = [
+    { tipos: ["ORACION"], proceso: false, pideLlamada: false },
+    { tipos: ["CONSEJERIA"], proceso: false, pideLlamada: true },
+    { tipos: ["ORACION", "CONSEJERIA"], proceso: false, pideLlamada: true },
+    { tipos: ["ORACION"], proceso: true, pideLlamada: true },
   ];
   for (const caso of casos) {
-    assert.equal(urgeLlamar(caso.tipos, caso.proceso), caso.wa);
-    // Y el asunto cambia exactamente en los mismos casos.
+    assert.equal(urgeLlamar(caso.tipos, caso.proceso), caso.pideLlamada);
+
     const asunto = asuntoDelAviso({
       nombres: "Sandra",
       reservada: false,
@@ -225,10 +228,32 @@ test("urgeLlamar es la MISMA regla para el asunto y para el WhatsApp", () => {
     });
     assert.equal(
       asunto !== "Petición de oración: Sandra",
-      caso.wa,
+      caso.pideLlamada,
       `${asunto} no concuerda con urgeLlamar`,
     );
+
+    // Y el cuerpo solo reclama una llamada cuando de verdad hace falta.
+    const cuerpo = cuerpoDelAviso({
+      paraNombres: "Nora",
+      nombreCompleto: "Sandra Barón",
+      reservada: false,
+      tipos: caso.tipos,
+      quiereProceso: caso.proceso,
+      texto: "Oren por mí.",
+    });
+    assert.equal(cuerpo.includes("pide que alguien llame"), caso.pideLlamada);
   }
+
+  // La variable de WhatsApp se arma igual para una de solo oración: ya no hay
+  // ningún caso en que el aviso salga por correo y no por WhatsApp.
+  const linea = variableDeWhatsAppDeLaPeticion({
+    nombreCompleto: "Sandra Barón",
+    reservada: false,
+    tipos: ["ORACION"],
+    quiereProceso: false,
+  });
+  assert.ok(linea.includes("oración"));
+  assert.ok(!/[\n\r\t]/.test(linea));
 });
 
 test("cada resultado del lote vuelve a SU destinatario", () => {

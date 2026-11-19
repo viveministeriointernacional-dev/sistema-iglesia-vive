@@ -7,7 +7,6 @@ import type { OrigenDeLaPeticion } from "@/lib/oracion-catalogo";
 import {
   debeAvisar,
   repartirEnvios,
-  urgeLlamar,
   variableDeWhatsAppDeLaPeticion,
 } from "@/lib/aviso-de-peticion-catalogo";
 import { exportarAvisoDePeticion } from "@/lib/highlevel-salida";
@@ -160,15 +159,22 @@ export async function avisarDePeticionNueva(datos: {
 
     const { enviados, sinCorreo, fallos } = repartirEnvios(preparados, envios);
 
-    // --- El WhatsApp, **solo cuando pide que alguien llame.**
+    // --- El WhatsApp sale **en las tres**: oración, consejería y proceso.
     //
-    // Una petición de oración va solo por correo a propósito. Un WhatsApp es
-    // una interrupción: suena en el bolsillo, en la pantalla de bloqueo, a
-    // cualquier hora. Quince teléfonos sonando por «oren por mi trabajo» es
-    // como se silencia el canal, y entonces no suena tampoco el día que
-    // alguien escribe que se quiere matar. Una consejería o un «quiero
-    // empezar» sí piden que alguien llame hoy.
-    const porWhatsapp = urgeLlamar(datos.tipos, datos.quiereProceso);
+    // ⚠️ **Esto estuvo al revés, y lo cambió la medida, no una opinión.** Lo
+    // escribí acotado a consejería y proceso con el argumento de que un
+    // WhatsApp es una interrupción y quince teléfonos sonando por «oren por mi
+    // trabajo» acabarían silenciando el canal. El número lo desmontó: por el
+    // link público entran unas **2 peticiones al mes**, así que son dos o tres
+    // WhatsApp mensuales, no una avalancha. Decisión del usuario (19-nov-2026):
+    // «que salga también en las de solo oración».
+    //
+    // ⚠️ **`urgeLlamar` sigue vivo, pero YA NO decide esto**: decide el asunto
+    // del correo y la frase «esto pide que alguien llame». Una petición de solo
+    // oración recibe el aviso y **no** dice que haya que llamar, que son dos
+    // cosas distintas. Si vuelven a juntarse, el aviso de una oración acabaría
+    // pidiendo una llamada que nadie pidió.
+    const porWhatsapp = true;
     let whatsappEncargados = 0;
     let whatsappBloqueo: string | null = null;
     let whatsappFallos: { nombre: string; motivo: string }[] = [];
