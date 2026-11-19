@@ -3,10 +3,13 @@ import test from "node:test";
 import {
   asuntoDeInscripcion,
   type CasaDeLaInscripcion,
-  CONFIRMACION_SIN_CASA,
+  type GeneroDePersona,
+  confirmacionSinCasa,
   cuandoSeReune,
   dondeSeReune,
   fraseDeInscripcion,
+  fraseDeQuedoInscrito,
+  nombreDeLaCasaEnLaFrase,
   avisoDeDatosQueFaltan,
   loQueFaltaDeLaCasa,
   participioDeInscripcion,
@@ -169,17 +172,27 @@ test("la variable del WhatsApp cabe siempre en una sola línea", () => {
     casa({ everyNWeeks: 2 }),
   ];
 
+  // Los tres géneros, porque desde el 19-nov la frase de apertura cambia con
+  // él: son tres textos distintos y los tres tienen que caber en la variable.
+  const generos: GeneroDePersona[] = ["MUJER", "HOMBRE", null];
+
   for (const una of casos) {
-    const texto = variableDeConfirmacion(una);
-    assert.ok(texto.length > 0, "Meta rechaza también la cadena vacía");
-    assert.ok(!texto.includes("\n"), texto);
-    assert.ok(!texto.includes("\t"), texto);
-    assert.ok(!texto.includes("  "), `dos espacios seguidos: ${texto}`);
-    assert.equal(texto, texto.trim());
+    for (const genero of generos) {
+      const texto = variableDeConfirmacion(una, genero);
+      assert.ok(texto.length > 0, "Meta rechaza también la cadena vacía");
+      assert.ok(!texto.includes("\n"), texto);
+      assert.ok(!texto.includes("\t"), texto);
+      assert.ok(!texto.includes("  "), `dos espacios seguidos: ${texto}`);
+      assert.equal(texto, texto.trim());
+    }
   }
 
-  assert.ok(CONFIRMACION_SIN_CASA.length > 0);
-  assert.ok(!CONFIRMACION_SIN_CASA.includes("\n"));
+  for (const genero of generos) {
+    const sinCasa = confirmacionSinCasa(genero);
+    assert.ok(sinCasa.length > 0);
+    assert.ok(!sinCasa.includes("\n"));
+    assert.ok(!sinCasa.includes("  "), sinCasa);
+  }
 });
 
 // Probar al revés es lo que hace valer la prueba: se mete un salto de línea a
@@ -189,6 +202,7 @@ test("la variable del WhatsApp cabe siempre en una sola línea", () => {
 test("un salto de línea escrito a mano sale aplanado", () => {
   const texto = variableDeConfirmacion(
     casa({ nombre: "CASA\nDEL SUR", address: "Carrera 9\n#21-14" }),
+    "MUJER",
   );
   assert.ok(!texto.includes("\n"));
   assert.ok(texto.includes("CASA DEL SUR"));
@@ -198,8 +212,10 @@ test("un salto de línea escrito a mano sale aplanado", () => {
 // Lo que la persona tiene que poder leer sin abrir nada: dónde, cuándo, quién
 // la lleva y qué llevar. Es el bloque «TU CASA DE FE» del correo.
 test("la confirmación por WhatsApp dice casa, cuándo, dónde, quién y qué llevar", () => {
-  const texto = variableDeConfirmacion(casa());
-  assert.ok(texto.includes("«CASA DE FE GRUPAL SUR»"));
+  const texto = variableDeConfirmacion(casa(), "HOMBRE");
+  // ⚠️ «GRUPAL SUR» y no el nombre entero: la frase ya dice «Casa de Fe», así
+  // que repetirlo sonaba a tartamudeo en 31 de las 56 casas abiertas.
+  assert.ok(texto.includes("«GRUPAL SUR»"), texto);
   assert.ok(texto.includes("los jueves a las 4:00 p. m."), texto);
   assert.ok(texto.includes("Carrera 9 #21-14"));
   assert.ok(
@@ -224,7 +240,106 @@ test("la confirmación por WhatsApp dice casa, cuándo, dónde, quién y qué ll
 // Cuando falta un dato no queda un hueco ni un «null»: queda una frase que
 // dice qué va a pasar. Falta la dirección en 24 de las 59 casas abiertas.
 test("si falta el día o la dirección, lo dice con palabras", () => {
-  assert.ok(variableDeConfirmacion(casa({ address: null })).includes(SIN_DIRECCION));
-  assert.ok(variableDeConfirmacion(casa({ weekday: null })).includes(SIN_DIA_NI_HORA));
-  assert.ok(!variableDeConfirmacion(casa({ address: null })).includes("null"));
+  assert.ok(
+    variableDeConfirmacion(casa({ address: null }), "MUJER").includes(SIN_DIRECCION),
+  );
+  assert.ok(
+    variableDeConfirmacion(casa({ weekday: null }), "MUJER").includes(SIN_DIA_NI_HORA),
+  );
+  assert.ok(!variableDeConfirmacion(casa({ address: null }), "MUJER").includes("null"));
+});
+
+// ⚠️ **Lo que pidió el usuario el 19-nov, y lo que el canal no podía hacer
+// antes.** La frase de qué pasó vivía en el texto FIJO de la plantilla de Meta
+// («Ya quedaste en tu Casa de Fe»), que es el mismo para los 61 miembros, así
+// que no podía llevar género. Ahora abre la variable, y con él.
+test("el WhatsApp dice «inscrito» o «inscrita», y neutro cuando no se sabe", () => {
+  const mujer = variableDeConfirmacion(casa(), "MUJER");
+  const hombre = variableDeConfirmacion(casa(), "HOMBRE");
+  const sinDato = variableDeConfirmacion(casa(), null);
+
+  assert.ok(
+    mujer.startsWith("Ya quedaste inscrita en la Casa de Fe «GRUPAL SUR»"),
+    mujer,
+  );
+  assert.ok(
+    hombre.startsWith("Ya quedaste inscrito en la Casa de Fe «GRUPAL SUR»"),
+    hombre,
+  );
+
+  // ⚠️ Los 9 sin el dato (de 61, medidos el 19-nov) no reciben un «inscrito/a»
+  // ni un hueco: reciben una frase que dice lo mismo sin el participio.
+  assert.ok(!sinDato.includes("inscrit"), sinDato);
+  assert.ok(sinDato.startsWith("Ya estás en la Casa de Fe «GRUPAL SUR»"), sinDato);
+
+  // ⚠️ Y no se cuela un «Ya ya»: la forma neutra ya empieza por «Ya», así que
+  // ponerle otro delante es el fallo que solo se ve imprimiendo las frases.
+  for (const texto of [mujer, hombre, sinDato]) {
+    assert.ok(!/\bYa ya\b/i.test(texto), texto);
+    // La casa se nombra UNA vez: la frase nueva ya la nombra, así que el
+    // «Tu Casa de Fe es «X»» de antes sobraba.
+    assert.equal(texto.split("GRUPAL SUR").length - 1, 1, texto);
+    // Y «Casa de Fe» aparece una sola vez, no dos seguidas.
+    assert.ok(!/Casa de Fe «Casa de [Ff]e/.test(texto), texto);
+  }
+});
+
+// La misma regla cuando no se pudo recuperar la casa: cambia lo que se sabe de
+// la reunión, no cómo se le habla a la persona.
+test("sin casa, la confirmación también lleva el género", () => {
+  assert.ok(confirmacionSinCasa("MUJER").startsWith("Ya quedaste inscrita en una"));
+  assert.ok(confirmacionSinCasa("HOMBRE").startsWith("Ya quedaste inscrito en una"));
+  assert.ok(!confirmacionSinCasa(null).includes("inscrit"));
+  for (const genero of ["MUJER", "HOMBRE", null] as GeneroDePersona[]) {
+    assert.ok(confirmacionSinCasa(genero).includes("el día, la hora y la dirección"));
+  }
+});
+
+// El correo y el WhatsApp dicen lo mismo con palabras distintas a propósito
+// (allí hay saludo delante y aquí no), pero el participio sale del MISMO sitio:
+// si alguien cambia `participioDeInscripcion`, los dos canales se mueven
+// juntos. Esta prueba es lo que lo vigila.
+test("los dos canales comparten el participio", () => {
+  for (const genero of ["MUJER", "HOMBRE"] as GeneroDePersona[]) {
+    const participio = participioDeInscripcion(genero)!;
+    assert.ok(
+      fraseDeInscripcion({ nombreDePila: "Luisa Fernanda", genero, casa: "X" }).includes(
+        `quedaste ${participio} en la Casa de Fe «X»`,
+      ),
+    );
+    assert.ok(
+      fraseDeQuedoInscrito({ genero, casa: "X" }).includes(
+        `quedaste ${participio} en la Casa de Fe «X»`,
+      ),
+    );
+  }
+});
+
+// ⚠️ **Los 31 nombres de verdad, no inventados.** Son los que tenía la base el
+// 19-nov entre las 56 casas abiertas, y están aquí porque cada uno rompía el
+// recorte de una manera distinta: el guion doble, la barra vertical, los tres
+// puntos, la «é» con tilde y el nombre que no lleva el prefijo.
+test("el nombre de la casa no repite «Casa de Fe»", () => {
+  const reales: [string, string][] = [
+    ["Casa de fe Ana Lopez", "Ana Lopez"],
+    ["casa de fe -  Jairo Andre Moya", "Jairo Andre Moya"],
+    ["Casa de Fe -  Saira Leyton", "Saira Leyton"],
+    ["Casa de fe | Santiago Lemus", "Santiago Lemus"],
+    ["Casa de Fé Harver & Krystel", "Harver & Krystel"],
+    ["Casa de Fe... Karolanne y Cristopher", "Karolanne y Cristopher"],
+    ["CASA DE FE GRUPAL SUR", "GRUPAL SUR"],
+    ["Casa de fe Nidia (abuela)", "Nidia (abuela)"],
+    // Los 22 que no llevan esas palabras se quedan tal cual.
+    ["JEISON Y LORENA", "JEISON Y LORENA"],
+    ["Los Viveros", "Los Viveros"],
+  ];
+
+  for (const [nombre, esperado] of reales) {
+    assert.equal(nombreDeLaCasaEnLaFrase(nombre), esperado, nombre);
+  }
+
+  // ⚠️ Si detrás del prefijo no queda nada, se devuelve el original: un hueco
+  // entre comillas no identifica ninguna casa.
+  assert.equal(nombreDeLaCasaEnLaFrase("Casa de Fe"), "Casa de Fe");
+  assert.equal(nombreDeLaCasaEnLaFrase("  casa de fe -  "), "casa de fe -");
 });

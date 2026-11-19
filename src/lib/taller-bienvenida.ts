@@ -1,8 +1,8 @@
 import { auditar } from "@/lib/audit";
 import { URL_SISTEMA, correoTalleresDeCasaDeFe } from "@/lib/correo";
 import {
-  CONFIRMACION_SIN_CASA,
   type CasaDeLaInscripcion,
+  confirmacionSinCasa,
   variableDeConfirmacion,
 } from "@/lib/casa-de-fe-bienvenida-catalogo";
 import { exportarAccesoAlTaller } from "@/lib/highlevel-salida";
@@ -110,9 +110,11 @@ export async function enviarAccesoAlTaller(
   const crm = await exportarAccesoAlTaller(learnerId, {
     codigo: mis.codigo,
     enlace,
+    // El género es el mismo que ya decide el «inscrita» / «inscrito» del
+    // correo: se lee de la ficha en el `select` de arriba, sin un viaje más.
     confirmacion: datos.casa
-      ? variableDeConfirmacion(datos.casa)
-      : CONFIRMACION_SIN_CASA,
+      ? variableDeConfirmacion(datos.casa, aprendiz.person.gender)
+      : confirmacionSinCasa(aprendiz.person.gender),
   });
 
   // ⚠️ **El enlace y el código NO se escriben en la auditoría**, igual que el

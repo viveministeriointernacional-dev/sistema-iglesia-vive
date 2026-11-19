@@ -246,6 +246,21 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   línea**.
   Las plantillas viven en **Configuración → WhatsApp → Plantillas** (68 el
   22-oct, casi todas «Activo»). La del recordatorio es `recordatorio_casa_de_fe`.
+- **La plantilla del acceso al taller tiene TRES variables desde el 19-nov**
+  (`acceso_taller_casa_de_fe`, editada por la API de Meta): `{{1}}` →
+  `{{contact.first_name}}` · `{{2}}` → **`{{contact.confirmacion_de_casa_de_fe}}`**
+  · `{{3}}` → `{{contact.enlace_de_talleres}}`.
+  ⚠️ **El `{{2}}` es nuevo y hay que mapearlo EN EL FLUJO**: una plantilla con
+  más variables que las mapeadas **no manda nada**. Antes eran dos, y el campo
+  «Confirmacion de casa de fe» **se escribía desde el 30-oct sin que ninguna
+  plantilla lo leyera** — el sistema armaba el mensaje entero (casa, día, hora,
+  dirección, líder, qué llevar) y moría en el CRM. Se vio mirando el contacto de
+  verdad, no el código.
+  ⚠️ **Y la frase de qué pasó vive AHORA en la variable, no en el texto fijo.**
+  Tenía que decir «ya quedaste **inscrito**» / «**inscrita**» (pedido del
+  usuario, 19-nov) y el texto fijo es el mismo para todos, así que no podía
+  llevar género. Lo decide `person.gender`: **30 mujeres, 22 hombres y 9 sin el
+  dato** de 61 miembros, y para esos 9 hay una frase neutra en vez de un hueco.
 - **El recordatorio de Casas de Fe, por WhatsApp**: el sistema escribe **el
   centro del mensaje, en UNA línea** (`variableDeWhatsApp`, que termina
   aplanando cualquier espacio en blanco para que no se cuele un salto) en el
@@ -293,17 +308,27 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
     por el que se escaparon los 56 WhatsApp del taller.
   - **No activar «Enable Marketing Messages»**: reclasifica el envío como
     marketing y la plantilla está aprobada como Utility.
-- **✅ CORREGIDO EL 19-NOV: EL RECHAZO DEL TALLER YA NO EXISTE.** Leído por la
-  API de Meta con el token nuevo: la cuenta tiene **76 plantillas y las 76
-  están APROBADAS**. `codigo_ingreso_escuela` **ya no existe**; en su lugar hay
-  **`acceso_taller_casa_de_fe` · APPROVED · UTILITY**, hecha con la receta que
-  se dedujo el 22-oct (sin código de dígitos, el enlace como variable `{{2}}`).
-  Desde el 22-oct el sistema lleva **13 `casa_de_fe.acceso_enviado`**.
-  ⚠️ **Lo que esto NO prueba:** que esos 13 WhatsApp llegaran. La plantilla
-  está aprobada, pero **qué plantilla usa el flujo de la etiqueta
-  `casa-de-fe-taller` no se puede leer por la API** —los flujos de HighLevel no
-  se exponen—, así que sigue siendo la última milla ajena de siempre. Lo que sí
-  está descartado es la causa que llevábamos un mes dando por buena.
+- **✅ CERRADO EL 19-NOV, Y LA CAUSA NO ERA META: EL FLUJO ESTABA VACÍO.**
+  Primero por la API de Meta con el token nuevo: la cuenta tiene **76 plantillas
+  y las 76 están APROBADAS**; `codigo_ingreso_escuela` **ya no existe** y en su
+  lugar hay **`acceso_taller_casa_de_fe` · APPROVED · UTILITY**. Y después, al
+  mirar HighLevel: **el flujo de la etiqueta `casa-de-fe-taller` existía sin una
+  sola acción dentro**. O sea que el sistema ponía la etiqueta, el flujo se
+  disparaba y **no hacía nada** — la plantilla aprobada nunca se llegó a usar.
+  ⚠️ **Esto corrige lo que este archivo dijo durante un mes** («la plantilla está
+  rechazada»): era verdad en octubre y dejó de serlo sin que nadie lo apuntara,
+  y encima **tapaba la causa de verdad**, que estaba un paso más allá y en una
+  pieza que la API de Meta no alcanza. Es §12.6 en su forma más caruca: *un
+  estado ajeno es una foto con fecha, no una regla* — y una foto equivocada
+  **impide buscar la causa real**, porque ya hay una explicación que encaja.
+  **✅ El usuario construyó el flujo el 19-nov y el WhatsApp de prueba llegó**,
+  con su nombre y su enlace. Es la primera vez que ese canal entrega algo desde
+  el 2-oct.
+  **⚠️ Y lo que queda por saber: si «Permitir reentrada» está encendida.** Se
+  disparó un segundo envío de prueba al mismo contacto y nadie ha dicho si
+  llegó. Si está apagada, cada persona recibe el acceso **una vez y nunca más**
+  —y un reenvío es justo cuando alguien dice «no me llegó» (§6, el recordatorio
+  tiene la misma trampa).
   **Lo de abajo queda como historia de lo que pasó entre el 2 y el 21-oct**, que
   es donde está la lección:
 - **⚠️ EL WHATSAPP DEL ACCESO AL TALLER NO FUNCIONÓ DURANTE TRES SEMANAS** (del
@@ -698,9 +723,25 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   captura del 22-oct aparecía como `x-iglesia-webhook-se…`, que es el nombre de
   la **cabecera**, no de la variable) y, si está bien, el **código de respuesta
   en sus Logs**. Detalle entero en la bitácora del 23-oct.
-- **⚠️ FALTA EL FLUJO DEL AVISO DE PETICIÓN EN HIGHLEVEL** (19-nov): el campo
-  y la plantilla **ya están** (los creé yo por API); lo que falta es el flujo,
-  que la API no alcanza (§6). El código está vivo y **no falla en silencio**.
+- **⚠️ HAY QUE REMAPEAR LAS VARIABLES DEL FLUJO DEL TALLER** (19-nov, tarde):
+  la plantilla `acceso_taller_casa_de_fe` pasó a **tres** variables y el flujo
+  tiene dos mapeadas. **Con menos variables mapeadas que la plantilla, el
+  WhatsApp no sale.** Lo que hay que poner: `{{1}}` → Contact First Name ·
+  `{{2}}` → **Confirmacion de casa de fe** (la nueva) · `{{3}}` → Enlace de
+  talleres. Van ~1 ingreso al día, así que la ventana cuesta.
+- **⚠️ NO SE SABE SI «PERMITIR REENTRADA» ESTÁ ENCENDIDA EN EL FLUJO DEL
+  TALLER** (19-nov): se disparó un segundo envío de prueba al mismo contacto y
+  nadie dijo si llegó. Apagada, cada persona recibe el acceso **una vez y nunca
+  más**, y un reenvío es justo cuando alguien dice «no me llegó». Es la misma
+  trampa que la etiqueta que se quita y se vuelve a poner, un nivel más arriba.
+- **⚠️ EL FLUJO DEL AVISO DE PETICIÓN NO SE HA PROBADO CON UN ENVÍO REAL**
+  (19-nov): el usuario dijo que publicó **los dos** flujos ese día, y el del
+  taller quedó **demostrado** (llegó el WhatsApp de prueba con su nombre y su
+  enlace); el del aviso **no**, porque no ha entrado ninguna petición por el
+  link desde entonces. ⚠️ **Y por la API no se puede comprobar**: los flujos de
+  HighLevel no se exponen y la API de workflows está cerrada para esta cuenta
+  (`WORKFLOW_API_NOT_ENABLED_FOR_LOCATION`). El campo y la plantilla
+  `aviso_peticion` sí están (los creé por API). La prueba es mandarse uno: §12.6.
 - **«Quiero iniciar un proceso» de alguien YA REGISTRADO no abre tarjeta**
   (13-nov): `pedirAcompanamiento` solo abre Operación 72 y reparte consolidador
   cuando la persona es **nueva** (devuelve `abrioProceso: false` si viene con
@@ -1125,6 +1166,23 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   familia que el artículo de «asignen un» — el castellano mete el género en
   sitios donde el dato no está, y las dos salieron al **imprimir las frases
   generadas**, nunca leyendo el código.
+- **⚠️ UN DATO QUE EL SISTEMA ESCRIBE PARA OTRA HERRAMIENTA NO ESTÁ LLEGANDO A
+  NADIE HASTA QUE SE COMPRUEBE QUE ALGUIEN LO LEE — Y NO SE VE EN EL CÓDIGO, SE
+  VE MIRANDO EL REGISTRO DE VERDAD.** El sistema escribía desde el 30-oct el
+  campo «Confirmacion de casa de fe» con el mensaje entero (la casa, el día, la
+  hora, la dirección, quién la lleva y qué llevar, en una línea) y **la
+  plantilla de Meta no lo leía**: solo tenía el nombre y el enlace. Veinte días
+  escribiendo un texto que moría en el CRM, con las pruebas en verde, la
+  auditoría diciendo `acceso_enviado` y el código perfectamente correcto por su
+  lado. **Lo delató abrir el contacto del usuario en HighLevel y encontrar
+  dentro el texto de la prueba del día anterior, intacto.** Dos cosas que
+  repetir: **la escritura y la lectura son dos hechos, y el nuestro es solo el
+  primero** —igual que poner la etiqueta no es mandar el WhatsApp (§6)—, y
+  **cuando el que lee está en otra herramienta, la única comprobación es ir a
+  mirar el valor donde quedó**. El coste de no mirarlo se mide en a quién le
+  faltaba: de 21 miembros, **los 21 tienen celular y solo 11 tienen correo**, así
+  que la mitad del grupo recibió un enlace sin saber cuándo ni dónde
+  presentarse.
 - **⚠️ UNA AFIRMACIÓN DE ESTA MEMORIA SOBRE UN SISTEMA AJENO CADUCA SIN AVISAR,
   Y SE SIGUE LEYENDO COMO VERDAD.** §6 llevaba **un mes** diciendo que el
   WhatsApp del acceso al taller «nunca ha funcionado» porque su plantilla estaba
@@ -1373,7 +1431,9 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 > archivo del mes** y su renglón **arriba de este índice**. Si de ese trabajo
 > sale una regla general, va **además** a §12.
 
-### `docs/bitacora/2026-11.md` — noviembre de 2026 (3 entradas)
+### `docs/bitacora/2026-11.md` — noviembre de 2026 (4 entradas)
+
+- **19-nov (tarde)** · **«Ya quedaste inscrito en la Casa de Fe», y un mensaje entero que se escribía para nadie** · la frase que pidió el usuario **no estaba en el sistema**: vivía en el texto FIJO de la plantilla de Meta, igual para los 61, así que no podía llevar género · ⚠️ **y al mirarlo: el campo «Confirmacion de casa de fe» se escribía desde el 30-oct y ninguna plantilla lo leía** —la confirmación entera (casa, día, hora, dirección, líder) moría en el CRM, y **21 de 21 tienen celular contra 11 de 21 con correo** · la plantilla pasa a **tres variables** y la frase se mueve dentro: «inscrita» / «inscrito», y neutra para los **9 de 61 sin el dato** · ⚠️ **dibujarlo con casas de verdad sacó que 31 de las 56 se llaman «Casa de fe …»**, o sea que el 55 % de los mensajes decía «en la Casa de Fe «Casa de fe Ana Lopez»» — y el texto viejo tenía el mismo fallo sin que nadie lo viera · los 31 nombres reales dictaron el recorte, y dos lo rompían (la barra vertical y la «Fé» con tilde) · ⚠️ **la ventana de riesgo se dice en voz alta**: 3 variables con 2 mapeadas no manda nada, y van ~1 ingreso al día.
 
 - **19-nov** · **El aviso perdía 6 correos de 16, y el token de Meta destapó que el taller ya está arreglado** (`0619325` + `664eae6`) · ⚠️ **el primer aviso real mandó 16 `fetch` a la vez y Resend rechazó 6 con un 429** («10 requests per second»): seis pastores sin enterarse de una consejería, y **lo único que lo delató fue la fila de auditoría** · se pasa a `/emails/batch`, que **cuenta como UNA petición** · el lote obliga a casar por índice, así que nace `repartirEnvios` con su contrato escrito · ⚠️ **las plantillas NO se tocan por la API de HighLevel** (204 KB de catálogo, cero menciones de WhatsApp): se tocan por **Meta**, y montarlo costó cuatro tropiezos —app propia, rol dentro de la app, **el id de la URL no es el de la WABA**, y el formulario de credenciales no sirve en una conversación larga— · ✅ **y lo primero que se leyó corrige §6: las 76 plantillas están APROBADAS y `codigo_ingreso_escuela` ya no existe** · `aviso_peticion` creada por API · el WhatsApp pasa a salir **en las tres** porque la medida (2 peticiones al mes) tumbó mi argumento · ⚠️ **al reescribir una prueba me llevé las dos siguientes, y lo cazó el lint, no las pruebas**.
 

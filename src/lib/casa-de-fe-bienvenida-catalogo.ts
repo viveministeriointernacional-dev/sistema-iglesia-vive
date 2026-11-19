@@ -88,6 +88,31 @@ export function asuntoDeInscripcion(datos: {
   return cuando ? `${encabezado} · ${cuando.corto}` : encabezado;
 }
 
+/// **El nombre de la casa, sin repetir «Casa de Fe» cuando la frase ya lo dice.**
+///
+/// ⚠️ **No es un detalle de redacción: son 31 de las 56 casas abiertas** (medido
+/// el 19-nov), así que más de la mitad de los mensajes decía «en la Casa de Fe
+/// «Casa de fe Ana Lopez»». El equipo bautiza la mayoría de los grupos con esas
+/// tres palabras delante y el nombre de quien la lleva detrás, que es lo que de
+/// verdad identifica a la casa.
+///
+/// Solo quita el prefijo, **nunca el nombre entero**: si detrás no queda nada
+/// —un grupo llamado solo «Casa de Fe»— devuelve el original, porque un hueco
+/// entre comillas no identifica nada.
+///
+/// Los separadores que quedan sueltos se limpian con la lista de verdad, sacada
+/// de los 31 nombres: `-`, `–`, `—`, `:`, `.`, `,`, `·`, `|`. Y la `e` lleva
+/// tilde en uno («Casa de Fé Harver & Krystel»), así que la comparación la
+/// admite — sin eso ese nombre se quedaba con el prefijo puesto.
+export function nombreDeLaCasaEnLaFrase(nombre: string): string {
+  const limpio = nombre.trim();
+  const resto = limpio
+    .replace(/^casa\s+de\s+f[eé]/i, "")
+    .replace(/^[\s\-–—:.,·|]+/, "")
+    .trim();
+  return resto.length > 0 ? resto : limpio;
+}
+
 /// La primera frase del correo: qué pasó y en qué casa.
 export function fraseDeInscripcion(datos: {
   nombreDePila: string;
@@ -95,9 +120,37 @@ export function fraseDeInscripcion(datos: {
   casa: string;
 }): string {
   const participio = participioDeInscripcion(datos.genero);
+  const casa = nombreDeLaCasaEnLaFrase(datos.casa);
   return participio
-    ? `Hola ${datos.nombreDePila}, quedaste ${participio} en la Casa de Fe «${datos.casa}».`
-    : `Hola ${datos.nombreDePila}, ya estás en la Casa de Fe «${datos.casa}».`;
+    ? `Hola ${datos.nombreDePila}, quedaste ${participio} en la Casa de Fe «${casa}».`
+    : `Hola ${datos.nombreDePila}, ya estás en la Casa de Fe «${casa}».`;
+}
+
+/// **La misma frase, para el WhatsApp: sin saludo delante.**
+///
+/// El saludo vive en el texto fijo de la plantilla de Meta («¡Hola, {{1}}!»),
+/// así que aquí la frase empieza por lo que pasó. Pedido por el usuario el
+/// 19-nov: el mensaje decía «Ya quedaste en tu Casa de Fe» —una frase del
+/// texto fijo, igual para todos— y tenía que decir **«ya quedaste inscrito»**,
+/// o **«inscrita»** si es mujer.
+///
+/// ⚠️ **No es la misma cadena que la del correo y no se puede compartir**: allí
+/// va detrás de «Hola Luisa, » y aquí abre el mensaje, así que una lleva
+/// mayúscula y «Ya» delante y la otra no. Lo que sí es compartido es la pieza
+/// que podía desincronizarse de verdad —el participio— y vive en
+/// `participioDeInscripcion`, una sola vez para los dos canales.
+///
+/// La forma neutra ya empieza por «Ya», así que **no se le pone otro delante**:
+/// es el detalle que solo se ve imprimiendo las tres frases juntas (§12.6).
+export function fraseDeQuedoInscrito(datos: {
+  genero: GeneroDePersona;
+  casa: string;
+}): string {
+  const participio = participioDeInscripcion(datos.genero);
+  const casa = nombreDeLaCasaEnLaFrase(datos.casa);
+  return participio
+    ? `Ya quedaste ${participio} en la Casa de Fe «${casa}»`
+    : `Ya estás en la Casa de Fe «${casa}»`;
 }
 
 /// **Cuándo se reúne**, en dos formatos: el largo para el cuerpo del correo y
@@ -212,12 +265,25 @@ export function avisoDeDatosQueFaltan(falta: string[]): string | null {
 /// **NO lleva la lista de los 12 temas.** Doce títulos en una sola línea son
 /// unos 300 caracteres de ruido delante del único dato que hay que pulsar, y
 /// están todos detrás del enlace.
-export function variableDeConfirmacion(casa: CasaDeLaInscripcion): string {
+export function variableDeConfirmacion(
+  casa: CasaDeLaInscripcion,
+  /// Lo que decide «inscrita» o «inscrito». Sale de `person.gender`, que llega
+  /// del registro. ⚠️ Medido el 19-nov sobre los 61 miembros de Casa de Fe:
+  /// **30 mujeres, 22 hombres y 9 sin el dato** — para esos 9 la frase es la
+  /// neutra, que dice lo mismo sin tener que acertar el género.
+  genero: GeneroDePersona,
+): string {
   const cuando = cuandoSeReune(casa);
   const direccion = (casa.address ?? "").trim();
 
   const partes = [
-    `Tu Casa de Fe es «${casa.nombre}»`,
+    // ⚠️ **Antes aquí decía «Tu Casa de Fe es «X»» y la frase de qué pasó
+    // estaba en el texto FIJO de la plantilla** («Ya quedaste en tu Casa de
+    // Fe»), que es igual para todos y por eso no podía llevar el género. Al
+    // traerla aquí, el mensaje dice por fin «ya quedaste inscrito» o
+    // «inscrita», y de paso se ahorra una frase: el nombre de la casa ya lo
+    // nombra esta.
+    fraseDeQuedoInscrito({ genero, casa: casa.nombre }),
     cuando ? `Se reúnen ${cuando.largo.toLowerCase()}` : SIN_DIA_NI_HORA,
     direccion ? `La dirección es ${direccion}` : SIN_DIRECCION,
     // ⚠️ **El líder se nombra UNA sola vez, y con su papel delante.** La
@@ -253,6 +319,16 @@ function frase(texto: string): string {
 /// confirmación del correo cuando la inscripción no pudo recuperar la casa, y
 /// el campo del CRM no se puede quedar vacío: Meta rechaza también la cadena
 /// vacía, y el WhatsApp saldría con un hueco en medio.
-export const CONFIRMACION_SIN_CASA = enUnaLinea(
-  "Ya estás en una Casa de Fe. Tu líder te confirmará el día, la hora y la dirección.",
-);
+///
+/// Lleva el género igual que la otra: de las dos ramas, esta es la que se usa
+/// cuando no se sabe **nada** de la casa, y no saber dónde se reúne no es
+/// razón para dejar de hablarle bien a la persona.
+export function confirmacionSinCasa(genero: GeneroDePersona): string {
+  const participio = participioDeInscripcion(genero);
+  const quePaso = participio
+    ? `Ya quedaste ${participio} en una Casa de Fe`
+    : "Ya estás en una Casa de Fe";
+  return enUnaLinea(
+    `${quePaso}. Tu líder te confirmará el día, la hora y la dirección.`,
+  );
+}
