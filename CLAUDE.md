@@ -261,6 +261,19 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   usuario, 19-nov) y el texto fijo es el mismo para todos, así que no podía
   llevar género. Lo decide `person.gender`: **30 mujeres, 22 hombres y 9 sin el
   dato** de 61 miembros, y para esos 9 hay una frase neutra en vez de un hueco.
+  ✅ **APPROVED en Meta el 24-nov**, y el texto nuevo **comprobado vivo** con un
+  ingreso real del 21-nov (su campo del CRM empieza por «Ya quedaste inscrito»).
+- **✅ CÓMO SABER SI UN WHATSAPP SALIÓ DE VERDAD, QUE ES LO QUE FALTABA DESDE EL
+  22-OCT:** el historial de conversaciones del CRM **sí se lee por la API**.
+  `GET /conversations/search?locationId=…&contactId=…` da el id de la
+  conversación y `GET /conversations/{id}/messages` los mensajes, **con la
+  cabecera `Version: 2021-04-15`** (con `2021-07-28` no sirve). Cada mensaje
+  trae `messageType` (`TYPE_WHATSAPP`), `direction` y **`status`**: `read`,
+  `delivered` o `failed`. **Eso es la última milla ajena, por fin legible** — la
+  diferencia entre «el CRM aceptó nuestra escritura» y «el mensaje llegó».
+  ⚠️ Un `failed` **no se interpreta solo**: mirar si ese contacto recibió alguno
+  alguna vez, porque un número que no está en WhatsApp falla siempre y parece
+  un fallo nuestro.
 - **El recordatorio de Casas de Fe, por WhatsApp**: el sistema escribe **el
   centro del mensaje, en UNA línea** (`variableDeWhatsApp`, que termina
   aplanando cualquier espacio en blanco para que no se cuele un salto) en el
@@ -674,6 +687,23 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   que el próximo registro con él volverá a engancharse mal; y la Op72 de Celina
   sigue en **CONTACTADA por esa misma llamada**, así que puede que a Celina
   **nunca se la haya contactado**.
+- **Cuatro contactos de HighLevel se llamaban «Santiago Viveros» (25-nov).**
+  Dos de ellos tenían enganchadas las fichas de **Sara Vanesa García Muñoz**
+  (`NprTghjGhn3E2orB9VzL`, 311 2171540) e **Isabella Torres**
+  (`tGMGyomh4L2KIdSuvTVZ`, 320 4302630). **El usuario los corrigió a mano** en
+  el CRM y quedaron con sus nombres; comprobado por la API después.
+  ⚠️ **La parte que importa, porque puede repetirse: NACIERON BIEN Y LOS
+  RENOMBRARON DESPUÉS.** No es una suposición — nuestro webhook lee **el mismo
+  campo de nombre** que lleva el contacto, y las dos fichas se crearon el mismo
+  día con el nombre correcto; si el formulario hubiera traído «Santiago
+  Viveros», las fichas se llamarían así. Los dos contactos tienen **fecha de
+  modificación 13-nov**, el mismo día, semanas después de crearse (18-sep y
+  15-oct), y en nuestra auditoría de ese día **no hay ni una fila** tocándolos:
+  el cambio se hizo **dentro de HighLevel**. **Si algo vuelve a renombrarlos, el
+  arreglo no dura** — y no hay nada que avise.
+  Quedan dos contactos más con ese nombre y **sin ficha**: 312 5675163
+  («Primera Llamada», 21-oct, nació ya con ese nombre) y 317 3407878
+  («Primera Llamada», 6-oct). Pueden ser otros números suyos; no se confirmó.
 - **NO fusionar (decisión del usuario, 7-sep):** **Luna Sandoval / Lina Mercedes
   Jovel** (`linitajovel@gmail.com`) y **Nini Guerrón / Dilan Cadena**
   (`ninijguerrons@gmail.com`) **son personas distintas que comparten correo** —
@@ -723,17 +753,45 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   captura del 22-oct aparecía como `x-iglesia-webhook-se…`, que es el nombre de
   la **cabecera**, no de la variable) y, si está bien, el **código de respuesta
   en sus Logs**. Detalle entero en la bitácora del 23-oct.
-- **⚠️ HAY QUE REMAPEAR LAS VARIABLES DEL FLUJO DEL TALLER** (19-nov, tarde):
-  la plantilla `acceso_taller_casa_de_fe` pasó a **tres** variables y el flujo
-  tiene dos mapeadas. **Con menos variables mapeadas que la plantilla, el
-  WhatsApp no sale.** Lo que hay que poner: `{{1}}` → Contact First Name ·
-  `{{2}}` → **Confirmacion de casa de fe** (la nueva) · `{{3}}` → Enlace de
-  talleres. Van ~1 ingreso al día, así que la ventana cuesta.
-- **⚠️ NO SE SABE SI «PERMITIR REENTRADA» ESTÁ ENCENDIDA EN EL FLUJO DEL
-  TALLER** (19-nov): se disparó un segundo envío de prueba al mismo contacto y
-  nadie dijo si llegó. Apagada, cada persona recibe el acceso **una vez y nunca
-  más**, y un reenvío es justo cuando alguien dice «no me llegó». Es la misma
-  trampa que la etiqueta que se quita y se vuelve a poner, un nivel más arriba.
+- **⚠️ SIGUE PENDIENTE EL REMAPEO DE LAS VARIABLES DEL FLUJO DEL TALLER**
+  (19-nov, y todavía el 25-nov): la plantilla `acceso_taller_casa_de_fe` pasó a
+  **tres** variables y el flujo tiene dos mapeadas. **Con menos variables
+  mapeadas que la plantilla, el WhatsApp no sale.** Lo que hay que poner:
+  `{{1}}` → Contact First Name · `{{2}}` → **Confirmacion de casa de fe** (la
+  nueva) · `{{3}}` → Enlace de talleres, **eligiéndolas del selector**.
+  ✅ La plantilla quedó **APPROVED** en Meta (24-nov).
+  ⚠️ **El único ingreso desde el cambio no sirve para comprobarlo**: el de
+  Jose Duvan (21-nov) salió `failed`, pero ese contacto tiene **2 WhatsApp y los
+  2 fallaron**, uno del 8-nov, de antes de todo — ese número no está en
+  WhatsApp. Para comprobar el remapeo hace falta un envío a un número que sí
+  reciba.
+- **⚠️ EL SALUDO DEL WHATSAPP DICE MEDIO NOMBRE EN 52 DE 538 CONTACTOS**
+  (medido el 24-nov, barriendo los 538 enlaces uno a uno). El `{{1}}` lee el
+  **First Name de HighLevel**, y el CRM parte el nombre por el primer espacio:
+  a Juan Felipe le dice «¡Hola, Juan!», a Harold Mauricio «Harold». Es el fallo
+  de §12.6 pero **en el dato del CRM, no en nuestro código** — nosotros tenemos
+  `person.first_name` entero. Se arregla sin tocar el CRM: escribir los nombres
+  en un campo propio y apuntar `{{1}}` ahí. Es código nuestro más una línea del
+  remapeo; el usuario no ha dicho si lo quiere.
+- **⚠️ AMANDA SUAREZ CUELGA DEL CONTACTO DE «luz mery quesada», CON OTRO
+  TELÉFONO** (24-nov): el de Amanda es `320 4207524` y el del contacto
+  `318 7731064`. **No es el caso del teléfono compartido**: se engancharon por
+  el correo de relleno **`notiene@gmail.com`** (§12.7), que el `upsert` casa por
+  correo. Consecuencia: *luz mery*, una persona ajena, **recibe el enlace del
+  taller de Amanda**. Pendiente de decidir: darle contacto propio y sacarle el
+  correo de relleno.
+- **✅ «PERMITIR REENTRADA» SÍ ESTÁ ENCENDIDA** (comprobado el 24-nov, y
+  **contra mi propia sospecha**). El usuario dijo «no me llegó nada» del segundo
+  envío de prueba y yo iba a darlo por apagada; el historial de WhatsApp del
+  contacto en HighLevel dice otra cosa: **dos mensajes, 5:30 y 5:33 p. m., los
+  dos marcados `read`**. Llegaron con 3 minutos de diferencia y el **texto
+  idéntico**, así que en el chat se ven como el mismo mensaje repetido — por eso
+  no se notó el segundo. **Un reenvío a la misma persona sí dispara.**
+  ⚠️ **Y la lección de método: el historial de conversaciones del CRM SÍ se puede
+  leer por la API**, y es la única forma de saber si un WhatsApp salió de verdad
+  (`/conversations/search?contactId=…` y luego `/conversations/{id}/messages`,
+  con `Version: 2021-04-15`). Es lo que lleva un año faltando para no tener que
+  preguntarle al usuario por su bandeja.
 - **⚠️ EL FLUJO DEL AVISO DE PETICIÓN NO SE HA PROBADO CON UN ENVÍO REAL**
   (19-nov): el usuario dijo que publicó **los dos** flujos ese día, y el del
   taller quedó **demostrado** (llegó el WhatsApp de prueba con su nombre y su
@@ -1347,6 +1405,31 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   `now() AT TIME ZONE 'UTC'`**, nunca `CURRENT_TIMESTAMP`: las columnas son
   `timestamp without time zone` que guardan UTC, y dejarlo a la zona de la
   sesión es la trampa de §12.1. Se comprueba contra una fila que ya exista.
+- **✅ UN TELÉFONO REPETIDO NO ES UN PROBLEMA, Y ESO LO DECIDIÓ EL USUARIO
+  (25-nov). NO VOLVER A SACARLO COMO HALLAZGO.** Sus palabras: los números que
+  se repiten son de **menores de edad o de gente sin celular propio, que da el
+  de un familiar**, y eso está previsto. **Lo que identifica a cada persona es
+  su código de miembro** (6 dígitos, único), que es con lo que entra al taller,
+  y **se lo entrega su líder de Casa de Fe en la mano**. Así que un contacto del
+  CRM compartido con un pariente **no impide que la persona entre**: el camino
+  automático (WhatsApp y correo) es una comodidad, no el canal oficial.
+  ⚠️ **Lo que SÍ queda como consecuencia real, y es lo único que vale reportar
+  de un enlace compartido:** todo lo que el sistema escribe cae en la tarjeta
+  del pariente, así que **el WhatsApp saluda a otra persona**, y si el teléfono
+  del contacto **NO es el de la persona** (el caso de Amanda Suarez, §9) el
+  mensaje llega a un tercero ajeno. Eso segundo no es el caso de los familiares
+  y hay que distinguirlos antes de hablar: **comparar el teléfono de la ficha
+  con el del contacto** es lo que los separa.
+- **⚠️ Y HAY UN SEGUNDO IMÁN, QUE NO ES EL TELÉFONO: UN CORREO DE RELLENO.**
+  `/contacts/upsert` casa **también por correo**, así que un correo inventado que
+  el equipo reutiliza —`notiene@gmail.com`— engancha a cualquiera que se exporte
+  con él al contacto de quien ya lo tenía. Comprobado el 24-nov: en HighLevel hay
+  **exactamente un** contacto con ese correo, el de *luz mery quesada*, y de él
+  cuelga la ficha de **Amanda Suarez**, cuyo teléfono es **otro**. Es la misma
+  trampa del teléfono una casilla más allá, y **más difícil de ver**, porque el
+  teléfono distinto hace que el mensaje se vaya a un número que no es de nadie
+  conocido. En la plataforma solo hay **3 correos repetidos** y los tres son los
+  pares legítimos de §8, así que el peligro no es la base: es el dato de relleno.
 - **⚠️ UN TELÉFONO REPETIDO NO DA UN DUPLICADO: SE TRAGA AL RECIÉN LLEGADO.**
   El webhook de registro casa por teléfono, y si el número ya está en otra
   ficha **engancha el contacto nuevo a ESA ficha y no crea nada**. El único
@@ -1371,6 +1454,22 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   producción y cruzarla con algo que el usuario ya vio.
 - **Para saber si una credencial de la base sigue sirviendo, pedirle al sitio
   algo que la use.** No hace falta preguntar.
+- **⚠️ SI UN WHATSAPP SALIÓ O NO, LO DICE EL HISTORIAL DEL CRM — NO HACE FALTA
+  PREGUNTARLE AL USUARIO POR SU BANDEJA, Y SU RECUERDO PUEDE ESTAR EQUIVOCADO.**
+  El 24-nov dijo «no me llegó nada» del segundo envío de prueba y yo iba a
+  cerrar «Permitir reentrada» como apagada. El historial decía **dos mensajes,
+  los dos `read`**, con 3 minutos de diferencia y el **texto idéntico** — que es
+  justo por lo que no se nota el segundo. Se lee con
+  `/conversations/search?locationId=…&contactId=…` y después
+  `/conversations/{id}/messages`, con **`Version: 2021-04-15`** (la otra versión
+  no sirve ahí). Trae `direction` y **`status`** (`read`, `delivered`,
+  `failed`), que es lo único que distingue «el CRM aceptó nuestra escritura» de
+  «el mensaje llegó» — la lección del §12.6 que llevaba un mes sin herramienta.
+  ⚠️ **Y un `failed` tampoco se interpreta solo:** el de Jose Duvan parecía
+  confirmar que el remapeo faltaba, y al mirar su historial completo tenía
+  **2 de 2 fallidos**, uno de antes de cualquier cambio — ese número no está en
+  WhatsApp. **Antes de culpar al cambio de hoy, mirar si ese contacto recibió
+  alguno alguna vez.**
 - **⚠️ NO abrir el PR hasta que TODO esté empujado** — el usuario fusiona en
   minutos. **Y si aparece trabajo nuevo con un PR ya abierto, se abre OTRO PR:
   no se apila sobre el abierto** (así entró a medias el #112).
@@ -1431,7 +1530,9 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 > archivo del mes** y su renglón **arriba de este índice**. Si de ese trabajo
 > sale una regla general, va **además** a §12.
 
-### `docs/bitacora/2026-11.md` — noviembre de 2026 (4 entradas)
+### `docs/bitacora/2026-11.md` — noviembre de 2026 (5 entradas)
+
+- **24/25-nov** · **El barrido de los 538 enlaces al CRM, y tres cosas que desmontó** · ✅ el texto nuevo quedó **comprobado vivo** con un ingreso real del 21-nov, y la plantilla **APPROVED** · ⚠️ **«no me llegó nada» era falso y lo desmontó el historial del CRM: dos mensajes, los dos `read`**, con texto idéntico 3 minutos aparte — **«Permitir reentrada» SÍ está encendida**, y por fin hay forma de leer si un WhatsApp salió (`/conversations`, `Version: 2021-04-15`) · del barrido: **52 de 538 saludan con medio nombre** y **7 enlaces apuntaban a otra persona**, en **tres mecanismos distintos** · ⚠️ **mi primera clasificación agrupaba por apellido compartido, que es justo lo que comparten madre e hija**: tuve que rehacerla por nombre de pila · ✅ **el usuario cerró el caso de los teléfonos repetidos**: son menores o gente sin celular propio, y **el código de miembro es lo que identifica**, entregado en mano por el líder · ⚠️ **imán nuevo que §12.7 no tenía: un correo de relleno** (`notiene@gmail.com`) engancha por correo, y ahí el teléfono **no** coincide, así que el mensaje se va a un tercero · ⚠️ **cuatro contactos se llamaban «Santiago Viveros»: nacieron bien y los renombraron el 13-nov DENTRO de HighLevel** (cero filas en nuestra auditoría), así que el arreglo puede no durar.
 
 - **19-nov (tarde)** · **«Ya quedaste inscrito en la Casa de Fe», y un mensaje entero que se escribía para nadie** · la frase que pidió el usuario **no estaba en el sistema**: vivía en el texto FIJO de la plantilla de Meta, igual para los 61, así que no podía llevar género · ⚠️ **y al mirarlo: el campo «Confirmacion de casa de fe» se escribía desde el 30-oct y ninguna plantilla lo leía** —la confirmación entera (casa, día, hora, dirección, líder) moría en el CRM, y **21 de 21 tienen celular contra 11 de 21 con correo** · la plantilla pasa a **tres variables** y la frase se mueve dentro: «inscrita» / «inscrito», y neutra para los **9 de 61 sin el dato** · ⚠️ **dibujarlo con casas de verdad sacó que 31 de las 56 se llaman «Casa de fe …»**, o sea que el 55 % de los mensajes decía «en la Casa de Fe «Casa de fe Ana Lopez»» — y el texto viejo tenía el mismo fallo sin que nadie lo viera · los 31 nombres reales dictaron el recorte, y dos lo rompían (la barra vertical y la «Fé» con tilde) · ⚠️ **la ventana de riesgo se dice en voz alta**: 3 variables con 2 mapeadas no manda nada, y van ~1 ingreso al día.
 
