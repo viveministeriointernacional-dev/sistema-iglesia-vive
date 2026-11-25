@@ -1,3 +1,4 @@
+import { mensajeDeAccesoEnUnaLinea } from "@/lib/casa-de-fe-bienvenida-catalogo";
 import type { CallOutcome } from "@iglesia/prisma-client";
 import { nombreCompleto, textoDeHorario } from "@/lib/dominio";
 import { variableDeEntorno } from "@/lib/entorno";
@@ -599,9 +600,25 @@ export async function exportarAccesoAlTaller(
     }
 
     const campos = await camposDelTaller(cred);
+
+    // ⚠️ **EN «Enlace de talleres» VA EL MENSAJE ENTERO, NO SOLO EL ENLACE**
+    // (25-nov-2026), y no es un descuido: es el campo que la acción de WhatsApp
+    // del flujo tiene mapeado como `{{2}}`, y la plantilla volvió a dos
+    // variables porque la acción **no deja añadir la tercera casilla** sin
+    // volver a elegir la plantilla (el porqué, medido, está en
+    // `mensajeDeAccesoEnUnaLinea`). Mientras la plantilla tenía tres y el flujo
+    // dos, **Meta rechazaba cada envío**.
+    const mensaje = mensajeDeAccesoEnUnaLinea({
+      confirmacion: datos.confirmacion,
+      enlace: datos.enlace,
+    });
+
     const aEscribir = [
       ...(campos.codigo ? [{ id: campos.codigo, valor: datos.codigo }] : []),
-      ...(campos.enlace ? [{ id: campos.enlace, valor: datos.enlace }] : []),
+      ...(campos.enlace ? [{ id: campos.enlace, valor: mensaje }] : []),
+      // La confirmación sola se sigue escribiendo en su propio campo. No la lee
+      // ninguna plantilla hoy, pero es el dato limpio y **es lo que habría que
+      // mapear como `{{2}}` el día que el flujo se pueda arreglar de verdad**.
       ...(campos.confirmacion
         ? [{ id: campos.confirmacion, valor: datos.confirmacion }]
         : []),
@@ -654,21 +671,17 @@ export async function exportarAccesoAlTaller(
     // Faltan los campos: la etiqueta ya está puesta y el workflow va a
     // disparar, así que hay que decir que el mensaje va a salir incompleto.
     //
-    // ⚠️ **Se miran los campos que VIAJAN en el mensaje, no los tres.** El
-    // código se escribe pero ya no sale por WhatsApp (22-oct), así que que
-    // falte su campo no deja el mensaje cojo: avisar de él sería un aviso que
-    // no hay que atender, y los avisos que no hay que atender se dejan de leer
-    // (§12.6).
-    if (!campos.enlace || !campos.confirmacion) {
-      const faltan = [
-        campos.enlace ? null : "«Enlace de talleres»",
-        campos.confirmacion ? null : "«Confirmación de casa de fe»",
-      ]
-        .filter(Boolean)
-        .join(" y ");
+    // ⚠️ **Se mira UN SOLO campo, y desde el 25-nov es «Enlace de talleres»**,
+    // porque es el único que viaja en el mensaje: ahí va el texto entero. El
+    // código de miembro se escribe pero no sale por WhatsApp (22-oct), y la
+    // confirmación suelta tampoco la lee ninguna plantilla — avisar de esos dos
+    // sería un aviso que no hay que atender, y los avisos que no hay que
+    // atender se dejan de leer (§12.6).
+    if (!campos.enlace) {
       return {
         ok: false,
-        motivo: `en HighLevel todavía no existe el campo ${faltan}, así que el WhatsApp va a salir sin ese dato.`,
+        motivo:
+          "en HighLevel todavía no existe el campo «Enlace de talleres», que es donde viaja el mensaje, así que el WhatsApp va a salir vacío.",
       };
     }
 

@@ -8,7 +8,9 @@ import {
   cuandoSeReune,
   dondeSeReune,
   fraseDeInscripcion,
+  FRASE_DEL_ENLACE,
   fraseDeQuedoInscrito,
+  mensajeDeAccesoEnUnaLinea,
   nombreDeLaCasaEnLaFrase,
   avisoDeDatosQueFaltan,
   loQueFaltaDeLaCasa,
@@ -342,4 +344,51 @@ test("el nombre de la casa no repite «Casa de Fe»", () => {
   // entre comillas no identifica ninguna casa.
   assert.equal(nombreDeLaCasaEnLaFrase("Casa de Fe"), "Casa de Fe");
   assert.equal(nombreDeLaCasaEnLaFrase("  casa de fe -  "), "casa de fe -");
+});
+
+// ⚠️ **La variable que de verdad se manda desde el 25-nov.** La plantilla volvió
+// a dos variables porque la acción de WhatsApp del flujo no deja añadir la
+// tercera casilla sin volver a elegir la plantilla, así que el mensaje entero
+// —confirmación Y enlace— viaja en el campo que el flujo ya tiene mapeado.
+// Medido con un antes y un después sobre el mismo número: 2 variables con 2
+// mapeadas salió `read`; 3 con 2 salió `failed`.
+test("el mensaje de acceso lleva la confirmación y el enlace en UNA línea", () => {
+  const enlace = "https://ejemplo.test/taller/mis/abc123";
+  const texto = mensajeDeAccesoEnUnaLinea({
+    confirmacion: variableDeConfirmacion(casa(), "MUJER"),
+    enlace,
+  });
+
+  // Lo que Meta rechaza, otra vez: ni saltos, ni tabuladores, ni dobles
+  // espacios, ni la cadena vacía.
+  assert.ok(texto.length > 0);
+  assert.ok(!texto.includes("\n"), texto);
+  assert.ok(!texto.includes("\t"), texto);
+  assert.ok(!texto.includes("  "), texto);
+  assert.equal(texto, texto.trim());
+
+  // Y lo que tiene que llevar: la frase con género, el enlace al final, y la
+  // frase que lo presenta.
+  assert.ok(texto.startsWith("Ya quedaste inscrita en la Casa de Fe «GRUPAL SUR»"), texto);
+  assert.ok(texto.includes(FRASE_DEL_ENLACE), texto);
+  assert.ok(texto.endsWith(enlace), texto);
+
+  // ⚠️ El enlace va UNA vez: si alguien lo mete también en la confirmación,
+  // el mensaje lo repite y nadie lo vería leyendo el código.
+  assert.equal(texto.split(enlace).length - 1, 1, texto);
+});
+
+// El caso sin casa también tiene que llevar el enlace: es justo cuando la
+// persona menos sabe, así que el único dato accionable no puede faltar.
+test("sin casa, el mensaje de acceso sigue llevando el enlace", () => {
+  const enlace = "https://ejemplo.test/taller/mis/xyz";
+  for (const genero of ["MUJER", "HOMBRE", null] as GeneroDePersona[]) {
+    const texto = mensajeDeAccesoEnUnaLinea({
+      confirmacion: confirmacionSinCasa(genero),
+      enlace,
+    });
+    assert.ok(texto.endsWith(enlace), texto);
+    assert.ok(!texto.includes("\n"), texto);
+    assert.ok(texto.includes("el día, la hora y la dirección"), texto);
+  }
 });

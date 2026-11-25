@@ -315,6 +315,44 @@ function frase(texto: string): string {
   return limpio.endsWith(".") ? limpio : `${limpio}.`;
 }
 
+/// **La confirmación Y EL ENLACE en una sola variable.**
+///
+/// ⚠️ **Existe por una limitación de HighLevel, no por diseño, y el porqué
+/// importa para no "arreglarlo" mal (25-nov-2026).** La plantilla de Meta tenía
+/// tres variables —nombre, confirmación y enlace— y **la acción de WhatsApp del
+/// flujo guarda su propia copia de la plantilla**: remapear sobre esa copia
+/// vieja no añade la tercera casilla, así que el flujo seguía mandando dos
+/// valores y **Meta rechazaba cada envío**. Medido con un antes y un después
+/// sobre el mismo número: con 2 variables y 2 mapeadas el mensaje salió `read`
+/// (19-nov), con 3 y 2 salió `failed` (25-nov).
+///
+/// Decisión del usuario: **volver la plantilla a dos variables** en vez de
+/// seguir peleando con el flujo. Así `{{2}}` lee el campo que el flujo ya tiene
+/// mapeado —«Enlace de talleres»— y por eso ese campo lleva ahora **el mensaje
+/// entero**, no solo el enlace.
+///
+/// ⚠️ **Y eso deja el nombre del campo mintiendo**: «Enlace de talleres»
+/// contiene un párrafo. Está escrito aquí y en §6 porque desde el CRM no se
+/// nota, y quien busque un enlace limpio para copiar no lo va a encontrar ahí
+/// — el enlace sigue entero dentro del texto, al final.
+///
+/// Va **en una línea** como todas las variables de plantilla: el enlace queda
+/// al final del párrafo, que WhatsApp convierte en enlace igual.
+export function mensajeDeAccesoEnUnaLinea(datos: {
+  /// Lo que devuelve `variableDeConfirmacion` o `confirmacionSinCasa`.
+  confirmacion: string;
+  enlace: string;
+}): string {
+  return enUnaLinea(
+    `${datos.confirmacion} ${FRASE_DEL_ENLACE} ${datos.enlace}`,
+  );
+}
+
+/// Lo que presenta el enlace. Separado para que se vea en las pruebas y no se
+/// escriba dos veces.
+export const FRASE_DEL_ENLACE =
+  "Entra a tus 12 talleres desde aquí, con el mismo celular:";
+
 /// **Lo que se escribe cuando se perdió el grupo.** `casa` es `null` en la
 /// confirmación del correo cuando la inscripción no pudo recuperar la casa, y
 /// el campo del CRM no se puede quedar vacío: Meta rechaza también la cadena
