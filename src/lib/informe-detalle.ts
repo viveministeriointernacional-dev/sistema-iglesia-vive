@@ -14,6 +14,7 @@ import {
   quienLoHizo,
   TOPE,
 } from "@/lib/detalle-filas";
+import { aLaHora } from "@/lib/reunion-catalogo";
 import { VISITA_CUMPLIDA } from "@/lib/op72";
 import {
   type Desglose,
@@ -376,7 +377,7 @@ async function visitas(
         : contexto(
             fila.registrada_por ? `la agendó ${fila.registrada_por}` : "entró por el formulario",
             fila.scheduled_at
-              ? `pactada para el ${dia(fila.scheduled_at)} a las ${hora(fila.scheduled_at)}`
+              ? `pactada para el ${dia(fila.scheduled_at)} ${aLaHora(hora(fila.scheduled_at))}`
               : "sin fecha pactada",
             fila.is_virtual ? "virtual" : fila.place,
           ),

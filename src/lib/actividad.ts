@@ -4,6 +4,7 @@ import { HITOS_DEL_RECORRIDO } from "@/lib/expediente";
 import { ETIQUETA_LLAMADA } from "@/lib/op72";
 import type { ClientePrisma } from "@/lib/prisma";
 import {
+  aLaHora,
   diaDeLaSemana,
   fraseDeFrecuencia,
   horaLegible,
@@ -984,7 +985,7 @@ export async function cargarActividad(
           const dia = diaDeLaSemana(typeof r.dia === "number" ? r.dia : null);
           const hora = typeof r.hora === "string" ? r.hora : null;
           if (!dia || !hora) return "sin día ni hora";
-          return `${dia.plural} a las ${horaLegible(hora)} · ${fraseDeFrecuencia(Number(r.cada) || 1)}`;
+          return `${dia.plural} ${aLaHora(horaLegible(hora))} · ${fraseDeFrecuencia(Number(r.cada) || 1)}`;
         };
         filas.push({ k: "Antes", v: legible(antes) });
         filas.push({ k: "Ahora", v: legible(ahora) });

@@ -1,3 +1,4 @@
+import { mensajeDeAccesoEnUnaLinea } from "@/lib/casa-de-fe-bienvenida-catalogo";
 import type { CallOutcome } from "@iglesia/prisma-client";
 import { nombreCompleto, textoDeHorario } from "@/lib/dominio";
 import { variableDeEntorno } from "@/lib/entorno";
@@ -448,6 +449,19 @@ export const ETIQUETA_TALLER = "casa-de-fe-taller";
 /// autorizada, y así tampoco hace falta un despliegue nuevo cuando se creen.
 const NOMBRES_DE_CAMPO = {
   codigo: ["codigo de miembro", "código de miembro"],
+  /// **Los NOMBRES de la ficha, enteros.**
+  ///
+  /// ⚠️ **Existe porque el `first_name` de HighLevel está cortado por el primer
+  /// espacio en 52 de los 538 contactos enlazados** (medido el 24-nov barriendo
+  /// los enlaces uno a uno): el `{{1}}` de la plantilla decía «¡Hola, Juan!» a
+  /// Juan Felipe y «Harold» a Harold Mauricio. En Colombia los dos nombres
+  /// **son** el nombre (§12.6).
+  ///
+  /// El dato bueno es `person.first_name`, que guarda los NOMBRES, y **se
+  /// escribe entero, sin pasar por `nombreDePila()`** — que es justo la función
+  /// que corta. Con el campo puesto, `{{1}}` se mapea aquí en vez de al First
+  /// Name del CRM y el saludo deja de depender de cómo partió el CRM el nombre.
+  nombres: ["nombres"],
   enlace: ["enlace de talleres", "enlace de los talleres"],
   /// El centro de la confirmación de inscripción, **en una sola línea** (la
   /// casa, el día, la hora, la dirección, quién la lleva y qué llevar).
@@ -549,13 +563,17 @@ async function buscarIdsDeCampos<Clave extends string>(
 /// en el CRM para quien lo necesite —el líder que tiene que dictárselo a quien
 /// perdió el enlace— y quitarlo de aquí sería perder un dato que ya está puesto
 /// en 46 contactos.
-async function camposDelTaller(
-  cred: Credenciales,
-): Promise<{ codigo: string | null; enlace: string | null; confirmacion: string | null }> {
+async function camposDelTaller(cred: Credenciales): Promise<{
+  codigo: string | null;
+  enlace: string | null;
+  confirmacion: string | null;
+  nombres: string | null;
+}> {
   return buscarIdsDeCampos(cred, {
     codigo: NOMBRES_DE_CAMPO.codigo,
     enlace: NOMBRES_DE_CAMPO.enlace,
     confirmacion: NOMBRES_DE_CAMPO.confirmacion,
+    nombres: NOMBRES_DE_CAMPO.nombres,
   });
 }
 
@@ -599,9 +617,30 @@ export async function exportarAccesoAlTaller(
     }
 
     const campos = await camposDelTaller(cred);
+
+    // ⚠️ **EN «Enlace de talleres» VA EL MENSAJE ENTERO, NO SOLO EL ENLACE**
+    // (25-nov-2026), y no es un descuido: es el campo que la acción de WhatsApp
+    // del flujo tiene mapeado como `{{2}}`, y la plantilla volvió a dos
+    // variables porque la acción **no deja añadir la tercera casilla** sin
+    // volver a elegir la plantilla (el porqué, medido, está en
+    // `mensajeDeAccesoEnUnaLinea`). Mientras la plantilla tenía tres y el flujo
+    // dos, **Meta rechazaba cada envío**.
+    const mensaje = mensajeDeAccesoEnUnaLinea({
+      confirmacion: datos.confirmacion,
+      enlace: datos.enlace,
+    });
+
     const aEscribir = [
+      // Los NOMBRES enteros, para que el saludo de la plantilla no dependa de
+      // cómo partió HighLevel el nombre al crear el contacto.
+      ...(campos.nombres && aprendiz.person.firstName.trim()
+        ? [{ id: campos.nombres, valor: aprendiz.person.firstName.trim() }]
+        : []),
       ...(campos.codigo ? [{ id: campos.codigo, valor: datos.codigo }] : []),
-      ...(campos.enlace ? [{ id: campos.enlace, valor: datos.enlace }] : []),
+      ...(campos.enlace ? [{ id: campos.enlace, valor: mensaje }] : []),
+      // La confirmación sola se sigue escribiendo en su propio campo. No la lee
+      // ninguna plantilla hoy, pero es el dato limpio y **es lo que habría que
+      // mapear como `{{2}}` el día que el flujo se pueda arreglar de verdad**.
       ...(campos.confirmacion
         ? [{ id: campos.confirmacion, valor: datos.confirmacion }]
         : []),
@@ -654,21 +693,17 @@ export async function exportarAccesoAlTaller(
     // Faltan los campos: la etiqueta ya está puesta y el workflow va a
     // disparar, así que hay que decir que el mensaje va a salir incompleto.
     //
-    // ⚠️ **Se miran los campos que VIAJAN en el mensaje, no los tres.** El
-    // código se escribe pero ya no sale por WhatsApp (22-oct), así que que
-    // falte su campo no deja el mensaje cojo: avisar de él sería un aviso que
-    // no hay que atender, y los avisos que no hay que atender se dejan de leer
-    // (§12.6).
-    if (!campos.enlace || !campos.confirmacion) {
-      const faltan = [
-        campos.enlace ? null : "«Enlace de talleres»",
-        campos.confirmacion ? null : "«Confirmación de casa de fe»",
-      ]
-        .filter(Boolean)
-        .join(" y ");
+    // ⚠️ **Se mira UN SOLO campo, y desde el 25-nov es «Enlace de talleres»**,
+    // porque es el único que viaja en el mensaje: ahí va el texto entero. El
+    // código de miembro se escribe pero no sale por WhatsApp (22-oct), y la
+    // confirmación suelta tampoco la lee ninguna plantilla — avisar de esos dos
+    // sería un aviso que no hay que atender, y los avisos que no hay que
+    // atender se dejan de leer (§12.6).
+    if (!campos.enlace) {
       return {
         ok: false,
-        motivo: `en HighLevel todavía no existe el campo ${faltan}, así que el WhatsApp va a salir sin ese dato.`,
+        motivo:
+          "en HighLevel todavía no existe el campo «Enlace de talleres», que es donde viaja el mensaje, así que el WhatsApp va a salir vacío.",
       };
     }
 

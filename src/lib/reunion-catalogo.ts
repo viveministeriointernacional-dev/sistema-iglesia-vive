@@ -75,6 +75,27 @@ export function horaLegible(hhmm: string): string {
   return `${doceHoras}:${mm} ${hora >= 12 ? "p. m." : "a. m."}`;
 }
 
+/// **La hora con su preposición: «a la 1:00 p. m.» pero «a las 4:00 p. m.».**
+///
+/// ⚠️ **En castellano la una va en singular**, y el sistema llevaba meses
+/// diciendo «a las 1:00 p. m.» en el correo, en el WhatsApp, en «Actividad del
+/// día» y en el informe. Son **3 de las 64 casas abiertas** (medido el 26-nov:
+/// 13:00 y 13:30), poca cosa en número pero se lee en cada mensaje que reciben
+/// sus miembros — y la de Milena Saenz es una de ellas.
+///
+/// Recibe la hora **ya formateada** y devuelve la frase entera, para que valga
+/// tanto con `horaLegible` («1:00 p. m.») como con el formateador de `Intl` del
+/// informe. Así no hay dos reglas que mantener.
+///
+/// ⚠️ Solo es singular el **1**: `^1[:.]` acierta con «1:00» y no con «11:00»
+/// ni «12:00», y deja en plural la hora de 24 horas («a las 13:00»), que es lo
+/// correcto.
+export function aLaHora(horaFormateada: string): string {
+  const hora = horaFormateada.trim();
+  if (!hora) return "";
+  return `${/^1[:.]/.test(hora) ? "a la" : "a las"} ${hora}`;
+}
+
 /// «Los miércoles a las 7:00 p. m. · cada semana», o `null` si al grupo
 /// todavía no le han puesto el día y la hora.
 export function fraseDeLaReunion(grupo: {
@@ -86,7 +107,7 @@ export function fraseDeLaReunion(grupo: {
   if (!dia || !grupo.meetingTime || !esHoraValida(grupo.meetingTime)) {
     return null;
   }
-  return `Los ${dia.plural} a las ${horaLegible(grupo.meetingTime)} · ${fraseDeFrecuencia(grupo.everyNWeeks)}`;
+  return `Los ${dia.plural} ${aLaHora(horaLegible(grupo.meetingTime))} · ${fraseDeFrecuencia(grupo.everyNWeeks)}`;
 }
 
 // ------------------------------------------------------- fechas civiles

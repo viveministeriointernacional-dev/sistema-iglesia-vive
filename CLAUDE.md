@@ -246,16 +246,55 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   línea**.
   Las plantillas viven en **Configuración → WhatsApp → Plantillas** (68 el
   22-oct, casi todas «Activo»). La del recordatorio es `recordatorio_casa_de_fe`.
-- **La plantilla del acceso al taller tiene TRES variables desde el 19-nov**
-  (`acceso_taller_casa_de_fe`, editada por la API de Meta): `{{1}}` →
-  `{{contact.first_name}}` · `{{2}}` → **`{{contact.confirmacion_de_casa_de_fe}}`**
-  · `{{3}}` → `{{contact.enlace_de_talleres}}`.
-  ⚠️ **El `{{2}}` es nuevo y hay que mapearlo EN EL FLUJO**: una plantilla con
-  más variables que las mapeadas **no manda nada**. Antes eran dos, y el campo
-  «Confirmacion de casa de fe» **se escribía desde el 30-oct sin que ninguna
-  plantilla lo leyera** — el sistema armaba el mensaje entero (casa, día, hora,
-  dirección, líder, qué llevar) y moría en el CRM. Se vio mirando el contacto de
-  verdad, no el código.
+- **⚠️ LA PLANTILLA VIVA DEL ACCESO AL TALLER ES `acceso_taller_casa_de_fe_v2`**
+  (creada por API el 26-nov, APPROVED, id `2552377041914702`), y **existe por una
+  razón que hay que entender antes de tocar nada**: HighLevel **se queda con la
+  copia de la plantilla que tomó cuando se eligió en la acción**, y no la suelta.
+  Comprobado hasta el final: el usuario re-eligió `acceso_taller_casa_de_fe` en
+  el desplegable y **el mensaje seguía llegando con el cuerpo ORIGINAL** —ni el
+  de tres variables del 19-nov ni el de dos del 25-nov: el de antes de que yo
+  tocara nada—. **Re-elegir la plantilla NO refresca la copia.**
+  ✅ **Lo que sí fuerza una copia nueva es un NOMBRE nuevo**, porque de ese
+  nombre HighLevel no tiene ninguna copia. De ahí el `_v2`.
+  ⚠️ **Y mientras el flujo apunte a la plantilla vieja, su cuerpo manda sobre
+  todo lo que yo cambie en Meta**: fija el saludo, la frase «Ya quedaste en tu
+  Casa de Fe» (sin género, que es justo lo que el usuario pidió cambiar), el
+  renglón que presenta el enlace y el cierre «Cuando termines uno». **Dentro de
+  ese marco el «inscrito/inscrita» es inalcanzable.** La forma de saber cuál
+  está puesta, sin entrar al panel: leer el historial del contacto y mirar la
+  última línea — **«Cuando termines un taller»** = la nueva · **«Cuando
+  termines uno»** = la vieja.
+  **El mapeo de la `_v2`, que son las mismas dos casillas de siempre:**
+  `{{1}}` → **`{{contact.nombres}}`** · `{{2}}` →
+  **`{{contact.enlace_de_talleres}}`**.
+- **⚠️ EL `{{1}}` YA NO LEE EL FIRST NAME DE HIGHLEVEL, SINO EL CAMPO
+  «Nombres»** (`contact.nombres`, id `Yya825AtApDPtLXRPdZX`, creado por API el
+  26-nov). El motivo está medido: **el First Name del CRM está cortado por el
+  primer espacio en 52 de los 538 contactos enlazados**, así que el saludo decía
+  «¡Hola, Juan!» a Juan Felipe. El sistema escribe ahí `person.first_name`
+  **entero**, sin pasar por `nombreDePila()` — que es la función que corta
+  (§12.6).
+  ⚠️ **Y EN «Enlace de talleres» VA EL MENSAJE ENTERO, NO SOLO EL ENLACE.** El nombre del
+  campo miente a propósito: lleva la confirmación (casa, día, hora, dirección,
+  líder, qué llevar) **y el enlace al final**, todo en una línea, porque es el
+  único campo que la acción del flujo tiene mapeado. Lo arma
+  `mensajeDeAccesoEnUnaLinea` en el catálogo. Quien busque un enlace limpio para
+  copiar **no lo va a encontrar ahí suelto**: está al final del párrafo.
+  **El campo «Confirmacion de casa de fe» se sigue escribiendo** con el texto
+  limpio: no lo lee nadie hoy, pero **es lo que habría que mapear como `{{2}}`
+  el día que el flujo se pueda arreglar de verdad**.
+  ⚠️ **POR QUÉ FRACASÓ EL CAMINO DE TRES VARIABLES, QUE ES LA LECCIÓN:** el
+  19-nov la plantilla pasó a tres (`{{2}}` = confirmación, `{{3}}` = enlace) y
+  el usuario remapeó el flujo, **y siguió fallando**. La causa: **la acción de
+  WhatsApp del flujo guarda su propia copia de la plantilla**, y remapear sobre
+  esa copia vieja **no añade la tercera casilla** — el flujo mandaba dos valores
+  para una plantilla de tres y **Meta rechazaba cada envío**, sin que nada en
+  HighLevel lo dijera. Para refrescarla hay que **volver a elegir la plantilla
+  en el desplegable de la acción** (o borrar la acción y añadirla de nuevo).
+  **Medido con un antes y un después sobre el mismo número**: 2 variables con 2
+  mapeadas → `read` (19-nov); 3 con 2 → `failed` (25-nov). **Y costó una persona
+  real**: Milena Saenz, que entró el 24-nov, **no tiene correo**, y su único
+  camino falló.
   ⚠️ **Y la frase de qué pasó vive AHORA en la variable, no en el texto fijo.**
   Tenía que decir «ya quedaste **inscrito**» / «**inscrita**» (pedido del
   usuario, 19-nov) y el texto fijo es el mismo para todos, así que no podía
@@ -753,26 +792,23 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   captura del 22-oct aparecía como `x-iglesia-webhook-se…`, que es el nombre de
   la **cabecera**, no de la variable) y, si está bien, el **código de respuesta
   en sus Logs**. Detalle entero en la bitácora del 23-oct.
-- **⚠️ SIGUE PENDIENTE EL REMAPEO DE LAS VARIABLES DEL FLUJO DEL TALLER**
-  (19-nov, y todavía el 25-nov): la plantilla `acceso_taller_casa_de_fe` pasó a
-  **tres** variables y el flujo tiene dos mapeadas. **Con menos variables
-  mapeadas que la plantilla, el WhatsApp no sale.** Lo que hay que poner:
-  `{{1}}` → Contact First Name · `{{2}}` → **Confirmacion de casa de fe** (la
-  nueva) · `{{3}}` → Enlace de talleres, **eligiéndolas del selector**.
-  ✅ La plantilla quedó **APPROVED** en Meta (24-nov).
-  ⚠️ **El único ingreso desde el cambio no sirve para comprobarlo**: el de
-  Jose Duvan (21-nov) salió `failed`, pero ese contacto tiene **2 WhatsApp y los
-  2 fallaron**, uno del 8-nov, de antes de todo — ese número no está en
-  WhatsApp. Para comprobar el remapeo hace falta un envío a un número que sí
-  reciba.
-- **⚠️ EL SALUDO DEL WHATSAPP DICE MEDIO NOMBRE EN 52 DE 538 CONTACTOS**
-  (medido el 24-nov, barriendo los 538 enlaces uno a uno). El `{{1}}` lee el
-  **First Name de HighLevel**, y el CRM parte el nombre por el primer espacio:
-  a Juan Felipe le dice «¡Hola, Juan!», a Harold Mauricio «Harold». Es el fallo
-  de §12.6 pero **en el dato del CRM, no en nuestro código** — nosotros tenemos
-  `person.first_name` entero. Se arregla sin tocar el CRM: escribir los nombres
-  en un campo propio y apuntar `{{1}}` ahí. Es código nuestro más una línea del
-  remapeo; el usuario no ha dicho si lo quiere.
+- **⚠️ LO ÚNICO QUE BLOQUEA EL TEXTO DEL TALLER: ELEGIR `acceso_taller_casa_de_fe_v2`
+  EN LA ACCIÓN DEL FLUJO** (pendiente del usuario, 26-nov). Está **APPROVED** en
+  Meta. El mapeo son las mismas dos casillas: `{{1}}` → **Nombres** (el campo
+  nuevo, no el First Name del CRM) · `{{2}}` → **Enlace de talleres**.
+  ✅ **Los envíos YA funcionan** (`read` el 26-nov a las 00:13), así que esto no
+  urge: lo que falta es el texto con género, no el canal.
+  ⚠️ **Y re-elegir la plantilla vieja NO sirve**, ya se intentó: su copia en
+  HighLevel es la ORIGINAL y no se suelta (§6). Por eso existe la `_v2`.
+  **Cómo lo compruebo yo**, sin preguntarle: disparar quitando y poniendo la
+  etiqueta `casa-de-fe-taller` en su contacto (`jx5W5syCWeaImQ9N807k`) y leer la
+  última línea del historial — «Cuando termines **un taller**» = ya está.
+- **✅ EL SALUDO DE MEDIO NOMBRE: ARREGLADO EN EL CÓDIGO** (26-nov). Eran **52
+  de 538** contactos («¡Hola, Juan!» a Juan Felipe). El sistema escribe ahora
+  `person.first_name` **entero** en el campo **«Nombres»** del CRM, y el `{{1}}`
+  de la plantilla `_v2` se mapea ahí. **Queda vivo solo hasta que el flujo
+  apunte a la `_v2`**: con la plantilla vieja el `{{1}}` sigue leyendo el First
+  Name cortado.
 - **⚠️ AMANDA SUAREZ CUELGA DEL CONTACTO DE «luz mery quesada», CON OTRO
   TELÉFONO** (24-nov): el de Amanda es `320 4207524` y el del contacto
   `318 7731064`. **No es el caso del teléfono compartido**: se engancharon por
@@ -1266,6 +1302,42 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
      llegar. Es la única prueba, y cuesta dos minutos.
   3. **Si el canal no puede confirmar, decirlo en la pantalla** en vez de dejar
      que el silencio parezca éxito.
+- **⚠️ UNA HERRAMIENTA AJENA PUEDE GUARDAR SU PROPIA COPIA DE LO QUE TÚ
+  CAMBIASTE, Y ENTONCES TU CAMBIO ROMPE LO QUE FUNCIONABA SIN ARREGLAR NADA.**
+  El 19-nov edité la plantilla de Meta para que tuviera tres variables en vez de
+  dos. Meta la aprobó, el usuario remapeó el flujo de HighLevel, **y todos los
+  envíos empezaron a fallar**. La causa: **la acción de WhatsApp del flujo tiene
+  su propia copia de la plantilla**, con sus dos casillas, y remapear sobre ella
+  no añade la tercera — así que el flujo mandaba dos valores para una plantilla
+  de tres y Meta rechazaba cada envío **sin que HighLevel dijera nada**.
+  Tres cosas que repetir:
+  1. **Al cambiar la FORMA de algo que otra herramienta consume —el número de
+     variables, el nombre de un campo, el orden— no basta con que la herramienta
+     lo lea: hay que comprobar que lo ha vuelto a leer.** Aquí se refresca
+     volviendo a elegir la plantilla en el desplegable de la acción.
+  2. **El antes y el después sobre el MISMO sujeto es lo que lo demuestra**: el
+     mismo número que salió `read` con 2 variables y 2 mapeadas salió `failed`
+     con 3 y 2. Sin ese par, «falló» no distingue mi cambio de un número que no
+     tiene WhatsApp — que es justo el error que casi cometí con otro contacto.
+  3. **Cuando el camino limpio depende de que otro refresque su copia, el camino
+     sucio puede ser el correcto.** La salida fue volver a dos variables y meter
+     el mensaje entero en el campo que el flujo ya tenía mapeado: el nombre del
+     campo queda mintiendo, pero **no depende de nadie** y funciona desde el
+     primer envío. Eso se escribe en el código y en la memoria, no se deja para
+     que alguien lo descubra.
+  4. **⚠️ Y LA COPIA AJENA PUEDE NO REFRESCARSE NUNCA: ENTONCES LA SALIDA ES UN
+     NOMBRE NUEVO.** El 26-nov el usuario re-eligió la plantilla en la acción y
+     **el mensaje siguió llegando con el cuerpo ORIGINAL**, el de antes de mis
+     dos ediciones. O sea que «volver a elegirla» —lo que yo le dije que
+     bastaba— **no refresca nada**. Lo que sí: **crear la plantilla con otro
+     nombre** (`acceso_taller_casa_de_fe_v2`), porque de ese nombre la otra
+     herramienta no tiene copia que conservar. **Cuando un caché ajeno no se
+     puede invalidar, se le cambia la llave.**
+  5. **Y el marco ajeno limita lo que se puede decir, no solo cómo se ve.** El
+     cuerpo viejo trae su propio saludo y su propia frase «Ya quedaste en tu
+     Casa de Fe» **sin género** — que era justo lo que había que cambiar. Dentro
+     de él, por mucho que yo rellene la variable, el «inscrita» **no cabe**.
+     **Antes de prometer un texto, comprobar qué parte del texto es tuya.**
 - **⚠️ Y ANTES DE ESCRIBIR UN MENSAJE PARA UN CANAL AJENO, MIRAR QUÉ FORMATO
   ADMITE ESE CANAL.** El recordatorio se diseñó entero —mockup aprobado, código,
   pruebas— dando por hecho que se podía mandar texto libre por WhatsApp. **No se
@@ -1505,6 +1577,23 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   como texto crudo, y su entrada en el catálogo de `audit.ts` o no compila.
 - **Todo webhook público nuevo va en `RUTAS_PUBLICAS`** o el middleware lo
   redirige con 307.
+- **⚠️ UN SCRIPT QUE EDITA ARCHIVOS CON EXPRESIONES REGULARES PUEDE BORRAR MEDIO
+  ARCHIVO Y SEGUIR SALIENDO «ok».** El 26-nov un script mío para añadir un
+  import a tres archivos dejó `actividad.ts` **con 1 531 líneas menos** —de 1 539
+  a 8— y escribió «ok» por pantalla: la rama que no encontraba el patrón
+  reconstruía la cadena mal y la escribía igual. **Lo delató `git diff --stat`,
+  no el script.** Dos cosas: **mirar `git diff --stat` después de cada edición
+  por script**, que cuesta un segundo y enseña el tamaño del daño; y para un
+  cambio de una línea en un archivo que no es el del trabajo, **usar la
+  herramienta de edición exacta en vez de un script** — un `replace` que falla
+  no escribe nada, un script que falla escribe lo que sea. Se restauró con
+  `git checkout --` porque el archivo estaba limpio en HEAD; si hubiera llevado
+  trabajo sin commitear, se habría perdido.
+- **⚠️ UN BUILD NO SE LANZA CON `| tail`: EL PIPE SE QUEDA CON EL CÓDIGO DE
+  SALIDA DE `tail` Y UN FALLO SE LEE COMO «exit 0».** Pasó el 25-nov: di por
+  verde una compilación que había fallado, y lo único que asomaba en las 6
+  líneas del final era un objeto de error sin contexto. Se lanza **sin pipe**,
+  redirigiendo a un archivo, y se lee `$?`; o se mira `${PIPESTATUS[0]}`.
 - **⚠️ `npm run cf:build` puede fallar EN ESTE CONTENEDOR por las fuentes de
   Google** (`Can't resolve '@vercel/turbopack-next/internal/font/google/font'`)
   **aunque el código esté bien**: el 15-nov la rama sin cambios fallaba igual.
@@ -1530,7 +1619,11 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 > archivo del mes** y su renglón **arriba de este índice**. Si de ese trabajo
 > sale una regla general, va **además** a §12.
 
-### `docs/bitacora/2026-11.md` — noviembre de 2026 (5 entradas)
+### `docs/bitacora/2026-11.md` — noviembre de 2026 (7 entradas)
+
+- **26-nov** · **La copia ajena no se refresca: se le cambia la llave** · ⚠️ **re-elegir la plantilla en la acción NO refresca nada** —mi consejo estaba mal—: el mensaje llegó `read` pero con el cuerpo **ORIGINAL**, el de antes de mis dos ediciones · ⚠️ **y el marco viejo limita lo que se puede DECIR**, no solo cómo se ve: trae su propia frase «Ya quedaste en tu Casa de Fe» **sin género**, que era justo lo que había que cambiar · ✅ **la salida es un NOMBRE nuevo**, `acceso_taller_casa_de_fe_v2`, porque de ese nombre HighLevel no tiene copia que conservar — **cuando un caché ajeno no se puede invalidar, se le cambia la llave** · ✅ **el saludo de medio nombre arreglado** (52 de 538): `person.first_name` entero en el campo nuevo «Nombres» · ✅ **«a la 1:00»** en los cuatro sitios, con `aLaHora`, que recibe la hora ya formateada y vale para `horaLegible` y para `Intl` · ⚠️ **y un script mío dejó `actividad.ts` con 1 531 líneas menos escribiendo «ok»**: lo delató `git diff --stat`.
+
+- **25-nov** · **El camino de tres variables no se pudo, y la vuelta atrás es la que funciona** · ⚠️ **la acción de WhatsApp del flujo guarda su PROPIA copia de la plantilla**: el usuario remapeó y siguió fallando, porque sobre la copia vieja **no hay tercera casilla que mapear** · **demostrado con un antes y un después sobre el mismo número**: 2 variables con 2 mapeadas → `read`; 3 con 2 → `failed` · ⚠️ **y costó una persona real**: Milena Saenz entró el 24-nov, **no tiene correo** y su único camino falló, con la auditoría diciendo `porWhatsapp: true` · decisión del usuario: **volver a dos variables** y meter el mensaje entero en «Enlace de talleres», el campo que el flujo ya tenía mapeado — el nombre del campo queda mintiendo, pero **no depende de que nadie refresque nada** · el orden importa y se eligió a propósito: **la plantilla primero** (los envíos se arreglan en el acto, con el enlace) y el código después (devuelve la confirmación).
 
 - **24/25-nov** · **El barrido de los 538 enlaces al CRM, y tres cosas que desmontó** · ✅ el texto nuevo quedó **comprobado vivo** con un ingreso real del 21-nov, y la plantilla **APPROVED** · ⚠️ **«no me llegó nada» era falso y lo desmontó el historial del CRM: dos mensajes, los dos `read`**, con texto idéntico 3 minutos aparte — **«Permitir reentrada» SÍ está encendida**, y por fin hay forma de leer si un WhatsApp salió (`/conversations`, `Version: 2021-04-15`) · del barrido: **52 de 538 saludan con medio nombre** y **7 enlaces apuntaban a otra persona**, en **tres mecanismos distintos** · ⚠️ **mi primera clasificación agrupaba por apellido compartido, que es justo lo que comparten madre e hija**: tuve que rehacerla por nombre de pila · ✅ **el usuario cerró el caso de los teléfonos repetidos**: son menores o gente sin celular propio, y **el código de miembro es lo que identifica**, entregado en mano por el líder · ⚠️ **imán nuevo que §12.7 no tenía: un correo de relleno** (`notiene@gmail.com`) engancha por correo, y ahí el teléfono **no** coincide, así que el mensaje se va a un tercero · ⚠️ **cuatro contactos se llamaban «Santiago Viveros»: nacieron bien y los renombraron el 13-nov DENTRO de HighLevel** (cero filas en nuestra auditoría), así que el arreglo puede no durar.
 
