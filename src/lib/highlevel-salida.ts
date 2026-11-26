@@ -449,6 +449,19 @@ export const ETIQUETA_TALLER = "casa-de-fe-taller";
 /// autorizada, y así tampoco hace falta un despliegue nuevo cuando se creen.
 const NOMBRES_DE_CAMPO = {
   codigo: ["codigo de miembro", "código de miembro"],
+  /// **Los NOMBRES de la ficha, enteros.**
+  ///
+  /// ⚠️ **Existe porque el `first_name` de HighLevel está cortado por el primer
+  /// espacio en 52 de los 538 contactos enlazados** (medido el 24-nov barriendo
+  /// los enlaces uno a uno): el `{{1}}` de la plantilla decía «¡Hola, Juan!» a
+  /// Juan Felipe y «Harold» a Harold Mauricio. En Colombia los dos nombres
+  /// **son** el nombre (§12.6).
+  ///
+  /// El dato bueno es `person.first_name`, que guarda los NOMBRES, y **se
+  /// escribe entero, sin pasar por `nombreDePila()`** — que es justo la función
+  /// que corta. Con el campo puesto, `{{1}}` se mapea aquí en vez de al First
+  /// Name del CRM y el saludo deja de depender de cómo partió el CRM el nombre.
+  nombres: ["nombres"],
   enlace: ["enlace de talleres", "enlace de los talleres"],
   /// El centro de la confirmación de inscripción, **en una sola línea** (la
   /// casa, el día, la hora, la dirección, quién la lleva y qué llevar).
@@ -550,13 +563,17 @@ async function buscarIdsDeCampos<Clave extends string>(
 /// en el CRM para quien lo necesite —el líder que tiene que dictárselo a quien
 /// perdió el enlace— y quitarlo de aquí sería perder un dato que ya está puesto
 /// en 46 contactos.
-async function camposDelTaller(
-  cred: Credenciales,
-): Promise<{ codigo: string | null; enlace: string | null; confirmacion: string | null }> {
+async function camposDelTaller(cred: Credenciales): Promise<{
+  codigo: string | null;
+  enlace: string | null;
+  confirmacion: string | null;
+  nombres: string | null;
+}> {
   return buscarIdsDeCampos(cred, {
     codigo: NOMBRES_DE_CAMPO.codigo,
     enlace: NOMBRES_DE_CAMPO.enlace,
     confirmacion: NOMBRES_DE_CAMPO.confirmacion,
+    nombres: NOMBRES_DE_CAMPO.nombres,
   });
 }
 
@@ -614,6 +631,11 @@ export async function exportarAccesoAlTaller(
     });
 
     const aEscribir = [
+      // Los NOMBRES enteros, para que el saludo de la plantilla no dependa de
+      // cómo partió HighLevel el nombre al crear el contacto.
+      ...(campos.nombres && aprendiz.person.firstName.trim()
+        ? [{ id: campos.nombres, valor: aprendiz.person.firstName.trim() }]
+        : []),
       ...(campos.codigo ? [{ id: campos.codigo, valor: datos.codigo }] : []),
       ...(campos.enlace ? [{ id: campos.enlace, valor: mensaje }] : []),
       // La confirmación sola se sigue escribiendo en su propio campo. No la lee

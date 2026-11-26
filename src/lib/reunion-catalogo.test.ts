@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  aLaHora,
   DIAS_DE_LA_SEMANA,
   diaDeLaSemanaDe,
   enlaceComoLlegar,
@@ -421,4 +422,40 @@ test("la franja de horas se ajusta a lo que hay, sin dibujar el día entero", ()
   assert.ok(suelto.desde <= 19 && suelto.hasta >= 20);
   // Uno a las 7 de la mañana estira la franja hacia arriba.
   assert.equal(franjaDeLasHoras([{ inicio: m("07:00"), fin: m("08:30") }]).desde, 7);
+});
+
+// ⚠️ **«a la 1:00» pero «a las 4:00».** El sistema llevaba meses diciendo «a las
+// 1:00 p. m.» en el correo, el WhatsApp, «Actividad del día» y el informe. Son
+// 3 de las 64 casas abiertas (13:00 y 13:30 el 26-nov), y una es la de Milena.
+test("la una va en singular y las demás horas en plural", () => {
+  assert.equal(aLaHora("1:00 p. m."), "a la 1:00 p. m.");
+  assert.equal(aLaHora("1:30 a. m."), "a la 1:30 a. m.");
+
+  // Las que NO son la una, incluidas las dos que más se parecen.
+  assert.equal(aLaHora("11:00 a. m."), "a las 11:00 a. m.");
+  assert.equal(aLaHora("12:00 p. m."), "a las 12:00 p. m.");
+  assert.equal(aLaHora("4:00 p. m."), "a las 4:00 p. m.");
+  assert.equal(aLaHora("10:00 a. m."), "a las 10:00 a. m.");
+
+  // La hora de 24 horas va en plural, que es lo correcto: «a las 13:00».
+  assert.equal(aLaHora("13:00"), "a las 13:00");
+  assert.equal(aLaHora("13:30"), "a las 13:30");
+
+  // Nada que decir si no hay hora: la frase la arma quien llama.
+  assert.equal(aLaHora(""), "");
+  assert.equal(aLaHora("   "), "");
+});
+
+// Y la frase entera, que es donde se nota.
+test("la frase de la reunión usa la preposición correcta", () => {
+  assert.ok(
+    fraseDeLaReunion({ weekday: 6, meetingTime: "13:00", everyNWeeks: 1 })?.includes(
+      "a la 1:00 p. m.",
+    ),
+  );
+  assert.ok(
+    fraseDeLaReunion({ weekday: 3, meetingTime: "19:00", everyNWeeks: 1 })?.includes(
+      "a las 7:00 p. m.",
+    ),
+  );
 });

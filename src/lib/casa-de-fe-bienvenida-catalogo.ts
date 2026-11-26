@@ -15,6 +15,7 @@
 /// enlace; saber a qué hora llegar, no.
 
 import {
+  aLaHora,
   diaDeLaSemana,
   enlaceComoLlegar,
   fraseDeFrecuencia,
@@ -172,7 +173,7 @@ export function cuandoSeReune(
   const cada = casa.everyNWeeks > 1 ? ` (${fraseDeFrecuencia(casa.everyNWeeks)})` : "";
 
   return {
-    largo: `Todos los ${dia.plural} a las ${hora}${cada}`,
+    largo: `Todos los ${dia.plural} ${aLaHora(hora)}${cada}`,
     corto: `${dia.plural} ${hora}`,
   };
 }
