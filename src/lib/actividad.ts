@@ -9,6 +9,7 @@ import {
   fraseDeFrecuencia,
   horaLegible,
 } from "@/lib/reunion-catalogo";
+import { claveDeGrupoBorrado, ROTULOS } from "@/lib/tipo-de-grupo";
 
 /// La actividad del día: todo lo que quedó en la bitácora de auditoría (más
 /// las llamadas reales del CRM y los correos enviados), traducido a frases que
@@ -863,7 +864,12 @@ export async function cargarActividad(
       case "casa_de_fe.grupo_borrado":
       case "alpha.grupo_borrado": {
         tipo = "grupos"; etiqueta = "GRUPOS"; tono = "rojo";
-        const clase = fila.action.startsWith("alpha") ? " borró el Alpha " : " borró la Casa de Fe ";
+        // ⚠️ El tipo sale del METADATO, no del nombre de la acción: los tres
+        // tipos de `faith_house_group` se auditan con la misma
+        // (`casa_de_fe.grupo_borrado`), así que deducirlo de la acción llamaba
+        // «Casa de Fe» a un Restaurados o a una mentoría (26-nov).
+        const rotulosDelBorrado = ROTULOS[claveDeGrupoBorrado(m.tipo, fila.action)];
+        const clase = ` borró ${rotulosDelBorrado.articulo} ${rotulosDelBorrado.singular} `;
         const cuantas = Array.isArray(m.personas) ? m.personas.length : 0;
         frase = [A(), t(clase), b(texto(m.nombre) ?? "sin nombre"), t(cuantas === 0 ? " · no tenía a nadie dentro" : cuantas === 1 ? " · tenía 1 persona dentro" : ` · tenía ${cuantas} personas dentro`)];
         tituloDetalle = "Qué tenía dentro";

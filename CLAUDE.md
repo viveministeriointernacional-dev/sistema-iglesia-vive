@@ -743,6 +743,23 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   Quedan dos contactos más con ese nombre y **sin ficha**: 312 5675163
   («Primera Llamada», 21-oct, nació ya con ese nombre) y 317 3407878
   («Primera Llamada», 6-oct). Pueden ser otros números suyos; no se confirmó.
+- **Borrado el grupo duplicado «Restaura2 - Julian & Claudia» (26-nov).** Eran
+  **dos grupos de RESTAURADOS con la misma pareja, el mismo líder (Juan Felipe),
+  el mismo martes a la 1:30 p. m. y la misma dirección escrita de dos formas**,
+  separados solo por un guion en el nombre. Salió al medir una pregunta del
+  usuario sobre choques de horario: barridos **todos** los grupos abiertos, era
+  **el único caso** de un líder con dos grupos a la vez — y no era un choque,
+  era un duplicado. Confirmado por él («es la misma pareja»).
+  **Sobrevive el del 27-oct**, que tiene el pin del mapa y la dirección más
+  completa; se fue el del 13-nov (`8a3bad23-54bc-4455-b2e4-91d5507acff5`).
+  **Ninguno tenía miembros ni encargados**, así que no se tocó el expediente de
+  nadie, y después del borrado quedan **0 líderes con dos grupos a la misma
+  hora**.
+  **Método, imitando a `borrarGrupo`:** la auditoría **antes** del `delete` y
+  **en la misma sentencia** (un CTE de escritura, §12.8), con el nombre dentro
+  —borrada la fila no queda ni su nombre (§12.6)— y `actor_id` **vacío a
+  propósito**, porque nadie lo pulsó en la plataforma: va dicho con
+  `origen: "correccion_manual"` y el motivo entero en el metadato.
 - **NO fusionar (decisión del usuario, 7-sep):** **Luna Sandoval / Lina Mercedes
   Jovel** (`linitajovel@gmail.com`) y **Nini Guerrón / Dilan Cadena**
   (`ninijguerrons@gmail.com`) **son personas distintas que comparten correo** —
@@ -1425,6 +1442,20 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   una tabla compartida amplía en silencio todo lo que consultaba esa tabla sin
   filtrar** — hay que recorrer cada consulta y decidir una por una, no suponer
   que lo que servía para una fila sirve para todas.
+  ⚠️ **Y ESTA REGLA SE COBRÓ UNA SEGUNDA VEZ EL 26-NOV, EN UN SITIO QUE NO ES
+  UNA CONSULTA: UN RÓTULO.** Los tres tipos de `faith_house_group` se auditan
+  con **la misma acción** (`casa_de_fe.grupo_borrado`), y «Actividad del día»
+  deducía el tipo **del nombre de la acción** — así que al borrar un grupo de
+  Restaurados su línea decía **«borró la Casa de Fe»**. Se vio al borrar el
+  duplicado de Julian & Claudia (§8), no leyendo el código. Arreglado: el tipo
+  viaja en el **metadato** (`tipo`) y lo lee `claveDeGrupoBorrado`, que **se cae
+  al nombre de la acción para las filas viejas** —las de antes del 26-nov no lo
+  llevan— para que ninguna línea ya escrita cambie de significado.
+  **Lo que esto añade a la regla: al compartir una tabla, lo que hay que
+  recorrer no son solo las consultas, son también los TEXTOS que nombran la
+  fila.** Y si una acción de auditoría va a servir para varios tipos, **el tipo
+  se escribe en el metadato el día que se crea**, porque borrada la fila no hay
+  dónde ir a buscarlo.
 - **⚠️ EL ARTÍCULO INDEFINIDO DELANTE DE UN SUSTANTIVO NO ES EL QUE VA SOLO.**
   «un grupo» pero «asignen **uno**». El catálogo de rótulos guardaba un solo
   campo para las dos cosas y la pantalla decía «Cuando te asignen un,
@@ -1619,7 +1650,9 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 > archivo del mes** y su renglón **arriba de este índice**. Si de ese trabajo
 > sale una regla general, va **además** a §12.
 
-### `docs/bitacora/2026-11.md` — noviembre de 2026 (7 entradas)
+### `docs/bitacora/2026-11.md` — noviembre de 2026 (8 entradas)
+
+- **26-nov (tarde)** · **Un duplicado borrado, y el rótulo que llamaba «Casa de Fe» a un Restaurados** · ⚠️ **mi «3 de 64» estaba mal contado** —era la cuenta del error de texto, y sin filtrar por tipo— y lo que la pregunta del usuario destapó fue otra cosa: barridos **todos** los grupos, el único líder con dos a la misma hora tenía **el mismo grupo metido dos veces**, separado por un guion en el nombre · borrado el del 13-nov con la auditoría **antes del `delete` y en la misma sentencia**, `actor_id` vacío a propósito y el motivo dentro · después: **0 líderes con dos grupos a la vez** · ⚠️ **y al leer el código del borrado antes de imitarlo salió el fallo**: los tres tipos de `faith_house_group` comparten la acción de auditoría, así que «Actividad del día» deducía el tipo del nombre de la acción y decía «borró la Casa de Fe» de un Restaurados — **§12.6 otra vez, pero en un RÓTULO y no en una consulta** · el tipo pasa al metadato, con caída al nombre de la acción para las filas viejas.
 
 - **26-nov** · **La copia ajena no se refresca: se le cambia la llave** · ⚠️ **re-elegir la plantilla en la acción NO refresca nada** —mi consejo estaba mal—: el mensaje llegó `read` pero con el cuerpo **ORIGINAL**, el de antes de mis dos ediciones · ⚠️ **y el marco viejo limita lo que se puede DECIR**, no solo cómo se ve: trae su propia frase «Ya quedaste en tu Casa de Fe» **sin género**, que era justo lo que había que cambiar · ✅ **la salida es un NOMBRE nuevo**, `acceso_taller_casa_de_fe_v2`, porque de ese nombre HighLevel no tiene copia que conservar — **cuando un caché ajeno no se puede invalidar, se le cambia la llave** · ✅ **el saludo de medio nombre arreglado** (52 de 538): `person.first_name` entero en el campo nuevo «Nombres» · ✅ **«a la 1:00»** en los cuatro sitios, con `aLaHora`, que recibe la hora ya formateada y vale para `horaLegible` y para `Intl` · ⚠️ **y un script mío dejó `actividad.ts` con 1 531 líneas menos escribiendo «ok»**: lo delató `git diff --stat`.
 

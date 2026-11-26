@@ -251,3 +251,28 @@ export function fraseDelAlcance(r: RotulosDeGrupo, vistaCompleta: boolean) {
     ? `Tod${r.articuloPlural === "las" ? "a" : "o"}s ${r.articuloPlural} ${r.plural} de la iglesia`
     : `${r.articuloPlural === "las" ? "Las" : "Los"} que llevas y ${r.articuloPlural} de tu red`;
 }
+
+/// **De qué tipo era el grupo que se borró, para poder nombrarlo bien.**
+///
+/// ⚠️ **Los TRES tipos de `faith_house_group` se auditan con la misma acción**,
+/// `casa_de_fe.grupo_borrado`, porque comparten tabla, ruta y permiso. Así que
+/// deducir el tipo del nombre de la acción llama **«Casa de Fe» a un grupo de
+/// Restaurados o a una mentoría** — se vio el 26-nov-2026 al borrar un
+/// duplicado de Restaurados, cuya línea en «Actividad del día» iba a decir
+/// «borró la Casa de Fe Restaura2 - Julian & Claudia».
+///
+/// El tipo bueno viaja en el **metadato** (`tipo`), que es lo único que sigue
+/// existiendo cuando la fila ya no está (§12.6).
+///
+/// ⚠️ **Y las filas de antes del 26-nov no lo llevan**: para esas se cae al
+/// nombre de la acción, que es exactamente lo que decían antes — así ninguna
+/// línea vieja cambia de significado al desplegar esto.
+export function claveDeGrupoBorrado(
+  tipoDelMetadato: unknown,
+  action: string,
+): ClaveDeSeccion {
+  if (typeof tipoDelMetadato === "string" && tipoDelMetadato in ROTULOS) {
+    return tipoDelMetadato as ClaveDeSeccion;
+  }
+  return action.startsWith("alpha") ? "ALPHA" : "CASA_DE_FE";
+}

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  claveDeGrupoBorrado,
   fraseDelAlcance,
   fraseDelHueco,
   fraseSoloLaLinea,
@@ -103,4 +104,45 @@ test("Restaurados y Mentorías no prometen temas que no existen", () => {
   assert.doesNotMatch(ROTULOS.RESTAURADOS.referencia, /tema/i);
   assert.doesNotMatch(ROTULOS.MENTORIA.referencia, /tema/i);
   assert.match(ROTULOS.CASA_DE_FE.referencia, /12 temas/);
+});
+
+// ⚠️ **Los TRES tipos de `faith_house_group` se auditan con la MISMA acción**,
+// así que el nombre de la acción no dice de qué tipo era el grupo borrado. Se
+// vio el 26-nov al borrar un duplicado de Restaurados: su línea en «Actividad
+// del día» iba a decir «borró la Casa de Fe Restaura2 - Julian & Claudia».
+test("el tipo del grupo borrado sale del metadato, no de la acción", () => {
+  // Lo que importa: el metadato manda, aunque la acción diga «casa_de_fe».
+  assert.equal(
+    claveDeGrupoBorrado("RESTAURADOS", "casa_de_fe.grupo_borrado"),
+    "RESTAURADOS",
+  );
+  assert.equal(claveDeGrupoBorrado("MENTORIA", "casa_de_fe.grupo_borrado"), "MENTORIA");
+  assert.equal(claveDeGrupoBorrado("CASA_DE_FE", "casa_de_fe.grupo_borrado"), "CASA_DE_FE");
+  assert.equal(claveDeGrupoBorrado("ALPHA", "alpha.grupo_borrado"), "ALPHA");
+
+  // ⚠️ Las filas de antes del 26-nov NO llevan el tipo: se cae al nombre de la
+  // acción, que es lo que decían antes — ninguna línea vieja cambia de
+  // significado al desplegar esto.
+  assert.equal(claveDeGrupoBorrado(undefined, "casa_de_fe.grupo_borrado"), "CASA_DE_FE");
+  assert.equal(claveDeGrupoBorrado(undefined, "alpha.grupo_borrado"), "ALPHA");
+  assert.equal(claveDeGrupoBorrado(null, "alpha.grupo_borrado"), "ALPHA");
+
+  // Y un metadato con basura no revienta ni inventa un tipo.
+  assert.equal(claveDeGrupoBorrado("CUALQUIERA", "casa_de_fe.grupo_borrado"), "CASA_DE_FE");
+  assert.equal(claveDeGrupoBorrado(42, "casa_de_fe.grupo_borrado"), "CASA_DE_FE");
+});
+
+// Y la frase que de verdad se pinta, para los cuatro tipos.
+test("la frase del borrado nombra bien cada tipo", () => {
+  const frase = (tipo: unknown, action: string) => {
+    const r = ROTULOS[claveDeGrupoBorrado(tipo, action)];
+    return `borró ${r.articulo} ${r.singular}`;
+  };
+  assert.equal(frase("CASA_DE_FE", "casa_de_fe.grupo_borrado"), "borró la Casa de Fe");
+  assert.equal(
+    frase("RESTAURADOS", "casa_de_fe.grupo_borrado"),
+    "borró el grupo de Restaurados",
+  );
+  assert.equal(frase("MENTORIA", "casa_de_fe.grupo_borrado"), "borró la mentoría");
+  assert.equal(frase("ALPHA", "alpha.grupo_borrado"), "borró el Alpha");
 });
