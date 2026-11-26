@@ -17,6 +17,7 @@ import {
   nombreCoincide,
   NOMBRE_QUE_NO_COINCIDE,
 } from "@/lib/borrar-grupo-catalogo";
+import type { ClaveDeSeccion } from "@/lib/tipo-de-grupo";
 
 export type ResultadoDeGrupo = { ok: true } | { ok: false; mensaje: string };
 
@@ -28,7 +29,14 @@ export type ResultadoDeGrupo = { ok: true } | { ok: false; mensaje: string };
 export async function loQueTieneElGrupo(
   clase: ClaseDeGrupo,
   grupoId: string,
-): Promise<{ nombre: string; tiene: LoQueTieneElGrupo } | null> {
+): Promise<{
+  nombre: string;
+  /// De qué tipo es, **para que la auditoría del borrado lo diga**: los tres
+  /// tipos de `faith_house_group` se auditan con la misma acción, así que sin
+  /// esto «Actividad del día» llama «Casa de Fe» a un Restaurados (26-nov).
+  clave: ClaveDeSeccion;
+  tiene: LoQueTieneElGrupo;
+} | null> {
   const prisma = await getPrisma();
 
   if (clase === "alpha") {
@@ -52,6 +60,7 @@ export async function loQueTieneElGrupo(
 
     return {
       nombre: grupo.name,
+      clave: "ALPHA",
       tiene: {
         personas: grupo.enrollments.map((inscripcion) =>
           nombreCompleto(inscripcion.learner.person),
@@ -74,6 +83,7 @@ export async function loQueTieneElGrupo(
     where: { id: grupoId },
     select: {
       name: true,
+      kind: true,
       _count: { select: { coLeaders: true, meetings: true } },
       members: {
         select: {
@@ -88,6 +98,7 @@ export async function loQueTieneElGrupo(
 
   return {
     nombre: grupo.name,
+    clave: grupo.kind,
     tiene: {
       ...GRUPO_VACIO,
       personas: grupo.members.map((miembro) => nombreCompleto(miembro.learner.person)),
@@ -172,6 +183,11 @@ export async function borrarGrupo(
       entityId: grupoId,
       metadata: {
         nombre: datos.nombre,
+        // ⚠️ **El tipo, porque la acción no lo distingue.** Los tres tipos de
+        // `faith_house_group` comparten `casa_de_fe.grupo_borrado`, y borrada
+        // la fila esto es lo único que dice si era una Casa de Fe, un grupo de
+        // Restaurados o una mentoría (§12.6).
+        tipo: datos.clave,
         // Los nombres y no los ids: quien lea esto dentro de un año necesita
         // leer a quién tenía dentro, no ir a buscar 4 expedientes.
         personas: datos.tiene.personas,
