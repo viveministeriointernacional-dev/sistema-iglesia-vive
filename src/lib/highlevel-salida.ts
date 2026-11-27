@@ -462,6 +462,11 @@ const NOMBRES_DE_CAMPO = {
   /// que corta. Con el campo puesto, `{{1}}` se mapea aquí en vez de al First
   /// Name del CRM y el saludo deja de depender de cómo partió el CRM el nombre.
   nombres: ["nombres"],
+  /// El WhatsApp con el que un mentor recibe a una persona entregada
+  /// (27-nov-2026). Igual que el recordatorio y el aviso de petición: **el
+  /// campo ES el mensaje**, en una sola línea, y la plantilla de Meta solo
+  /// aporta el saludo y el cierre.
+  entregaMentor: ["entrega a mentor"],
   enlace: ["enlace de talleres", "enlace de los talleres"],
   /// El centro de la confirmación de inscripción, **en una sola línea** (la
   /// casa, el día, la hora, la dirección, quién la lleva y qué llevar).
@@ -789,6 +794,108 @@ export async function exportarRecordatorioDeCasaDeFe(
     return { ok: true };
   } catch (error) {
     console.error("No se pudo dejar listo el recordatorio en HighLevel", error);
+    return {
+      ok: false,
+      motivo: "HighLevel rechazó la escritura. Revisa el registro del Worker.",
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// La entrega de una persona a su mentor, por WhatsApp (27-nov-2026)
+// ---------------------------------------------------------------------------
+
+/// La etiqueta que dispara el WhatsApp con el que un mentor recibe a alguien.
+export const ETIQUETA_ENTREGA_MENTOR = "mentor-entrega";
+
+/// **Deja listo el WhatsApp con el que un mentor recibe a una persona.**
+///
+/// El correo sigue siendo el aviso completo —quién es, qué le pedimos y todo su
+/// historial de Operación 72—; esto es el toque en el bolsillo con lo único que
+/// hace falta para empezar: a quién, y su número.
+///
+/// ⚠️ **Sale UNO POR ENTREGA, y es una decisión del usuario con la medida
+/// delante** (27-nov). Las entregas llegan **en ráfaga**, no a goteo: el 27-nov
+/// hubo **11 en 41 minutos** y Paola Alejandra recibió 5 de ellas; en
+/// septiembre un mentor recibió **9 en un solo día**. Se eligió uno por entrega
+/// porque **cada mensaje es una persona distinta a la que llamar**, con su
+/// nombre y su número — no cinco copias del mismo aviso, que es el caso que
+/// cubre la regla de «un aviso que sale siempre se deja de leer» (§12.6). La
+/// alternativa medida era agruparlos, y agrupar algo inmediato exige retenerlo.
+///
+/// ⚠️ **Escribe también «Nombres»**, por lo mismo que el aviso de petición: el
+/// First Name del CRM está cortado por el primer espacio, y entre los mentores
+/// le pasa a 8 de 15 —«¡Hola, Juan!» a Juan Camilo y a Juan Felipe, y
+/// «¡Hola, Pastores!» a Alejandro—. Va en la **misma** escritura.
+///
+/// ⚠️ **Y si el campo del mensaje no existe, se sale ANTES de tocar la
+/// etiqueta**: aquí el campo **es** el mensaje, así que disparar sin él manda
+/// un WhatsApp vacío. Es la regla del recordatorio, no la del taller.
+export async function exportarEntregaAMentor(
+  contactId: string,
+  texto: string,
+  /// Los NOMBRES del MENTOR, enteros (`person.first_name`), para el saludo de
+  /// la plantilla. Vacío si su cuenta no tiene ficha enganchada: entonces no se
+  /// escribe y el saludo queda como lo tenga el CRM.
+  nombresDelMentor: string,
+): Promise<{ ok: true } | { ok: false; motivo: string }> {
+  const cred = await credenciales();
+  if (!cred) return { ok: false, motivo: "sin credenciales de HighLevel" };
+
+  try {
+    const campos = await buscarIdsDeCampos(cred, {
+      entregaMentor: NOMBRES_DE_CAMPO.entregaMentor,
+      nombres: NOMBRES_DE_CAMPO.nombres,
+    });
+    if (!campos.entregaMentor) {
+      return {
+        ok: false,
+        motivo:
+          "en HighLevel todavía no existe el campo «Entrega a mentor», así que el WhatsApp saldría vacío y no se disparó",
+      };
+    }
+
+    const aEscribir = [
+      { id: campos.entregaMentor, valor: texto },
+      ...(campos.nombres && nombresDelMentor.trim()
+        ? [{ id: campos.nombres, valor: nombresDelMentor.trim() }]
+        : []),
+    ];
+
+    await pedir(
+      `/contacts/${contactId}`,
+      "PUT",
+      {
+        customFields: aEscribir.map((campo) => ({
+          id: campo.id,
+          field_value: campo.valor,
+          value: campo.valor,
+        })),
+      },
+      cred.token,
+    );
+
+    // Quitarla puede fallar porque no estaba (la primera entrega de ese
+    // mentor): eso no es un error, es el estado inicial. Lo que no puede
+    // fallar es ponerla — y sin quitarla primero, de la segunda entrega en
+    // adelante añadirla no es un cambio y el mensaje no sale.
+    await pedir(
+      `/contacts/${contactId}/tags`,
+      "DELETE",
+      { tags: [ETIQUETA_ENTREGA_MENTOR] },
+      cred.token,
+    ).catch(() => undefined);
+
+    await pedir(
+      `/contacts/${contactId}/tags`,
+      "POST",
+      { tags: [ETIQUETA_ENTREGA_MENTOR] },
+      cred.token,
+    );
+
+    return { ok: true };
+  } catch (error) {
+    console.error("No se pudo dejar lista la entrega al mentor en HighLevel", error);
     return {
       ok: false,
       motivo: "HighLevel rechazó la escritura. Revisa el registro del Worker.",

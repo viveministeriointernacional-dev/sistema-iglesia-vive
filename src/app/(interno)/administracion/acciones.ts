@@ -33,7 +33,7 @@ import {
   correoCredenciales,
   type ResultadoCorreo,
 } from "@/lib/correo";
-import { enviarCorreoDeEntrega } from "@/lib/correo-entrega";
+import { avisarAlMentorDeLaEntrega } from "@/lib/correo-entrega";
 import { LARGO_MINIMO_CONTRASENA } from "@/lib/contrasena";
 import { momentoDesdeCampo, nombreCompleto } from "@/lib/dominio";
 import { actualizarDatosPersona, type DatosPersona } from "@/lib/persona";
@@ -579,9 +579,10 @@ export async function asignarMentor(
       });
     });
 
-    // El mentor recibe por correo quién es, qué le pedimos y cómo le fue en
-    // Operación 72; es el mismo correo que sale al entregar desde el tablero.
-    const correo = await enviarCorreoDeEntrega(prisma, {
+    // El mentor recibe el aviso por correo y por WhatsApp; es el mismo que sale
+    // al entregar desde el tablero (los dos sitios llaman a la misma función,
+    // que es lo que impide que uno de los dos se quede sin un canal).
+    const correo = await avisarAlMentorDeLaEntrega(prisma, {
       learnerId,
       mentorId: mentorUserId,
       entregadaPorId: usuario.id,

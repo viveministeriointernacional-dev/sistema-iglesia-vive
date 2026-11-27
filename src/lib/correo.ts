@@ -297,7 +297,7 @@ export async function correoCredenciales(datos: {
 
 /// Correo con el que el mentor recibe a una persona. Cinco bloques: quién es,
 /// qué le pedimos, cómo le fue en Operación 72, petición de oración y botones.
-/// El contenido lo arma `enviarCorreoDeEntrega` (src/lib/correo-entrega.ts).
+/// El contenido lo arma `avisarAlMentorDeLaEntrega` (src/lib/correo-entrega.ts).
 export async function correoEntregaAMentor(datos: {
   to: string;
   mentorNombre: string;

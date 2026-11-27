@@ -31,6 +31,11 @@ export type AccionAuditada =
   | "operacion72.marcado_asistente"
   | "operacion72.vuelve_a_proceso"
   | "mentor.asignado"
+  /// El WhatsApp con el que el mentor recibe a la persona. ⚠️ Se llama
+  /// «encargada» y no «enviada» a propósito: lo nuestro es escribir el campo y
+  /// mover la etiqueta; que el mensaje salga lo deciden HighLevel y Meta, y eso
+  /// solo se sabe leyendo el historial del CRM (§12.6).
+  | "mentor.entrega_encargada"
   | "notas.reveladas"
   | "hito.registrado"
   | "casa_de_fe.tema_actualizado"

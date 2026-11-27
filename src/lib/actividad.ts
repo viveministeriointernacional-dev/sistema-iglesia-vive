@@ -635,6 +635,23 @@ export async function cargarActividad(
       }
       case "mentor.asignado":
         continue; // va junto con operacion72.entregada
+      case "mentor.entrega_encargada": {
+        // ⚠️ **Dice lo que de verdad hicimos, no «se envió».** Es la lección de
+        // `acceso_enviado`, que afirmó durante tres semanas un hecho que no era
+        // nuestro mientras Meta no mandaba nada (§12.6). Y cuando NO se pudo,
+        // dice por qué: un canal que calla al fallar es el que se pierde.
+        tipo = "mentoria"; etiqueta = "MENTORÍA"; tono = "verde";
+        const mentor = usuario("mentorId");
+        const motivo = texto(m.motivo);
+        frase =
+          m.porWhatsapp === true
+            ? [t("Se dejó la entrega de "), P(), t(" encargada por WhatsApp"), ...(mentor ? [t(" a "), b(mentor)] : [])]
+            : [t("El WhatsApp de la entrega de "), P(), t(" no salió"), t(motivo ? ` · ${motivo}` : "")];
+        tituloDetalle = "El WhatsApp al mentor";
+        if (mentor) filas.push({ k: "Mentor", v: mentor });
+        filas.push({ k: "WhatsApp", v: m.porWhatsapp === true ? "encargado al CRM" : (motivo ?? "no salió") });
+        break;
+      }
       case "administracion.mentor_asignado": {
         tipo = "mentoria"; etiqueta = "MENTORÍA"; tono = "verde";
         const mentor = usuario("mentorId");

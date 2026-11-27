@@ -11,7 +11,7 @@ import {
 } from "@iglesia/prisma-client";
 import { getPrisma } from "@/lib/prisma";
 import { auditar, encolarEventoIntegracion } from "@/lib/audit";
-import { enviarCorreoDeEntrega } from "@/lib/correo-entrega";
+import { avisarAlMentorDeLaEntrega } from "@/lib/correo-entrega";
 import { momentoDesdeCampo, ZONA_HORARIA } from "@/lib/dominio";
 import {
   DONDE_PUEDE_MENTOREAR,
@@ -795,9 +795,11 @@ export async function entregarAMentor(
     });
   });
 
-  // El mentor recibe por correo quién es, qué le pedimos y cómo le fue en
-  // Operación 72 (best-effort: si el correo falla, la entrega ya quedó hecha).
-  await enviarCorreoDeEntrega(prisma, {
+  // El mentor recibe quién es, qué le pedimos y cómo le fue en Operación 72:
+  // por correo el aviso completo, y por WhatsApp el nombre y el número, que es
+  // lo que necesita para llamar. Best-effort las dos: si fallan, la entrega ya
+  // quedó hecha.
+  await avisarAlMentorDeLaEntrega(prisma, {
     learnerId: operacion.learnerId,
     mentorId,
     entregadaPorId: usuario.id,
