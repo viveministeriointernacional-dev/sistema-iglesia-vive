@@ -816,8 +816,33 @@ export const ETIQUETA_AVISO_PETICION = "peticion-aviso";
 /// volver a añadirla no es un cambio: el mensaje no saldría. Sin esto el aviso
 /// funciona una vez y nunca más — es el segundo fallo del acceso al taller,
 /// que solo añadía (22-oct).
+///
+/// ⚠️ **Y escribe también «Nombres», con los NOMBRES enteros de quien RECIBE**
+/// (27-nov-2026). El `{{1}}` de la plantilla leía el First Name del CRM, que
+/// está cortado por el primer espacio, y el primer aviso real lo dejó medido:
+/// de los 15 destinatarios, **8 fueron saludados por la mitad** —«¡Hola,
+/// Juan!» a Juan Camilo y a Juan Felipe, «¡Hola, Paola!» a Paola Alejandra,
+/// «¡Hola, Yuli!» a Yuli Katherine— y dos no recibieron ni medio nombre:
+/// «¡Hola, **Pastores**!» (la pareja metida en la ficha) y «¡Hola, **Pastor**!»
+/// (el título dentro del nombre). Es el mismo campo y el mismo arreglo que el
+/// acceso al taller, que ya lo hacía.
+///
+/// ⚠️ **Falta de «Nombres» NO bloquea el aviso, al contrario que «Aviso de
+/// petición».** No es una incoherencia: ahí falta el mensaje y aquí falta el
+/// saludo. Pero tiene un precio que hay que saber — con el `{{1}}` ya mapeado a
+/// este campo, si la escritura no entra el WhatsApp dice «¡Hola, !». Se asume
+/// por lo mismo que en el taller: callar el aviso entero de una consejería es
+/// peor que un saludo cojo.
 export async function exportarAvisoDePeticion(
-  destinatarios: readonly { contactId: string; nombre: string }[],
+  destinatarios: readonly {
+    contactId: string;
+    nombre: string;
+    /// `person.first_name` **entero**, sin pasar por `nombreDePila()` — que es
+    /// justo la función que corta (§12.6). Se llama `nombres` en plural a
+    /// propósito: el nombre del parámetro dice de dónde sale el dato, y con
+    /// `nombre` cualquiera le mete el completo.
+    nombres: string;
+  }[],
   texto: string,
 ): Promise<{
   encargados: number;
@@ -839,11 +864,14 @@ export async function exportarAvisoDePeticion(
   }
 
   let campoId: string | null = null;
+  let campoNombres: string | null = null;
   try {
     const campos = await buscarIdsDeCampos(cred, {
       avisoPeticion: NOMBRES_DE_CAMPO.avisoPeticion,
+      nombres: NOMBRES_DE_CAMPO.nombres,
     });
     campoId = campos.avisoPeticion;
+    campoNombres = campos.nombres;
   } catch (error) {
     console.error("No se pudo leer el catálogo de campos de HighLevel", error);
     return {
@@ -865,13 +893,25 @@ export async function exportarAvisoDePeticion(
   const resultados = await Promise.all(
     destinatarios.map(async (destino) => {
       try {
+        // Los dos campos en **una sola** escritura: son dos valores del mismo
+        // contacto, y partirlo en dos PUT doblaría los viajes a HighLevel para
+        // cada uno de los 15 destinatarios.
+        const aEscribir = [
+          { id: campoId, valor: texto },
+          ...(campoNombres && destino.nombres.trim()
+            ? [{ id: campoNombres, valor: destino.nombres.trim() }]
+            : []),
+        ];
+
         await pedir(
           `/contacts/${destino.contactId}`,
           "PUT",
           {
-            customFields: [
-              { id: campoId, field_value: texto, value: texto },
-            ],
+            customFields: aEscribir.map((campo) => ({
+              id: campo.id,
+              field_value: campo.valor,
+              value: campo.valor,
+            })),
           },
           cred.token,
         );

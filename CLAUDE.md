@@ -247,15 +247,23 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   Las plantillas viven en **Configuración → WhatsApp → Plantillas** (68 el
   22-oct, casi todas «Activo»). La del recordatorio es `recordatorio_casa_de_fe`.
 - **⚠️ LA PLANTILLA VIVA DEL ACCESO AL TALLER ES `acceso_taller_casa_de_fe_v2`**
-  (creada por API el 26-nov, APPROVED, id `2552377041914702`), y **existe por una
-  razón que hay que entender antes de tocar nada**: HighLevel **se queda con la
-  copia de la plantilla que tomó cuando se eligió en la acción**, y no la suelta.
-  Comprobado hasta el final: el usuario re-eligió `acceso_taller_casa_de_fe` en
-  el desplegable y **el mensaje seguía llegando con el cuerpo ORIGINAL** —ni el
-  de tres variables del 19-nov ni el de dos del 25-nov: el de antes de que yo
-  tocara nada—. **Re-elegir la plantilla NO refresca la copia.**
-  ✅ **Lo que sí fuerza una copia nueva es un NOMBRE nuevo**, porque de ese
-  nombre HighLevel no tiene ninguna copia. De ahí el `_v2`.
+  (creada por API el 26-nov, APPROVED, id `2552377041914702`).
+  **⚠️ CORREGIDO EL 27-NOV, Y LA CORRECCIÓN ES MÍA: «re-elegir la plantilla no
+  refresca la copia» NO ESTÁ PROBADO, y lo escribí aquí como si lo estuviera.**
+  Lo que pasó el 26-nov fue que el mensaje siguió llegando con el cuerpo
+  original después de que el usuario dijera que re-eligió la plantilla, y yo
+  concluí que HighLevel no suelta su copia ni al re-elegirla. **El 27-nov se
+  pudo medir, y dice otra cosa mucho más simple: el flujo del taller tiene
+  `updatedAt` del 19-nov y `version 4`** —se lee por la API, `GET /workflows/?
+  locationId=…`—, **así que ese cambio NUNCA SE GUARDÓ.** No hay ningún caché
+  misterioso: hay un formulario que no se guardó o no se publicó.
+  **Lo que sí sigue siendo cierto y medido** es lo de abajo: una plantilla con
+  **más variables** que casillas mapeadas hace que Meta rechace cada envío. Eso
+  es otra cosa, y es lo que de verdad costó el mes.
+  ✅ **Y el `_v2` no sobra aunque la causa fuera otra**: un nombre nuevo no tiene
+  copia que conservar, así que funciona sea cual sea la explicación. Pero **no
+  se vuelve a crear un `_v3` sin antes mirar `updatedAt`**: la primera pregunta
+  es si el cambio se guardó, no si la otra herramienta lo cacheó.
   ⚠️ **Y mientras el flujo apunte a la plantilla vieja, su cuerpo manda sobre
   todo lo que yo cambie en Meta**: fija el saludo, la frase «Ya quedaste en tu
   Casa de Fe» (sin género, que es justo lo que el usuario pidió cambiar), el
@@ -417,16 +425,57 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   recordatorio (el campo **es** el mensaje, así que si no existe **no se toca la
   etiqueta**; y la etiqueta **se quita y se vuelve a poner**). ⚠️ **El id del
   campo se resuelve UNA vez para los 15 destinatarios**, no uno por persona.
-  **La plantilla `aviso_peticion` la creé YO por la API de Meta el 19-nov**
-  (id `3363707660685411`, Utility, idioma `es`), copiando la forma exacta de
-  `acceso_taller_casa_de_fe`, que ya estaba aprobada en esa cuenta.
-  ⚠️ **PENDIENTE DEL USUARIO: el FLUJO, que la API no alcanza** — activador
-  Etiqueta añadida → `peticion-aviso`, acción WhatsApp con `aviso_peticion`,
-  **mapear las variables en HighLevel** (`{{1}}` → Contact First Name, `{{2}}` →
-  Aviso de peticion), **«Permitir reentrada» ENCENDIDA** y **«Ventana de
-  tiempo» APAGADA** (decisión del usuario, 19-nov: el aviso sale en el instante
-  en que se pide, sea la hora que sea). Mientras el flujo no exista, los correos
-  salen igual y **«Actividad del día» dice que el WhatsApp no salió y por qué**.
+  **✅ VIVO Y PROBADO CON UN CASO REAL DESDE EL 26-NOV.** Es el único canal de
+  WhatsApp de este sistema que está demostrado de punta a punta.
+  - **Plantilla `aviso_peticion_v2`** · **APPROVED** · Utility · `es` · id
+    `1521844784336370`, con **2 variables**. La creó el usuario desde HighLevel
+    (no por la API de Meta), que es **el camino bueno**: así HighLevel la tiene
+    en el desplegable de la acción desde el primer segundo. La vieja
+    `aviso_peticion` (`3363707660685411`) sigue aprobada y sin usar.
+  - Su último renglón dice **«estás en la lista de avisos de oración»**, y no
+    «eres parte del equipo pastoral», porque **6 de los 15 no son pastores**
+    (3 administradoras y los 3 mentores de la mesa ministerial). Es la señal
+    para saber de un vistazo qué plantilla está puesta.
+  - **Flujo «Aviso de petición · WhatsApp»** (`cccbfedb-d85b-4c2d-8fe9-e7b6ffd4a099`),
+    **`published`, versión 4, 26-nov 22:15 UTC**.
+  - **✅ «Permitir reentrada» ENCENDIDA, comprobada con DOS disparos seguidos**
+    al mismo contacto: dos entradas, dos mensajes, 2 minutos de diferencia. ⚠️ Y
+    la lección de método: **el primer disparo no prueba la reentrada**, porque
+    es la primera entrada de esa persona al flujo. Hay que disparar dos veces.
+  - ⚠️ **La «Ventana de tiempo» NO está comprobada.** Las dos pruebas y el caso
+    real cayeron entre las 5 y las 5:30 de la tarde, dentro de cualquier franja
+    de oficina, así que habrían salido igual con la ventana puesta. Solo lo
+    prueba una petición de madrugada.
+  - **El primer caso real: María Isabella Gaitán Tovar, 26-nov 17:32:54.** La
+    cadena entera tardó **5 segundos** (17:32:57 los 16 correos aceptados ·
+    17:32:58-59 los 15 WhatsApp) y salió **12 `delivered` y 3 `read`, cero
+    fallos**. ✅ **Y Ruth Bonilla contestó a los 98 segundos** («Amen oramos en
+    el nombre del señor Jesuscristo»): la primera respuesta pastoral que
+    produce este canal.
+  - **⚠️ Y lo que ese caso destapó, que es el valor de haberlo medido: las DOS
+    consejerías anteriores nunca salieron por WhatsApp.** La del 25-nov (María
+    del Carmen) y la del 13-nov (Leidy Ibáñez) tienen las dos
+    `porWhatsapp: true` y `whatsappEncargados: 15` en la auditoría, y al leer el
+    historial del CRM en sus ventanas exactas hay **cero mensajes** en los cinco
+    contactos revisados — porque el flujo no existió hasta el 26-nov. Es §12.6
+    medido con un antes y un después: **que el CRM acepte nuestra escritura no
+    es que el mensaje llegue.**
+  ⚠️ **`{{1}}` SE MAPEA A «Nombres», NO al First Name del CRM** (desde el
+  27-nov). Antes iba al First Name y el primer aviso real lo dejó medido: de los
+  15 destinatarios, **8 saludados por la mitad** —«¡Hola, Juan!» a Juan Camilo y
+  a Juan Felipe, «Paola» a Paola Alejandra, «Yuli» a Yuli Katherine—, y **dos
+  sin ni medio nombre**: «¡Hola, **Pastores**!» a Alejandro Facundo (la pareja
+  metida en la ficha) y «¡Hola, **Pastor**!» a Luis Alberto (el título dentro
+  del nombre). `exportarAvisoDePeticion` escribe ahora «Nombres» con
+  `person.first_name` **entero**, en la **misma** escritura que «Aviso de
+  petición» para no doblar los viajes.
+  ⚠️ **Faltar «Nombres» NO bloquea el aviso** (al contrario que «Aviso de
+  petición», que **es** el mensaje), y el precio es sabido: con el `{{1}}` ya
+  mapeado ahí, si la escritura no entra el WhatsApp dice «¡Hola, !». Se asume
+  porque callar el aviso de una consejería es peor que un saludo cojo.
+  ⚠️ **Y esas dos fichas se arreglan EN LA FICHA, no en el código**: mientras
+  `person.first_name` diga «Pastores Alejandro & Cristina» o «Pastor Luis
+  Alberto», el campo entero saludará con eso.
 - **Mapa de personal ↔ HighLevel:** en la lista «Mi personal» de HighLevel, el
   código bajo cada correo es el **user id de HighLevel**. Se guarda en
   `app_user.highlevel_user_id`. Sirve para: asignar el consolidador dueño de un
@@ -458,6 +507,41 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   contrario y era falso). `services.leadconnectorhq.com` responde con `curl`;
   `urllib` de Python recibe 403 del proxy, así que usar `curl`. El token PIT vive
   fuera del repo (scratchpad `.ghl-token`), nunca commitear.
+- **⚠️ LO QUE SE PUEDE Y LO QUE NO, CON LOS FLUJOS Y CON EL WHATSAPP — MEDIDO EL
+  27-NOV, PARA NO VOLVER A PROBARLO.** La pregunta «¿lo puedes hacer tú?» tiene
+  tres respuestas distintas y todas con su error exacto:
+  - **✅ LEER los flujos: SÍ.** `GET /workflows/?locationId=…` da los 43 con
+    `id`, `name`, **`status`** (`draft` / `published`), **`version`** y
+    **`updatedAt`**. **Es la herramienta que llevaba un año faltando**: dice si
+    un flujo está publicado y **si un cambio se guardó de verdad**. No da el
+    activador, ni las acciones, ni el mapeo de las variables (`GET` del flujo
+    suelto es 404), así que **la etiqueta, la reentrada y el mapeo solo los
+    prueba un envío real**.
+  - **❌ CREAR, EDITAR o PUBLICAR un flujo: NO, y no es el token.** `POST
+    /workflows/` → **403 `WORKFLOW_API_NOT_ENABLED_FOR_LOCATION`**, con el
+    mensaje explícito *«This is not a token or scope problem — the API is
+    currently available to selected sub-accounts and agencies only»*. Ni esta
+    subcuenta ni su agencia están en la lista. **La ruta existe** (el control:
+    una inventada da 404). **Un flujo lo construye el usuario a mano, siempre.**
+  - **⚠️ MANDAR un WhatsApp desde el sistema, sin flujo: el token SÍ puede, pero
+    no hay plantilla que darle.** `POST /conversations/messages` con
+    `type: WhatsApp` pasa la autorización, y **`templateId` es un campo real**
+    (`CONVERSATIONS_MSG_TEMPLATE_NOT_FOUND` lo repite por su nombre) — pero
+    apunta al **almacén de plantillas propio de HighLevel, que está VACÍO** para
+    esta subcuenta, y el id de Meta lo rechaza. No existe ninguna ruta que
+    liste ni cree plantillas de WhatsApp ahí. Y texto libre solo entra dentro de
+    la ventana de 24 h, que con los pastores **nunca está abierta**: 0 mensajes
+    entrantes.
+  - **❌ MANDAR por Meta directamente: NO, por un permiso que falta.** `POST
+    /{phone-number-id}/messages` → **`code 10`, «Application does not have
+    permission for this action»**. Al usuario del sistema se le dio solo
+    `whatsapp_business_management`, no **`whatsapp_business_messaging`**.
+    **Número de la WABA: `876241752241399`** (+57 322 8042438, calidad GREEN).
+    ⚠️ **Y si algún día se añade ese permiso, tiene dos costes que hay que pesar
+    antes**: la WABA la administra **LeadConnector como socio**, así que no está
+    dicho que Meta acepte un segundo remitente sin roce; y lo que salga por ahí
+    **no aparecería en el historial de HighLevel**, que es hoy la única forma de
+    saber si un mensaje llegó.
 
 ## 7. Funcionalidades ya construidas (no rehacer)
 
@@ -607,11 +691,23 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   correos al mes y nadie los abriría. El **botón «Verla en la plataforma» se
   pinta solo a quien puede abrir Oración** (Jairo, Yuli y Ruth no la tienen).
   **Una reservada no lleva ni el nombre ni el celular al correo**, que es el
-  sitio por donde eso se escaparía. El **WhatsApp sale solo cuando pide que
-  alguien llame** (consejería o proceso), por `urgeLlamar`, la misma función que
-  decide el asunto; llega a 15 de los 16. Libs: `aviso-de-peticion-catalogo.ts`
-  (texto y decisiones, 11 pruebas), `aviso-de-peticion.ts`,
-  `correoPeticionNueva`, `exportarAvisoDePeticion`.
+  sitio por donde eso se escaparía.
+  ⚠️ **CORREGIDO EL 27-NOV: este renglón decía «el WhatsApp sale solo cuando
+  pide que alguien llame» y era FALSO desde el 19-nov.** Sale **en las tres**
+  —oración, consejería y proceso—, decisión del usuario con la medida delante
+  (por el link entran unas 2-5 peticiones al mes, así que no hay avalancha que
+  silencie el canal). Comprobado el 26-nov con un caso real de **solo oración**:
+  salió a los 15. `urgeLlamar` **sigue vivo pero ya no decide esto**: decide el
+  asunto del correo y la frase «esto pide que alguien llame».
+  **Lo que NO cambia con el tipo es a quién le llega**: siempre los mismos **16
+  por correo y 15 por WhatsApp** (el 16º es «Administración Iglesia Vive», sin
+  celular). Medido en las cuatro peticiones con auditoría, dos de ellas de
+  consejería: las cuatro dan `destinatarios: 16` y `whatsappEncargados: 15`.
+  **Lo que sí cambia es el texto**: el asunto pasa de «Petición de oración:
+  X» a «Pide consejería: X» o «Quiere iniciar un proceso: X», y el correo
+  añade el renglón «**Esto pide que alguien llame**, no solo que oremos».
+  Libs: `aviso-de-peticion-catalogo.ts` (texto y decisiones, 11 pruebas),
+  `aviso-de-peticion.ts`, `correoPeticionNueva`, `exportarAvisoDePeticion`.
 - **El tablero de Operación 72 dice cuánto se movió** (16-oct): encima de cada
   contador de «Ver solo» va un **⊕ con cuántas entraron** a esa lista en el
   periodo, y al final un **⊖ rojo con cuántas salieron** de Operación 72; los
@@ -815,11 +911,21 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   nuevo, no el First Name del CRM) · `{{2}}` → **Enlace de talleres**.
   ✅ **Los envíos YA funcionan** (`read` el 26-nov a las 00:13), así que esto no
   urge: lo que falta es el texto con género, no el canal.
-  ⚠️ **Y re-elegir la plantilla vieja NO sirve**, ya se intentó: su copia en
-  HighLevel es la ORIGINAL y no se suelta (§6). Por eso existe la `_v2`.
-  **Cómo lo compruebo yo**, sin preguntarle: disparar quitando y poniendo la
-  etiqueta `casa-de-fe-taller` en su contacto (`jx5W5syCWeaImQ9N807k`) y leer la
-  última línea del historial — «Cuando termines **un taller**» = ya está.
+  ⚠️ **CORREGIDO EL 27-NOV: aquí decía que re-elegir la plantilla vieja «no
+  sirve, ya se intentó», y eso NO está probado.** El flujo del taller
+  (`723021d1-4698-4863-bdb7-2f659ad2c48d`) tiene **`updatedAt` del 19-nov y
+  `version 4`**, así que el cambio del 26-nov **nunca se guardó** — no hay copia
+  que no se suelte, hay un formulario sin guardar (§12.6.4). **Así que el primer
+  intento vuelve a ser el simple: abrir la acción, elegir la plantilla
+  (`_v2`, que ya existe y está APPROVED), mapear, y GUARDAR Y PUBLICAR.**
+  **Cómo lo compruebo yo, y ahora en dos pasos:** primero `GET /workflows/?
+  locationId=…` — si `version` y `updatedAt` **no suben, no se guardó** y no hay
+  nada que probar—; y si suben, disparar quitando y poniendo la etiqueta
+  `casa-de-fe-taller` en su contacto (`jx5W5syCWeaImQ9N807k`) y leer la última
+  línea del historial. ⚠️ **Ojo con esa huella: las DOS plantillas de Meta
+  dicen hoy «Cuando termines un taller»** (edité la vieja el 19/25-nov), así que
+  la frase solo distingue **la copia guardada en HighLevel** de las de Meta —
+  «Cuando termines **uno**» = sigue la copia vieja.
 - **✅ EL SALUDO DE MEDIO NOMBRE: ARREGLADO EN EL CÓDIGO** (26-nov). Eran **52
   de 538** contactos («¡Hola, Juan!» a Juan Felipe). El sistema escribe ahora
   `person.first_name` **entero** en el campo **«Nombres»** del CRM, y el `{{1}}`
@@ -845,14 +951,27 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   (`/conversations/search?contactId=…` y luego `/conversations/{id}/messages`,
   con `Version: 2021-04-15`). Es lo que lleva un año faltando para no tener que
   preguntarle al usuario por su bandeja.
-- **⚠️ EL FLUJO DEL AVISO DE PETICIÓN NO SE HA PROBADO CON UN ENVÍO REAL**
-  (19-nov): el usuario dijo que publicó **los dos** flujos ese día, y el del
-  taller quedó **demostrado** (llegó el WhatsApp de prueba con su nombre y su
-  enlace); el del aviso **no**, porque no ha entrado ninguna petición por el
-  link desde entonces. ⚠️ **Y por la API no se puede comprobar**: los flujos de
-  HighLevel no se exponen y la API de workflows está cerrada para esta cuenta
-  (`WORKFLOW_API_NOT_ENABLED_FOR_LOCATION`). El campo y la plantilla
-  `aviso_peticion` sí están (los creé por API). La prueba es mandarse uno: §12.6.
+- **✅ CERRADO EL 26-NOV: EL AVISO DE PETICIÓN FUNCIONA, Y ESTO DECÍA LO
+  CONTRARIO.** El flujo no existía —no es que estuviera sin probar: en los 42
+  flujos de la cuenta **no había ninguno** de petición/oración/aviso—. El
+  usuario lo construyó y lo publicó el 26-nov, y el primer caso real entregó a
+  los 15 en 5 segundos. Detalle entero en §6 y en la bitácora del 26-nov.
+- **⚠️ LO ÚNICO QUE QUEDA DEL AVISO: REMAPEAR `{{1}}` → «Nombres»** en la acción
+  del flujo «Aviso de petición · WhatsApp» (pendiente del usuario, 27-nov). El
+  código ya escribe el campo; mientras el `{{1}}` siga en **Contact First Name**,
+  8 de los 15 se saludan por la mitad y dos con «¡Hola, Pastores!» y «¡Hola,
+  Pastor!». ⚠️ **Y esto NO es el caso del taller**: ahí falló añadir una
+  **tercera** casilla a una copia de dos; aquí la casilla existe y solo cambia
+  de qué campo se alimenta.
+  **Cómo lo compruebo yo**: `GET /workflows/?locationId=…` da `version` y
+  `updatedAt` —si no suben, no se guardó—, y después disparo quitando y
+  poniendo la etiqueta `peticion-aviso` y leo el saludo en el historial.
+- **⚠️ Y DOS FICHAS QUE SE ARREGLAN EN LA FICHA, NO EN EL CÓDIGO** (27-nov):
+  `person.first_name` dice **«Pastores Alejandro & Cristina»** (la pareja
+  dentro del nombre, el fallo de los 7 grupos del 21-sep otra vez) y **«Pastor
+  Luis Alberto»** (el título dentro). Con el campo entero el saludo dirá eso
+  tal cual. Y **Nora Bonilla** recibe «¡Hola, Noraima!», que es su nombre real
+  de la fusión de §8 pero no como la llama nadie.
 - **«Quiero iniciar un proceso» de alguien YA REGISTRADO no abre tarjeta**
   (13-nov): `pedirAcompanamiento` solo abre Operación 72 y reparte consolidador
   cuando la persona es **nueva** (devuelve `abrioProceso: false` si viene con
@@ -1342,14 +1461,25 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
      campo queda mintiendo, pero **no depende de nadie** y funciona desde el
      primer envío. Eso se escribe en el código y en la memoria, no se deja para
      que alguien lo descubra.
-  4. **⚠️ Y LA COPIA AJENA PUEDE NO REFRESCARSE NUNCA: ENTONCES LA SALIDA ES UN
-     NOMBRE NUEVO.** El 26-nov el usuario re-eligió la plantilla en la acción y
-     **el mensaje siguió llegando con el cuerpo ORIGINAL**, el de antes de mis
-     dos ediciones. O sea que «volver a elegirla» —lo que yo le dije que
-     bastaba— **no refresca nada**. Lo que sí: **crear la plantilla con otro
-     nombre** (`acceso_taller_casa_de_fe_v2`), porque de ese nombre la otra
-     herramienta no tiene copia que conservar. **Cuando un caché ajeno no se
-     puede invalidar, se le cambia la llave.**
+  4. **⚠️ Y SI EL CAMBIO NO APARECE, LA PRIMERA SOSPECHA ES QUE NO SE GUARDÓ —
+     NO QUE LA OTRA HERRAMIENTA LO CACHEÓ. ESTA LA FALLÉ YO, Y DOS VECES
+     SEGUIDAS.** El 26-nov el usuario re-eligió la plantilla en la acción, el
+     mensaje siguió llegando con el cuerpo original, y yo escribí en esta
+     memoria que «volver a elegirla no refresca nada» y que por eso hacía falta
+     un nombre nuevo. **El 27-nov la API lo desmontó: ese flujo tiene
+     `updatedAt` del 19-nov y `version 4`, así que el cambio NUNCA SE GUARDÓ.**
+     No había caché que invalidar: había un formulario sin guardar.
+     **Tres cosas que repetir:**
+     - **Antes de explicar el comportamiento de otra herramienta con una teoría,
+       buscar el dato que dice si tu cambio llegó a existir.** Casi siempre lo
+       hay: una fecha de modificación, un número de versión, un contador. Aquí
+       era `GET /workflows/` y estaba a una llamada de distancia.
+     - **Una teoría que encaja con los síntomas no es una causa.** «Guarda su
+       propia copia» explicaba el síntoma perfectamente **y era innecesaria**, y
+       encima me llevó a construir un `_v2` y a dar un consejo equivocado.
+     - **Cuando un caché ajeno de verdad no se puede invalidar, se le cambia la
+       llave** (un nombre nuevo): sigue siendo la salida buena, pero es el
+       **segundo** paso, no el primero.
   5. **Y el marco ajeno limita lo que se puede decir, no solo cómo se ve.** El
      cuerpo viejo trae su propio saludo y su propia frase «Ya quedaste en tu
      Casa de Fe» **sin género** — que era justo lo que había que cambiar. Dentro
@@ -1573,6 +1703,26 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
   **2 de 2 fallidos**, uno de antes de cualquier cambio — ese número no está en
   WhatsApp. **Antes de culpar al cambio de hoy, mirar si ese contacto recibió
   alguno alguna vez.**
+- **⚠️ PARA PROBAR UN DISPARADOR AJENO HAY QUE DISPARARLO DOS VECES: EL PRIMER
+  ENVÍO NO PRUEBA LA REENTRADA, PORQUE ES LA PRIMERA ENTRADA.** El 26-nov el
+  aviso de petición salió a la primera y la tentación era cerrarlo como
+  «funciona»; «Permitir reentrada» decide si sale **la segunda vez**, y de eso
+  el primer disparo no dice nada. Se disparó otra vez, con **texto distinto a
+  propósito** (dos mensajes idénticos se leen como uno solo: la lección del
+  24-nov), y salieron los dos. Es la trampa que lleva meses en §6 un nivel más
+  arriba: no basta con quitar y poner la etiqueta si el flujo no deja entrar, y
+  no basta con un envío para saber si deja.
+  ⚠️ **Y lo mismo por el otro lado: decir qué NO prueba la prueba.** Esos dos
+  envíos **no prueban la «Ventana de tiempo»**, porque cayeron a las 5 de la
+  tarde, dentro de cualquier franja de oficina. Eso solo lo prueba un disparo de
+  madrugada, y hay que escribirlo como pendiente en vez de darlo por bueno.
+- **⚠️ Y ANTES DE DISPARAR UNA PRUEBA SOBRE UN CONTACTO REAL, LEER Y GUARDAR LO
+  QUE VA A PISAR.** El campo «Aviso de petición» del contacto del usuario
+  llevaba dentro el mensaje real de una petición del día anterior; la prueba lo
+  sobrescribe. Se guarda el valor antes, se restaura después, y **se mira si la
+  etiqueta ya estaba puesta** —lo estaba, así que añadirla sin quitarla primero
+  no habría disparado nada y la prueba habría «fallado» por el motivo
+  equivocado.
 - **⚠️ NO abrir el PR hasta que TODO esté empujado** — el usuario fusiona en
   minutos. **Y si aparece trabajo nuevo con un PR ya abierto, se abre OTRO PR:
   no se apila sobre el abierto** (así entró a medias el #112).
@@ -1650,7 +1800,9 @@ de que se llamó, y sirven para detectar a quien marca pero no registra.
 > archivo del mes** y su renglón **arriba de este índice**. Si de ese trabajo
 > sale una regla general, va **además** a §12.
 
-### `docs/bitacora/2026-11.md` — noviembre de 2026 (8 entradas)
+### `docs/bitacora/2026-11.md` — noviembre de 2026 (9 entradas)
+
+- **26/27-nov** · **El aviso de petición por fin sale, y la causa del mes no era un caché: era un formulario sin guardar** · el usuario dijo «hazlo tú» y no se podía: **`POST /workflows/` da 403 `WORKFLOW_API_NOT_ENABLED_FOR_LOCATION`** —no es el token, es una lista blanca; el control: una ruta inventada da 404— · ni por `/conversations/messages` (el token **sí** puede mandar y `templateId` es real, pero apunta al almacén de HighLevel, **vacío**) ni por Meta (**`code 10`**, falta `whatsapp_business_messaging`) · ✅ **pero LEER los flujos sí: `status`, `version` y `updatedAt`**, que es la herramienta que llevaba un año faltando · y destapó que **el flujo del aviso no estaba sin probar: NO EXISTÍA** · ⚠️ **y la corrección que más duele, porque es mía: «re-elegir la plantilla no refresca la copia» NO estaba probado** — el flujo del taller tiene `updatedAt` del 19-nov, así que **ese cambio nunca se guardó**; construí una teoría que encajaba con el síntoma, la escribí como hecho y di un consejo equivocado · ✅ el usuario lo montó, estaba en **`draft`** (el único de 43 sin publicar) y lo publicó · ⚠️ **la prueba son DOS disparos, no uno: el primero no prueba la reentrada** porque es la primera entrada — el segundo salió, así que **«Permitir reentrada» está encendida**; y los dos **no** prueban la «Ventana de tiempo», que cayó en horario de oficina · **primer caso real** (María Isabella, solo oración): 16 correos y 15 WhatsApp en **5 segundos**, 12 `delivered` y 3 `read`, y **Ruth contestó a los 98 segundos** · ⚠️ **las dos consejerías anteriores nunca salieron por WhatsApp** (cero mensajes en las dos ventanas, con `porWhatsapp: true` en la auditoría) y la del 13-nov **perdió 6 de 16 correos** por el 429 · ⚠️ §7 llevaba 8 días diciendo que el WhatsApp sale «solo cuando urge llamar», y es falso desde el 19-nov · ✅ **el saludo entero**: 8 de 15 iban por la mitad y dos sin ni medio nombre («¡Hola, **Pastores**!», «¡Hola, **Pastor**!»).
 
 - **26-nov (tarde)** · **Un duplicado borrado, y el rótulo que llamaba «Casa de Fe» a un Restaurados** · ⚠️ **mi «3 de 64» estaba mal contado** —era la cuenta del error de texto, y sin filtrar por tipo— y lo que la pregunta del usuario destapó fue otra cosa: barridos **todos** los grupos, el único líder con dos a la misma hora tenía **el mismo grupo metido dos veces**, separado por un guion en el nombre · borrado el del 13-nov con la auditoría **antes del `delete` y en la misma sentencia**, `actor_id` vacío a propósito y el motivo dentro · después: **0 líderes con dos grupos a la vez** · ⚠️ **y al leer el código del borrado antes de imitarlo salió el fallo**: los tres tipos de `faith_house_group` comparten la acción de auditoría, así que «Actividad del día» deducía el tipo del nombre de la acción y decía «borró la Casa de Fe» de un Restaurados — **§12.6 otra vez, pero en un RÓTULO y no en una consulta** · el tipo pasa al metadato, con caída al nombre de la acción para las filas viejas.
 

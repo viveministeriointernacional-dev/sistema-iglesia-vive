@@ -184,9 +184,15 @@ export async function avisarDePeticionNueva(datos: {
         .map((d) => ({
           contactId: d.person?.highLevelContacts[0]?.contactId ?? null,
           nombre: d.fullName,
+          // El mismo dato y el mismo respaldo que el saludo del correo, unas
+          // líneas más arriba: `person.first_name` guarda los NOMBRES enteros,
+          // y si la cuenta no tiene ficha queda el nombre de la cuenta —
+          // llevará el apellido, pero es mejor que un «¡Hola, !».
+          nombres: d.person?.firstName ?? d.fullName,
         }))
         .filter(
-          (d): d is { contactId: string; nombre: string } => d.contactId !== null,
+          (d): d is { contactId: string; nombre: string; nombres: string } =>
+            d.contactId !== null,
         );
 
       const salida = await exportarAvisoDePeticion(
